@@ -64,15 +64,36 @@ no analytics, no commodity data. All added under `src/lib/economy/*` — see
   *consume* OSIRIS projections over HTTP, but it is a separate client, not a
   substrate for this codebase.
 
-## Capability gap analysis (post-phase-1)
+## Phase 2 — live acquisition, temporal state, graph exploration (delivered)
+
+Source reconnaissance ran as a parallel probe workflow from inside this
+sandbox; every adapter below was built against endpoints proven reachable and
+parseable here, with verbatim response captures committed as snapshots:
+
+| Source | Verdict | Adapter |
+|---|---|---|
+| UN Comtrade public preview | works, no key; physical kg incl. bilateral rows; strict per-IP rate limits | `comtrade-trade` (world totals; per-request snapshot degradation on 429) |
+| USGS MCS World Data CSV (ScienceBase) | works; REPORTED production/reserves by country | `usgs-mcs-live` |
+| Yahoo HG=F chart API | works with browser UA; monthly USD/lb 10y | `yahoo-copper-price` |
+| CFTC COT (Socrata) | works, no key; weekly positioning (dataset ids inverted vs docs: 72hh-3qpy = disaggregated) | `cftc-positioning` |
+| WB Pink Sheet xlsx | works ($/mt monthly since 1960) but xlsx parsing + hash discovery | deferred (Yahoo covers price) |
+| LME/SHFE stocks | no free API confirmed | not built — stock series stays representative |
+
+Patterns adapted from the OSINT-War-Room study now live in code: the
+degradation ladder and in-flight coalescing wrap every live adapter (reusing
+the substrate's own `sourceCache`), and "never mix simulated and sourced data"
+became the reported>estimated>representative evidence ranking in
+`observationsAt`.
+
+## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
 |---|---|---|---|---|
 | Canonical state + provenance | ✅ copper | more commodities | new curated/live adapters; state model needs no change | high |
-| Live acquisition | ❌ | trade stats, exchange stocks, AIS | implement `EconomyAdapter` against live providers, reuse War-Room coalescing/degradation patterns | high |
-| Time-series state | partial (inventory series) | flows/production over time | `period` already on every record; add series storage + temporal UI | high |
-| Graph UI | ❌ (server traversal + panel trees only) | visual graph exploration | `react-force-graph-2d` already a dependency; feed it `view=state` | medium |
-| Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | medium |
+| Live acquisition | ✅ 4 providers | bilateral trade flows as graph edges; LME stocks | allocation model for country↔facility flow reconciliation; paid/licensed stock feeds | medium |
+| Time-series state | ✅ (decade series, asOf engine, playback UI) | time-resolved flow tonnage | quarterly/annual flow snapshots per period | medium |
+| Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
+| Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
 | Search over entities | ❌ | find "Escondida" from the search bar | extend existing `SearchBar`/geosearch with econ entities | medium |
 | Alerting | ❌ | anomaly → LiveAlerts | feed `anomalies`/`propagation` results into existing alerts panel | low |
 

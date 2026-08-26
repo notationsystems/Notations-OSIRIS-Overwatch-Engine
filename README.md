@@ -26,11 +26,13 @@ Osiris is a production-grade OSINT platform that provides situational awareness 
 > **Notations OSIRIS Overwatch Engine** — this fork extends OSIRIS with a
 > **physical-economy intelligence engine**: a canonical, provenance-preserving
 > world state (entities / observations / flows / capacities / dependencies /
-> events), a directed flow-dependency graph, analytical systems (HHI
-> concentration, flow centrality, candidate bottlenecks, anomaly signals,
-> event propagation), and a copper vertical slice rendered as map layers plus a
-> research panel with evidence-backed drill-down. See
-> [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
+> events), live acquisition from USGS, UN Comtrade, COMEX and CFTC behind a
+> snapshot degradation ladder, a directed flow-dependency graph with a
+> force-graph explorer, analytical systems (HHI concentration + trajectory,
+> flow centrality, candidate bottlenecks, anomaly signals, event propagation),
+> and temporal playback that re-evaluates the world state at any date — all
+> rendered as map layers plus a research panel with evidence-backed
+> drill-down. See [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
 > [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
 
 ### Key Capabilities
