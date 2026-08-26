@@ -728,6 +728,7 @@ export default function Dashboard() {
   // ── PHYSICAL ECONOMY — layer-aware + temporal-playback-aware fetch ──
   const anyEconLayer = activeLayers.econ_production || activeLayers.econ_processing || activeLayers.econ_ports || activeLayers.econ_flows || activeLayers.econ_bottlenecks;
   const econFetchKeyRef = useRef<string | null>(null);
+  const econSeqRef = useRef(0);
   useEffect(() => {
     if (!anyEconLayer) return;
     const key = econAsOf ?? 'live';
@@ -736,10 +737,17 @@ export default function Dashboard() {
     // so a cancelled debounce doesn't leave the layer stuck on stale data.
     const t = setTimeout(() => {
       econFetchKeyRef.current = key;
+      const seq = ++econSeqRef.current;
       fetchEndpoint(
         `/api/economy?commodity=copper&view=map${econAsOf ? `&asOf=${econAsOf}` : ''}`,
-        d => ({ econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events }),
-      );
+        // Out-of-order guard: a slower older request must not overwrite a
+        // newer evaluation date — a stale response merges nothing.
+        d => (econSeqRef.current === seq ? { econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events } : {}),
+      ).then(ok => {
+        // Roll back on failure so the next effect run (scrub, toggle) retries
+        // this date instead of silently keeping the previous date's data.
+        if (!ok && econFetchKeyRef.current === key) econFetchKeyRef.current = null;
+      });
     }, econAsOf ? 200 : 0);
     return () => clearTimeout(t);
   }, [anyEconLayer, econAsOf, fetchEndpoint]);

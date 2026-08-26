@@ -29,7 +29,9 @@ interface EconTimeBarProps {
   onChange: (asOf: string | null) => void;
 }
 
-function monthRange(min: string, max: string): string[] {
+/** Exported for tests (vitest matches .test.ts only, so helpers are tested
+ *  from EconTimeBar.test.ts like the sibling panels do). */
+export function monthRange(min: string, max: string): string[] {
   const months: string[] = [];
   let [y, m] = min.split('-').map(Number);
   const [ey, em] = max.split('-').map(Number);
@@ -42,7 +44,7 @@ function monthRange(min: string, max: string): string[] {
 }
 
 /** Evaluate at month-end so events starting mid-month register that month. */
-function monthEnd(ym: string): string {
+export function monthEnd(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
   return `${ym}-${String(lastDay).padStart(2, '0')}`;

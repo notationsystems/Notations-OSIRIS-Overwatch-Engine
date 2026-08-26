@@ -30,7 +30,9 @@ describe('economy store (curated copper assembly)', () => {
     const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot']);
     for (const rec of [...state.observations, ...state.flows, ...state.capacities]) {
       if (LIVE_SOURCES.has(rec.provenance.sourceId)) {
-        expect(['reported', 'estimated'], `live record ${rec.id}`).toContain(rec.valueKind);
+        // 'derived' appears when OSIRIS computes a total the reporter did not
+        // publish (e.g. a Comtrade world aggregate summed from partner rows).
+        expect(['reported', 'estimated', 'derived'], `live record ${rec.id}`).toContain(rec.valueKind);
       } else {
         expect(rec.valueKind, `curated record ${rec.id}`).toBe('representative');
       }

@@ -70,19 +70,23 @@ const LEGEND: Array<[string, string]> = [
 
 export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClose }: EconGraphViewProps) {
   const [data, setData] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null);
-  const [failed, setFailed] = useState(false);
+  // Failure is keyed to the evaluation date it happened for — a later fetch
+  // (new asOf) must not stay stuck behind an old error banner.
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 800, h: 500 });
 
   useEffect(() => {
     let cancelled = false;
+    const key = asOf ?? 'live';
     const qs = asOf ? `&asOf=${asOf}` : '';
     fetch(`/api/economy?commodity=copper&view=graph${qs}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then(d => { if (!cancelled) setData({ nodes: d.nodes, links: d.links }); })
-      .catch(() => { if (!cancelled) setFailed(true); });
+      .catch(() => { if (!cancelled) setFailedKey(key); });
     return () => { cancelled = true; };
   }, [asOf]);
+  const failed = !data && failedKey === (asOf ?? 'live');
 
   useEffect(() => {
     const el = containerRef.current;
@@ -95,17 +99,22 @@ export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClos
   }, []);
 
   // react-force-graph mutates node/link objects (layout coordinates,
-  // resolved references) — hand it a copy so the fetched data stays pristine
-  // across re-renders.
-  const graphData = useMemo(() => (data ? {
-    nodes: data.nodes.map(n => ({ ...n })),
-    links: data.links.map(l => ({ ...l })),
-  } : { nodes: [], links: [] }), [data]);
+  // resolved references) — hand it copies so the fetched data stays pristine.
+  // Carry each node's previous position/velocity forward so a playback scrub
+  // updates colors/flags without re-heating and re-scrambling the layout.
+  const lastNodesRef = useRef<Map<string, { x?: number; y?: number; vx?: number; vy?: number }>>(new Map());
+  const graphData = useMemo(() => {
+    if (!data) return { nodes: [], links: [] };
+    const prev = lastNodesRef.current;
+    const nodes = data.nodes.map(n => ({ ...n, ...(prev.get(n.id) ?? {}) }));
+    lastNodesRef.current = new Map(nodes.map(n => [n.id, n]));
+    return { nodes, links: data.links.map(l => ({ ...l })) };
+  }, [data]);
 
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[70] flex items-center justify-center pointer-events-auto"
+      className="fixed inset-0 z-[500] flex items-center justify-center pointer-events-auto"
       style={{ background: 'rgba(4, 4, 8, 0.72)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >

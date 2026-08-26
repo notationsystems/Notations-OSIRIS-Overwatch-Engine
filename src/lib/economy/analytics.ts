@@ -35,8 +35,10 @@ export interface ConcentrationShare {
 export interface Concentration {
   metric: Metric;
   hhi: number; // 0..10000 (shares in %, squared and summed)
-  /** DOJ-style bands: <1500 unconcentrated, 1500–2500 moderate, >2500 high. */
-  band: 'unconcentrated' | 'moderate' | 'high';
+  /** DOJ-style bands: <1500 unconcentrated, 1500–2500 moderate, >2500 high.
+   *  'no-data' when no observations exist at the evaluation date — a zero
+   *  computed from zero evidence must not read as a verdict. */
+  band: 'unconcentrated' | 'moderate' | 'high' | 'no-data';
   total: number;
   unit: string;
   shares: ConcentrationShare[];
@@ -48,6 +50,15 @@ export interface Concentration {
 const VALUE_KIND_RANK: Record<Observation['valueKind'], number> = {
   reported: 3, estimated: 2, representative: 1, derived: 0,
 };
+const CONF_RANK = { high: 2, medium: 1, low: 0 } as const;
+
+/** True when `candidate` is harder evidence than `incumbent` for the same
+ *  (entity, metric, period): higher valueKind rank, then higher confidence. */
+function outranks(candidate: Observation, incumbent: Observation): boolean {
+  return VALUE_KIND_RANK[candidate.valueKind] > VALUE_KIND_RANK[incumbent.valueKind]
+    || (VALUE_KIND_RANK[candidate.valueKind] === VALUE_KIND_RANK[incumbent.valueKind]
+      && CONF_RANK[candidate.confidence] > CONF_RANK[incumbent.confidence]);
+}
 
 /**
  * One observation per entity for a metric: the latest whose period ends at or
@@ -63,19 +74,13 @@ export function observationsAt(
   asOf?: string,
 ): Observation[] {
   const cutoff = asOf ?? '9999-12-31';
-  const confRank = { high: 2, medium: 1, low: 0 } as const;
   const best = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.metric !== metric || o.period.end > cutoff) continue;
     const ent = state.entities.find(e => e.id === o.entityId);
     if (ent?.kind !== kind) continue;
     const prev = best.get(o.entityId);
-    if (!prev
-      || o.period.end > prev.period.end
-      || (o.period.end === prev.period.end && (
-        VALUE_KIND_RANK[o.valueKind] > VALUE_KIND_RANK[prev.valueKind]
-        || (VALUE_KIND_RANK[o.valueKind] === VALUE_KIND_RANK[prev.valueKind] && confRank[o.confidence] > confRank[prev.confidence])
-      ))) {
+    if (!prev || o.period.end > prev.period.end || (o.period.end === prev.period.end && outranks(o, prev))) {
       best.set(o.entityId, o);
     }
   }
@@ -105,7 +110,7 @@ export function concentration(
     }))
     .sort((a, b) => b.share - a.share);
   const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
-  const band = hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
+  const band = shares.length === 0 ? 'no-data' as const : hhi > 2500 ? 'high' as const : hhi >= 1500 ? 'moderate' as const : 'unconcentrated' as const;
   return wrap(
     'concentration',
     { metric, kind, asOf },
@@ -195,7 +200,7 @@ export function capacityConcentration(
     .map(x => ({ entityId: x.entityId, name: x.name, value: x.value, share: total > 0 ? x.value / total : 0 }))
     .sort((a, b) => b.share - a.share);
   const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
-  const band = hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
+  const band = shares.length === 0 ? 'no-data' as const : hhi > 2500 ? 'high' as const : hhi >= 1500 ? 'moderate' as const : 'unconcentrated' as const;
   return wrap(
     'capacityConcentration',
     { stage },
@@ -360,10 +365,22 @@ export interface AnomalySignal {
   explanation: string;
 }
 
-/** Extract an ordered time series for one entity+metric from observations. */
+/**
+ * Extract an ordered time series for one entity+metric from observations.
+ * Multiple providers can cover the same period (curated + live): each period
+ * resolves to its hardest evidence via the same ranking observationsAt uses.
+ * Without this, provider disagreement would masquerade as period-over-period
+ * change and fabricate anomaly signals.
+ */
 export function extractSeries(state: EconomyState, entityId: string, metric: Metric): SeriesPoint[] {
-  return state.observations
-    .filter(o => o.entityId === entityId && o.metric === metric)
+  const byPeriod = new Map<string, Observation>();
+  for (const o of state.observations) {
+    if (o.entityId !== entityId || o.metric !== metric) continue;
+    const key = `${o.period.start}|${o.period.end}`;
+    const prev = byPeriod.get(key);
+    if (!prev || outranks(o, prev)) byPeriod.set(key, o);
+  }
+  return [...byPeriod.values()]
     .sort((a, b) => a.period.start.localeCompare(b.period.start))
     .map(o => ({ period: o.period.start.slice(0, 7), value: o.value, observationId: o.id }));
 }
@@ -374,20 +391,18 @@ export function extractSeries(state: EconomyState, entityId: string, metric: Met
  * rate of change. No ML — a researcher can recompute either by hand.
  */
 export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 2, rocThreshold = 0.12 } = {}): AnalyticalResult<AnomalySignal[]> {
-  const seriesKeys = new Map<string, Observation[]>();
-  for (const o of state.observations) {
-    const key = `${o.entityId}|${o.metric}`;
-    if (!seriesKeys.has(key)) seriesKeys.set(key, []);
-    seriesKeys.get(key)!.push(o);
-  }
+  const seriesKeys = new Set<string>();
+  for (const o of state.observations) seriesKeys.add(`${o.entityId}|${o.metric}`);
 
   const signals: AnomalySignal[] = [];
   const usedObs = new Set<string>();
 
-  for (const [key, obsList] of seriesKeys) {
-    if (obsList.length < window) continue;
+  for (const key of seriesKeys) {
     const [entityId, metric] = key.split('|') as [string, Metric];
+    // Length is judged on the RESOLVED series — raw observation counts would
+    // let same-period provider duplicates fake a longer history.
     const series = extractSeries(state, entityId, metric);
+    if (series.length < window) continue;
 
     for (let i = window; i < series.length; i++) {
       const trailing = series.slice(i - window, i).map(p => p.value);

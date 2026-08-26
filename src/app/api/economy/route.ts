@@ -88,8 +88,10 @@ export async function GET(request: Request) {
       if (ev.end) months.push(ev.end.slice(0, 7));
     }
     for (const o of state.observations) {
-      // Monthly series only — annual observations would drag the scrubber
-      // back a decade, which is history, not playback.
+      // Physical monthly series only (inventory). Annual observations are
+      // history, not playback — and the live price/positioning series reach
+      // back a decade, which would bury the event horizon in dead months.
+      if (o.metric !== 'inventory') continue;
       if (o.period.start.slice(0, 7) !== o.period.end.slice(0, 7)) continue;
       months.push(o.period.start.slice(0, 7));
     }

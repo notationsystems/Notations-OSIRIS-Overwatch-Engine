@@ -41,6 +41,8 @@ interface EconEvent { id: string; entityId?: string; type: string; title: string
 interface TrajectoryPoint { period: string; hhi: number; band: string; topName: string; topShare: number; participants: number }
 
 interface Analytics {
+  /** Which evaluation date produced this payload (client bookkeeping). */
+  _evalKey?: string;
   commodityName: string;
   providers: string[];
   concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
@@ -76,7 +78,7 @@ const CONCENTRATION_LABELS: Record<string, string> = {
   refiningCapacityByCountry: 'REFINING CAPACITY / COUNTRY',
 };
 
-const BAND_COLOR: Record<string, string> = { high: '#FF3D3D', moderate: '#FF9500', unconcentrated: '#00E676' };
+const BAND_COLOR: Record<string, string> = { high: '#FF3D3D', moderate: '#FF9500', unconcentrated: '#00E676', 'no-data': '#5C5A54' };
 const CONF_COLOR: Record<string, string> = { high: '#00E676', medium: '#FF9500', low: '#FF3D3D' };
 
 const kindLabel = (kind: string, stage?: string | null) =>
@@ -154,10 +156,11 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
   useEffect(() => {
     let cancelled = false;
     // Debounce so timeline scrubbing doesn't fire a request per tick.
+    const key = asOf ?? 'live';
     const t = setTimeout(() => {
       fetch(`/api/economy?commodity=copper&view=analytics${asOf ? `&asOf=${asOf}` : ''}`, { cache: 'no-store' })
         .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then(d => { if (!cancelled) setAnalytics(d); })
+        .then(d => { if (!cancelled) setAnalytics({ ...d, _evalKey: key }); })
         .catch(() => { if (!cancelled) setAnalyticsError(true); });
     }, asOf ? 300 : 0);
     return () => { cancelled = true; clearTimeout(t); };
@@ -219,7 +222,9 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
             PHYSICAL ECONOMY — {analytics?.commodityName?.toUpperCase() ?? 'COPPER'}
           </span>
           {asOf && (
-            <span className="text-[8px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1 shrink-0">AS OF {asOf}</span>
+            <span className="text-[8px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1 shrink-0">
+              AS OF {asOf}{analytics && analytics._evalKey !== (asOf ?? 'live') ? ' · updating…' : ''}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -497,7 +502,7 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                     </div>
                   ))}
                   <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80 mt-1">
-                    Quantities are representative magnitudes assembled from public sources — every record carries valueKind, confidence and provenance. Nothing here is a live market feed.
+                    Curated records are representative magnitudes; live providers (USGS, UN Comtrade, COMEX, CFTC) contribute reported/estimated observations behind a snapshot fallback ladder. Every record carries valueKind, confidence and provenance — including which rung served it.
                   </div>
                 </div>
               </Section>

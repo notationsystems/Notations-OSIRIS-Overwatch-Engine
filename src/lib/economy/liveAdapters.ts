@@ -36,8 +36,12 @@ import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
 function liveDisabled(): boolean {
+  // VITEST is set by the vitest runner regardless of NODE_ENV; NODE_ENV alone
+  // is not enough (vitest only defaults it when unset, so a CI shell that
+  // pre-exports NODE_ENV=production would silently un-gate live fetches).
+  const underTest = process.env.VITEST !== undefined || process.env.NODE_ENV === 'test';
   return process.env.OSIRIS_DISABLE_LIVE === '1'
-    || (process.env.NODE_ENV === 'test' && process.env.RUN_LIVE_TESTS !== '1');
+    || (underTest && process.env.RUN_LIVE_TESTS !== '1');
 }
 
 async function fetchJson<T>(url: string, timeoutMs = 15000, headers: Record<string, string> = {}): Promise<T> {
@@ -129,6 +133,7 @@ export function parseMcsWorldCsv(csvText: string, prov: (ref: string, note?: str
   const iType = col('TYPE');
   const iProd23 = col('PROD_2023');
   const iProd24 = col('PROD_EST_ 2024') >= 0 ? col('PROD_EST_ 2024') : col('PROD_EST_2024');
+  const iProdNotes = col('PROD_NOTES');
   const iReserves = col('RESERVES_2024');
   if (iCommodity < 0 || iCountry < 0 || iType < 0) throw new Error('MCS CSV header not recognized');
 
@@ -152,13 +157,17 @@ export function parseMcsWorldCsv(csvText: string, prov: (ref: string, note?: str
     const slug = entityId.split(':')[2];
     if (metric) {
       const v23 = num(row[iProd23]);
+      // USGS flags some 2023 figures as its own estimates in PROD_NOTES
+      // (e.g. "estimated 2023") — those must not carry 'reported'.
+      const notes23 = (row[iProdNotes] ?? '').trim();
+      const est23 = /estimat/i.test(notes23);
       if (v23 !== null) {
         obs.push({
           id: `obs:usgs-mcs2025:${metric}:${slug}:2023`,
           entityId, metric, value: v23, unit: 'kt/y',
           period: { start: '2023-01-01', end: '2023-12-31' },
-          valueKind: 'reported', confidence: 'high',
-          provenance: prov(`${type}, 2023`),
+          valueKind: est23 ? 'estimated' : 'reported', confidence: 'high',
+          provenance: prov(`${type}, 2023`, est23 ? `USGS note: ${notes23}` : undefined),
         });
       }
       const v24 = num(row[iProd24]);
@@ -279,7 +288,9 @@ export function parseComtradeResponse(
     value: Math.round(kg / 1e6),
     unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
     period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
-    valueKind: 'reported',
+    // A world total OSIRIS computed by summing partner rows is inference,
+    // not the reporter's own aggregate — the identity charter says so.
+    valueKind: derivedFromPartners ? 'derived' : 'reported',
     confidence: estimated ? 'medium' : 'high',
     provenance: prov(
       `HS ${hs} flow ${flow} reporter ${m49Str} period ${yearStr}`,
@@ -310,7 +321,9 @@ async function fetchComtradeLive(): Promise<Observation[]> {
         const url = `https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=${m49}&period=${year}&cmdCode=${hs}&flowCode=${flow}`;
         const raw = await fetchJson<ComtradeResponse>(url, 20000);
         one = parseComtradeResponse(key, raw, prov);
-        anyLive = true;
+        // A 200 with an empty data array is NOT live coverage — counting it
+        // would let an all-snapshot result be cached as a fresh success.
+        if (one) anyLive = true;
         await new Promise(r => setTimeout(r, 1100)); // stay polite
       } catch (e) {
         if (e instanceof Error && e.message.includes('429')) rateLimited = true;

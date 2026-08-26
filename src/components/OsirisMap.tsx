@@ -1528,7 +1528,10 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     map.on('mouseleave', 'econ-dots', () => { map.getCanvas().style.cursor = ''; });
 
     // ── Physical economy flows ──
-    map.on('click', 'econ-flow-lines', e => {
+    // One handler for both flow layers: a disrupted flow moves to its own
+    // (dashed red) layer, and losing its popup there would hide exactly the
+    // flows an analyst most needs to inspect.
+    const econFlowClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
       const p = e.features?.[0]?.properties;
       if (!p) return;
       const formCol = ({ concentrate: '#FFB300', blister: '#FF7043', anode: '#FF7043', cathode: '#4FC3F7', refined: '#4FC3F7' } as Record<string, string>)[p.form] || '#90A4AE';
@@ -1536,8 +1539,11 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
         <div style="color:${formCol};font-weight:bold;font-size:11px;margin-bottom:4px;">MATERIAL FLOW — ${String(p.form || '').toUpperCase()}</div>
         <div style="font-size:9px;color:#aaa;">Quantity: <span style="color:${formCol};font-weight:bold;">${Number(p.quantity).toLocaleString()} ${p.unit}</span></div>
         <div style="font-size:9px;color:#aaa;">Mode: <span style="color:#fff;">${p.mode}</span> — Confidence: <span style="color:${p.confidence === 'high' ? '#00E676' : p.confidence === 'medium' ? '#FF9500' : '#FF3D3D'};">${p.confidence}</span></div>
+        ${p.disrupted === true || p.disrupted === 'true' ? '<div style="font-size:9px;color:#FF3D3D;font-weight:bold;margin-top:2px;">■ INTERRUPTED BY ACTIVE EVENT</div>' : ''}
       </div>`);
-    });
+    };
+    map.on('click', 'econ-flow-lines', econFlowClick);
+    map.on('click', 'econ-flow-disrupted', econFlowClick);
 
     // ── Live News (opens feed viewer) ──
     map.on('click', 'news-dots', e => {

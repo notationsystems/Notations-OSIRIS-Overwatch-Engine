@@ -45,6 +45,13 @@ describe('concentration (synthetic, hand-computable)', () => {
     expect(asOf2020.result.hhi).toBe(10000);
     expect(observationsAt(s, 'production', 'country', '2021-06-30').map(o => o.id)).toEqual(['obs:prod:aa:2020']);
   });
+
+  it('answers no-data, not a confident zero, when asOf predates all evidence', () => {
+    const r = concentration(syntheticState(), 'production', 'country', '2010-12-31');
+    expect(r.result.shares).toEqual([]);
+    expect(r.result.hhi).toBe(0);
+    expect(r.result.band).toBe('no-data');
+  });
 });
 
 describe('concentration trajectory', () => {
@@ -112,6 +119,43 @@ describe('bottleneck candidates', () => {
 });
 
 describe('anomaly detection', () => {
+  it('never treats same-period multi-provider observations as time steps', () => {
+    const s = syntheticState();
+    // A second provider disagrees slightly on the SAME periods with softer
+    // evidence — this must not read as period-over-period change, collapse
+    // the rolling σ, or appear in any signal at all.
+    const inv = s.observations.filter(o => o.metric === 'inventory');
+    for (const o of inv) {
+      s.observations.push({
+        ...o,
+        id: o.id + ':secondary',
+        value: o.value * 0.94, // 6% provider disagreement
+        valueKind: 'estimated',
+        provenance: { ...o.provenance, sourceId: 'secondary-test' },
+      });
+    }
+    const r = detectAnomalies(s, { window: 6 });
+    // Exactly the same signals as the single-provider baseline — the harder
+    // (reported) series wins each period and no duplicate-period signals appear.
+    const baseline = detectAnomalies(syntheticState(), { window: 6 });
+    expect(r.result.map(a => `${a.kind}:${a.period}:${a.value}`).sort())
+      .toEqual(baseline.result.map(a => `${a.kind}:${a.period}:${a.value}`).sort());
+    for (const a of r.result) {
+      for (const id of a.observationIds) expect(id).not.toMatch(/:secondary$/);
+    }
+  });
+
+  it('resolves duplicate periods inside extractSeries by evidence rank', () => {
+    const s = syntheticState();
+    const first = s.observations.find(o => o.metric === 'inventory')!;
+    s.observations.push({ ...first, id: first.id + ':dup', value: 999, valueKind: 'estimated' });
+    const series = extractSeries(s, first.entityId, 'inventory');
+    // 8 periods stay 8 points; the reported 100 beats the estimated 999.
+    expect(series).toHaveLength(8);
+    expect(series[0].value).toBe(100);
+    expect(series[0].observationId).toBe(first.id);
+  });
+
   it('flags the structural break in the synthetic inventory series', () => {
     const r = detectAnomalies(syntheticState(), { window: 6 });
     const hit = r.result.find(a => a.entityId === 'ent:port:gate' && a.kind === 'rolling-deviation');

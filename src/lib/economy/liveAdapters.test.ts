@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import type { Provenance } from './types';
 import { validateState } from './types';
 import {
@@ -118,6 +118,49 @@ describe('parseCftcRows (against the committed real capture)', () => {
     expect(latest.unit).toBe('contracts');
     // Sorted ascending by date.
     expect(obs[0].period.start < latest.period.start).toBe(true);
+  });
+});
+
+describe('comtrade degradation ladder (stubbed fetch)', () => {
+  // NOTE: order matters — the all-empty case must run before the partial
+  // case, because a successful partial pass caches under econ:comtrade for
+  // its full TTL while a failed pass is never served from cache.
+  const realFetch = globalThis.fetch;
+  const savedEnv = process.env.RUN_LIVE_TESTS;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    if (savedEnv === undefined) delete process.env.RUN_LIVE_TESTS;
+    else process.env.RUN_LIVE_TESTS = savedEnv;
+  });
+
+  it('treats an all-200-but-empty live pass as failure: snapshot serves, nothing cached as fresh', async () => {
+    process.env.RUN_LIVE_TESTS = '1';
+    globalThis.fetch = (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })) as unknown as typeof fetch;
+    const payload = await comtradeAdapter.load('copper');
+    expect(payload.observations.length).toBeGreaterThan(0);
+    for (const o of payload.observations) {
+      expect(o.provenance.note, o.id).toContain('bundled snapshot');
+    }
+  });
+
+  it('degrades per request: one live success + 429s yields mixed live/snapshot provenance', async () => {
+    process.env.RUN_LIVE_TESTS = '1';
+    const firstResponse = (comtradeSnapshot as { responses: Record<string, unknown> }).responses['152-2603-X-2023'];
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls++;
+      if (calls === 1) return { ok: true, status: 200, json: async () => firstResponse };
+      return { ok: false, status: 429, json: async () => ({}) };
+    }) as unknown as typeof fetch;
+    const payload = await comtradeAdapter.load('copper');
+    expect(payload.observations).toHaveLength(6);
+    const live = payload.observations.filter(o => !(o.provenance.note ?? '').includes('bundled snapshot'));
+    const snap = payload.observations.filter(o => (o.provenance.note ?? '').includes('rate limited'));
+    expect(live).toHaveLength(1);
+    expect(live[0].id).toBe('obs:comtrade:cl:2603:X:2023');
+    expect(snap).toHaveLength(5);
+    // The 429 circuit breaker stopped further live attempts after request 2.
+    expect(calls).toBe(2);
   });
 });
 
