@@ -32,7 +32,7 @@ economics; they render what `/api/economy` serves.
 
 ## Canonical state — identity discipline
 
-Six identities, never blurred (all in `src/lib/economy/types.ts`):
+Six identities plus one derived record, never blurred (all in `src/lib/economy/types.ts`):
 
 | Identity     | Meaning                                   | Id prefix |
 |--------------|-------------------------------------------|-----------|
@@ -48,7 +48,18 @@ Every quantitative record carries:
 - **provenance** — sourceId, source name/URL, retrieval timestamp, source ref, note
 - **valueKind** — `reported` / `estimated` / `derived` / `representative`
 - **confidence** — `high` / `medium` / `low`
+- **knownAt** — when the value became knowable (vs. `period`, what it describes)
+- **measurementClass** (derived from metric) — `physical_flow` / `physical_stock` /
+  `market_price` / `financial_positioning`. Only physical measurements may feed
+  physical analytics; `concentration()` throws on price/positioning, and
+  reserves (a stock compiled under differing standards) never read as throughput.
+- **partnerEntityId** — bilateral mirror scope; partner-scoped observations feed
+  only divergence analysis, never aggregates
 - **geoPrecision** on entities — `exact` / `site` / `city` / `region` / `country`
+
+`Divergence` is the seventh, explicitly derived record: emitted when
+resolution discards a claim or a mirror pair disagrees, with claims,
+resolvedTo, spread, direction, persistence and class.
 
 Raw evidence and inference never share an identity: analytics return
 `AnalyticalResult<T>` wrappers that separate **operation** (what was requested),
@@ -132,20 +143,33 @@ that reached each node.
 Registered in `src/lib/economy/engine.ts`; each is a pure, independent computation
 over (state, graph):
 
-Systems receive a `SystemContext` with an optional `asOf` evaluation date —
-the engine computes state *as of* any date the data covers (temporal playback).
+Systems receive a `SystemContext` with an optional `asOf` evaluation date and
+a `knowledge` mode. `best_known` (default) is the current best reconstruction
+of history; `as_known_then` restricts the run to evidence knowable at `asOf`
+(observation `knownAt` ≤ asOf, event `firstReportedAt` ≤ asOf) — the mode
+backtesting requires, since a detector scored under hindsight is being graded
+on information it could not have had. Every observation carries `knownAt`
+(publication/release date, or retrieval time as the conservative bound) and
+optionally `supersedes` (revision chains: MCS 2025 figures supersede MCS 2024's
+estimates for the same periods — both vintages are held, so the engine can
+answer "what did the world believe in June 2024"). Events carry
+`firstReportedAt`; detection latency (first report − occurrence) is served on
+the timeline, because it is the number that says how much warning the system
+could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 
 | System | What it derives |
 |---|---|
 | `concentration` | HHI of mine production (country/mine), refined production, consumption, smelting/refining capacity — each from the latest observation per entity at `asOf`. DOJ bands (<1500 / 1500–2500 / >2500). Never mixes entity kinds in one calculation. Includes the **concentration trajectory**: HHI recomputed per year from that year's own observations (years with too few reporters are dropped, not fabricated). |
 | `centrality` | Material throughput per node (in + out, kt/y) and network share. |
 | `bottlenecks` | **Candidate** bottleneck score: 0.35·throughput share + 0.25·utilization (flow vs stated capacity) + 0.25·redundancy (alternatives at same stage) + 0.15·dependency load. Explicitly a triage signal, not validated risk; every score exposes its components, explanation and evidence ids. Countries/regions are excluded (aggregates are not chokepoints). |
-| `anomalies` | Rolling z-score vs trailing window + period-over-period rate of change on every (entity, metric) series with enough points. No ML — hand-recomputable. Live price and positioning series feed this directly. |
+| `anomalies` | Rolling z-score vs trailing window + period-over-period rate of change on every (entity, metric) series with enough points. Series resolve one observation per period by evidence rank before detection (provider disagreement is never a time step). The continuous front-month price series is excluded (roll discontinuities are contract artifacts, not moves); positioning signals are tagged `financial_positioning` and rendered as reflexive market context, never physical evidence. |
+| `coverage` | Facility-model coverage per country: rolled-up facility observations ÷ the country's own observation. ≈1 complete, <1 the unmodelled share, >1 a contradiction. This is the standing integrity check that keeps facility- and country-level populations from ever being conflated — they meet only here, explicitly, as a ratio. |
+| `divergence` | Observer disagreement kept as evidence: multi-provider conflicts (revision lag / coverage / unexplained) and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Persistent directional gaps are the standard route to transshipment and misreporting findings; the current data surfaces the well-known Chilean concentrate reporter-side suppression (Chile declares ~2.1 Mt gross to China; China records ~8.4 Mt from Chile) and a −25% DRC→China refined gap consistent with Dar/Durban re-attribution. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
 | `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. |
 
 ## API projections
 
-All views accept `&asOf=YYYY-MM-DD` to evaluate at a date.
+All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 
 - `GET /api/economy?commodity=copper&view=map` — geolocated entities (with
   production, capacity, bottleneck score, event count, disruption flag at the

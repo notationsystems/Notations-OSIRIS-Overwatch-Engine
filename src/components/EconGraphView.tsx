@@ -43,6 +43,7 @@ interface GraphLink {
 interface EconGraphViewProps {
   selectedId: string | null;
   asOf: string | null;
+  knowledge: 'best_known' | 'as_known_then';
   onSelectEntity: (id: string) => void;
   onClose: () => void;
 }
@@ -68,7 +69,7 @@ const LEGEND: Array<[string, string]> = [
   ['LOGISTICS', '#78909C'], ['MANUFACTURING', '#AB47BC'],
 ];
 
-export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClose }: EconGraphViewProps) {
+export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEntity, onClose }: EconGraphViewProps) {
   const [data, setData] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null);
   // Failure is keyed to the evaluation date it happened for — a later fetch
   // (new asOf) must not stay stuck behind an old error banner.
@@ -78,15 +79,15 @@ export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClos
 
   useEffect(() => {
     let cancelled = false;
-    const key = asOf ?? 'live';
-    const qs = asOf ? `&asOf=${asOf}` : '';
+    const key = `${asOf ?? 'live'}|${knowledge}`;
+    const qs = asOf ? `&asOf=${asOf}&knowledge=${knowledge}` : '';
     fetch(`/api/economy?commodity=copper&view=graph${qs}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then(d => { if (!cancelled) setData({ nodes: d.nodes, links: d.links }); })
       .catch(() => { if (!cancelled) setFailedKey(key); });
     return () => { cancelled = true; };
-  }, [asOf]);
-  const failed = !data && failedKey === (asOf ?? 'live');
+  }, [asOf, knowledge]);
+  const failed = !data && failedKey === `${asOf ?? 'live'}|${knowledge}`;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -102,14 +103,15 @@ export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClos
   // resolved references) — hand it copies so the fetched data stays pristine.
   // Carry each node's previous position/velocity forward so a playback scrub
   // updates colors/flags without re-heating and re-scrambling the layout.
-  const lastNodesRef = useRef<Map<string, { x?: number; y?: number; vx?: number; vy?: number }>>(new Map());
+  // (A state-held mutable cache, not a ref: refs must not be read in render.)
+  const [posCache] = useState(() => new Map<string, { x?: number; y?: number; vx?: number; vy?: number }>());
   const graphData = useMemo(() => {
     if (!data) return { nodes: [], links: [] };
-    const prev = lastNodesRef.current;
-    const nodes = data.nodes.map(n => ({ ...n, ...(prev.get(n.id) ?? {}) }));
-    lastNodesRef.current = new Map(nodes.map(n => [n.id, n]));
+    const nodes = data.nodes.map(n => ({ ...n, ...(posCache.get(n.id) ?? {}) }));
+    posCache.clear();
+    for (const n of nodes) posCache.set(n.id, n);
     return { nodes, links: data.links.map(l => ({ ...l })) };
-  }, [data]);
+  }, [data, posCache]);
 
   return (
     <motion.div
@@ -127,7 +129,7 @@ export default function EconGraphView({ selectedId, asOf, onSelectEntity, onClos
           <div className="flex items-center gap-2">
             <Network className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
             <span className="hud-text text-[11px] text-[var(--text-primary)]">FLOW GRAPH — COPPER</span>
-            {asOf && <span className="text-[9px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1">AS OF {asOf}</span>}
+            {asOf && <span className="text-[9px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1">{knowledge === 'as_known_then' ? 'AS KNOWN' : 'AS OF'} {asOf}</span>}
           </div>
           <div className="flex items-center gap-3">
             {LEGEND.map(([label, color]) => (

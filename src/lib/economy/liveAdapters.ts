@@ -29,6 +29,7 @@ import type { Observation, Provenance } from './types';
 import type { AdapterPayload, EconomyAdapter } from './adapters';
 import { cachedSource } from '@/lib/sourceCache';
 import { MCS_SNAPSHOT_CSV, MCS_SNAPSHOT_CAPTURED_AT } from '@/data/economy/snapshots/mcs2025-world-copper';
+import { MCS2024_SNAPSHOT_CSV, MCS2024_SNAPSHOT_CAPTURED_AT, MCS2024_PUBLISHED_AT } from '@/data/economy/snapshots/mcs2024-world-copper';
 import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
@@ -124,18 +125,63 @@ function splitCsvRow(line: string): string[] {
   return out;
 }
 
-export function parseMcsWorldCsv(csvText: string, prov: (ref: string, note?: string) => Provenance): Observation[] {
-  const lines = csvText.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
+/**
+ * Column layout of one MCS edition ("vintage"). Each edition is a dated
+ * snapshot of a revised series: MCS Y carries reported Y-2 figures and
+ * estimated Y-1 figures, published in January of year Y — which is the
+ * knownAt bound for everything it contains.
+ */
+export interface McsVintageSpec {
+  idPrefix: string;
+  /** Publication date of the edition — the knowability bound. */
+  publishedAt: string;
+  /** null → the file is commodity-specific (no COMMODITY column). */
+  commodityCol: string | null;
+  countryCol: string;
+  typeCol: string;
+  reportedCol: string;
+  reportedYear: number;
+  estimatedCol: string;
+  estimatedYear: number;
+  reservesCol: string | null;
+  reservesYear: number;
+  notesCol: string | null;
+}
+
+export const MCS2025_SPEC: McsVintageSpec = {
+  idPrefix: 'usgs-mcs2025', publishedAt: '2025-01-30',
+  commodityCol: 'COMMODITY', countryCol: 'COUNTRY', typeCol: 'TYPE',
+  reportedCol: 'PROD_2023', reportedYear: 2023,
+  estimatedCol: 'PROD_EST_ 2024', estimatedYear: 2024,
+  reservesCol: 'RESERVES_2024', reservesYear: 2024,
+  notesCol: 'PROD_NOTES',
+};
+
+export const MCS2024_SPEC: McsVintageSpec = {
+  idPrefix: 'usgs-mcs2024', publishedAt: MCS2024_PUBLISHED_AT,
+  commodityCol: null, countryCol: 'Country', typeCol: 'Type',
+  reportedCol: 'Prod_kt_2022', reportedYear: 2022,
+  estimatedCol: 'Prod_kt_est_2023', estimatedYear: 2023,
+  reservesCol: 'Reserves_kt', reservesYear: 2023,
+  notesCol: 'Prod_notes',
+};
+
+export function parseMcsWorldCsv(
+  csvText: string,
+  prov: (ref: string, note?: string) => Provenance,
+  spec: McsVintageSpec = MCS2025_SPEC,
+): Observation[] {
+  const lines = csvText.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
   const header = splitCsvRow(lines[0]).map(h => h.trim());
-  const col = (name: string) => header.findIndex(h => h.replace(/\s+/g, ' ') === name);
-  const iCommodity = col('COMMODITY');
-  const iCountry = col('COUNTRY');
-  const iType = col('TYPE');
-  const iProd23 = col('PROD_2023');
-  const iProd24 = col('PROD_EST_ 2024') >= 0 ? col('PROD_EST_ 2024') : col('PROD_EST_2024');
-  const iProdNotes = col('PROD_NOTES');
-  const iReserves = col('RESERVES_2024');
-  if (iCommodity < 0 || iCountry < 0 || iType < 0) throw new Error('MCS CSV header not recognized');
+  const col = (name: string | null) => (name === null ? -1 : header.findIndex(h => h.replace(/\s+/g, ' ') === name.replace(/\s+/g, ' ')));
+  const iCommodity = col(spec.commodityCol);
+  const iCountry = col(spec.countryCol);
+  const iType = col(spec.typeCol);
+  const iReported = col(spec.reportedCol);
+  const iEstimated = col(spec.estimatedCol);
+  const iReserves = col(spec.reservesCol);
+  const iNotes = col(spec.notesCol);
+  if (iCountry < 0 || iType < 0) throw new Error(`MCS CSV header not recognized for ${spec.idPrefix}`);
 
   const num = (raw: string | undefined): number | null => {
     const cleaned = (raw ?? '').replace(/[",\s]/g, '');
@@ -147,7 +193,7 @@ export function parseMcsWorldCsv(csvText: string, prov: (ref: string, note?: str
   const obs: Observation[] = [];
   for (const line of lines.slice(1)) {
     const row = splitCsvRow(line);
-    if ((row[iCommodity] ?? '').trim() !== 'Copper') continue;
+    if (iCommodity >= 0 && (row[iCommodity] ?? '').trim() !== 'Copper') continue;
     const entityId = MCS_COUNTRY_MAP[(row[iCountry] ?? '').trim()];
     if (!entityId) continue; // "Other Countries", "World total", unmapped
     const type = (row[iType] ?? '').trim();
@@ -156,39 +202,42 @@ export function parseMcsWorldCsv(csvText: string, prov: (ref: string, note?: str
         : null;
     const slug = entityId.split(':')[2];
     if (metric) {
-      const v23 = num(row[iProd23]);
-      // USGS flags some 2023 figures as its own estimates in PROD_NOTES
-      // (e.g. "estimated 2023") — those must not carry 'reported'.
-      const notes23 = (row[iProdNotes] ?? '').trim();
-      const est23 = /estimat/i.test(notes23);
-      if (v23 !== null) {
+      // USGS flags some "reported" figures as its own estimates in the notes
+      // column (e.g. "estimated 2023") — those must not carry 'reported'.
+      const notes = iNotes >= 0 ? (row[iNotes] ?? '').trim() : '';
+      const noteEstimated = /estimat/i.test(notes);
+      const vReported = num(row[iReported]);
+      if (vReported !== null) {
         obs.push({
-          id: `obs:usgs-mcs2025:${metric}:${slug}:2023`,
-          entityId, metric, value: v23, unit: 'kt/y',
-          period: { start: '2023-01-01', end: '2023-12-31' },
-          valueKind: est23 ? 'estimated' : 'reported', confidence: 'high',
-          provenance: prov(`${type}, 2023`, est23 ? `USGS note: ${notes23}` : undefined),
+          id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.reportedYear}`,
+          entityId, metric, value: vReported, unit: 'kt/y',
+          period: { start: `${spec.reportedYear}-01-01`, end: `${spec.reportedYear}-12-31` },
+          knownAt: spec.publishedAt,
+          valueKind: noteEstimated ? 'estimated' : 'reported', confidence: 'high',
+          provenance: prov(`${type}, ${spec.reportedYear}`, noteEstimated ? `USGS note: ${notes}` : undefined),
         });
       }
-      const v24 = num(row[iProd24]);
-      if (v24 !== null) {
+      const vEstimated = num(row[iEstimated]);
+      if (vEstimated !== null) {
         obs.push({
-          id: `obs:usgs-mcs2025:${metric}:${slug}:2024`,
-          entityId, metric, value: v24, unit: 'kt/y',
-          period: { start: '2024-01-01', end: '2024-12-31' },
+          id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.estimatedYear}`,
+          entityId, metric, value: vEstimated, unit: 'kt/y',
+          period: { start: `${spec.estimatedYear}-01-01`, end: `${spec.estimatedYear}-12-31` },
+          knownAt: spec.publishedAt,
           valueKind: 'estimated', confidence: 'high',
-          provenance: prov(`${type}, 2024 est.`),
+          provenance: prov(`${type}, ${spec.estimatedYear} est.`),
         });
       }
-      if (metric === 'production') {
-        const res24 = num(row[iReserves]);
-        if (res24 !== null) {
+      if (metric === 'production' && iReserves >= 0) {
+        const vReserves = num(row[iReserves]);
+        if (vReserves !== null) {
           obs.push({
-            id: `obs:usgs-mcs2025:reserves:${slug}:2024`,
-            entityId, metric: 'reserves', value: res24, unit: 'kt',
-            period: { start: '2024-01-01', end: '2024-12-31' },
+            id: `obs:${spec.idPrefix}:reserves:${slug}:${spec.reservesYear}`,
+            entityId, metric: 'reserves', value: vReserves, unit: 'kt',
+            period: { start: `${spec.reservesYear}-01-01`, end: `${spec.reservesYear}-12-31` },
+            knownAt: spec.publishedAt,
             valueKind: 'estimated', confidence: 'medium',
-            provenance: prov('Reserves, 2024', 'USGS reserves are estimates by definition.'),
+            provenance: prov(`Reserves, ${spec.reservesYear}`, 'USGS reserves are estimates by definition, compiled under differing national standards — a stock figure, never comparable as throughput.'),
           });
         }
       }
@@ -210,7 +259,29 @@ async function fetchMcsLive(): Promise<Observation[]> {
     sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
     sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
     retrievedAt, sourceRef: ref, note,
-  }));
+  }), MCS2025_SPEC);
+}
+
+/** The MCS2024 edition — static history, always served from the committed
+ *  capture. Its estimates are what was knowable before MCS2025 published. */
+function mcs2024VintageObs(): Observation[] {
+  return parseMcsWorldCsv(MCS2024_SNAPSHOT_CSV, (ref, note) => ({
+    sourceId: 'usgs-mcs2024-vintage',
+    sourceName: 'USGS Mineral Commodity Summaries 2024 — Copper (ScienceBase vintage)',
+    sourceUrl: 'https://www.sciencebase.gov/catalog/item/65b7d77ed34e36a39045b4b2',
+    retrievedAt: `${MCS2024_SNAPSHOT_CAPTURED_AT}T00:00:00Z`,
+    sourceRef: ref, note,
+  }), MCS2024_SPEC);
+}
+
+/** Chain revisions: an MCS2025 figure supersedes the MCS2024 figure for the
+ *  same (entity, metric, period). */
+function linkSupersedes(current: Observation[], vintage: Observation[]): Observation[] {
+  const vintageByKey = new Map(vintage.map(o => [`${o.entityId}|${o.metric}|${o.period.start}`, o.id]));
+  return current.map(o => {
+    const prior = vintageByKey.get(`${o.entityId}|${o.metric}|${o.period.start}`);
+    return prior ? { ...o, supersedes: prior } : o;
+  });
 }
 
 function mcsSnapshot(reason: string): Observation[] {
@@ -221,7 +292,7 @@ function mcsSnapshot(reason: string): Observation[] {
     retrievedAt: `${MCS_SNAPSHOT_CAPTURED_AT}T00:00:00Z`,
     sourceRef: ref,
     note: [`bundled snapshot (${reason})`, note].filter(Boolean).join(' — '),
-  }));
+  }), MCS2025_SPEC);
 }
 
 /* ══════════════ UN Comtrade preview ══════════════ */
@@ -299,6 +370,51 @@ export function parseComtradeResponse(
   };
 }
 
+/** Slug of an entity id. */
+function entitySlug(entityId: string): string {
+  return entityId.split(':')[2];
+}
+
+/**
+ * Bilateral (partner-scoped) observations from a Comtrade response's partner
+ * rows. These are mirror evidence — reporter-declared flows to/from a named
+ * counterparty. They never enter aggregate analytics; the divergence system
+ * matches them against the counterparty's own declaration of the same flow.
+ */
+export function parseComtradeBilateral(
+  key: string,
+  raw: ComtradeResponse,
+  prov: (ref: string, note?: string) => Provenance,
+): Observation[] {
+  const [m49Str, hs, flow, yearStr] = key.split('-');
+  const entityId = M49_TO_ENTITY[Number(m49Str)];
+  if (!entityId) return [];
+  const metric = hs === '2603'
+    ? (flow === 'X' ? 'concentrate_exports' as const : 'concentrate_imports' as const)
+    : (flow === 'X' ? 'refined_exports' as const : 'refined_imports' as const);
+  const minKg = hs === '2603' ? 1e8 : 5e7; // 100 kt gross / 50 kt — bound the noise
+  const obs: Observation[] = [];
+  for (const row of (raw.data ?? []) as Array<ComtradeRow & { partnerCode?: number }>) {
+    if (!row.partnerCode || row.partnerCode === 0) continue;
+    const partnerEntityId = M49_TO_ENTITY[row.partnerCode];
+    if (!partnerEntityId || row.netWgt === null || row.netWgt === undefined || row.netWgt < minKg) continue;
+    obs.push({
+      id: `obs:comtrade:${entitySlug(entityId)}:${hs}:${flow}:${yearStr}:${entitySlug(partnerEntityId)}`,
+      entityId, partnerEntityId, metric,
+      value: Math.round(row.netWgt / 1e6),
+      unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
+      period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
+      valueKind: 'reported',
+      confidence: row.isNetWgtEstimated === true ? 'medium' : 'high',
+      provenance: prov(
+        `HS ${hs} flow ${flow} reporter ${m49Str} partner ${row.partnerCode} period ${yearStr}`,
+        'Bilateral declaration (mirror evidence) — excluded from aggregate analytics; compared against the counterparty\'s declaration by the divergence system.',
+      ),
+    });
+  }
+  return obs;
+}
+
 async function fetchComtradeLive(): Promise<Observation[]> {
   const retrievedAt = new Date().toISOString();
   const prov = (ref: string, note?: string): Provenance => ({
@@ -308,6 +424,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
     retrievedAt, sourceRef: ref, note,
   });
   const snapshotResponses = (comtradeSnapshot as { capturedAt: string; responses: Record<string, ComtradeResponse> });
+  const rawByKey = new Map<string, ComtradeResponse>();
   const obs: Observation[] = [];
   let anyLive = false;
   let rateLimited = false;
@@ -320,6 +437,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
       try {
         const url = `https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=${m49}&period=${year}&cmdCode=${hs}&flowCode=${flow}`;
         const raw = await fetchJson<ComtradeResponse>(url, 20000);
+        rawByKey.set(key, raw);
         one = parseComtradeResponse(key, raw, prov);
         // A 200 with an empty data array is NOT live coverage — counting it
         // would let an all-snapshot result be cached as a fresh success.
@@ -330,18 +448,26 @@ async function fetchComtradeLive(): Promise<Observation[]> {
         one = null;
       }
     }
-    if (!one) {
+    let bilateral: Observation[] = [];
+    if (one) {
+      // Live parse succeeded — bilateral rows come from the same response at
+      // zero extra request cost. (rawByKey holds the last successful raw.)
+      bilateral = parseComtradeBilateral(key, rawByKey.get(key)!, prov);
+    } else {
       // Per-request degradation: this key alone falls back to its snapshot slice.
       const snap = snapshotResponses.responses[key];
       if (snap) {
-        one = parseComtradeResponse(key, snap, (ref, note) => ({
+        const snapProv = (ref: string, note?: string): Provenance => ({
           ...prov(ref, note),
           retrievedAt: `${snapshotResponses.capturedAt}T00:00:00Z`,
           note: [`bundled snapshot (live request unavailable${rateLimited ? ': rate limited' : ''})`, note].filter(Boolean).join(' — '),
-        }));
+        });
+        one = parseComtradeResponse(key, snap, snapProv);
+        bilateral = parseComtradeBilateral(key, snap, snapProv);
       }
     }
     if (one) obs.push(one);
+    obs.push(...bilateral);
   }
   // If nothing came back live, report failure so the ladder's snapshot rung
   // serves — an all-snapshot result must not be cached as a fresh success.
@@ -364,6 +490,7 @@ function comtradeSnapshotObs(reason: string): Observation[] {
   for (const [key, raw] of Object.entries(responses)) {
     const one = parseComtradeResponse(key, raw, prov);
     if (one) obs.push(one);
+    obs.push(...parseComtradeBilateral(key, raw, prov));
   }
   return obs;
 }
@@ -401,6 +528,9 @@ export function parseYahooChart(raw: YahooChart, prov: (ref: string, note?: stri
     const [y, m] = month.split('-').map(Number);
     const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
     const partial = month === lastMonth;
+    // A completed month's close is knowable the following day; the partial
+    // month falls back to retrieval time via knownAtOf.
+    const dayAfter = new Date(Date.UTC(y, m - 1, lastDay) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     return {
       id: `obs:hg-price:${month}`,
       entityId: 'ent:commodity:copper',
@@ -408,6 +538,7 @@ export function parseYahooChart(raw: YahooChart, prov: (ref: string, note?: stri
       value: Number(byMonth.get(month)!.toFixed(4)),
       unit: 'USD/lb',
       period: { start: `${month}-01`, end: `${month}-${String(lastDay).padStart(2, '0')}` },
+      ...(partial ? {} : { knownAt: dayAfter }),
       valueKind: 'reported' as const,
       confidence: partial ? 'medium' as const : 'high' as const,
       provenance: prov(`HG=F monthly close, ${month}`, partial ? 'Month in progress — month-to-date close.' : undefined),
@@ -458,6 +589,7 @@ export function parseCftcRows(rows: CftcRow[], prov: (ref: string, note?: string
     const long = Number(row.m_money_positions_long_all);
     const short = Number(row.m_money_positions_short_all);
     if (!date || !Number.isFinite(long) || !Number.isFinite(short)) continue;
+    const release = new Date(Date.parse(`${date}T00:00:00Z`) + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     obs.push({
       id: `obs:cftc-mm-net:${date}`,
       entityId: 'ent:commodity:copper',
@@ -465,6 +597,7 @@ export function parseCftcRows(rows: CftcRow[], prov: (ref: string, note?: string
       value: long - short,
       unit: 'contracts',
       period: { start: date, end: date },
+      knownAt: release, // COT releases Friday, three days after the Tuesday as-of
       valueKind: 'reported',
       confidence: 'high',
       provenance: prov(
@@ -529,11 +662,19 @@ export const usgsMcsAdapter: EconomyAdapter = {
   providerName: 'USGS Mineral Commodity Summaries World Data (live, ScienceBase)',
   commodities: ['copper'],
   async load() {
-    return observationOnlyPayload(await loaders.usgs(), {
+    const vintage = mcs2024VintageObs();
+    const current = linkSupersedes(await loaders.usgs(), vintage);
+    const payload = observationOnlyPayload([...current, ...vintage], {
       sourceId: 'usgs-mcs2025-live',
       sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
       sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
     });
+    payload.sources.push({
+      sourceId: 'usgs-mcs2024-vintage',
+      sourceName: 'USGS Mineral Commodity Summaries 2024 — Copper (ScienceBase vintage)',
+      sourceUrl: 'https://www.sciencebase.gov/catalog/item/65b7d77ed34e36a39045b4b2',
+    });
+    return payload;
   },
 };
 

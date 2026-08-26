@@ -70,7 +70,7 @@ describe('engine core', () => {
   it('runs all registered systems over the copper state', async () => {
     const run = await runEngine('copper');
     const names = listSystems().map(s => s.name);
-    expect(names).toEqual(['concentration', 'centrality', 'bottlenecks', 'anomalies', 'propagation']);
+    expect(names).toEqual(['concentration', 'centrality', 'bottlenecks', 'anomalies', 'coverage', 'divergence', 'propagation']);
     for (const name of names) {
       expect(run.systems[name], `system ${name}`).toBeDefined();
       expect(run.systems[name].execution.engine).toBeTruthy();

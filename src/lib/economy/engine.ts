@@ -22,14 +22,25 @@ import { buildGraph } from './graph';
 import { getEconomyState } from './store';
 import {
   bottleneckCandidates, capacityConcentration, concentration, concentrationTrajectory,
-  detectAnomalies, flowCentrality,
+  detectAnomalies, facilityCoverage, flowCentrality, knownAtOf,
 } from './analytics';
+import { detectDivergences } from './divergence';
 import { propagateEvents } from './propagation';
 
 export interface SystemContext {
   /** Evaluation date (ISO, YYYY-MM-DD). Temporal systems compute state as of
    *  this date; omitted means "now" / latest available. */
   asOf?: string;
+  /**
+   * What the evaluation is allowed to know:
+   *   best_known     (default) the current best reconstruction of history —
+   *                  revised figures, later vintages, everything we hold now.
+   *   as_known_then  only evidence knowable at asOf (observation knownAt and
+   *                  event firstReportedAt ≤ asOf). Required for backtesting:
+   *                  a detector scored under best_known is being graded on
+   *                  information it could not have had.
+   */
+  knowledge?: 'best_known' | 'as_known_then';
 }
 
 export interface EconomySystem {
@@ -79,6 +90,24 @@ const SYSTEMS: EconomySystem[] = [
     run: (state) => detectAnomalies(state),
   },
   {
+    name: 'coverage',
+    describes: 'Facility-model coverage: rolled-up facilities vs direct country observations, per metric',
+    run: (state, _graph, ctx) => ({
+      operation: { name: 'coverage-suite', params: { asOf: ctx.asOf } },
+      execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+      inputs: {},
+      result: {
+        mineProduction: facilityCoverage(state, 'production', ['mine'], ctx.asOf),
+        refinedProduction: facilityCoverage(state, 'refined_production', ['refinery', 'smelter'], ctx.asOf),
+      },
+    }),
+  },
+  {
+    name: 'divergence',
+    describes: 'Observer disagreement: multi-provider conflicts and Comtrade mirror gaps, kept as evidence',
+    run: (state) => detectDivergences(state),
+  },
+  {
     name: 'propagation',
     describes: 'Event → state-change propagation: disrupted flow, downstream exposure, alternative capacity',
     run: (state, graph, ctx) => propagateEvents(state, graph, ctx.asOf ? { asOf: ctx.asOf } : {}),
@@ -99,6 +128,8 @@ export interface EngineRun {
   commodity: string;
   /** Evaluation date the systems ran at (undefined = latest/now). */
   asOf?: string;
+  knowledge?: 'best_known' | 'as_known_then';
+  /** The state the systems actually saw (knowledge-filtered under as_known_then). */
   state: EconomyState;
   graph: EconomyGraph;
   providers: string[];
@@ -111,12 +142,31 @@ export interface EngineRun {
  * store; systems are cheap enough to run per call, which keeps a run
  * consistent with the state it was computed from.
  */
+/**
+ * Restrict a state to what was knowable at `asOf`: observations by knownAt
+ * (falling back to retrieval time as the conservative bound) and events by
+ * firstReportedAt (falling back to occurrence, which assumes immediate
+ * reporting — curated events set it explicitly).
+ */
+function asKnownThen(state: EconomyState, asOf: string): EconomyState {
+  return {
+    ...state,
+    observations: state.observations.filter(o => knownAtOf(o) <= asOf),
+    events: state.events.filter(ev => (ev.firstReportedAt ?? ev.start) <= asOf),
+  };
+}
+
 export async function runEngine(commodity: string, ctx: SystemContext = {}): Promise<EngineRun> {
-  const { state, providers } = await getEconomyState(commodity);
+  const assembled = await getEconomyState(commodity);
+  const providers = assembled.providers;
+  // The run's world state is what the evaluation is allowed to know.
+  const state = ctx.knowledge === 'as_known_then' && ctx.asOf
+    ? asKnownThen(assembled.state, ctx.asOf)
+    : assembled.state;
   const graph = buildGraph(state);
   const systems: Record<string, AnalyticalResult<unknown>> = {};
   for (const system of SYSTEMS) {
     systems[system.name] = system.run(state, graph, ctx);
   }
-  return { commodity, asOf: ctx.asOf, state, graph, providers, systems };
+  return { commodity, asOf: ctx.asOf, knowledge: ctx.knowledge ?? 'best_known', state, graph, providers, systems };
 }

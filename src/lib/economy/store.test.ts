@@ -27,7 +27,7 @@ describe('economy store (curated copper assembly)', () => {
 
   it('keeps curated records representative; reported/estimated only from live providers', async () => {
     const { state } = await getEconomyState('copper');
-    const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot']);
+    const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'usgs-mcs2024-vintage', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot']);
     for (const rec of [...state.observations, ...state.flows, ...state.capacities]) {
       if (LIVE_SOURCES.has(rec.provenance.sourceId)) {
         // 'derived' appears when OSIRIS computes a total the reporter did not
@@ -80,13 +80,15 @@ describe('economy store (curated copper assembly)', () => {
   it('carries multi-year series observations for temporal analytics', async () => {
     const { state } = await getEconomyState('copper');
     const clCurated = state.observations.filter(o =>
-      o.entityId === 'ent:country:cl' && o.metric === 'production' && o.provenance.sourceId !== 'usgs-mcs2025-live');
+      o.entityId === 'ent:country:cl' && o.metric === 'production'
+      && !['usgs-mcs2025-live', 'usgs-mcs2024-vintage'].includes(o.provenance.sourceId));
     expect(clCurated.length).toBe(10); // curated: 2015–2023 series + 2024 snapshot
     expect(new Set(clCurated.map(o => o.period.end)).size).toBe(10); // no duplicate years within the curated set
     // The live USGS provider adds same-period reported/estimated evidence on
     // top — coexisting observations, resolved by observationsAt at read time.
     const clAll = state.observations.filter(o => o.entityId === 'ent:country:cl' && o.metric === 'production');
-    expect(clAll.length).toBe(12);
+    // curated 10 + MCS2025 (2023, 2024) + MCS2024 vintage (2022, 2023) = 14
+    expect(clAll.length).toBe(14);
     const paZero = state.observations.find(o => o.id === 'obs:prod:pa:2024');
     expect(paZero?.value).toBe(0);
   });

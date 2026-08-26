@@ -128,9 +128,56 @@ export interface Observation {
   /** e.g. "kt/y", "Mt/y", "kt", "%", "t/d" */
   unit: string;
   period: Period;
+  /**
+   * When this value became knowable to us (ISO date): the publication date
+   * of the source edition, the release date of the report, or — as the
+   * conservative upper bound when publication timing is untracked — the
+   * retrieval time. `period` says what the value DESCRIBES; `knownAt` says
+   * when it EXISTED. The distinction is what makes backtesting honest:
+   * as-known-then playback must never show June 2019 a figure published in
+   * January 2026. Absent, provenance.retrievedAt is the fallback bound.
+   */
+  knownAt?: string;
+  /** Observation this value revises (e.g. a later MCS vintage superseding
+   *  the previous edition's estimate for the same period). */
+  supersedes?: string;
+  /**
+   * Bilateral scope: set when the observation measures a flow with respect
+   * to a specific counterparty (e.g. China's concentrate imports FROM Peru,
+   * as opposed to from the world). Partner-scoped observations are mirror
+   * evidence — they never enter aggregate analytics (concentration, series,
+   * anomalies), only divergence analysis.
+   */
+  partnerEntityId?: string;
   valueKind: ValueKind;
   confidence: Confidence;
   provenance: Provenance;
+}
+
+/* ── Measurement classes ── */
+
+/**
+ * What kind of thing a metric measures. The invariant this encodes: only
+ * physical measurements may feed physical analytics (concentration,
+ * centrality, bottlenecks, propagation). Prices and positioning are context
+ * layers — reflexive signals that respond to expectations about the very
+ * disruptions the physical layer detects — and reserves are stocks compiled
+ * under differing standards, never comparable as throughput.
+ */
+export type MeasurementClass = 'physical_flow' | 'physical_stock' | 'market_price' | 'financial_positioning';
+
+export function measurementClassOf(metric: Metric): MeasurementClass {
+  switch (metric) {
+    case 'inventory':
+    case 'reserves':
+      return 'physical_stock';
+    case 'price':
+      return 'market_price';
+    case 'net_positioning':
+      return 'financial_positioning';
+    default:
+      return 'physical_flow';
+  }
 }
 
 /* ── Flow ── */
@@ -215,8 +262,17 @@ export interface EconEvent {
   entityId?: string;
   type: EconEventType;
   title: string;
+  /** When the event OCCURRED (start of its physical window). */
   start: string;
   end?: string;
+  /**
+   * When the event became publicly knowable (first credible report or
+   * disclosure). Detection latency — firstReportedAt minus start — is the
+   * number that says how much warning a detector could actually have given.
+   * Absent, `start` is assumed (reported immediately), which overstates
+   * knowability; curated events should set it explicitly.
+   */
+  firstReportedAt?: string;
   severity: 'low' | 'medium' | 'high';
   description?: string;
   provenance: Provenance;
@@ -248,6 +304,52 @@ export interface AnalyticalResult<T> {
   /** Evidence identity: exact inputs the result was computed from. */
   inputs: { observationIds?: string[]; flowIds?: string[]; capacityIds?: string[]; entityIds?: string[] };
   result: T;
+}
+
+/* ── Divergence ── */
+
+/**
+ * A derived record of observer disagreement. An anomaly says the world
+ * moved; a divergence says the observers disagree about whether it moved —
+ * conflating the two is how fabricated sigma is born. Emitted whenever
+ * resolution discards a claim, and for Comtrade mirror pairs (exporter- vs
+ * importer-declared measurements of the same physical flow), where
+ * persistent directional gaps are the standard route to transshipment and
+ * misreporting findings.
+ */
+export interface DivergenceClaim {
+  observationId: string;
+  sourceId: string;
+  value: number;
+  unit: string;
+  valueKind: ValueKind;
+  confidence: Confidence;
+  /** Mirror pairs: who is speaking. */
+  perspective?: 'reporter' | 'partner';
+}
+
+export interface Divergence {
+  /** "div:<slug>" */
+  id: string;
+  kind: 'multi-provider' | 'mirror';
+  entityId: string;
+  /** Mirror pairs: the counterparty. */
+  partnerEntityId?: string;
+  metric: Metric;
+  period: Period;
+  claims: DivergenceClaim[];
+  /** The observation the resolved series actually used ('' when neither
+   *  side feeds aggregate analytics — bilateral mirror evidence). */
+  resolvedTo: string;
+  spread: number;
+  /** spread / max(|claims|), 0..∞ */
+  relativeSpread: number;
+  direction: 'resolved_higher' | 'resolved_lower' | 'reporter_higher' | 'partner_higher' | 'unsigned';
+  /** Consecutive periods this (entity, metric[, partner]) divergence has
+   *  held with consistent direction. */
+  persistence: number;
+  class: 'revision_lag' | 'coverage' | 'definitional' | 'unexplained';
+  explanation: string;
 }
 
 /* ── Validation ── */
@@ -297,7 +399,10 @@ export function validateState(state: EconomyState): ValidationIssue[] {
     if (value !== undefined && !Number.isFinite(value)) issues.push({ severity: 'error', message: `${kind} ${id} has non-finite value` });
   };
 
-  for (const o of state.observations) checkRecord(o.id, 'observation', [o.entityId], o.value);
+  for (const o of state.observations) {
+    checkRecord(o.id, 'observation', o.partnerEntityId ? [o.entityId, o.partnerEntityId] : [o.entityId], o.value);
+    if (o.knownAt && !/^\d{4}-\d{2}-\d{2}/.test(o.knownAt)) issues.push({ severity: 'error', message: `Observation ${o.id} has malformed knownAt` });
+  }
   for (const f of state.flows) {
     checkRecord(f.id, 'flow', [f.fromEntityId, f.toEntityId], f.quantity);
     if (f.fromEntityId === f.toEntityId) issues.push({ severity: 'error', message: `Flow ${f.id} is a self-loop` });

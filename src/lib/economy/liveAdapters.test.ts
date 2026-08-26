@@ -153,12 +153,15 @@ describe('comtrade degradation ladder (stubbed fetch)', () => {
       return { ok: false, status: 429, json: async () => ({}) };
     }) as unknown as typeof fetch;
     const payload = await comtradeAdapter.load('copper');
-    expect(payload.observations).toHaveLength(6);
-    const live = payload.observations.filter(o => !(o.provenance.note ?? '').includes('bundled snapshot'));
-    const snap = payload.observations.filter(o => (o.provenance.note ?? '').includes('rate limited'));
-    expect(live).toHaveLength(1);
-    expect(live[0].id).toBe('obs:comtrade:cl:2603:X:2023');
-    expect(snap).toHaveLength(5);
+    const world = payload.observations.filter(o => !o.partnerEntityId);
+    const bilateral = payload.observations.filter(o => o.partnerEntityId);
+    expect(world).toHaveLength(6);
+    expect(bilateral.length).toBeGreaterThan(5); // mirror evidence rides along
+    const liveWorld = world.filter(o => !(o.provenance.note ?? '').includes('bundled snapshot'));
+    const snapWorld = world.filter(o => (o.provenance.note ?? '').includes('rate limited'));
+    expect(liveWorld).toHaveLength(1);
+    expect(liveWorld[0].id).toBe('obs:comtrade:cl:2603:X:2023');
+    expect(snapWorld).toHaveLength(5);
     // The 429 circuit breaker stopped further live attempts after request 2.
     expect(calls).toBe(2);
   });
@@ -170,9 +173,15 @@ describe('live adapters in the assembled state (snapshot rung, network off)', ()
       const payload = await adapter.load('copper');
       expect(payload.observations.length, adapter.providerId).toBeGreaterThan(0);
       for (const o of payload.observations) {
+        // MCS2024 vintage records are permanent history, not a fallback rung —
+        // they carry their own vintage source id instead of a snapshot note.
+        if (o.provenance.sourceId === 'usgs-mcs2024-vintage') continue;
         expect(o.provenance.note, `${adapter.providerId} ${o.id}`).toContain('bundled snapshot');
       }
     }
+    // The vintage rode along with the USGS payload.
+    const usgs = await usgsMcsAdapter.load('copper');
+    expect(usgs.observations.some(o => o.provenance.sourceId === 'usgs-mcs2024-vintage')).toBe(true);
   });
 
   it('assembled copper state includes live-adapter observations and stays valid', async () => {

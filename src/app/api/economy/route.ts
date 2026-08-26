@@ -47,10 +47,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'asOf must be YYYY-MM-DD' }, { status: 400 });
   }
   const asOf = asOfParam ?? undefined;
+  const knowledgeParam = url.searchParams.get('knowledge');
+  if (knowledgeParam && knowledgeParam !== 'best_known' && knowledgeParam !== 'as_known_then') {
+    return NextResponse.json({ error: 'knowledge must be best_known or as_known_then' }, { status: 400 });
+  }
+  const knowledge = (knowledgeParam ?? 'best_known') as 'best_known' | 'as_known_then';
 
   let run;
   try {
-    run = await runEngine(commodity, { asOf });
+    run = await runEngine(commodity, { asOf, knowledge });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'unknown commodity' }, { status: 404 });
   }
@@ -68,11 +73,14 @@ export async function GET(request: Request) {
       commodityName: state.commodityName,
       providers,
       asOf: run.asOf ?? null,
+      knowledge: run.knowledge,
       systems: listSystems(),
       concentration: concentrationSuite,
       centrality: systems.centrality,
       bottlenecks: systems.bottlenecks,
       anomalies: systems.anomalies,
+      coverage: systems.coverage,
+      divergence: systems.divergence,
       propagation: systems.propagation,
       events: state.events,
       sources: state.sources,
@@ -102,13 +110,20 @@ export async function GET(request: Request) {
       commodity: state.commodity,
       range: { min: months[0] ?? nowMonth, max: nowMonth },
       events: state.events
-        .map(ev => ({
-          id: ev.id, title: ev.title, type: ev.type, severity: ev.severity,
-          start: ev.start, end: ev.end ?? null,
-          entityId: ev.entityId ?? null,
-          entityName: ev.entityId ? entityName.get(ev.entityId) ?? null : null,
-          disruptive: DISRUPTIVE_EVENT_TYPES.includes(ev.type),
-        }))
+        .map(ev => {
+          const reported = ev.firstReportedAt ?? ev.start;
+          const latencyDays = Math.round((Date.parse(reported) - Date.parse(ev.start)) / 86400000);
+          return {
+            id: ev.id, title: ev.title, type: ev.type, severity: ev.severity,
+            start: ev.start, end: ev.end ?? null,
+            firstReportedAt: reported,
+            // How much warning a detector could actually have given.
+            detectionLatencyDays: latencyDays,
+            entityId: ev.entityId ?? null,
+            entityName: ev.entityId ? entityName.get(ev.entityId) ?? null : null,
+            disruptive: DISRUPTIVE_EVENT_TYPES.includes(ev.type),
+          };
+        })
         .sort((a, b) => a.start.localeCompare(b.start)),
     });
   }
@@ -209,6 +224,7 @@ export async function GET(request: Request) {
       commodityName: state.commodityName,
       providers,
       asOf: run.asOf ?? null,
+      knowledge: run.knowledge,
       econ_entities: entities,
       econ_flows: flows,
       econ_events: state.events,

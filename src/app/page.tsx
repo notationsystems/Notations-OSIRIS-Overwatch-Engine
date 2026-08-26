@@ -123,6 +123,8 @@ export default function Dashboard() {
   const [econSelected, setEconSelected] = useState<string | null>(null);
   /** Temporal playback: evaluation date override (null = present state). */
   const [econAsOf, setEconAsOf] = useState<string | null>(null);
+  /** Playback epistemics: hindsight reconstruction vs as-known-then. */
+  const [econKnowledge, setEconKnowledge] = useState<'best_known' | 'as_known_then'>('best_known');
   const [showEconGraph, setShowEconGraph] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showSpaceCam, setShowSpaceCam] = useState(false);
@@ -731,7 +733,7 @@ export default function Dashboard() {
   const econSeqRef = useRef(0);
   useEffect(() => {
     if (!anyEconLayer) return;
-    const key = econAsOf ?? 'live';
+    const key = `${econAsOf ?? 'live'}|${econKnowledge}`;
     if (econFetchKeyRef.current === key) return;
     // Debounce scrubbing; mark the key only once the request actually fires
     // so a cancelled debounce doesn't leave the layer stuck on stale data.
@@ -739,7 +741,7 @@ export default function Dashboard() {
       econFetchKeyRef.current = key;
       const seq = ++econSeqRef.current;
       fetchEndpoint(
-        `/api/economy?commodity=copper&view=map${econAsOf ? `&asOf=${econAsOf}` : ''}`,
+        `/api/economy?commodity=copper&view=map${econAsOf ? `&asOf=${econAsOf}&knowledge=${econKnowledge}` : ''}`,
         // Out-of-order guard: a slower older request must not overwrite a
         // newer evaluation date — a stale response merges nothing.
         d => (econSeqRef.current === seq ? { econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events } : {}),
@@ -750,7 +752,7 @@ export default function Dashboard() {
       });
     }, econAsOf ? 200 : 0);
     return () => clearTimeout(t);
-  }, [anyEconLayer, econAsOf, fetchEndpoint]);
+  }, [anyEconLayer, econAsOf, econKnowledge, fetchEndpoint]);
 
   // CCTV: loaded once on layer toggle via layerFetchedRef (no viewport polling)
 
@@ -1374,6 +1376,7 @@ export default function Dashboard() {
                   onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
                   onOpenGraph={() => setShowEconGraph(true)}
                   asOf={econAsOf}
+                  knowledge={econKnowledge}
                 />
               </motion.div>
             )}
@@ -1746,7 +1749,7 @@ export default function Dashboard() {
       {/* ── PHYSICAL ECONOMY — temporal playback scrubber ── */}
       {anyEconLayer && !isMobile && (
         <div className="absolute bottom-[64px] left-1/2 -translate-x-1/2 z-[250] pointer-events-none">
-          <EconTimeBar asOf={econAsOf} onChange={setEconAsOf} />
+          <EconTimeBar asOf={econAsOf} onChange={setEconAsOf} knowledge={econKnowledge} onKnowledgeChange={setEconKnowledge} />
         </div>
       )}
 
@@ -1756,6 +1759,7 @@ export default function Dashboard() {
           <EconGraphView
             selectedId={econSelected}
             asOf={econAsOf}
+            knowledge={econKnowledge}
             onSelectEntity={(id) => { setEconSelected(id); setShowEconomy(true); setShowEconGraph(false); }}
             onClose={() => setShowEconGraph(false)}
           />

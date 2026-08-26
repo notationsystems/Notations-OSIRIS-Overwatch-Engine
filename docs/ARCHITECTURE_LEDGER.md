@@ -85,6 +85,32 @@ the substrate's own `sourceCache`), and "never mix simulated and sourced data"
 became the reported>estimated>representative evidence ranking in
 `observationsAt`.
 
+## Phase 3 — external review findings (all shipped)
+
+An external review of the phase-2 branch produced four findings; disposition:
+
+1. **Granularity overlap** — flagged as urgent double-counting. Verified NOT
+   live: `concentration()` restricts each calculation to one entity kind, so
+   facility and country populations never mix (now pinned by a regression
+   test). The review's by-product shipped as the `coverage` system: rolled-up
+   facilities ÷ direct country observation — the coverage denominator (Chile
+   45%, DRC 22%, Indonesia 73% modeled).
+2. **Divergence as evidence** — shipped as the `divergence` system + the
+   `Divergence` derived record + bilateral (partner-scoped) observations from
+   Comtrade partner rows. First run surfaced the Chilean concentrate
+   reporter-suppression mirror gap (~4x) and the DRC→China −25% gap.
+3. **Point-in-time correctness** — shipped before any alerting work: `knownAt`
+   + `supersedes` on observations, `firstReportedAt` + detection latency on
+   events, the MCS2024 vintage ingested alongside MCS2025, and
+   `knowledge=as_known_then` through engine, API and UI (HINDSIGHT/AS KNOWN
+   toggle on the scrubber). Verified live: mid-2024 as-known-then serves
+   MCS2024's Chile estimate (5,000 kt), best-known serves MCS2025's reported
+   revision (5,250 kt).
+4. **Epistemic classes** — `measurementClass` with enforced invariants:
+   concentration refuses price/positioning; the roll-bearing HG=F series is
+   excluded from anomaly detection; positioning anomalies are tagged reflexive
+   market context; reserves stay a stock, never throughput.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

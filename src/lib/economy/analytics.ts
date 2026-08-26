@@ -8,9 +8,15 @@
  * the observation/flow ids it was computed from.
  */
 
-import type { AnalyticalResult, EconomyState, Metric, Observation } from './types';
+import type { AnalyticalResult, EconomyState, MeasurementClass, Metric, Observation } from './types';
+import { measurementClassOf } from './types';
 import type { EconomyGraph } from './graph';
 import { nodeThroughput } from './graph';
+
+/** knownAt with its conservative fallback: retrieval time bounds knowability. */
+export function knownAtOf(o: Observation): string {
+  return o.knownAt ?? o.provenance.retrievedAt.slice(0, 10);
+}
 
 const ENGINE = 'osiris-economy-analytics/0.1';
 
@@ -54,10 +60,19 @@ const CONF_RANK = { high: 2, medium: 1, low: 0 } as const;
 
 /** True when `candidate` is harder evidence than `incumbent` for the same
  *  (entity, metric, period): higher valueKind rank, then higher confidence. */
+export function outranksObservation(candidate: Observation, incumbent: Observation): boolean {
+  return outranks(candidate, incumbent);
+}
+
 function outranks(candidate: Observation, incumbent: Observation): boolean {
-  return VALUE_KIND_RANK[candidate.valueKind] > VALUE_KIND_RANK[incumbent.valueKind]
-    || (VALUE_KIND_RANK[candidate.valueKind] === VALUE_KIND_RANK[incumbent.valueKind]
-      && CONF_RANK[candidate.confidence] > CONF_RANK[incumbent.confidence]);
+  if (VALUE_KIND_RANK[candidate.valueKind] !== VALUE_KIND_RANK[incumbent.valueKind]) {
+    return VALUE_KIND_RANK[candidate.valueKind] > VALUE_KIND_RANK[incumbent.valueKind];
+  }
+  if (CONF_RANK[candidate.confidence] !== CONF_RANK[incumbent.confidence]) {
+    return CONF_RANK[candidate.confidence] > CONF_RANK[incumbent.confidence];
+  }
+  // Equal rank and confidence: the later vintage wins (revisions supersede).
+  return knownAtOf(candidate) > knownAtOf(incumbent);
 }
 
 /**
@@ -77,6 +92,7 @@ export function observationsAt(
   const best = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.metric !== metric || o.period.end > cutoff) continue;
+    if (o.partnerEntityId) continue; // bilateral mirror evidence, not an aggregate
     const ent = state.entities.find(e => e.id === o.entityId);
     if (ent?.kind !== kind) continue;
     const prev = best.get(o.entityId);
@@ -99,6 +115,12 @@ export function concentration(
   kind: 'country' | 'mine' | 'smelter' | 'refinery' | 'region',
   asOf?: string,
 ): AnalyticalResult<Concentration> {
+  const cls = measurementClassOf(metric);
+  if (cls === 'market_price' || cls === 'financial_positioning') {
+    // A market signal has no population shares; an HHI over it is a category
+    // error, so refuse rather than return a plausible-looking number.
+    throw new Error(`concentration() rejects ${cls} metric "${metric}" — physical measurements only`);
+  }
   const obs = observationsAt(state, metric, kind, asOf);
   const total = obs.reduce((s, o) => s + o.value, 0);
   const shares: ConcentrationShare[] = obs
@@ -206,6 +228,84 @@ export function capacityConcentration(
     { stage },
     { capacityIds: caps.map(c => c.id) },
     { metric: 'throughput', hhi, band, total, unit: caps[0]?.unit ?? '', shares },
+  );
+}
+
+/* ── Facility coverage ── */
+
+export interface CoverageRow {
+  countryId: string;
+  countryName: string;
+  metric: Metric;
+  /** The country's own latest observation at asOf. */
+  direct: number;
+  directObservationId: string;
+  /** Sum of the latest facility observations rolled up via countryCode. */
+  rolledUp: number;
+  facilityCount: number;
+  facilityObservationIds: string[];
+  /** rolledUp / direct. ≈1 complete facility model; <1 unmodelled share;
+   *  >1 a real contradiction — one side is wrong. */
+  ratio: number;
+  status: 'complete' | 'partial' | 'contradiction';
+  unit: string;
+}
+
+/**
+ * Coverage denominator for the facility model: for each country carrying both
+ * a direct observation and rolled-up facility observations of the same metric,
+ * report what fraction of the country's output the modeled facilities account
+ * for. Diagnostic, not an error — the gap IS the unmodelled capacity, and a
+ * ratio above one is a contradiction worth chasing. This is also the standing
+ * integrity check that keeps facility- and country-level populations from
+ * ever being silently conflated: they meet only here, explicitly, as a ratio.
+ */
+export function facilityCoverage(
+  state: EconomyState,
+  metric: Metric,
+  facilityKinds: Array<'mine' | 'smelter' | 'refinery'>,
+  asOf?: string,
+): AnalyticalResult<CoverageRow[]> {
+  const direct = observationsAt(state, metric, 'country', asOf);
+  const facilityObs = facilityKinds.flatMap(kind => observationsAt(state, metric, kind, asOf));
+  const entityById = new Map(state.entities.map(e => [e.id, e]));
+
+  const rows: CoverageRow[] = [];
+  for (const d of direct) {
+    const country = entityById.get(d.entityId);
+    if (!country?.countryCode) continue;
+    const facilities = facilityObs.filter(o => {
+      const ent = entityById.get(o.entityId);
+      // Units must agree — a gross-weight figure must not roll up against
+      // a copper-content denominator.
+      return ent?.countryCode === country.countryCode && o.unit === d.unit;
+    });
+    if (facilities.length === 0) continue;
+    const rolledUp = facilities.reduce((s, o) => s + o.value, 0);
+    // A zero country total with zero facility output (e.g. Panama after the
+    // closure) is a COMPLETE model of nothing — not a contradiction. Facilities
+    // producing against a zero country figure IS one; keep it finite for JSON.
+    const ratio = d.value > 0 ? rolledUp / d.value : (rolledUp === 0 ? 1 : 99.999);
+    rows.push({
+      countryId: d.entityId,
+      countryName: country.name,
+      metric,
+      direct: d.value,
+      directObservationId: d.id,
+      rolledUp: Math.round(rolledUp),
+      facilityCount: facilities.length,
+      facilityObservationIds: facilities.map(o => o.id),
+      ratio: Number(ratio.toFixed(3)),
+      status: ratio > 1.02 ? 'contradiction' : ratio >= 0.95 ? 'complete' : 'partial',
+      unit: d.unit,
+    });
+  }
+  rows.sort((a, b) => b.direct - a.direct);
+  return wrap(
+    'facilityCoverage',
+    { metric, facilityKinds: facilityKinds.join(','), asOf },
+    { observationIds: [...new Set([...rows.map(r => r.directObservationId), ...rows.flatMap(r => r.facilityObservationIds)])] },
+    rows,
   );
 }
 
@@ -356,6 +456,10 @@ export interface SeriesPoint { period: string; value: number; observationId: str
 export interface AnomalySignal {
   entityId: string;
   metric: Metric;
+  /** What kind of thing moved — the UI partitions physical signals from
+   *  market context (positioning is reflexive: a corroborating layer, not
+   *  physical evidence). */
+  measurementClass: MeasurementClass;
   kind: 'rolling-deviation' | 'rate-of-change';
   period: string;
   value: number;
@@ -376,6 +480,7 @@ export function extractSeries(state: EconomyState, entityId: string, metric: Met
   const byPeriod = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.entityId !== entityId || o.metric !== metric) continue;
+    if (o.partnerEntityId) continue; // bilateral mirror evidence, not an aggregate series
     const key = `${o.period.start}|${o.period.end}`;
     const prev = byPeriod.get(key);
     if (!prev || outranks(o, prev)) byPeriod.set(key, o);
@@ -399,6 +504,10 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
 
   for (const key of seriesKeys) {
     const [entityId, metric] = key.split('|') as [string, Metric];
+    // The continuous front-month price series carries roll discontinuities —
+    // contract-expiry artifacts, not market moves. Until roll-adjusted, it is
+    // excluded from anomaly detection rather than allowed to flag rolls.
+    if (measurementClassOf(metric) === 'market_price') continue;
     // Length is judged on the RESOLVED series — raw observation counts would
     // let same-period provider duplicates fake a longer history.
     const series = extractSeries(state, entityId, metric);
@@ -415,7 +524,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
         if (Math.abs(z) >= zThreshold) {
           series.slice(i - window, i + 1).forEach(p => usedObs.add(p.observationId));
           signals.push({
-            entityId, metric, kind: 'rolling-deviation', period: point.period, value: point.value,
+            entityId, metric, measurementClass: measurementClassOf(metric),
+            kind: 'rolling-deviation', period: point.period, value: point.value,
             magnitude: Number(z.toFixed(2)),
             observationIds: series.slice(i - window, i + 1).map(p => p.observationId),
             explanation: `${point.period}: ${point.value} is ${z.toFixed(1)}σ from the trailing ${window}-period mean (${mean.toFixed(1)})`,
@@ -429,7 +539,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
         if (Math.abs(roc) >= rocThreshold) {
           usedObs.add(prev.observationId); usedObs.add(point.observationId);
           signals.push({
-            entityId, metric, kind: 'rate-of-change', period: point.period, value: point.value,
+            entityId, metric, measurementClass: measurementClassOf(metric),
+            kind: 'rate-of-change', period: point.period, value: point.value,
             magnitude: Number((roc * 100).toFixed(1)),
             observationIds: [prev.observationId, point.observationId],
             explanation: `${point.period}: ${(roc * 100).toFixed(1)}% change vs ${prev.period} (${prev.value} → ${point.value})`,

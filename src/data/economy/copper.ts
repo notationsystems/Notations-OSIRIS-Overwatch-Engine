@@ -219,24 +219,30 @@ export const COPPER_OBSERVATIONS: Observation[] = [
   ...countryProduction.map(([entityId, value, confidence]): Observation => ({
     id: `obs:prod-2024:${entityId.split(':')[2]}`,
     entityId, metric: 'production', value, unit: 'kt/y', period: Y2024,
+    // 2024 estimates first appeared in MCS 2025 (published late Jan 2025).
+    knownAt: '2025-01-30',
     valueKind: 'representative', confidence,
     provenance: usgs('Mine production, 2024 est.', 'Contained copper.'),
   })),
   ...countryRefined.map(([entityId, value, confidence]): Observation => ({
     id: `obs:refined-2024:${entityId.split(':')[2]}`,
     entityId, metric: 'refined_production', value, unit: 'kt/y', period: Y2024,
+    knownAt: '2025-06-30',
     valueKind: 'representative', confidence,
-    provenance: icsg('Refined production by country, 2024', 'Includes SX-EW cathode.'),
+    provenance: icsg('Refined production by country, 2024', 'Includes SX-EW cathode. knownAt approximates ICSG annual availability.'),
   })),
   ...regionConsumption.map(([entityId, value, confidence]): Observation => ({
     id: `obs:cons-2024:${entityId.split(':')[2]}`,
     entityId, metric: 'consumption', value, unit: 'kt/y', period: Y2024,
+    knownAt: '2025-06-30',
     valueKind: 'representative', confidence,
     provenance: icsg('Refined usage by region, 2024'),
   })),
   ...facilityProduction.map(([entityId, value, confidence]): Observation => ({
     id: `obs:prod-2024:${entityId.split(':')[2]}`,
     entityId, metric: 'production', value, unit: 'kt/y', period: Y2024,
+    // Annual company reporting lands through Q1 of the following year.
+    knownAt: '2025-03-31',
     valueKind: 'representative', confidence,
     provenance: curated('Facility output, contained Cu, assembled from company reporting.'),
   })),
@@ -244,6 +250,7 @@ export const COPPER_OBSERVATIONS: Observation[] = [
     id: `obs:lme-stocks:${ym}`,
     entityId: 'ent:infrastructure:lme-warehouses',
     metric: 'inventory', value, unit: 'kt', period: monthPeriod(ym),
+    knownAt: monthPeriod(ym).end, // exchange stocks publish daily
     valueKind: 'representative', confidence: 'medium',
     provenance: lme('Month-end total copper stocks, representative series.'),
   })),
@@ -356,31 +363,31 @@ export const COPPER_DEPENDENCIES: Dependency[] = [
 export const COPPER_EVENTS: EconEvent[] = [
   {
     id: 'evt:cobre-panama-closure', entityId: 'ent:mine:cobre-panama', type: 'closure',
-    title: 'Cobre Panamá ordered closed', start: '2023-11-28', severity: 'high',
+    title: 'Cobre Panamá ordered closed', start: '2023-11-28', firstReportedAt: '2023-11-28', severity: 'high',
     description: 'Supreme Court ruling voided the mining contract; ~350 kt/y of mine supply (≈1.5% of world output) removed from the market. Site in preservation pending arbitration/negotiation.',
     provenance: news('Widely reported; First Quantum disclosures.'),
   },
   {
     id: 'evt:kakula-seismic-2025', entityId: 'ent:mine:kamoa-kakula', type: 'disruption',
-    title: 'Kakula underground seismic event and flooding', start: '2025-05-18', end: '2025-09-30', severity: 'high',
+    title: 'Kakula underground seismic event and flooding', start: '2025-05-18', end: '2025-09-30', firstReportedAt: '2025-05-20', severity: 'high',
     description: 'Seismic activity forced suspension of underground operations at Kakula; guidance cut while dewatering and restart proceeded.',
     provenance: news('Ivanhoe Mines disclosures, May–Sep 2025.'),
   },
   {
     id: 'evt:grasberg-mud-rush-2025', entityId: 'ent:mine:grasberg', type: 'disruption',
-    title: 'Grasberg Block Cave mud rush / force majeure', start: '2025-09-08', severity: 'high',
-    description: 'Fatal mud rush halted Grasberg Block Cave operations; Freeport declared force majeure and cut 2025–2026 sales guidance. Major upstream shock to the concentrate market.',
+    title: 'Grasberg Block Cave mud rush / force majeure', start: '2025-09-08', firstReportedAt: '2025-09-10', severity: 'high',
+    description: 'Fatal mud rush halted Grasberg Block Cave operations (2025-09-08, first public reports 2025-09-10); Freeport declared force majeure 2025-09-24 and cut 2025–2026 sales guidance. Major upstream shock to the concentrate market. Detection latency between occurrence and first report: 2 days; to force majeure: 16 days.',
     provenance: news('Freeport-McMoRan disclosures, Sep–Oct 2025.'),
   },
   {
     id: 'evt:panama-canal-drought', entityId: 'ent:infrastructure:panama-canal', type: 'weather',
-    title: 'Panama Canal drought transit restrictions', start: '2023-06-01', end: '2024-09-30', severity: 'medium',
+    title: 'Panama Canal drought transit restrictions', start: '2023-06-01', end: '2024-09-30', firstReportedAt: '2023-06-01', severity: 'medium',
     description: 'Low Gatún Lake levels cut daily transits, lengthening some South America → Asia/Atlantic routings, including metal cargoes.',
     provenance: news('Panama Canal Authority advisories.'),
   },
   {
     id: 'evt:lme-stock-drawdown', entityId: 'ent:infrastructure:lme-warehouses', type: 'demand_surge',
-    title: 'Sustained exchange stock drawdown', start: '2026-02-01', severity: 'medium',
+    title: 'Sustained exchange stock drawdown', start: '2026-02-01', firstReportedAt: '2026-03-01', severity: 'medium',
     description: 'Representative series shows accelerating decline in exchange inventories through H1 2026 — the anomaly-detection layer flags the rate of change.',
     provenance: lme(),
   },

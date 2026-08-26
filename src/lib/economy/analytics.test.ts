@@ -4,7 +4,7 @@ import {
   bottleneckCandidates, detectAnomalies, extractSeries, observationsAt,
 } from './analytics';
 import { buildGraph } from './graph';
-import { syntheticState } from './fixtures';
+import { syntheticState, FIXTURE_PROV } from './fixtures';
 import { getEconomyState } from './store';
 
 describe('concentration (synthetic, hand-computable)', () => {
@@ -73,6 +73,45 @@ describe('concentration trajectory', () => {
     // Only 2 country observations in 2024 → below minParticipants.
     const r = concentrationTrajectory(s, 'production', 'country');
     expect(r.result).toEqual([]);
+  });
+});
+
+describe('measurement-class invariants', () => {
+  it('refuses an HHI over market prices or positioning', () => {
+    const s = syntheticState();
+    expect(() => concentration(s, 'price', 'country')).toThrow(/physical measurements only/);
+    expect(() => concentration(s, 'net_positioning', 'country')).toThrow(/physical measurements only/);
+  });
+
+  it('excludes the roll-bearing price series from anomaly detection', () => {
+    const s = syntheticState();
+    // A price series with a violent "roll" jump that would otherwise flag.
+    for (let i = 0; i < 8; i++) {
+      s.observations.push({
+        id: `obs:price:${i}`, entityId: 'ent:country:aa', metric: 'price',
+        value: i === 7 ? 9 : 4, unit: 'USD/lb',
+        period: { start: `2024-0${i + 1}-01`, end: `2024-0${i + 1}-28` },
+        valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV,
+      });
+    }
+    const r = detectAnomalies(s, { window: 6 });
+    expect(r.result.some(a => a.metric === 'price')).toBe(false);
+    // Physical signals carry their class tag for the UI to partition on.
+    for (const a of r.result) expect(a.measurementClass).toBeDefined();
+  });
+
+  it('bilateral (partner-scoped) observations never enter aggregates', () => {
+    const s = syntheticState();
+    s.observations.push({
+      id: 'obs:prod:aa:to-bb', entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb',
+      metric: 'production', value: 99999, unit: 'kt/y',
+      period: { start: '2024-01-01', end: '2024-12-31' },
+      valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV,
+    });
+    const r = concentration(s, 'production', 'country');
+    expect(r.result.hhi).toBe(6800); // unchanged — the bilateral row is invisible here
+    expect(r.inputs.observationIds).not.toContain('obs:prod:aa:to-bb');
+    expect(extractSeries(s, 'ent:country:aa', 'production').some(p => p.observationId === 'obs:prod:aa:to-bb')).toBe(false);
   });
 });
 

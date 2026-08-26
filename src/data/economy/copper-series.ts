@@ -100,6 +100,8 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
       return {
         id: `obs:prod:${entityId.split(':')[2]}:${year}`,
         entityId, metric: 'production', value, unit: 'kt/y', period: yearPeriod(year),
+        // Year Y first appears (as an estimate) in the MCS published Jan Y+1.
+        knownAt: `${year + 1}-01-31`,
         valueKind: 'representative',
         confidence: year >= 2020 ? 'high' : 'medium',
         provenance: usgsHist(String(year)),
@@ -108,6 +110,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
   ...PANAMA_SERIES.map(([year, value]): Observation => ({
     id: `obs:prod:pa:${year}`,
     entityId: 'ent:country:pa', metric: 'production', value, unit: 'kt/y', period: yearPeriod(year),
+    knownAt: `${year + 1}-01-31`,
     valueKind: 'representative', confidence: 'high',
     provenance: usgsHist(String(year)),
   })),
@@ -116,6 +119,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
     return {
       id: `obs:refined:cn:${year}`,
       entityId: 'ent:country:cn', metric: 'refined_production', value, unit: 'kt/y', period: yearPeriod(year),
+      knownAt: `${year + 1}-06-30`,
       valueKind: 'representative', confidence: 'high',
       provenance: icsgHist(String(year)),
     };
@@ -124,6 +128,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
     id: `obs:lme-stocks:${ym}`,
     entityId: 'ent:infrastructure:lme-warehouses',
     metric: 'inventory', value, unit: 'kt', period: monthPeriod(ym),
+    knownAt: monthPeriod(ym).end,
     valueKind: 'representative', confidence: 'medium',
     provenance: lme('Month-end total copper stocks, representative series.'),
   })),

@@ -27,6 +27,8 @@ interface TimelineEvent {
 interface EconTimeBarProps {
   asOf: string | null;
   onChange: (asOf: string | null) => void;
+  knowledge: 'best_known' | 'as_known_then';
+  onKnowledgeChange: (k: 'best_known' | 'as_known_then') => void;
 }
 
 /** Exported for tests (vitest matches .test.ts only, so helpers are tested
@@ -52,7 +54,7 @@ export function monthEnd(ym: string): string {
 
 const SEV_COLOR: Record<string, string> = { high: '#FF3D3D', medium: '#FF9500', low: '#FFD700' };
 
-export default function EconTimeBar({ asOf, onChange }: EconTimeBarProps) {
+export default function EconTimeBar({ asOf, onChange, knowledge, onKnowledgeChange }: EconTimeBarProps) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [range, setRange] = useState<{ min: string; max: string } | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -154,6 +156,17 @@ export default function EconTimeBar({ asOf, onChange }: EconTimeBarProps) {
           />
         </div>
 
+        {!live && (
+          <button
+            onClick={() => onKnowledgeChange(knowledge === 'best_known' ? 'as_known_then' : 'best_known')}
+            className={`px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider border ${knowledge === 'as_known_then' ? 'text-[#D4AF37] border-[#D4AF37]/50' : 'text-[var(--text-muted)] border-white/15 hover:bg-white/10'}`}
+            title={knowledge === 'as_known_then'
+              ? 'AS KNOWN: only evidence knowable at this date (honest backtesting). Click for hindsight.'
+              : 'HINDSIGHT: best current reconstruction, including later revisions. Click for as-known-then.'}
+          >
+            {knowledge === 'as_known_then' ? 'AS KNOWN' : 'HINDSIGHT'}
+          </button>
+        )}
         <button
           onClick={() => { setPlaying(false); onChange(null); }}
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono tracking-wider ${live ? 'text-[#00E676] border border-[#00E676]/50' : 'text-[var(--text-muted)] border border-white/15 hover:bg-white/10'}`}

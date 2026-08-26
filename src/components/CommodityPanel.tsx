@@ -22,6 +22,8 @@ interface CommodityPanelProps {
   onOpenGraph?: () => void;
   /** Temporal playback date (null = present) — analytics re-evaluate at it. */
   asOf?: string | null;
+  /** Playback epistemics: best-known reconstruction vs as-known-then. */
+  knowledge?: 'best_known' | 'as_known_then';
 }
 
 interface Share { entityId: string; name: string; value: number; share: number }
@@ -35,19 +37,30 @@ interface Bottleneck {
   components: { throughputShare: number; utilization: number | null; redundancy: number; dependencyLoad: number };
   explanation: string[];
 }
-interface Anomaly { entityId: string; metric: string; kind: string; period: string; magnitude: number; explanation: string; observationIds: string[] }
+interface Anomaly { entityId: string; metric: string; measurementClass?: string; kind: string; period: string; magnitude: number; explanation: string; observationIds: string[] }
 interface EconEvent { id: string; entityId?: string; type: string; title: string; start: string; end?: string; severity: string; description?: string }
 
 interface TrajectoryPoint { period: string; hhi: number; band: string; topName: string; topShare: number; participants: number }
+
+interface CoverageRow { countryId: string; countryName: string; direct: number; rolledUp: number; facilityCount: number; ratio: number; status: string; unit: string }
+interface DivergenceClaim { observationId: string; sourceId: string; value: number; unit: string; perspective?: string }
+interface DivergenceRec {
+  id: string; kind: string; entityId: string; partnerEntityId?: string; metric: string;
+  period: { start: string; end: string }; claims: DivergenceClaim[]; resolvedTo: string;
+  relativeSpread: number; direction: string; persistence: number; class: string; explanation: string;
+}
 
 interface Analytics {
   /** Which evaluation date produced this payload (client bookkeeping). */
   _evalKey?: string;
   commodityName: string;
   providers: string[];
+  knowledge?: string;
   concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
   bottlenecks: { result: Bottleneck[] };
   anomalies: { result: Anomaly[] };
+  coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
+  divergence?: { result: DivergenceRec[] };
   events: EconEvent[];
   sources: Array<{ sourceId: string; sourceName: string; sourceUrl?: string }>;
 }
@@ -145,7 +158,7 @@ function ProvLine({ p, valueKind, confidence }: { p: Prov; valueKind?: string; c
   );
 }
 
-export default function CommodityPanel({ selectedId, onSelectEntity, onClose, onFlyTo, onOpenGraph, asOf = null }: CommodityPanelProps) {
+export default function CommodityPanel({ selectedId, onSelectEntity, onClose, onFlyTo, onOpenGraph, asOf = null, knowledge = 'best_known' }: CommodityPanelProps) {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState(false);
   const [detailById, setDetailById] = useState<EntityDetail | null>(null);
@@ -156,15 +169,15 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
   useEffect(() => {
     let cancelled = false;
     // Debounce so timeline scrubbing doesn't fire a request per tick.
-    const key = asOf ?? 'live';
+    const key = `${asOf ?? 'live'}|${knowledge}`;
     const t = setTimeout(() => {
-      fetch(`/api/economy?commodity=copper&view=analytics${asOf ? `&asOf=${asOf}` : ''}`, { cache: 'no-store' })
+      fetch(`/api/economy?commodity=copper&view=analytics${asOf ? `&asOf=${asOf}&knowledge=${knowledge}` : ''}`, { cache: 'no-store' })
         .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
         .then(d => { if (!cancelled) setAnalytics({ ...d, _evalKey: key }); })
         .catch(() => { if (!cancelled) setAnalyticsError(true); });
     }, asOf ? 300 : 0);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [asOf]);
+  }, [asOf, knowledge]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -223,7 +236,7 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
           </span>
           {asOf && (
             <span className="text-[8px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1 shrink-0">
-              AS OF {asOf}{analytics && analytics._evalKey !== (asOf ?? 'live') ? ' · updating…' : ''}
+              {knowledge === 'as_known_then' ? 'AS KNOWN ' : 'AS OF '}{asOf}{analytics && analytics._evalKey !== `${asOf ?? 'live'}|${knowledge}` ? ' · updating…' : ''}
             </span>
           )}
         </div>
@@ -470,13 +483,67 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                 </div>
               </Section>
 
+              {(analytics.divergence?.result?.length ?? 0) > 0 && (
+                <Section id="divergences" open={!!openSections['divergences']} onToggle={toggle} title="DIVERGENCES" icon={<Activity className="w-3 h-3 text-[#FFB300]" />} count={analytics.divergence!.result.length}>
+                  <div className="space-y-1">
+                    <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
+                      An anomaly says the world moved; a divergence says the observers disagree. Mirror rows compare exporter- and importer-declared weights of the same flow.
+                    </div>
+                    {analytics.divergence!.result.slice(0, 6).map(d => (
+                      <button key={d.id} onClick={() => onSelectEntity(d.entityId)} className="w-full text-left px-2 py-1 rounded hover:bg-white/5 border-l-2"
+                        style={{ borderLeftColor: d.class === 'unexplained' ? '#FF3D3D' : d.class === 'coverage' ? '#FF9500' : '#5C5A54' }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[9px] font-mono font-bold" style={{ color: d.class === 'unexplained' ? '#FF3D3D' : '#FF9500' }}>
+                            {d.kind === 'mirror' ? 'MIRROR' : 'MULTI-SOURCE'} · {d.metric.replace(/_/g, ' ')} · {d.period.start.slice(0, 4)}
+                          </span>
+                          <span className="text-[9px] font-mono tabular-nums shrink-0" style={{ color: d.class === 'unexplained' ? '#FF3D3D' : '#FF9500' }}>
+                            {(d.relativeSpread * 100).toFixed(0)}% · {d.class.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-[8px] font-mono text-[var(--text-muted)]">
+                          {d.claims.map(c => `${c.perspective ? c.perspective + ' ' : ''}${c.value.toLocaleString()}`).join(' vs ')} {d.claims[0]?.unit}
+                        </div>
+                        <div className="text-[9px] font-mono text-[#E8E6E0] leading-tight">{d.explanation}</div>
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {(analytics.coverage?.result?.mineProduction?.result?.length ?? 0) > 0 && (
+                <Section id="coverage" open={!!openSections['coverage']} onToggle={toggle} title="FACILITY COVERAGE" icon={<Database className="w-3 h-3 text-[#00BCD4]" />} count={analytics.coverage!.result.mineProduction.result.length}>
+                  <div className="space-y-1">
+                    <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
+                      Share of each country total the facility model accounts for (rolled-up facilities ÷ country observation). The gap is unmodelled capacity; a ratio above 1 is a contradiction.
+                    </div>
+                    {analytics.coverage!.result.mineProduction.result.map(r => (
+                      <div key={r.countryId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono text-[#E8E6E0]">{r.countryName}</span>
+                          <span className="flex items-center gap-1.5 shrink-0">
+                            <ScoreBar value={Math.min(1, r.ratio)} color={r.status === 'contradiction' ? '#FF3D3D' : r.status === 'complete' ? '#00E676' : '#00BCD4'} />
+                            <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: r.status === 'contradiction' ? '#FF3D3D' : '#00BCD4' }}>{(r.ratio * 100).toFixed(0)}%</span>
+                          </span>
+                        </div>
+                        <div className="text-[8px] font-mono text-[var(--text-muted)]">
+                          {r.facilityCount} modeled facilit{r.facilityCount === 1 ? 'y' : 'ies'}: {r.rolledUp.toLocaleString()} of {r.direct.toLocaleString()} {r.unit}{r.status === 'contradiction' ? ' — CONTRADICTION: one side is wrong' : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
               <Section id="anomalies" open={!!openSections['anomalies']} onToggle={toggle} title="ANOMALY SIGNALS" icon={<Activity className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.anomalies.result.length}>
                 <div className="space-y-1">
                   {analytics.anomalies.result.length === 0 ? (
                     <div className="text-[9px] font-mono text-[#00E676]">No series deviates from its trailing window.</div>
                   ) : analytics.anomalies.result.slice(0, 6).map((a, i) => (
                     <button key={`${a.entityId}-${a.kind}-${a.period}-${i}`} onClick={() => onSelectEntity(a.entityId)} className="w-full text-left px-2 py-1 rounded hover:bg-white/5 border-l-2 border-[#FF3D3D]/60">
-                      <div className="text-[9px] font-mono text-[#FF3D3D] font-bold">{a.kind.toUpperCase()} · {a.metric} · {a.period}</div>
+                      <div className="text-[9px] font-mono text-[#FF3D3D] font-bold">
+                        {a.kind.toUpperCase()} · {a.metric} · {a.period}
+                        {a.measurementClass === 'financial_positioning' && <span className="ml-1 text-[8px] text-[#AB47BC] border border-[#AB47BC]/40 rounded px-0.5">MARKET CONTEXT — REFLEXIVE</span>}
+                      </div>
                       <div className="text-[9px] font-mono text-[#E8E6E0] leading-tight">{a.explanation}</div>
                     </button>
                   ))}
