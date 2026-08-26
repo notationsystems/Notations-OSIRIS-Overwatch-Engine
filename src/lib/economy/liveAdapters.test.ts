@@ -3,8 +3,10 @@ import type { Provenance } from './types';
 import { validateState } from './types';
 import {
   parseMcsWorldCsv, parseComtradeResponse, parseYahooChart, parseCftcRows,
+  parseWestmetallTable, westmetallObs,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
 } from './liveAdapters';
+import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
 import { MCS_SNAPSHOT_CSV } from '@/data/economy/snapshots/mcs2025-world-copper';
 import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
@@ -118,6 +120,33 @@ describe('parseCftcRows (against the committed real capture)', () => {
     expect(latest.unit).toBe('contracts');
     // Sorted ascending by date.
     expect(obs[0].period.start < latest.period.start).toBe(true);
+  });
+});
+
+describe('parseWestmetallTable / westmetallObs (against the committed real capture)', () => {
+  it('parses the daily table markup', () => {
+    const html = '<tr><td >25. August 2026</td>\n<td >14,425.00</td>\n<td >14,298.00</td>\n<td class="last">238,725</td></tr>'
+      + '<tr><td >02. January 2026</td>\n<td >12,000.00</td>\n<td >12,100.00</td>\n<td class="last">99,150</td></tr>';
+    const rows = parseWestmetallTable(html);
+    expect(rows).toEqual([
+      { date: '2026-01-02', stockTonnes: 99150 },
+      { date: '2026-08-25', stockTonnes: 238725 },
+    ]);
+  });
+
+  it('converts the snapshot to daily kt observations with day-after knowability', () => {
+    const rows = (westmetallSnapshot as { rows: Array<{ date: string; stockTonnes: number }> }).rows;
+    expect(rows.length).toBe(164);
+    const obs = westmetallObs(rows, prov);
+    const latest = obs[obs.length - 1];
+    expect(latest.id).toBe('obs:lme-stock-daily:2026-08-25');
+    expect(latest.value).toBeCloseTo(238.725, 3); // tonnes → kt
+    expect(latest.unit).toBe('kt');
+    expect(latest.basis).toBe('cu_content');
+    expect(latest.period).toEqual({ start: '2026-08-25', end: '2026-08-25' });
+    // Previous session's closing stock publishes the next morning.
+    expect(latest.knownAt).toBe('2026-08-26');
+    expect(latest.valueKind).toBe('reported');
   });
 });
 

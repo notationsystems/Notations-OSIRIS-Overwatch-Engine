@@ -77,7 +77,7 @@ parseable here, with verbatim response captures committed as snapshots:
 | Yahoo HG=F chart API | works with browser UA; monthly USD/lb 10y | `yahoo-copper-price` |
 | CFTC COT (Socrata) | works, no key; weekly positioning (dataset ids inverted vs docs: 72hh-3qpy = disaggregated) | `cftc-positioning` |
 | WB Pink Sheet xlsx | works ($/mt monthly since 1960) but xlsx parsing + hash discovery | deferred (Yahoo covers price) |
-| LME/SHFE stocks | no free API confirmed | not built — stock series stays representative |
+| LME/SHFE stocks | no free API confirmed (phase 2); phase 6 recon: LME pages + CME delivery reports bot-blocked (403), SHFE .dat paths 404, but Westmetall republishes LME daily headline stocks as public HTML | `westmetall-lme-stocks` (daily, year-to-date; licensing noted) |
 
 Patterns adapted from the OSINT-War-Room study now live in code: the
 degradation ladder and in-flight coalescing wrap every live adapter (reusing
@@ -186,6 +186,56 @@ trade edges arrive:
    the verdict and its reasons are encoded in the test suite, and the report
    names what would change the answer (weekly stocks feed, facility-cadence
    series, richer curated event record).
+
+## Phase 6 — the horizon is the headline (external review round 4)
+
+The round-4 review read the 0.438 backtest and found the wrong number in the
+headline: **the verdict was the lead time, not the precision** — no threshold
+tuning fixes −30 days, and monthly period-end series cannot in principle fire
+before an event inside the period they describe. Shipped in response, in the
+review's order:
+
+1. **Information horizon** (`horizon.ts`, published inside the backtest
+   report): per-source `knownAt − periodEnd` distributions, arrival cadence
+   from knownAt spacing, event `firstReportedAt − occurredAt`, and the lead
+   ceiling per source (best-case and typical). The review's expectation held
+   almost exactly: USGS −30/−213 days, CFTC −3 (reflexive), price ~0 (roll-
+   bearing, excluded), the monthly stock series 0 at best — not one
+   originally-ingested physical series capable of positive lead. The 0.438
+   was never the binding constraint. (Measured bonus: Comtrade's knownAt is
+   unstamped, so its true ~2–3-month delay is invisible to the corpus —
+   logged as a gap.)
+2. **Event-record curation**: 9 of 9 false positives traced to one missing
+   event. Six public-record events added (2017 Escondida strike + Grasberg
+   export halt, 2019 Chuquicamata strike, 2020 Peru COVID curtailments, 2022
+   Las Bambas blockade, 2025 US-tariff LME drawdown), each with occurrence,
+   first report, and estimated magnitude+basis; `magnitude` added to the
+   event schema. Precision moved 0.438 → 1.0 with the detector untouched —
+   confirming it had been measuring curation completeness. The test suite no
+   longer pins the value: it pins the procedure (no-lookahead, revision
+   separation, undetected-events-reported) and the horizon's structural
+   facts, and lets the number move.
+3. **Residual drift** replaces the level threshold: a fixed 25% reference
+   makes a genuine 30%-grade corridor read +20%, so the ±10% level trigger
+   sat inside its own noise floor. Grade is a slowly-moving per-corridor
+   offset; first-differencing removes it. A stable +20% corridor stays
+   definitional (pinned by test); a step from +0.8% to +15% reclasses on
+   drift. Level and band remain for display.
+4. **Revision channel + arrival-cadence gate**: the alert gate now keys on
+   how often information ARRIVES (knownAt spacing), not how long a period it
+   describes — recovering the one class of annual-series alerting with a
+   defensible lead: supersedes-chain revisions ≥5%, news on publication day.
+   Twelve fire on current data (MCS 2025 revising 2023: Zambia refined
+   −41.6%, Kazakhstan +23.3%, DRC +17.2%…), scored separately from
+   disruption detection (a publisher's act, not an inference).
+5. **Daily stocks adapter** after recon (see the phase-2 table update):
+   `westmetall-lme-stocks`, the corpus's first daily physical series
+   (best-case lead −1 day). Anomaly series now partition by period cadence
+   so the daily stream can never splice against the monthly one. Re-measured:
+   the 2026 drawdown detected at **+1 day lead** — the system's first
+   non-negative lead, delivered by acquisition, exactly as the horizon table
+   predicted. Next binding constraint, per the report's own caveat: the
+   monthly evaluation grid.
 
 ## Capability gap analysis (post-phase-2)
 

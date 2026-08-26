@@ -33,6 +33,7 @@ import { MCS2024_SNAPSHOT_CSV, MCS2024_SNAPSHOT_CAPTURED_AT, MCS2024_PUBLISHED_A
 import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
+import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
 
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
@@ -54,8 +55,8 @@ async function fetchJson<T>(url: string, timeoutMs = 15000, headers: Record<stri
   return res.json() as Promise<T>;
 }
 
-async function fetchText(url: string, timeoutMs = 20000): Promise<string> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': UA } });
+async function fetchText(url: string, timeoutMs = 20000, headers: Record<string, string> = {}): Promise<string> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': UA, ...headers } });
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
   return res.text();
 }
@@ -642,6 +643,92 @@ function cftcSnapshotObs(reason: string): Observation[] {
   }));
 }
 
+/* ══════════════ Westmetall daily LME copper stocks ══════════════ */
+
+/*
+ * Recon verdict (2026-08): the LME's own market-data pages and the CME
+ * delivery reports both sit behind bot protection (403), and LME data is
+ * commercially licensed at the feed level. Westmetall (a German metal
+ * trader) republishes the LME daily headline figures — cash settlement,
+ * 3-month, and closing stock — as a public HTML table, reachable without a
+ * key, year-to-date depth. This is the one daily-cadence PHYSICAL series
+ * the horizon table found capable of a non-negative lead. Licensing
+ * posture: headline daily totals republished by a third party, used here
+ * for internal research; a production deployment wants a licensed LME feed
+ * — that is the first line of the acquisition shopping list.
+ */
+
+const WM_URL = 'https://www.westmetall.com/en/markdaten.php?action=table&field=LME_Cu_cash';
+const WM_MONTHS: Record<string, number> = {
+  January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+  July: 7, August: 8, September: 9, October: 10, November: 11, December: 12,
+};
+
+export interface WestmetallRow { date: string; stockTonnes: number }
+
+/** Parse the Westmetall market-data table: date, cash, 3-month, stock. */
+export function parseWestmetallTable(html: string): WestmetallRow[] {
+  const rowRe = /<td >(\d{2})\. (\w+) (\d{4})<\/td>\s*<td >([\d,.]+)<\/td>\s*<td >([\d,.]+)<\/td>\s*<td class="last">([\d,]+)<\/td>/g;
+  const rows: WestmetallRow[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = rowRe.exec(html)) !== null) {
+    const [, d, mon, y, , , stock] = m;
+    const month = WM_MONTHS[mon];
+    if (!month) continue;
+    rows.push({
+      date: `${y}-${String(month).padStart(2, '0')}-${d}`,
+      stockTonnes: Number(stock.replace(/,/g, '')),
+    });
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export function westmetallObs(rows: WestmetallRow[], prov: (ref: string, note?: string) => Provenance): Observation[] {
+  return rows.map(r => {
+    // The LME publishes the previous session's closing stock the next
+    // morning — day+1 is the conservative knowability bound.
+    const dayAfter = new Date(Date.parse(`${r.date}T00:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return {
+      id: `obs:lme-stock-daily:${r.date}`,
+      entityId: 'ent:infrastructure:lme-warehouses',
+      metric: 'inventory' as const,
+      value: Number((r.stockTonnes / 1000).toFixed(3)),
+      unit: 'kt',
+      basis: 'cu_content' as const, // refined cathode: contained ≈ gross
+      period: { start: r.date, end: r.date },
+      knownAt: dayAfter,
+      valueKind: 'reported' as const,
+      confidence: 'medium' as const, // real published figure via a republisher
+      provenance: prov(`LME closing stock, ${r.date}`, `${r.stockTonnes.toLocaleString()} t; LME headline figure republished by Westmetall.`),
+    };
+  });
+}
+
+async function fetchWestmetallLive(): Promise<Observation[]> {
+  const html = await fetchText(WM_URL, 20000, {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  });
+  const retrievedAt = new Date().toISOString();
+  return westmetallObs(parseWestmetallTable(html), (ref, note) => ({
+    sourceId: 'westmetall-lme-stocks',
+    sourceName: 'LME daily copper stocks (via Westmetall market data)',
+    sourceUrl: WM_URL,
+    retrievedAt, sourceRef: ref, note,
+  }));
+}
+
+function westmetallSnapshotObs(reason: string): Observation[] {
+  const snap = westmetallSnapshot as { retrievedAt: string; rows: WestmetallRow[] };
+  return westmetallObs(snap.rows, (ref, note) => ({
+    sourceId: 'westmetall-lme-stocks',
+    sourceName: 'LME daily copper stocks (via Westmetall market data)',
+    sourceUrl: WM_URL,
+    retrievedAt: snap.retrievedAt,
+    sourceRef: ref,
+    note: [`bundled snapshot (${reason})`, note].filter(Boolean).join(' — '),
+  }));
+}
+
 /* ══════════════ Adapter assembly ══════════════ */
 
 function observationOnlyPayload(observations: Observation[], source: AdapterPayload['sources'][number]): AdapterPayload {
@@ -661,6 +748,7 @@ const loaders = {
   comtrade: withSnapshotFallback('econ:comtrade', 30 * DAY, fetchComtradeLive, comtradeSnapshotObs),
   yahoo: withSnapshotFallback('econ:yahoo-hg', 12 * 60 * 60 * 1000, fetchYahooLive, yahooSnapshotObs),
   cftc: withSnapshotFallback('econ:cftc-cot', 12 * 60 * 60 * 1000, fetchCftcLive, cftcSnapshotObs),
+  westmetall: withSnapshotFallback('econ:westmetall-lme', 6 * 60 * 60 * 1000, fetchWestmetallLive, westmetallSnapshotObs),
 };
 
 export const usgsMcsAdapter: EconomyAdapter = {
@@ -723,6 +811,19 @@ export const cftcPositioningAdapter: EconomyAdapter = {
   },
 };
 
+export const westmetallStocksAdapter: EconomyAdapter = {
+  providerId: 'westmetall-lme-stocks',
+  providerName: 'LME daily copper stocks via Westmetall',
+  commodities: ['copper'],
+  async load() {
+    return observationOnlyPayload(await loaders.westmetall(), {
+      sourceId: 'westmetall-lme-stocks',
+      sourceName: 'LME daily copper stocks (via Westmetall market data)',
+      sourceUrl: WM_URL,
+    });
+  },
+};
+
 export const LIVE_ADAPTERS: EconomyAdapter[] = [
-  usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
+  usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter, westmetallStocksAdapter,
 ];

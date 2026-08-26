@@ -30,16 +30,20 @@ const MIRROR_PAIRS: Array<[exportMetric: Metric, importMetric: Metric]> = [
 ];
 
 /**
- * Residuals within ±10% of the reference-grade normalization read as grade
- * variation, not as a signal — concentrate grades genuinely spread around
- * the reference. Beyond the tolerance the basis story requires an atypical
- * grade, and the pair re-earns 'unexplained' scrutiny: classing a pair
- * definitional must never permanently blind the system to its drift.
+ * Reclassification keys on DRIFT of the residual against the corridor's own
+ * history, never on its level: the level is confounded by the corridor's
+ * unknown true grade (a genuine 30%-grade corridor with perfectly honest
+ * declarations shows +20% at the 25% reference — firing on level would
+ * reintroduce, one layer down, exactly the false-positive class the gate
+ * was built to prevent). Grade is a slowly-moving physical property, an
+ * approximately constant offset per corridor, and first-differencing
+ * removes it: a corridor sitting stably at +18% is a 29.5%-grade corridor;
+ * one that moves from +0.8% to +15% in a period has had something change.
  */
-const RESIDUAL_TOLERANCE = 0.10;
+const DRIFT_THRESHOLD = 0.10;
 
 interface BasisVerdict {
-  class: 'definitional' | 'unexplained';
+  class: 'definitional';
   explanation: string;
   normalization?: Divergence['basisNormalization'];
 }
@@ -89,17 +93,13 @@ function basisGate(
   };
   const pct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
   const fingerprint = `Ratio ${ratio.toFixed(2)}x implies ${(impliedGrade * 100).toFixed(1)}% Cu content — inside the typical concentrate grade band (20–33%): contained metal on one side, gross shipped weight on the other (candidate basis mismatch).`;
+  const verdict = Math.abs(residual) <= 0.02
+    ? 'the basis explains the entire gap; no material suppression signal in this corridor'
+    : 'consistent with the basis mismatch at a corridor grade off the 25% reference — the level is grade-confounded, not a signal';
 
-  if (Math.abs(residual) > RESIDUAL_TOLERANCE) {
-    return {
-      class: 'unexplained',
-      explanation: `${fingerprint} But normalized at the ${(REFERENCE_CONCENTRATE_GRADE * 100).toFixed(0)}% reference grade a ${pct(residual)} residual remains — larger than grade variation normally explains (±${(RESIDUAL_TOLERANCE * 100).toFixed(0)}%). The basis accounts for most of the raw gap, not all of it; the residual is the finding.`,
-      normalization,
-    };
-  }
   return {
     class: 'definitional',
-    explanation: `${fingerprint} Normalized at the ${(REFERENCE_CONCENTRATE_GRADE * 100).toFixed(0)}% reference grade the residual is ${pct(residual)} — the basis explains the entire gap; no material suppression signal in this corridor. The residual is the watched baseline: drift beyond ±${(RESIDUAL_TOLERANCE * 100).toFixed(0)}% re-earns scrutiny.`,
+    explanation: `${fingerprint} Normalized at the ${(REFERENCE_CONCENTRATE_GRADE * 100).toFixed(0)}% reference grade the residual is ${pct(residual)} — ${verdict}. The residual is the watched baseline: reclassification keys on DRIFT against this corridor's own history (a stable offset is a grade; a step is a change).`,
     normalization,
   };
 }
@@ -243,26 +243,47 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
     }
   }
 
-  /* ── Persistence: consecutive periods with consistent direction ── */
+  /* ── Persistence + residual drift, per (corridor, metric) sequence ── */
   for (const seq of seqDir.values()) {
     seq.sort((a, b) => a.periodStart.localeCompare(b.periodStart));
     let run = 0;
     let prevDir: string | null = null;
+    const residuals: number[] = [];
     for (const item of seq) {
       run = item.direction === prevDir ? run + 1 : 1;
       prevDir = item.direction;
       item.record.persistence = run;
+
+      // Drift: residual vs the median of this corridor's PRIOR residuals.
+      // First-differencing removes the unknown-but-constant grade offset,
+      // so drift can distinguish "a 30%-grade corridor" (stable level) from
+      // "something changed" (a step) — which level alone cannot.
+      const bn = item.record.basisNormalization;
+      if (!bn) continue;
+      if (residuals.length > 0) {
+        const sorted = [...residuals].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        const drift = bn.residual - median;
+        bn.residualDrift = Number(drift.toFixed(4));
+        if (Math.abs(drift) > DRIFT_THRESHOLD && item.record.class === 'definitional') {
+          item.record.class = 'unexplained';
+          item.record.explanation += ` RECLASSIFIED on drift: the residual moved from a corridor median of ${(median * 100).toFixed(1)}% to ${(bn.residual * 100).toFixed(1)}% (${(drift * 100).toFixed(1)} points in one step). Grade is a slowly-moving physical property — a step this size is not a grade difference; something changed in this corridor.`;
+        }
+      }
+      residuals.push(bn.residual);
     }
   }
 
   // Largest, most persistent, least explained first. Normalized pairs rank
-  // on their RESIDUAL, not the raw spread: the raw spread of a basis
-  // mismatch measures the ore grade, and ranking on it would either bury a
-  // drifting corridor under its own dismissal or keep a fully-explained one
-  // artificially prominent.
+  // on drift where history exists (the grade-corrected quantity), residual
+  // otherwise — never the raw spread, which measures the ore grade and
+  // would either bury a drifting corridor under its own dismissal or keep a
+  // fully-explained one artificially prominent.
   const clsRank = { unexplained: 3, coverage: 2, definitional: 1, revision_lag: 0 } as const;
   const effectiveSpread = (d: Divergence) =>
-    d.basisNormalization ? Math.abs(d.basisNormalization.residual) : d.relativeSpread;
+    d.basisNormalization
+      ? Math.abs(d.basisNormalization.residualDrift ?? d.basisNormalization.residual)
+      : d.relativeSpread;
   records.sort((a, b) =>
     clsRank[b.class] - clsRank[a.class]
     || b.persistence - a.persistence

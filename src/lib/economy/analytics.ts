@@ -499,7 +499,15 @@ export interface AnomalySignal {
    *  market context (positioning is reflexive: a corroborating layer, not
    *  physical evidence). */
   measurementClass: MeasurementClass;
-  kind: 'rolling-deviation' | 'rate-of-change';
+  /**
+   * rolling-deviation / rate-of-change say the WORLD moved. 'revision' says
+   * the world's best estimate moved: a supersedes chain where the revising
+   * value differs materially from the superseded one. A revision is news on
+   * a known date (knownAt of the revising vintage) regardless of how old the
+   * period it describes is — and it is an explicit act by the publisher,
+   * not an inference from noise.
+   */
+  kind: 'rolling-deviation' | 'rate-of-change' | 'revision';
   period: string;
   value: number;
   /** Standard deviations from the rolling mean, or period-over-period %Δ. */
@@ -515,11 +523,25 @@ export interface AnomalySignal {
  * Without this, provider disagreement would masquerade as period-over-period
  * change and fabricate anomaly signals.
  */
-export function extractSeries(state: EconomyState, entityId: string, metric: Metric): SeriesPoint[] {
+/** Period-length class of an observation. A series is a sequence of
+ *  SAME-CADENCE measurements: a daily stock point and a monthly stock point
+ *  are different measurements of different things, and treating one as the
+ *  successor of the other fabricates period-over-period change — the same
+ *  splice class that once produced 10.3σ from provider duplicates. */
+export function periodCadence(o: Observation): 'daily' | 'weekly' | 'monthly' | 'annual' {
+  const days = (Date.parse(o.period.end) - Date.parse(o.period.start)) / 86_400_000;
+  if (days <= 2) return 'daily';
+  if (days <= 9) return 'weekly';
+  if (days <= 45) return 'monthly';
+  return 'annual';
+}
+
+export function extractSeries(state: EconomyState, entityId: string, metric: Metric, cadence?: ReturnType<typeof periodCadence>): SeriesPoint[] {
   const byPeriod = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.entityId !== entityId || o.metric !== metric) continue;
     if (o.partnerEntityId) continue; // bilateral mirror evidence, not an aggregate series
+    if (cadence && periodCadence(o) !== cadence) continue;
     const key = `${o.period.start}|${o.period.end}`;
     const prev = byPeriod.get(key);
     if (!prev || outranks(o, prev)) byPeriod.set(key, o);
@@ -534,22 +556,51 @@ export function extractSeries(state: EconomyState, entityId: string, metric: Met
  * points: rolling z-score against the trailing window, and month-over-month
  * rate of change. No ML — a researcher can recompute either by hand.
  */
-export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 2, rocThreshold = 0.12 } = {}): AnalyticalResult<AnomalySignal[]> {
+export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 2, rocThreshold = 0.12, revisionThreshold = 0.05 } = {}): AnalyticalResult<AnomalySignal[]> {
   const seriesKeys = new Set<string>();
   for (const o of state.observations) seriesKeys.add(`${o.entityId}|${o.metric}`);
 
   const signals: AnomalySignal[] = [];
   const usedObs = new Set<string>();
 
-  for (const key of seriesKeys) {
-    const [entityId, metric] = key.split('|') as [string, Metric];
+  // Revision pass: supersedes chains where the best estimate moved
+  // materially. The signal's date of existence is the REVISING value's
+  // knownAt — current news, however old the described period — which is why
+  // this channel survives cadence gating that annual level-signals fail.
+  const obsById = new Map(state.observations.map(o => [o.id, o]));
+  for (const o of state.observations) {
+    if (!o.supersedes) continue;
+    const prev = obsById.get(o.supersedes);
+    if (!prev || prev.value === 0) continue;
+    const delta = (o.value - prev.value) / Math.abs(prev.value);
+    if (Math.abs(delta) < revisionThreshold) continue;
+    usedObs.add(prev.id); usedObs.add(o.id);
+    signals.push({
+      entityId: o.entityId, metric: o.metric, measurementClass: measurementClassOf(o.metric),
+      kind: 'revision', period: o.period.start.slice(0, 7), value: o.value,
+      magnitude: Number((delta * 100).toFixed(1)),
+      observationIds: [prev.id, o.id],
+      explanation: `${o.provenance.sourceId} revises ${o.period.start.slice(0, 4)} ${o.metric}: ${prev.value} → ${o.value} (${(delta * 100).toFixed(1)}%). Best estimate moved — knowable ${knownAtOf(o)}.`,
+    });
+  }
+
+  for (const baseKey of seriesKeys) {
+    const [entityId, metric] = baseKey.split('|') as [string, Metric];
     // The continuous front-month price series carries roll discontinuities —
     // contract-expiry artifacts, not market moves. Until roll-adjusted, it is
     // excluded from anomaly detection rather than allowed to flag rolls.
     if (measurementClassOf(metric) === 'market_price') continue;
+    // One (entity, metric) can carry several cadences (daily live stocks
+    // alongside a monthly curated series). Each cadence is its own series —
+    // mixing them would fabricate period-over-period change at the seams.
+    const cadences = new Set(
+      state.observations
+        .filter(o => o.entityId === entityId && o.metric === metric && !o.partnerEntityId)
+        .map(o => periodCadence(o)));
+    for (const cadence of cadences) {
     // Length is judged on the RESOLVED series — raw observation counts would
     // let same-period provider duplicates fake a longer history.
-    const series = extractSeries(state, entityId, metric);
+    const series = extractSeries(state, entityId, metric, cadence);
     if (series.length < window) continue;
 
     for (let i = window; i < series.length; i++) {
@@ -586,6 +637,7 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
           });
         }
       }
+    }
     }
   }
 

@@ -362,21 +362,71 @@ export const COPPER_DEPENDENCIES: Dependency[] = [
 /* ── Events ── */
 
 export const COPPER_EVENTS: EconEvent[] = [
+  /* The backtest-window record (2016→). The alert backtest scores the
+   * detector against these, so the record's completeness IS the metric's
+   * meaning: an uncurated real disruption reads as detector false positives.
+   * Every entry carries occurrence, first public report, and an estimated
+   * magnitude with basis (marked estimate — never fabricated precision). */
+  {
+    id: 'evt:grasberg-export-halt-2017', entityId: 'ent:mine:grasberg', type: 'disruption',
+    title: 'Grasberg concentrate export halt (permit lapse)', start: '2017-01-12', end: '2017-04-21', firstReportedAt: '2017-01-12', severity: 'high',
+    magnitude: { value: 100, unit: 'kt', basis: 'cu_content', note: 'Estimated deferred output over the ~3-month halt; representative.' },
+    description: 'Indonesian mining-rule change lapsed PT Freeport Indonesia\'s concentrate export permit; exports halted mid-January, output was cut and force majeure declared in February, resuming after the IUPK framework agreement in April.',
+    provenance: news('Freeport-McMoRan / Indonesian ministry reporting, Jan–Apr 2017. Representative dating.'),
+  },
+  {
+    id: 'evt:escondida-strike-2017', entityId: 'ent:mine:escondida', type: 'strike',
+    title: 'Escondida 44-day strike', start: '2017-02-09', end: '2017-03-24', firstReportedAt: '2017-02-07', severity: 'high',
+    magnitude: { value: 120, unit: 'kt', basis: 'cu_content', note: 'Estimated lost output across the stoppage at a ~1.1 Mt/y mine; representative.' },
+    description: 'Union rejected the final wage offer and gave strike notice (2017-02-07); the stoppage at the world\'s largest copper mine began 2017-02-09 and ran 44 days. A strike is knowable before it starts — first report precedes occurrence.',
+    provenance: news('BHP / union statements, Feb–Mar 2017. Representative dating.'),
+  },
+  {
+    id: 'evt:chuquicamata-strike-2019', entityId: 'ent:mine:chuquicamata', type: 'strike',
+    title: 'Chuquicamata strike', start: '2019-06-14', end: '2019-06-28', firstReportedAt: '2019-06-14', severity: 'medium',
+    magnitude: { value: 10, unit: 'kt', basis: 'cu_content', note: 'Estimated lost output over two weeks; Codelco maintained partial operations.' },
+    description: 'Two-week strike by three unions at Codelco\'s Chuquicamata over restructuring terms; partial operations maintained.',
+    provenance: news('Codelco / union statements, Jun 2019. Representative dating.'),
+  },
+  {
+    id: 'evt:peru-covid-shutdown-2020', entityId: 'ent:country:pe', type: 'disruption',
+    title: 'Peru COVID-19 national emergency mine curtailments', start: '2020-03-16', end: '2020-06-30', firstReportedAt: '2020-03-16', severity: 'high',
+    magnitude: { value: 310, unit: 'kt', basis: 'cu_content', note: 'Full-year 2020 national output fell ~2,460 → ~2,150 kt vs 2019; Q2 was the trough.' },
+    description: 'National state of emergency (2020-03-16) curtailed most Peruvian mining for roughly a quarter; phased restart under Phase 1 reactivation from May, normalizing by mid-year.',
+    provenance: news('Peruvian government decrees / MINEM production data, 2020. Representative dating.'),
+  },
+  {
+    id: 'evt:las-bambas-blockade-2022', entityId: 'ent:mine:las-bambas', type: 'disruption',
+    title: 'Las Bambas community occupation halts production', start: '2022-04-20', end: '2022-06-11', firstReportedAt: '2022-04-14', severity: 'medium',
+    magnitude: { value: 50, unit: 'kt', basis: 'cu_content', note: 'Estimated lost output over ~7 weeks at a ~400 kt/y mine; representative.' },
+    description: 'Community members entered the mine site (reported from 2022-04-14); MMG suspended operations 2022-04-20 and resumed in mid-June after agreement. One of a series of blockades on the Las Bambas corridor 2019–2022.',
+    provenance: news('MMG disclosures / Peruvian press, Apr–Jun 2022. Representative dating.'),
+  },
+  {
+    id: 'evt:lme-tariff-drawdown-2025', entityId: 'ent:infrastructure:lme-warehouses', type: 'demand_surge',
+    title: 'US tariff-anticipation drawdown of LME stocks', start: '2025-02-25', end: '2025-07-31', firstReportedAt: '2025-02-25', severity: 'high',
+    magnitude: { value: 165, unit: 'kt', basis: 'cu_content', note: 'Series decline ~260 → 95 kt Feb–Jun 2025; representative of the reported LME drawdown.' },
+    description: 'US Section 232 copper import probe (ordered 2025-02-25) opened a COMEX premium; metal was pulled from LME warehouses toward US delivery points through H1 2025. The pull unwound after the July 2025 tariff decision left refined cathode exempt.',
+    provenance: news('Executive order 2025-02-25; exchange stock reporting H1 2025. Representative dating.'),
+  },
   {
     id: 'evt:cobre-panama-closure', entityId: 'ent:mine:cobre-panama', type: 'closure',
     title: 'Cobre Panamá ordered closed', start: '2023-11-28', firstReportedAt: '2023-11-28', severity: 'high',
+    magnitude: { value: 350, unit: 'kt/y', basis: 'cu_content', note: 'Annualized mine supply removed from the market.' },
     description: 'Supreme Court ruling voided the mining contract; ~350 kt/y of mine supply (≈1.5% of world output) removed from the market. Site in preservation pending arbitration/negotiation.',
     provenance: news('Widely reported; First Quantum disclosures.'),
   },
   {
     id: 'evt:kakula-seismic-2025', entityId: 'ent:mine:kamoa-kakula', type: 'disruption',
     title: 'Kakula underground seismic event and flooding', start: '2025-05-18', end: '2025-09-30', firstReportedAt: '2025-05-20', severity: 'high',
+    magnitude: { value: 100, unit: 'kt', basis: 'cu_content', note: 'Estimated from the 2025 guidance cut across the suspension; representative.' },
     description: 'Seismic activity forced suspension of underground operations at Kakula; guidance cut while dewatering and restart proceeded.',
     provenance: news('Ivanhoe Mines disclosures, May–Sep 2025.'),
   },
   {
     id: 'evt:grasberg-mud-rush-2025', entityId: 'ent:mine:grasberg', type: 'disruption',
     title: 'Grasberg Block Cave mud rush / force majeure', start: '2025-09-08', firstReportedAt: '2025-09-10', severity: 'high',
+    magnitude: { value: 400, unit: 'kt', basis: 'cu_content', note: 'Estimated deferred 2025–26 output per revised sales guidance; representative.' },
     description: 'Fatal mud rush halted Grasberg Block Cave operations (2025-09-08, first public reports 2025-09-10); Freeport declared force majeure 2025-09-24 and cut 2025–2026 sales guidance. Major upstream shock to the concentrate market. Detection latency between occurrence and first report: 2 days; to force majeure: 16 days.',
     provenance: news('Freeport-McMoRan disclosures, Sep–Oct 2025.'),
   },

@@ -37,6 +37,10 @@ export function syntheticState(): EconomyState {
         value: v,
         unit: 'kt',
         period: { start: `2024-0${i + 1}-01`, end: `2024-0${i + 1}-28` },
+        // Month-end stocks are knowable at period end — stamped so the
+        // series has a measurable arrival cadence (the alert gate refuses
+        // series whose knowability collapses to a single retrieval date).
+        knownAt: `2024-0${i + 1}-28`,
         valueKind: 'reported' as const,
         confidence: 'high' as const,
         provenance: FIXTURE_PROV,

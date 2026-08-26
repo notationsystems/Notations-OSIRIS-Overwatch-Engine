@@ -65,21 +65,53 @@ describe('divergence detection (synthetic)', () => {
     expect(d.explanation).toContain('no material suppression signal');
   });
 
-  it('a residual beyond tolerance re-earns unexplained — definitional is never a permanent blind spot', () => {
-    // Ratio 3.33 is still inside the grade band, but at the 25% reference
-    // the residual is +20%: the basis story requires an atypical grade, so
-    // the pair climbs back to the hardest class instead of staying filed.
+  it('a stable off-reference residual is a grade, not a signal — level never triggers', () => {
+    // A genuine 30%-grade corridor with honest declarations shows +20% at
+    // the 25% reference in EVERY period. Firing on that level would
+    // reintroduce, one layer down, the exact false-positive class the gate
+    // was built to prevent. Two stable periods → drift ≈ 0 → definitional.
     const s = syntheticState();
     const prov = s.observations[0].provenance;
-    const period = { start: '2024-01-01', end: '2024-12-31' };
-    s.observations.push(
-      { id: 'obs:m:aa-exp', entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb', metric: 'concentrate_exports', value: 120, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
-      { id: 'obs:m:bb-imp', entityId: 'ent:country:bb', partnerEntityId: 'ent:country:aa', metric: 'concentrate_imports', value: 400, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
-    );
-    const d = detectDivergences(s).result.find(x => x.kind === 'mirror')!;
-    expect(d.class).toBe('unexplained');
-    expect(d.basisNormalization!.residual).toBeCloseTo(0.20, 4);
-    expect(d.explanation).toContain('residual');
+    const mk = (year: number, exp: number, imp: number) => {
+      const period = { start: `${year}-01-01`, end: `${year}-12-31` };
+      s.observations.push(
+        { id: `obs:m:aa-exp:${year}`, entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb', metric: 'concentrate_exports', value: exp, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+        { id: `obs:m:bb-imp:${year}`, entityId: 'ent:country:bb', partnerEntityId: 'ent:country:aa', metric: 'concentrate_imports', value: imp, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+      );
+    };
+    mk(2023, 120, 400); // residual +20% (implied grade 30%)
+    mk(2024, 120, 400); // same — the offset is the corridor's grade
+    const r = detectDivergences(s).result.filter(x => x.kind === 'mirror');
+    expect(r).toHaveLength(2);
+    for (const d of r) expect(d.class).toBe('definitional');
+    const y2024 = r.find(d => d.period.start === '2024-01-01')!;
+    expect(y2024.basisNormalization!.residual).toBeCloseTo(0.20, 4);
+    expect(y2024.basisNormalization!.residualDrift).toBeCloseTo(0, 4);
+  });
+
+  it('a residual STEP reclasses on drift — definitional is never a permanent blind spot', () => {
+    // The "moves to 15% next year" case: baseline residual ~0, then a jump
+    // to +15% while the ratio stays inside the grade band. Grade cannot move
+    // that fast; the pair climbs back to the hardest class, with the drift
+    // recorded.
+    const s = syntheticState();
+    const prov = s.observations[0].provenance;
+    const mk = (year: number, exp: number, imp: number) => {
+      const period = { start: `${year}-01-01`, end: `${year}-12-31` };
+      s.observations.push(
+        { id: `obs:m:aa-exp:${year}`, entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb', metric: 'concentrate_exports', value: exp, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+        { id: `obs:m:bb-imp:${year}`, entityId: 'ent:country:bb', partnerEntityId: 'ent:country:aa', metric: 'concentrate_imports', value: imp, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+      );
+    };
+    mk(2023, 100, 400); // residual 0
+    mk(2024, 115, 400); // residual +15% — a step, not a grade
+    const r = detectDivergences(s).result.filter(x => x.kind === 'mirror');
+    const y2023 = r.find(d => d.period.start === '2023-01-01')!;
+    const y2024 = r.find(d => d.period.start === '2024-01-01')!;
+    expect(y2023.class).toBe('definitional');
+    expect(y2024.class).toBe('unexplained');
+    expect(y2024.basisNormalization!.residualDrift).toBeCloseTo(0.15, 4);
+    expect(y2024.explanation).toContain('RECLASSIFIED on drift');
   });
 
   it('ignores sub-noise disagreement', () => {

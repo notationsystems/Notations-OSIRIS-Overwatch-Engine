@@ -86,7 +86,7 @@ Adapter-oriented (`src/lib/economy/adapters.ts`):
 Provider → EconomyAdapter.load(commodity) → AdapterPayload → store assembly → validated EconomyState
 ```
 
-Adapters are registered, not hard-coded. Five serve copper:
+Adapters are registered, not hard-coded. Six serve copper:
 
 - **`curated-copper-v1`** — the curated dataset (`src/data/economy/copper.ts` +
   `copper-series.ts`): 49 geolocated entities, a decade of annual production
@@ -103,6 +103,14 @@ Adapters are registered, not hard-coded. Five serve copper:
   commodity entity; the in-progress month is flagged partial. TTL 12 h.
 - **`cftc-positioning`** — CFTC COT managed-money net positioning, weekly, on
   the commodity entity. TTL 12 h.
+- **`westmetall-lme-stocks`** — daily LME copper closing stock (year-to-date
+  depth), republished as a public HTML table by Westmetall. The only
+  daily-cadence physical series in the corpus, added because the information
+  horizon table showed nothing else could ever produce a non-negative alert
+  lead. Recon verdict: LME's own pages and CME delivery reports are
+  bot-blocked (403) and LME data is commercially licensed at feed level —
+  this republished headline figure serves internal research; a production
+  deployment wants a licensed feed. TTL 6 h.
 
 Every live adapter (`src/lib/economy/liveAdapters.ts`) sits behind the same
 **degradation ladder**:
@@ -185,7 +193,7 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 | `bottlenecks` | **Candidate** bottleneck score: 0.35·throughput share + 0.25·utilization (flow vs stated capacity) + 0.25·redundancy (alternatives at same stage) + 0.15·dependency load. Explicitly a triage signal, not validated risk; every score exposes its components, explanation and evidence ids. Countries/regions are excluded (aggregates are not chokepoints). |
 | `anomalies` | Rolling z-score vs trailing window + period-over-period rate of change on every (entity, metric) series with enough points. Series resolve one observation per period by evidence rank before detection (provider disagreement is never a time step). The continuous front-month price series is excluded (roll discontinuities are contract artifacts, not moves); positioning signals are tagged `financial_positioning` and rendered as reflexive market context, never physical evidence. |
 | `coverage` | Facility-model coverage per country: rolled-up facility observations ÷ the country's own observation. ≈1 complete, <1 the unmodelled share, >1 a contradiction. This is the standing integrity check that keeps facility- and country-level populations from ever being conflated — they meet only here, explicitly, as a ratio. The coverage range is also **attached to the facility-level HHI** (`coverageBias`), because differential coverage biases facility concentration toward better-modeled countries and the number must not travel without that caveat. |
-| `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. Classing definitional is **normalization, not dismissal**: the pair is converted at the fixed 25% reference grade and the residual recorded (`basisNormalization`) — Chile→China: 8,433 × 0.25 = 2,108 vs 2,125 declared, a **+0.8% residual: the basis explains the entire gap, no material suppression signal in this corridor**. The residual is the watched baseline — definitional pairs rank on residual, not raw spread, and a residual drifting beyond ±10% reclasses the pair `unexplained` so it climbs back into view. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
+| `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. Classing definitional is **normalization, not dismissal**: the pair is converted at the fixed 25% reference grade and the residual recorded (`basisNormalization`) — Chile→China: 8,433 × 0.25 = 2,108 vs 2,125 declared, a **+0.8% residual: the basis explains the entire gap, no material suppression signal in this corridor**. The residual is the watched baseline — definitional pairs rank on it, never on raw spread — and reclassification keys on **drift** against the corridor's own history, never on level: the level is confounded by the corridor's unknown true grade (a genuine 30%-grade corridor shows +20% at the 25% reference with honest declarations — a stable offset is a grade), while grade moves slowly, so first-differencing removes it and a step beyond ±10 points reclasses the pair `unexplained`. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
 | `scenario` (via `POST /api/economy/scenario`) | Counterfactual event injection: hypothetical events run through the same engine on an explicit **EvaluationFrame** (`kind: counterfactual`, scenario id, asOf, knowledge) so a hypothetical can never be read as a reconstruction. Returns baseline + counterfactual frames and the structural delta (newly disrupted entities, newly affected downstream, disrupted kt/y). Combined with `as_known_then` it backtests the analytical layer itself: posing Grasberg's halt into the 2025-09-09 knowledge state recovers the same dependent-smelter conclusion the best-known reconstruction reaches — evidence the analytics' structural calls do not depend on hindsight. |
 | `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. |
 
@@ -195,11 +203,22 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 computed — never a fresh computation. Trust discipline, in order:
 
 1. **Derivation** — anomaly signals (physical classes only: reflexive
-   positioning never wakes anyone) and newly-reported events. A **cadence
-   gate** admits only monthly-or-finer series: an annual aggregate is history
-   at publication, an anomaly but never an alert. Event alerts carry their
-   detection latency (`firstReportedAt − start`) so notification speed is
-   never mistaken for detection skill.
+   positioning never wakes anyone) and newly-reported events. An
+   **arrival-cadence gate** admits only series whose *information arrives*
+   monthly or finer (measured from knownAt spacing, not period length): an
+   annual aggregate is history at publication, an anomaly but never an
+   alert. The one exception the axis change recovers: a **revision** to an
+   annual series (a supersedes chain moving the best estimate ≥5%) is new
+   information on a known date — "our best estimate of 2023 just moved
+   −41.6%" (Zambia refined, MCS 2025) is knowable the day the edition
+   publishes and alerts with that date, however old the described period.
+   Revisions are a publisher's explicit act, not an inference from noise,
+   and are scored separately everywhere (never against the disruption
+   record). Event alerts carry their detection latency (`firstReportedAt −
+   start`) so notification speed is never mistaken for detection skill.
+   Series additionally partition by period cadence before anomaly windows —
+   a daily stock point is never treated as the successor of a monthly one
+   (the splice class again).
 2. **Suppression memory** — an alert whose signal is already explained by the
    divergence system (`definitional` / `coverage` / `revision_lag`) must not
    fire; the withheld alert references the explaining divergence record.
@@ -212,16 +231,29 @@ computed — never a fresh computation. Trust discipline, in order:
 4. **Backtest before wiring** (`alertBacktest.ts`) — the detector runs
    against a decade of month-end knowledge states, strictly `as_known_then`,
    with the no-lookahead invariant *checked* per alert (violations counted;
-   must be 0). Measured on current data (2016–2026, 128 evaluations):
-   **precision 0.438** (7/16 fired inventory alerts match the curated event
-   record; the 9 false positives are the real-but-uncurated mid-2025 LME
-   drawdown), **recall 0.2** (only the exchange-stock event is detectable —
-   the mine/logistics events have no monthly-cadence series near them), and
-   **first-detection lead −30 days** (monthly period-end knowability trails
-   public reporting by a month). Verdict encoded in the test suite: **alerts
-   are not ready to wake anyone**, and no alert panel is wired until the
-   measurement says otherwise. What would change the answer: a weekly/daily
-   stocks feed, facility-cadence series, a richer curated event record.
+   must be 0). The report leads with the **information horizon**
+   (`horizon.ts`): per-source distributions of `knownAt − periodEnd`, and
+   `firstReportedAt − occurredAt` across the event record — the ceiling on
+   lead time as a property of the SOURCES, computable without a detector.
+   That table is the honest headline: no threshold tuning moves it, and it
+   converts "we need better data" into a shopping list with numbers. On the
+   current corpus: USGS annual best-case −30 days / typical −213; Comtrade
+   unstamped (retrieval-fallback shows the corpus cannot measure its true
+   ~2–3-month delay); CFTC −3 days but reflexive; the curated monthly stock
+   series best-case 0 (can tie, never beat); the daily Westmetall stream
+   best-case −1 day — the only physical series capable of non-negative lead.
+   Measured on the curated record (11 events, 2016–2026, 128 evaluations):
+   precision 1.0, recall 0.18, and the 2026 drawdown detected at **+1 day
+   lead** — the first non-negative lead in the system's history, arriving
+   with the daily adapter, exactly as the horizon table predicted. The
+   precision VALUE is deliberately not pinned in tests: an earlier revision
+   pinned 0.438, and completing one missing event record moved it to 1.0
+   with the detector untouched — the number measures curation, so the tests
+   pin the procedure and the horizon and let the number move. Recall is the
+   corpus speaking: mine-level events stay undetectable until something
+   near them reports at daily/weekly cadence. Evaluation runs on a monthly
+   grid, which now bounds measurable lead — the next knob, noted in the
+   caveats.
 
 ## API projections
 
@@ -303,11 +335,19 @@ inspect supporting evidence.
   the grade band as uncertainty), and corridors without a grade refuse shares
   visibly instead of entering as zero.
 - The reference concentrate grade (25%) and the 20–33% band are industry-typical
-  constants, not per-corridor assays; residuals inherit that uncertainty and
-  the `residualBand` says so.
-- Alerting is engine-only by measurement: backtested precision 0.438 / recall
-  0.2 / lead −30 days on current data — below the bar for waking anyone, so
-  no alert UI exists yet.
+  constants, not per-corridor assays; the residual level inherits that
+  uncertainty (which is why reclassification keys on drift, and where a
+  documented assay exists it should replace the reference for that corridor).
+- Alerting remains engine-only. The horizon table says the corpus now has
+  exactly one stream capable of non-negative lead (daily LME stocks via
+  Westmetall, republished headline data — licensing noted in the adapter);
+  recall is bounded at the exchange-stock event class until mine-adjacent
+  daily/weekly series exist. The backtest evaluation grid is monthly, which
+  bounds measurable lead now that a daily source exists.
+- Comtrade observations carry no knownAt stamp (publication timing untracked),
+  so the horizon table can only show the retrieval-time fallback (~2.6 years)
+  rather than Comtrade's true ~2–3-month publication delay — stamping release
+  dates is a known gap.
 - Flow records are 2024 annual snapshots; playback re-evaluates events,
   propagation and observation selection over time, but flow tonnage itself is
   not yet time-resolved.

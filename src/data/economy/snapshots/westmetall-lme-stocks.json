@@ -1,0 +1,663 @@
+{
+ "retrievedAt": "2026-08-26T00:00:00Z",
+ "sourceUrl": "https://www.westmetall.com/en/markdaten.php?action=table&field=LME_Cu_cash",
+ "note": "Daily LME copper closing stock (tonnes), republished by Westmetall; parsed from the public table.",
+ "rows": [
+  {
+   "date": "2026-01-02",
+   "stockTonnes": 145325
+  },
+  {
+   "date": "2026-01-05",
+   "stockTonnes": 142550
+  },
+  {
+   "date": "2026-01-06",
+   "stockTonnes": 146075
+  },
+  {
+   "date": "2026-01-07",
+   "stockTonnes": 143225
+  },
+  {
+   "date": "2026-01-08",
+   "stockTonnes": 141075
+  },
+  {
+   "date": "2026-01-09",
+   "stockTonnes": 138975
+  },
+  {
+   "date": "2026-01-12",
+   "stockTonnes": 137225
+  },
+  {
+   "date": "2026-01-13",
+   "stockTonnes": 141550
+  },
+  {
+   "date": "2026-01-14",
+   "stockTonnes": 141625
+  },
+  {
+   "date": "2026-01-15",
+   "stockTonnes": 141125
+  },
+  {
+   "date": "2026-01-16",
+   "stockTonnes": 143575
+  },
+  {
+   "date": "2026-01-19",
+   "stockTonnes": 147425
+  },
+  {
+   "date": "2026-01-20",
+   "stockTonnes": 156300
+  },
+  {
+   "date": "2026-01-21",
+   "stockTonnes": 159400
+  },
+  {
+   "date": "2026-01-22",
+   "stockTonnes": 168250
+  },
+  {
+   "date": "2026-01-23",
+   "stockTonnes": 171700
+  },
+  {
+   "date": "2026-01-26",
+   "stockTonnes": 170525
+  },
+  {
+   "date": "2026-01-27",
+   "stockTonnes": 172350
+  },
+  {
+   "date": "2026-01-28",
+   "stockTonnes": 173925
+  },
+  {
+   "date": "2026-01-29",
+   "stockTonnes": 176075
+  },
+  {
+   "date": "2026-01-30",
+   "stockTonnes": 174975
+  },
+  {
+   "date": "2026-02-02",
+   "stockTonnes": 174675
+  },
+  {
+   "date": "2026-02-03",
+   "stockTonnes": 176125
+  },
+  {
+   "date": "2026-02-04",
+   "stockTonnes": 178650
+  },
+  {
+   "date": "2026-02-05",
+   "stockTonnes": 180575
+  },
+  {
+   "date": "2026-02-06",
+   "stockTonnes": 183275
+  },
+  {
+   "date": "2026-02-09",
+   "stockTonnes": 184300
+  },
+  {
+   "date": "2026-02-10",
+   "stockTonnes": 189100
+  },
+  {
+   "date": "2026-02-11",
+   "stockTonnes": 192100
+  },
+  {
+   "date": "2026-02-12",
+   "stockTonnes": 196650
+  },
+  {
+   "date": "2026-02-13",
+   "stockTonnes": 203875
+  },
+  {
+   "date": "2026-02-16",
+   "stockTonnes": 211850
+  },
+  {
+   "date": "2026-02-17",
+   "stockTonnes": 221625
+  },
+  {
+   "date": "2026-02-18",
+   "stockTonnes": 224650
+  },
+  {
+   "date": "2026-02-19",
+   "stockTonnes": 225575
+  },
+  {
+   "date": "2026-02-20",
+   "stockTonnes": 235150
+  },
+  {
+   "date": "2026-02-23",
+   "stockTonnes": 241825
+  },
+  {
+   "date": "2026-02-24",
+   "stockTonnes": 243175
+  },
+  {
+   "date": "2026-02-25",
+   "stockTonnes": 249650
+  },
+  {
+   "date": "2026-02-26",
+   "stockTonnes": 253600
+  },
+  {
+   "date": "2026-02-27",
+   "stockTonnes": 253700
+  },
+  {
+   "date": "2026-03-02",
+   "stockTonnes": 257675
+  },
+  {
+   "date": "2026-03-03",
+   "stockTonnes": 257675
+  },
+  {
+   "date": "2026-03-04",
+   "stockTonnes": 261525
+  },
+  {
+   "date": "2026-03-05",
+   "stockTonnes": 282200
+  },
+  {
+   "date": "2026-03-06",
+   "stockTonnes": 284325
+  },
+  {
+   "date": "2026-03-09",
+   "stockTonnes": 294250
+  },
+  {
+   "date": "2026-03-10",
+   "stockTonnes": 301950
+  },
+  {
+   "date": "2026-03-11",
+   "stockTonnes": 312075
+  },
+  {
+   "date": "2026-03-12",
+   "stockTonnes": 312350
+  },
+  {
+   "date": "2026-03-13",
+   "stockTonnes": 311825
+  },
+  {
+   "date": "2026-03-16",
+   "stockTonnes": 311600
+  },
+  {
+   "date": "2026-03-17",
+   "stockTonnes": 330375
+  },
+  {
+   "date": "2026-03-18",
+   "stockTonnes": 334100
+  },
+  {
+   "date": "2026-03-19",
+   "stockTonnes": 335425
+  },
+  {
+   "date": "2026-03-20",
+   "stockTonnes": 342350
+  },
+  {
+   "date": "2026-03-23",
+   "stockTonnes": 347475
+  },
+  {
+   "date": "2026-03-24",
+   "stockTonnes": 359275
+  },
+  {
+   "date": "2026-03-25",
+   "stockTonnes": 360175
+  },
+  {
+   "date": "2026-03-26",
+   "stockTonnes": 359825
+  },
+  {
+   "date": "2026-03-27",
+   "stockTonnes": 360250
+  },
+  {
+   "date": "2026-03-30",
+   "stockTonnes": 362600
+  },
+  {
+   "date": "2026-03-31",
+   "stockTonnes": 362425
+  },
+  {
+   "date": "2026-04-01",
+   "stockTonnes": 361925
+  },
+  {
+   "date": "2026-04-02",
+   "stockTonnes": 364450
+  },
+  {
+   "date": "2026-04-07",
+   "stockTonnes": 378775
+  },
+  {
+   "date": "2026-04-08",
+   "stockTonnes": 385275
+  },
+  {
+   "date": "2026-04-09",
+   "stockTonnes": 383450
+  },
+  {
+   "date": "2026-04-10",
+   "stockTonnes": 392750
+  },
+  {
+   "date": "2026-04-13",
+   "stockTonnes": 399150
+  },
+  {
+   "date": "2026-04-14",
+   "stockTonnes": 400625
+  },
+  {
+   "date": "2026-04-15",
+   "stockTonnes": 402625
+  },
+  {
+   "date": "2026-04-16",
+   "stockTonnes": 401700
+  },
+  {
+   "date": "2026-04-17",
+   "stockTonnes": 400225
+  },
+  {
+   "date": "2026-04-20",
+   "stockTonnes": 398425
+  },
+  {
+   "date": "2026-04-21",
+   "stockTonnes": 398575
+  },
+  {
+   "date": "2026-04-22",
+   "stockTonnes": 395575
+  },
+  {
+   "date": "2026-04-23",
+   "stockTonnes": 396000
+  },
+  {
+   "date": "2026-04-24",
+   "stockTonnes": 392575
+  },
+  {
+   "date": "2026-04-27",
+   "stockTonnes": 391250
+  },
+  {
+   "date": "2026-04-28",
+   "stockTonnes": 396525
+  },
+  {
+   "date": "2026-04-29",
+   "stockTonnes": 396925
+  },
+  {
+   "date": "2026-04-30",
+   "stockTonnes": 399725
+  },
+  {
+   "date": "2026-05-01",
+   "stockTonnes": 398675
+  },
+  {
+   "date": "2026-05-05",
+   "stockTonnes": 398675
+  },
+  {
+   "date": "2026-05-06",
+   "stockTonnes": 397725
+  },
+  {
+   "date": "2026-05-07",
+   "stockTonnes": 398325
+  },
+  {
+   "date": "2026-05-08",
+   "stockTonnes": 399400
+  },
+  {
+   "date": "2026-05-11",
+   "stockTonnes": 401000
+  },
+  {
+   "date": "2026-05-12",
+   "stockTonnes": 400000
+  },
+  {
+   "date": "2026-05-13",
+   "stockTonnes": 398550
+  },
+  {
+   "date": "2026-05-14",
+   "stockTonnes": 397050
+  },
+  {
+   "date": "2026-05-15",
+   "stockTonnes": 395725
+  },
+  {
+   "date": "2026-05-18",
+   "stockTonnes": 393400
+  },
+  {
+   "date": "2026-05-19",
+   "stockTonnes": 394675
+  },
+  {
+   "date": "2026-05-20",
+   "stockTonnes": 393400
+  },
+  {
+   "date": "2026-05-21",
+   "stockTonnes": 393100
+  },
+  {
+   "date": "2026-05-22",
+   "stockTonnes": 391900
+  },
+  {
+   "date": "2026-05-26",
+   "stockTonnes": 389525
+  },
+  {
+   "date": "2026-05-27",
+   "stockTonnes": 387300
+  },
+  {
+   "date": "2026-05-28",
+   "stockTonnes": 385100
+  },
+  {
+   "date": "2026-05-29",
+   "stockTonnes": 389425
+  },
+  {
+   "date": "2026-06-01",
+   "stockTonnes": 386050
+  },
+  {
+   "date": "2026-06-02",
+   "stockTonnes": 384250
+  },
+  {
+   "date": "2026-06-03",
+   "stockTonnes": 382550
+  },
+  {
+   "date": "2026-06-04",
+   "stockTonnes": 379975
+  },
+  {
+   "date": "2026-06-05",
+   "stockTonnes": 379225
+  },
+  {
+   "date": "2026-06-08",
+   "stockTonnes": 376775
+  },
+  {
+   "date": "2026-06-09",
+   "stockTonnes": 372650
+  },
+  {
+   "date": "2026-06-10",
+   "stockTonnes": 369575
+  },
+  {
+   "date": "2026-06-11",
+   "stockTonnes": 367300
+  },
+  {
+   "date": "2026-06-12",
+   "stockTonnes": 364100
+  },
+  {
+   "date": "2026-06-15",
+   "stockTonnes": 361600
+  },
+  {
+   "date": "2026-06-16",
+   "stockTonnes": 357000
+  },
+  {
+   "date": "2026-06-17",
+   "stockTonnes": 357525
+  },
+  {
+   "date": "2026-06-18",
+   "stockTonnes": 355725
+  },
+  {
+   "date": "2026-06-19",
+   "stockTonnes": 352150
+  },
+  {
+   "date": "2026-06-22",
+   "stockTonnes": 349225
+  },
+  {
+   "date": "2026-06-23",
+   "stockTonnes": 344925
+  },
+  {
+   "date": "2026-06-24",
+   "stockTonnes": 341925
+  },
+  {
+   "date": "2026-06-25",
+   "stockTonnes": 339100
+  },
+  {
+   "date": "2026-06-26",
+   "stockTonnes": 336475
+  },
+  {
+   "date": "2026-06-29",
+   "stockTonnes": 333100
+  },
+  {
+   "date": "2026-06-30",
+   "stockTonnes": 329225
+  },
+  {
+   "date": "2026-07-01",
+   "stockTonnes": 324850
+  },
+  {
+   "date": "2026-07-02",
+   "stockTonnes": 322350
+  },
+  {
+   "date": "2026-07-03",
+   "stockTonnes": 318900
+  },
+  {
+   "date": "2026-07-06",
+   "stockTonnes": 314950
+  },
+  {
+   "date": "2026-07-07",
+   "stockTonnes": 312575
+  },
+  {
+   "date": "2026-07-08",
+   "stockTonnes": 310650
+  },
+  {
+   "date": "2026-07-09",
+   "stockTonnes": 307750
+  },
+  {
+   "date": "2026-07-10",
+   "stockTonnes": 306500
+  },
+  {
+   "date": "2026-07-13",
+   "stockTonnes": 305200
+  },
+  {
+   "date": "2026-07-14",
+   "stockTonnes": 303525
+  },
+  {
+   "date": "2026-07-15",
+   "stockTonnes": 302275
+  },
+  {
+   "date": "2026-07-16",
+   "stockTonnes": 300600
+  },
+  {
+   "date": "2026-07-17",
+   "stockTonnes": 296625
+  },
+  {
+   "date": "2026-07-20",
+   "stockTonnes": 295275
+  },
+  {
+   "date": "2026-07-21",
+   "stockTonnes": 290925
+  },
+  {
+   "date": "2026-07-22",
+   "stockTonnes": 284175
+  },
+  {
+   "date": "2026-07-23",
+   "stockTonnes": 281425
+  },
+  {
+   "date": "2026-07-24",
+   "stockTonnes": 276775
+  },
+  {
+   "date": "2026-07-27",
+   "stockTonnes": 272975
+  },
+  {
+   "date": "2026-07-28",
+   "stockTonnes": 268775
+  },
+  {
+   "date": "2026-07-29",
+   "stockTonnes": 262300
+  },
+  {
+   "date": "2026-07-30",
+   "stockTonnes": 255400
+  },
+  {
+   "date": "2026-07-31",
+   "stockTonnes": 249850
+  },
+  {
+   "date": "2026-08-03",
+   "stockTonnes": 244025
+  },
+  {
+   "date": "2026-08-04",
+   "stockTonnes": 238350
+  },
+  {
+   "date": "2026-08-05",
+   "stockTonnes": 231825
+  },
+  {
+   "date": "2026-08-06",
+   "stockTonnes": 226650
+  },
+  {
+   "date": "2026-08-07",
+   "stockTonnes": 222975
+  },
+  {
+   "date": "2026-08-10",
+   "stockTonnes": 218300
+  },
+  {
+   "date": "2026-08-11",
+   "stockTonnes": 214550
+  },
+  {
+   "date": "2026-08-12",
+   "stockTonnes": 212125
+  },
+  {
+   "date": "2026-08-13",
+   "stockTonnes": 207725
+  },
+  {
+   "date": "2026-08-14",
+   "stockTonnes": 204975
+  },
+  {
+   "date": "2026-08-17",
+   "stockTonnes": 207825
+  },
+  {
+   "date": "2026-08-18",
+   "stockTonnes": 223550
+  },
+  {
+   "date": "2026-08-19",
+   "stockTonnes": 235975
+  },
+  {
+   "date": "2026-08-20",
+   "stockTonnes": 239925
+  },
+  {
+   "date": "2026-08-21",
+   "stockTonnes": 238575
+  },
+  {
+   "date": "2026-08-24",
+   "stockTonnes": 240250
+  },
+  {
+   "date": "2026-08-25",
+   "stockTonnes": 238725
+  }
+ ]
+}

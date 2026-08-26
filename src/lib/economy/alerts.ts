@@ -31,6 +31,7 @@ import type { AnomalySignal } from './analytics';
 import { knownAtOf } from './analytics';
 import type { EngineRun } from './engine';
 import { DISRUPTIVE_EVENT_TYPES } from './propagation';
+import { arrivalGapDays } from './horizon';
 
 export type AlertStatus = 'fired' | 'suppressed' | 'retracted';
 
@@ -40,6 +41,10 @@ export interface Alert {
   /** Stable identity of the underlying signal across evaluations. */
   signalKey: string;
   kind: 'anomaly' | 'event';
+  /** What produced the signal. 'revision' = the world's best estimate moved
+   *  (a publisher's explicit act) — scored separately from disruption
+   *  detection everywhere downstream. */
+  signalKind: 'rolling-deviation' | 'rate-of-change' | 'revision' | 'event';
   entityId: string;
   entityName: string;
   title: string;
@@ -72,15 +77,25 @@ export interface Alert {
 const SUPPRESSING_CLASSES: Divergence['class'][] = ['definitional', 'coverage', 'revision_lag'];
 
 /**
- * An alert must describe something actionable near real time. A signal over
- * an annual aggregate is knowable only at publication — up to a year after
- * the world moved — so it is an ANOMALY (kept, shown in the anomaly system)
- * but never an ALERT. The decade backtest made this concrete: annual
- * production z-scores dominated the fired set at −121 days median lead,
- * flagging history as if it were news. Cadence, not staleness, is the gate:
- * the triggering observation's own period must be monthly or finer.
+ * An alert must describe something actionable near real time. What
+ * disqualifies annual production z-scores is not that the period is a year —
+ * it is that the INFORMATION ARRIVES a year late. So the gate keys on
+ * arrival cadence (spacing of the signal's evidence knownAt dates), not on
+ * period length. Usually the same axis, with one exception the period-length
+ * gate wrongly threw away: a REVISION to an annual series is new information
+ * delivered on a known date — "our best estimate of 2024 just moved 8%" is a
+ * statement about the present state of knowledge, knowable the day the
+ * edition publishes — so revision signals bypass this gate entirely.
+ * A series whose evidence all arrived on one date (curated backfill,
+ * retrieval-time fallback) has no measurable arrival cadence and is refused.
  */
-const MAX_ALERTABLE_PERIOD_DAYS = 45;
+const MAX_ARRIVAL_GAP_DAYS = 45;
+
+function arrivalAdmissible(s: AnomalySignal, knownAts: string[]): boolean {
+  if (s.kind === 'revision') return true; // arrival IS the event
+  const gap = arrivalGapDays(knownAts);
+  return gap !== null && gap <= MAX_ARRIVAL_GAP_DAYS;
+}
 
 const DAY_MS = 86_400_000;
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY_MS);
@@ -88,6 +103,7 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
 function anomalySeverity(s: AnomalySignal): Alert['severity'] {
   const m = Math.abs(s.magnitude);
   if (s.kind === 'rolling-deviation') return m >= 4 ? 'high' : m >= 2.5 ? 'medium' : 'low';
+  if (s.kind === 'revision') return m >= 10 ? 'high' : m >= 5 ? 'medium' : 'low'; // % move of best estimate
   return m >= 40 ? 'high' : m >= 20 ? 'medium' : 'low'; // rate-of-change, in %
 }
 
@@ -118,29 +134,40 @@ export function generateAlerts(run: EngineRun): Alert[] {
   const obsById = new Map(state.observations.map(o => [o.id, o]));
 
   const alerts: Alert[] = [];
+  // A daily series produces several same-month signals sharing one signal
+  // identity — one alert per (entity, metric, kind, month), keeping the
+  // earliest detection and the largest magnitude's explanation.
+  const anomalyByKey = new Map<string, Alert>();
+  const sevRank = { high: 2, medium: 1, low: 0 } as const;
 
   for (const s of anomalies) {
     // Reflexive context never wakes anyone.
     if (s.measurementClass === 'financial_positioning') continue;
-    // Cadence gate: only monthly-or-finer series can produce alerts.
-    const trigger = obsById.get(s.observationIds[s.observationIds.length - 1]);
-    if (trigger && daysBetween(trigger.period.start, trigger.period.end) > MAX_ALERTABLE_PERIOD_DAYS) continue;
-    const signalKey = `anomaly:${s.entityId}:${s.metric}:${s.kind}:${s.period}`;
     // The signal exists only once its latest evidence observation was
     // knowable — this is what the backtest's no-lookahead check pins.
     const knownAts = s.observationIds
       .map(id => obsById.get(id))
       .filter((o): o is NonNullable<typeof o> => o !== undefined)
       .map(o => knownAtOf(o));
+    // Arrival-cadence gate (revisions bypass: their arrival IS the news).
+    if (!arrivalAdmissible(s, knownAts)) continue;
+    const signalKey = `anomaly:${s.entityId}:${s.metric}:${s.kind}:${s.period}`;
     const detectedAt = knownAts.length > 0 ? knownAts.reduce((a, b) => (a > b ? a : b)) : asOf;
-    const div = explainingDivergence(s, divergences);
+    // Suppression never applies to revision signals: a revision does not
+    // claim the world moved, so "explained by revision_lag" is not a
+    // counter-claim — it is the signal itself, seen by the divergence system.
+    const div = s.kind === 'revision' ? undefined : explainingDivergence(s, divergences);
+    const name = entityName.get(s.entityId) ?? s.entityId;
     const base: Alert = {
       id: `alert:${signalKey}`,
       signalKey,
       kind: 'anomaly',
+      signalKind: s.kind,
       entityId: s.entityId,
-      entityName: entityName.get(s.entityId) ?? s.entityId,
-      title: `${s.metric} ${s.kind === 'rolling-deviation' ? `${s.magnitude}σ deviation` : `${s.magnitude}% move`} — ${entityName.get(s.entityId) ?? s.entityId}`,
+      entityName: name,
+      title: s.kind === 'revision'
+        ? `${s.metric} best estimate revised ${s.magnitude > 0 ? '+' : ''}${s.magnitude}% — ${name}`
+        : `${s.metric} ${s.kind === 'rolling-deviation' ? `${s.magnitude}σ deviation` : `${s.magnitude}% move`} — ${name}`,
       severity: anomalySeverity(s),
       detectedAt,
       signalPeriod: s.period,
@@ -157,8 +184,17 @@ export function generateAlerts(run: EngineRun): Alert[] {
         reason: `Signal is already classed ${div.class} by the divergence system — the movement is ${div.class === 'definitional' ? 'a measurement-basis artifact' : div.class === 'coverage' ? 'a coverage gap between observers' : 'a source revision'}, not evidence the world moved. See ${div.id}.`,
       };
     }
-    alerts.push(base);
+    const standing = anomalyByKey.get(signalKey);
+    if (!standing) {
+      anomalyByKey.set(signalKey, base);
+    } else {
+      anomalyByKey.set(signalKey, {
+        ...(sevRank[base.severity] > sevRank[standing.severity] ? base : standing),
+        detectedAt: standing.detectedAt < base.detectedAt ? standing.detectedAt : base.detectedAt,
+      });
+    }
   }
+  alerts.push(...anomalyByKey.values());
 
   const alertableEventTypes: EconEvent['type'][] = [...DISRUPTIVE_EVENT_TYPES, 'demand_surge'];
   for (const ev of state.events) {
@@ -170,6 +206,7 @@ export function generateAlerts(run: EngineRun): Alert[] {
       id: `alert:event:${ev.id}`,
       signalKey: `event:${ev.id}`,
       kind: 'event',
+      signalKind: 'event',
       entityId: ev.entityId,
       entityName: entityName.get(ev.entityId) ?? ev.entityId,
       title: ev.title,
@@ -183,7 +220,6 @@ export function generateAlerts(run: EngineRun): Alert[] {
     });
   }
 
-  const sevRank = { high: 2, medium: 1, low: 0 } as const;
   alerts.sort((a, b) =>
     Number(a.status === 'suppressed') - Number(b.status === 'suppressed')
     || sevRank[b.severity] - sevRank[a.severity]

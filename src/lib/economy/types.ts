@@ -296,6 +296,10 @@ export interface EconEvent {
    */
   firstReportedAt?: string;
   severity: 'low' | 'medium' | 'high';
+  /** Estimated physical magnitude of the impact, when curatable — the
+   *  number a backtest match can be sized against. Estimates say so in
+   *  `note`; absence means "not curated", never zero. */
+  magnitude?: { value: number; unit: string; basis?: QuantityBasis; note?: string };
   description?: string;
   provenance: Provenance;
 }
@@ -382,10 +386,22 @@ export interface Divergence {
   basisNormalization?: {
     referenceGrade: number;
     impliedGrade: number;
-    /** (content-declared − gross×reference) ÷ (gross×reference). */
+    /**
+     * (content-declared − gross×reference) ÷ (gross×reference). The LEVEL is
+     * confounded by the corridor's unknown true grade (a genuine 30%-grade
+     * corridor with honest declarations shows +20% at the 25% reference), so
+     * it is display and baseline — never a trigger.
+     */
     residual: number;
     /** Residual across the 20–33% grade uncertainty band. */
     residualBand: [number, number];
+    /**
+     * Residual minus the median of this corridor's PRIOR residuals. Grade is
+     * a slowly-moving physical property — an approximately constant offset
+     * per corridor — so first-differencing removes it, and drift is what
+     * reclassification keys on. Absent for a corridor's first period.
+     */
+    residualDrift?: number;
   };
   explanation: string;
 }

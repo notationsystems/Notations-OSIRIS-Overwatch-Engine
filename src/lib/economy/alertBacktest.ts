@@ -27,6 +27,8 @@ import { buildGraph } from './graph';
 import type { Alert } from './alerts';
 import { generateAlerts, reconcileAlerts } from './alerts';
 import { DISRUPTIVE_EVENT_TYPES } from './propagation';
+import type { EventHorizon, InformationHorizon } from './horizon';
+import { informationHorizons } from './horizon';
 
 export interface BacktestAlertRecord {
   alert: Alert;
@@ -68,6 +70,18 @@ export interface BacktestReport {
   retractedCount: number;
   /** Alerts whose evidence postdated their evaluation date. Must be 0. */
   lookaheadViolations: number;
+  /**
+   * The corpus's information horizon — the ceiling on lead time as a
+   * property of the SOURCES, computable without a detector. This is the
+   * headline the precision figure is subordinate to: if no physical source
+   * has a bestCaseLead beating the event record's reporting delay, alerting
+   * is an acquisition problem, and no detector work changes the answer.
+   */
+  horizons: { sources: InformationHorizon[]; events: EventHorizon | null };
+  /** Revision alerts (knowledge moved, not the world): reported separately —
+   *  scoring a publisher's explicit act against the disruption record would
+   *  be a category error, so they never enter precision. */
+  revisionAlerts: Alert[];
   caveats: string[];
   /** Final reconciled ledger (fired + suppressed + retracted). */
   ledger: Alert[];
@@ -142,7 +156,10 @@ export async function backtestAlerts(
     return graph.edges.some(e => (e.from === a && e.to === b) || (e.from === b && e.to === a));
   };
 
-  const firedAnomalies = ledger.filter(a => a.kind === 'anomaly' && (a.status === 'fired' || a.status === 'retracted') && firedAtByKey.has(a.signalKey));
+  const firedAnomalies = ledger.filter(a =>
+    a.kind === 'anomaly' && a.signalKind !== 'revision'
+    && (a.status === 'fired' || a.status === 'retracted') && firedAtByKey.has(a.signalKey));
+  const revisionAlerts = ledger.filter(a => a.signalKind === 'revision');
   const records: BacktestAlertRecord[] = firedAnomalies.map(alert => {
     const firedAt = firedAtByKey.get(alert.signalKey)!;
     const match = truth.find(ev =>
@@ -195,10 +212,13 @@ export async function backtestAlerts(
     suppressedCount: ledger.filter(a => a.status === 'suppressed').length,
     retractedCount: ledger.filter(a => a.status === 'retracted').length,
     lookaheadViolations,
+    horizons: informationHorizons(best.state).result,
+    revisionAlerts,
     caveats: [
       `Ground truth is the curated event record: ${truthRows.length} event(s) in window — treat the percentages as small-n measurements, not general performance claims.`,
       'Annual production series can only be detected at publication (the following year): production-derived detections structurally lag occurrence.',
       'Matching allows one structural hop and a −3/+2 month window; both parameters are transparent and deliberately loose.',
+      'Evaluation runs on a month-end grid, which now bounds measurable lead: a daily-cadence signal can fire at most at the month end after it becomes knowable. With a daily source in the corpus, evaluation cadence is the next binding constraint.',
     ],
     ledger,
   };

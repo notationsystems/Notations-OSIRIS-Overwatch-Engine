@@ -27,7 +27,7 @@ describe('economy store (curated copper assembly)', () => {
 
   it('keeps curated records representative; reported/estimated only from live providers', async () => {
     const { state } = await getEconomyState('copper');
-    const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'usgs-mcs2024-vintage', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot']);
+    const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'usgs-mcs2024-vintage', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot', 'westmetall-lme-stocks']);
     for (const rec of [...state.observations, ...state.flows, ...state.capacities]) {
       if (LIVE_SOURCES.has(rec.provenance.sourceId)) {
         // 'derived' appears when OSIRIS computes a total the reporter did not
