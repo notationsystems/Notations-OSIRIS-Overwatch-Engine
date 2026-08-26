@@ -218,7 +218,7 @@ function monthPeriod(ym: string) {
 export const COPPER_OBSERVATIONS: Observation[] = [
   ...countryProduction.map(([entityId, value, confidence]): Observation => ({
     id: `obs:prod-2024:${entityId.split(':')[2]}`,
-    entityId, metric: 'production', value, unit: 'kt/y', period: Y2024,
+    entityId, metric: 'production', value, unit: 'kt/y', basis: 'cu_content', period: Y2024,
     // 2024 estimates first appeared in MCS 2025 (published late Jan 2025).
     knownAt: '2025-01-30',
     valueKind: 'representative', confidence,
@@ -226,7 +226,7 @@ export const COPPER_OBSERVATIONS: Observation[] = [
   })),
   ...countryRefined.map(([entityId, value, confidence]): Observation => ({
     id: `obs:refined-2024:${entityId.split(':')[2]}`,
-    entityId, metric: 'refined_production', value, unit: 'kt/y', period: Y2024,
+    entityId, metric: 'refined_production', value, unit: 'kt/y', basis: 'cu_content', period: Y2024,
     knownAt: '2025-06-30',
     valueKind: 'representative', confidence,
     provenance: icsg('Refined production by country, 2024', 'Includes SX-EW cathode. knownAt approximates ICSG annual availability.'),
@@ -240,7 +240,7 @@ export const COPPER_OBSERVATIONS: Observation[] = [
   })),
   ...facilityProduction.map(([entityId, value, confidence]): Observation => ({
     id: `obs:prod-2024:${entityId.split(':')[2]}`,
-    entityId, metric: 'production', value, unit: 'kt/y', period: Y2024,
+    entityId, metric: 'production', value, unit: 'kt/y', basis: 'cu_content', period: Y2024,
     // Annual company reporting lands through Q1 of the following year.
     knownAt: '2025-03-31',
     valueKind: 'representative', confidence,
@@ -343,6 +343,7 @@ const flowRows: FlowRow[] = [
 
 export const COPPER_FLOWS: Flow[] = flowRows.map(([id, fromEntityId, toEntityId, form, quantity, mode, confidence, note]) => ({
   id, fromEntityId, toEntityId, commodity: 'copper', form, quantity, unit: 'kt/y',
+  basis: 'cu_content',
   period: Y2024, mode, valueKind: 'representative', confidence,
   provenance: curated(note ?? 'Trade-flow magnitude assembled from public trade statistics and company reporting; expressed as contained Cu.'),
 }));

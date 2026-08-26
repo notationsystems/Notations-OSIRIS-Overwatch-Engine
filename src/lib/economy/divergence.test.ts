@@ -78,22 +78,34 @@ describe('divergence detection (copper, real captures)', () => {
     expect(peCn.class).toBe('coverage'); // ~6% — timing/coverage range
     expect(peCn.resolvedTo).toBe(''); // bilateral evidence feeds no aggregate
 
-    // Chile → China concentrate: importer records ~4x the exporter's declaration —
-    // the well-known Chilean reporter-side suppression. Must rank as unexplained.
+    // Chile → China concentrate: importer records 3.97x the exporter's
+    // declaration — a ratio that reproduces the industry concentrate grade
+    // (implied 25.2% Cu). The basis gate must class this as a candidate
+    // basis mismatch (contained metal vs gross weight), NOT suppression:
+    // 'unexplained' here would send an analyst after ~6,000 kt of phantom.
     const clCn = mirrors.find(d => d.entityId === 'ent:country:cl' && d.partnerEntityId === 'ent:country:cn')!;
     expect(clCn.claims.find(c => c.perspective === 'reporter')!.value).toBe(2125);
     expect(clCn.claims.find(c => c.perspective === 'partner')!.value).toBe(8433);
     expect(clCn.direction).toBe('partner_higher');
-    expect(clCn.class).toBe('unexplained');
-    expect(clCn.relativeSpread).toBeGreaterThan(0.7);
+    expect(clCn.class).toBe('definitional');
+    expect(clCn.explanation).toContain('3.97');
+    expect(clCn.explanation).toContain('25.2% Cu');
+    expect(clCn.explanation).toContain('basis mismatch');
 
-    // DRC → China refined: −25% gap, consistent with Dar/Durban re-attribution.
+    // DRC → China refined: −25% gap. Refined cathode is ~99.99% Cu, so basis
+    // cannot be the mechanism — this one legitimately earns 'unexplained'
+    // (consistent with Dar/Durban re-attribution).
     const cdCn = mirrors.find(d => d.entityId === 'ent:country:cd' && d.partnerEntityId === 'ent:country:cn')!;
     expect(cdCn.direction).toBe('reporter_higher');
     expect(cdCn.class).toBe('unexplained');
 
-    // Unexplained mirrors sort ahead of revision noise.
+    // Unexplained is the hardest class — and what earns it sorts first,
+    // while the basis artifact drops toward the bottom.
     expect(r.result[0].class).toBe('unexplained');
+    expect(r.result[0].id).toBe(cdCn.id);
+    const clRank = r.result.findIndex(d => d.id === clCn.id);
+    const cdRank = r.result.findIndex(d => d.id === cdCn.id);
+    expect(clRank).toBeGreaterThan(cdRank);
   });
 
   it('an anomaly is not a divergence: signal streams stay separate', async () => {

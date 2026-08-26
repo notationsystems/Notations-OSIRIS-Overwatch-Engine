@@ -30,7 +30,10 @@ interface Share { entityId: string; name: string; value: number; share: number }
 interface ConcentrationBlock {
   operation: { name: string };
   inputs: { observationIds?: string[]; capacityIds?: string[] };
-  result: { hhi: number; band: string; total: number; unit: string; shares: Share[] };
+  result: {
+    hhi: number; band: string; total: number; unit: string; shares: Share[];
+    coverageBias?: { minRatio: number; maxRatio: number; countries: number; note: string };
+  };
 }
 interface Bottleneck {
   entityId: string; name: string; kind: string; score: number;
@@ -442,6 +445,11 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                         <div className="text-[8px] font-mono text-[var(--text-muted)] mt-0.5">
                           {block.result.shares.slice(0, 3).map(s => `${s.name} ${(s.share * 100).toFixed(0)}%`).join(' · ')}
                         </div>
+                        {block.result.coverageBias && (
+                          <div className="text-[8px] font-mono text-[#FF9500] mt-0.5">
+                            ⚠ modeled coverage {(block.result.coverageBias.minRatio * 100).toFixed(0)}–{(block.result.coverageBias.maxRatio * 100).toFixed(0)}% by country — biased toward better-modeled countries
+                          </div>
+                        )}
                       </button>
                       {openEvidence[key] && (
                         <div className="mt-1 border-t border-white/5 pt-1">

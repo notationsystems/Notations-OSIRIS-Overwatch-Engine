@@ -111,6 +111,32 @@ An external review of the phase-2 branch produced four findings; disposition:
    excluded from anomaly detection; positioning anomalies are tagged reflexive
    market context; reserves stay a stock, never throughput.
 
+## Phase 4 — basis correctness + scenario (external review round 2)
+
+The round-2 review caught that phase 3's top-ranked divergence (Chile→China
+"suppression", 75%) was a units artifact: the 3.97× ratio implies 25.2% Cu —
+dead center of the concentrate grade band — i.e. contained metal on one side,
+gross weight on the other. Shipped in response:
+
+- **QuantityBasis** (`cu_content`/`gross_weight`/`unspecified`) on
+  observations and flows; the graph refuses gross-weight flows as throughput
+  (pinned by test), so mixed bases can never skew propagation shares.
+- **Grade-band basis gate** in divergence classification: ratios in 3.0–5.0×
+  on concentrate mirrors class `definitional` with the implied grade named;
+  `unexplained` is now the hardest class to earn. The DRC→China refined gap
+  (basis cannot be the mechanism at 99.99% Cu) correctly retains it and now
+  ranks first.
+- **coverageBias** attached to the facility-level HHI: modeled-coverage range
+  (currently 22–100% by country) travels with the number.
+- **Scenario system**: counterfactual event injection through the same engine
+  on an explicit EvaluationFrame (kind/scenario/asOf/knowledge — knowledge in
+  the run fingerprint, so a disagreeing replay can distinguish "the baseline
+  moved" from "we know more now"). POST /api/economy/scenario returns
+  baseline + counterfactual + structural delta. The as-known-then replay test
+  demonstrates the backtest: Grasberg's dependent-smelter conclusion is
+  reachable with contemporaneous knowledge, and posing the event two days
+  earlier recovers the same conclusion.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

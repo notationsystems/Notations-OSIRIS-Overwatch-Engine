@@ -210,7 +210,7 @@ export function parseMcsWorldCsv(
       if (vReported !== null) {
         obs.push({
           id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.reportedYear}`,
-          entityId, metric, value: vReported, unit: 'kt/y',
+          entityId, metric, value: vReported, unit: 'kt/y', basis: 'cu_content',
           period: { start: `${spec.reportedYear}-01-01`, end: `${spec.reportedYear}-12-31` },
           knownAt: spec.publishedAt,
           valueKind: noteEstimated ? 'estimated' : 'reported', confidence: 'high',
@@ -221,7 +221,7 @@ export function parseMcsWorldCsv(
       if (vEstimated !== null) {
         obs.push({
           id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.estimatedYear}`,
-          entityId, metric, value: vEstimated, unit: 'kt/y',
+          entityId, metric, value: vEstimated, unit: 'kt/y', basis: 'cu_content',
           period: { start: `${spec.estimatedYear}-01-01`, end: `${spec.estimatedYear}-12-31` },
           knownAt: spec.publishedAt,
           valueKind: 'estimated', confidence: 'high',
@@ -358,6 +358,11 @@ export function parseComtradeResponse(
     entityId, metric,
     value: Math.round(kg / 1e6),
     unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
+    // Schema basis: Comtrade netWgt is nominally gross shipped weight. This
+    // is a CLAIM about the reporter's declaration, not verified fact — the
+    // divergence grade-band gate detects reporters who deviate (e.g. Chile
+    // appears to declare contained metal under HS 2603).
+    basis: hs === '2603' ? 'gross_weight' : 'cu_content',
     period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
     // A world total OSIRIS computed by summing partner rows is inference,
     // not the reporter's own aggregate — the identity charter says so.
@@ -403,6 +408,7 @@ export function parseComtradeBilateral(
       entityId, partnerEntityId, metric,
       value: Math.round(row.netWgt / 1e6),
       unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
+      basis: hs === '2603' ? 'gross_weight' : 'cu_content',
       period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
       valueKind: 'reported',
       confidence: row.isNetWgtEstimated === true ? 'medium' : 'high',

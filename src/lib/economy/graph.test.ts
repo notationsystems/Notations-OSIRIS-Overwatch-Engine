@@ -46,6 +46,19 @@ describe('economy graph (synthetic)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  it('basis firewall: a gross-weight flow never contributes throughput', () => {
+    const s = syntheticState();
+    // Same route, declared gross weight — ~4x fatter than its content basis.
+    // If this leaked into throughput, inbound shares (and propagation
+    // impairment) would skew toward the fat-basis supplier, silently.
+    s.flows.push({
+      ...s.flows[0], id: 'flow:alpha-gate-gross', quantity: 1200, basis: 'gross_weight',
+    });
+    const t = nodeThroughput(buildGraph(s));
+    expect(t.get('ent:port:gate')!.inKt).toBe(400); // unchanged
+    expect(t.get('ent:port:gate')!.flowIds).not.toContain('flow:alpha-gate-gross');
+  });
+
   it('sums throughput per node from flow edges', () => {
     const t = nodeThroughput(graph);
     expect(t.get('ent:port:gate')).toMatchObject({ inKt: 400, outKt: 400 });

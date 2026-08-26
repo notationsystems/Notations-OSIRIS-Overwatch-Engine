@@ -99,7 +99,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
       const year = 2015 + i;
       return {
         id: `obs:prod:${entityId.split(':')[2]}:${year}`,
-        entityId, metric: 'production', value, unit: 'kt/y', period: yearPeriod(year),
+        entityId, metric: 'production', value, unit: 'kt/y', basis: 'cu_content', period: yearPeriod(year),
         // Year Y first appears (as an estimate) in the MCS published Jan Y+1.
         knownAt: `${year + 1}-01-31`,
         valueKind: 'representative',
@@ -109,7 +109,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
     })),
   ...PANAMA_SERIES.map(([year, value]): Observation => ({
     id: `obs:prod:pa:${year}`,
-    entityId: 'ent:country:pa', metric: 'production', value, unit: 'kt/y', period: yearPeriod(year),
+    entityId: 'ent:country:pa', metric: 'production', value, unit: 'kt/y', basis: 'cu_content', period: yearPeriod(year),
     knownAt: `${year + 1}-01-31`,
     valueKind: 'representative', confidence: 'high',
     provenance: usgsHist(String(year)),
@@ -118,7 +118,7 @@ export const COPPER_SERIES_OBSERVATIONS: Observation[] = [
     const year = 2015 + i;
     return {
       id: `obs:refined:cn:${year}`,
-      entityId: 'ent:country:cn', metric: 'refined_production', value, unit: 'kt/y', period: yearPeriod(year),
+      entityId: 'ent:country:cn', metric: 'refined_production', value, unit: 'kt/y', basis: 'cu_content', period: yearPeriod(year),
       knownAt: `${year + 1}-06-30`,
       valueKind: 'representative', confidence: 'high',
       provenance: icsgHist(String(year)),

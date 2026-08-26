@@ -16,7 +16,7 @@
  * economics — it renders projections of an engine run.
  */
 
-import type { AnalyticalResult, EconomyState } from './types';
+import type { AnalyticalResult, EconEvent, EconomyState } from './types';
 import type { EconomyGraph } from './graph';
 import { buildGraph } from './graph';
 import { getEconomyState } from './store';
@@ -41,6 +41,34 @@ export interface SystemContext {
    *                  information it could not have had.
    */
   knowledge?: 'best_known' | 'as_known_then';
+  /**
+   * Counterfactual injection: hypothetical events evaluated as if they had
+   * occurred. The run's frame is marked 'counterfactual' and every injected
+   * event is branded (evt:scenario:* id, osiris-scenario provenance) so a
+   * hypothetical can never be read back as a reconstruction.
+   */
+  scenario?: ScenarioSpec;
+}
+
+export interface ScenarioSpec {
+  id: string;
+  label: string;
+  events: Array<Pick<EconEvent, 'entityId' | 'type' | 'title' | 'start' | 'end' | 'severity' | 'description'>>;
+}
+
+/**
+ * The run fingerprint. Anything comparing two runs — a replay, a backtest, a
+ * cached projection — must compare frames first: without knowledge in the
+ * fingerprint, a disagreeing replay cannot distinguish "the baseline moved"
+ * from "we know more now".
+ */
+export interface EvaluationFrame {
+  kind: 'reconstruction' | 'counterfactual';
+  asOf?: string;
+  knowledge: 'best_known' | 'as_known_then';
+  scenarioId?: string;
+  scenarioLabel?: string;
+  injectedEventIds?: string[];
 }
 
 export interface EconomySystem {
@@ -57,22 +85,37 @@ const SYSTEMS: EconomySystem[] = [
   {
     name: 'concentration',
     describes: 'HHI concentration of production, refining and consumption plus capacity structure',
-    run: (state, _graph, ctx) => ({
+    run: (state, _graph, ctx) => {
+      // Facility-level HHI is biased by differential coverage — attach the
+      // coverage range so the number never travels without it.
+      const byMine = concentration(state, 'production', 'mine', ctx.asOf);
+      const mineCoverage = facilityCoverage(state, 'production', ['mine'], ctx.asOf).result;
+      if (mineCoverage.length > 0 && byMine.result.shares.length > 0) {
+        const ratios = mineCoverage.map(r => r.ratio);
+        byMine.result.coverageBias = {
+          minRatio: Math.min(...ratios),
+          maxRatio: Math.max(...ratios),
+          countries: mineCoverage.length,
+          note: 'Facility HHI reflects only the modeled share of each country; differential coverage biases it toward better-modeled countries.',
+        };
+      }
+      return {
       // Compound projection of several concentration operations; each inner
       // result keeps its own operation/execution/evidence identity.
-      operation: { name: 'concentration-suite', params: { asOf: ctx.asOf } },
+      operation: { name: 'concentration-suite', params: { asOf: ctx.asOf, knowledge: ctx.knowledge } },
       execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
       inputs: {},
       result: {
         mineProductionByCountry: concentration(state, 'production', 'country', ctx.asOf),
-        mineProductionByMine: concentration(state, 'production', 'mine', ctx.asOf),
+        mineProductionByMine: byMine,
         refinedProductionByCountry: concentration(state, 'refined_production', 'country', ctx.asOf),
         consumptionByRegion: concentration(state, 'consumption', 'region', ctx.asOf),
         smeltingCapacityByCountry: capacityConcentration(state, 'smelting'),
         refiningCapacityByCountry: capacityConcentration(state, 'refining'),
         trajectory: concentrationTrajectory(state, 'production', 'country'),
       },
-    }),
+      };
+    },
   },
   {
     name: 'centrality',
@@ -129,7 +172,11 @@ export interface EngineRun {
   /** Evaluation date the systems ran at (undefined = latest/now). */
   asOf?: string;
   knowledge?: 'best_known' | 'as_known_then';
-  /** The state the systems actually saw (knowledge-filtered under as_known_then). */
+  /** Run fingerprint: reconstruction vs counterfactual, evaluation date,
+   *  knowledge mode, and any injected scenario. */
+  frame: EvaluationFrame;
+  /** The state the systems actually saw (knowledge-filtered under
+   *  as_known_then; scenario events injected under a counterfactual). */
   state: EconomyState;
   graph: EconomyGraph;
   providers: string[];
@@ -156,17 +203,56 @@ function asKnownThen(state: EconomyState, asOf: string): EconomyState {
   };
 }
 
+/** Brand and inject hypothetical events into a state copy. */
+function injectScenario(state: EconomyState, scenario: ScenarioSpec): { state: EconomyState; injectedIds: string[] } {
+  const entityIds = new Set(state.entities.map(e => e.id));
+  const injected: EconEvent[] = scenario.events.map((ev, i) => {
+    if (ev.entityId && !entityIds.has(ev.entityId)) {
+      throw new Error(`Scenario references unknown entity "${ev.entityId}"`);
+    }
+    return {
+      ...ev,
+      id: `evt:scenario:${scenario.id}:${i}`,
+      // A hypothetical is knowable the moment it is posed.
+      firstReportedAt: ev.start,
+      description: `[COUNTERFACTUAL — scenario "${scenario.label}"] ${ev.description ?? ''}`.trim(),
+      provenance: {
+        sourceId: 'osiris-scenario',
+        sourceName: `OSIRIS scenario injection: ${scenario.label}`,
+        retrievedAt: new Date().toISOString(),
+        note: 'Hypothetical event — not an observation of the world.',
+      },
+    };
+  });
+  return { state: { ...state, events: [...state.events, ...injected] }, injectedIds: injected.map(e => e.id) };
+}
+
 export async function runEngine(commodity: string, ctx: SystemContext = {}): Promise<EngineRun> {
   const assembled = await getEconomyState(commodity);
   const providers = assembled.providers;
-  // The run's world state is what the evaluation is allowed to know.
-  const state = ctx.knowledge === 'as_known_then' && ctx.asOf
+  // The run's world state is what the evaluation is allowed to know…
+  let state = ctx.knowledge === 'as_known_then' && ctx.asOf
     ? asKnownThen(assembled.state, ctx.asOf)
     : assembled.state;
+  // …plus, under a counterfactual, what the scenario poses. Injection comes
+  // AFTER the knowledge filter: a hypothetical is posed into a knowledge
+  // state, not filtered by it.
+  let injectedEventIds: string[] | undefined;
+  if (ctx.scenario) {
+    const injected = injectScenario(state, ctx.scenario);
+    state = injected.state;
+    injectedEventIds = injected.injectedIds;
+  }
+  const frame: EvaluationFrame = {
+    kind: ctx.scenario ? 'counterfactual' : 'reconstruction',
+    asOf: ctx.asOf,
+    knowledge: ctx.knowledge ?? 'best_known',
+    ...(ctx.scenario ? { scenarioId: ctx.scenario.id, scenarioLabel: ctx.scenario.label, injectedEventIds } : {}),
+  };
   const graph = buildGraph(state);
   const systems: Record<string, AnalyticalResult<unknown>> = {};
   for (const system of SYSTEMS) {
     systems[system.name] = system.run(state, graph, ctx);
   }
-  return { commodity, asOf: ctx.asOf, knowledge: ctx.knowledge ?? 'best_known', state, graph, providers, systems };
+  return { commodity, asOf: ctx.asOf, knowledge: ctx.knowledge ?? 'best_known', frame, state, graph, providers, systems };
 }

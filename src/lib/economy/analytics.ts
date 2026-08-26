@@ -48,6 +48,14 @@ export interface Concentration {
   total: number;
   unit: string;
   shares: ConcentrationShare[];
+  /**
+   * Facility-level concentrations only: how much of each country the facility
+   * model covers. Differential coverage biases facility HHI systematically —
+   * a country that is 73% modeled looks more concentrated than one 22%
+   * modeled purely because more of it is visible. The range travels with the
+   * number so the bias cannot be read as structure.
+   */
+  coverageBias?: { minRatio: number; maxRatio: number; countries: number; note: string };
 }
 
 /** When two sources cover the same (entity, metric, period), the harder

@@ -149,10 +149,26 @@ export interface Observation {
    * anomalies), only divergence analysis.
    */
   partnerEntityId?: string;
+  /** Mass basis of the value (physical metrics). Absent = 'unspecified'. */
+  basis?: QuantityBasis;
   valueKind: ValueKind;
   confidence: Confidence;
   provenance: Provenance;
 }
+
+/* ── Quantity basis ── */
+
+/**
+ * What a physical mass number actually weighs. A kt without a basis is
+ * underspecified everywhere it appears: contained metal and gross shipped
+ * weight differ by the ore grade (~4x for copper concentrate), the numbers
+ * are arithmetically combinable and semantically incompatible, and nothing
+ * throws when they mix. Trade schemas nominally fix the basis (Comtrade
+ * netWgt is gross) but reporters deviate — Chile appears to declare metal
+ * content under HS 2603 — so declared basis is a claim, and the divergence
+ * system's grade-band gate is the check.
+ */
+export type QuantityBasis = 'cu_content' | 'gross_weight' | 'unspecified';
 
 /* ── Measurement classes ── */
 
@@ -205,6 +221,9 @@ export interface Flow {
   form: MaterialForm;
   quantity: number;
   unit: string;
+  /** Mass basis. Only cu_content flows may enter graph throughput — a
+   *  gross-weight edge would carry ~4x its true weight in inbound shares. */
+  basis?: QuantityBasis;
   period: Period;
   mode: TransportMode;
   valueKind: ValueKind;

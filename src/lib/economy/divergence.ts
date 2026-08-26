@@ -28,6 +28,46 @@ const MIRROR_PAIRS: Array<[exportMetric: Metric, importMetric: Metric]> = [
   ['refined_exports', 'refined_imports'],
 ];
 
+/**
+ * Copper concentrate typically grades 20–33% Cu, so contained-metal and
+ * gross-weight declarations of the SAME flow differ by a factor of ~3.0–5.0.
+ * A mirror ratio landing inside that band is the fingerprint of a basis
+ * mismatch, not of suppression — the gap reproduces the industry grade, and
+ * chasing it would send an analyst after phantom tonnage. The gate runs
+ * BEFORE 'unexplained' can be assigned: unexplained is the hardest class to
+ * earn, never the default residue.
+ */
+const CONCENTRATE_GRADE_BAND = { minRatio: 3.0, maxRatio: 5.0 };
+
+interface BasisVerdict { class: 'definitional'; explanation: string }
+
+function basisGate(
+  metric: Metric,
+  values: number[],
+  declaredBases: Set<string>,
+): BasisVerdict | null {
+  const known = [...declaredBases].filter(b => b !== 'unspecified');
+  if (new Set(known).size > 1) {
+    return {
+      class: 'definitional',
+      explanation: `Claims declare different mass bases (${known.join(' vs ')}) — the gap measures the basis difference, not the world. Normalize bases before comparing; the residual after normalization would be the finding.`,
+    };
+  }
+  if (!metric.startsWith('concentrate')) return null;
+  const hi = Math.max(...values);
+  const lo = Math.min(...values);
+  if (lo <= 0) return null;
+  const ratio = hi / lo;
+  if (ratio >= CONCENTRATE_GRADE_BAND.minRatio && ratio <= CONCENTRATE_GRADE_BAND.maxRatio) {
+    const impliedGrade = (100 / ratio).toFixed(1);
+    return {
+      class: 'definitional',
+      explanation: `Ratio ${ratio.toFixed(2)}x implies ${impliedGrade}% Cu content — inside the typical concentrate grade band (20–33%). Almost certainly contained metal on one side and gross shipped weight on the other (candidate basis mismatch), not suppression or transshipment. The residual after basis normalization, much smaller, would be the finding.`,
+    };
+  }
+  return null;
+}
+
 /** Relative gaps below this read as measurement noise, not disagreement. */
 const MIN_RELATIVE_SPREAD = 0.005;
 
@@ -69,13 +109,16 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
     const relativeSpread = maxAbs > 0 ? spread / maxAbs : 0;
     if (relativeSpread < MIN_RELATIVE_SPREAD) continue;
 
-    // Class heuristic, most specific first.
+    // Class heuristic, most specific first. The basis gate runs before
+    // anything can be called unexplained.
+    const basisVerdict = basisGate(winner.metric, values, new Set(group.map(o => o.basis ?? 'unspecified')));
     const supersedesLink = group.some(a => group.some(b => a.supersedes === b.id));
     const sameFamily = new Set(group.map(o => o.provenance.sourceId.replace(/\d{4}.*$/, ''))).size === 1;
     const hasRepresentative = others.some(o => o.valueKind === 'representative');
-    const cls: Divergence['class'] = supersedesLink || sameFamily ? 'revision_lag'
-      : hasRepresentative ? 'coverage'
-        : 'unexplained';
+    const cls: Divergence['class'] = basisVerdict ? 'definitional'
+      : supersedesLink || sameFamily ? 'revision_lag'
+        : hasRepresentative ? 'coverage'
+          : 'unexplained';
 
     const direction: Divergence['direction'] = group.length === 2
       ? (winner.value > others[0].value ? 'resolved_higher' : 'resolved_lower')
@@ -97,11 +140,12 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
       direction,
       persistence: 1, // filled below
       class: cls,
-      explanation: cls === 'revision_lag'
-        ? `Later vintage (${winner.provenance.sourceId}, knowable ${knownAtOf(winner)}) revises an earlier figure for the same period.`
-        : cls === 'coverage'
-          ? `Curated representative figure differs from the resolved ${winner.valueKind} value by ${(relativeSpread * 100).toFixed(1)}% — the gap measures curated-model coverage, not a world change.`
-          : `Independent sources disagree by ${(relativeSpread * 100).toFixed(1)}% on the same subject and period.`,
+      explanation: basisVerdict ? basisVerdict.explanation
+        : cls === 'revision_lag'
+          ? `Later vintage (${winner.provenance.sourceId}, knowable ${knownAtOf(winner)}) revises an earlier figure for the same period.`
+          : cls === 'coverage'
+            ? `Curated representative figure differs from the resolved ${winner.valueKind} value by ${(relativeSpread * 100).toFixed(1)}% — the gap measures curated-model coverage, not a world change.`
+            : `Independent sources disagree by ${(relativeSpread * 100).toFixed(1)}% on the same subject and period.`,
     };
     group.forEach(o => usedObs.add(o.id));
     records.push(rec);
@@ -125,9 +169,13 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
       const maxAbs = Math.max(Math.abs(exp.value), Math.abs(imp.value));
       const spread = Math.abs(exp.value - imp.value);
       const relativeSpread = maxAbs > 0 ? spread / maxAbs : 0;
-      // Weight-based mirror gaps have no CIF/FOB component; below ~8% they
-      // are usually timing (year-boundary shipments) and coverage.
-      const cls: Divergence['class'] = relativeSpread < 0.08 ? 'coverage' : 'unexplained';
+      // Basis gate first: a grade-band ratio is a units artifact, not a
+      // finding. Then: weight-based mirror gaps have no CIF/FOB component;
+      // below ~8% they are usually timing (year-boundary shipments) and
+      // coverage. Only what survives both gates earns 'unexplained'.
+      const basisVerdict = basisGate(exportMetric, [exp.value, imp.value], new Set([exp.basis ?? 'unspecified', imp.basis ?? 'unspecified']));
+      const cls: Divergence['class'] = basisVerdict ? 'definitional'
+        : relativeSpread < 0.08 ? 'coverage' : 'unexplained';
       const rec: Divergence = {
         id: `div:mirror:${slug(exp.entityId)}-${slug(imp.entityId)}:${exportMetric}:${exp.period.start.slice(0, 4)}`,
         kind: 'mirror',
@@ -144,9 +192,10 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
         direction: exp.value > imp.value ? 'reporter_higher' : 'partner_higher',
         persistence: 1,
         class: cls,
-        explanation: cls === 'coverage'
-          ? `Exporter and importer declarations differ by ${(relativeSpread * 100).toFixed(1)}% — within the range year-boundary timing and coverage normally explain.`
-          : `Exporter declares ${exp.value.toLocaleString()} ${exp.unit}; importer records ${imp.value.toLocaleString()} — a ${(relativeSpread * 100).toFixed(0)}% gap. Persistent directional gaps of this size are the standard signature of transshipment re-attribution, reporter suppression or misdeclaration; investigate before concluding.`,
+        explanation: basisVerdict ? `Exporter declares ${exp.value.toLocaleString()}; importer records ${imp.value.toLocaleString()} ${exp.unit}. ${basisVerdict.explanation}`
+          : cls === 'coverage'
+            ? `Exporter and importer declarations differ by ${(relativeSpread * 100).toFixed(1)}% — within the range year-boundary timing and coverage normally explain.`
+            : `Exporter declares ${exp.value.toLocaleString()} ${exp.unit}; importer records ${imp.value.toLocaleString()} — a ${(relativeSpread * 100).toFixed(0)}% gap. Persistent directional gaps of this size are the standard signature of transshipment re-attribution, reporter suppression or misdeclaration; investigate before concluding.`,
       };
       usedObs.add(exp.id); usedObs.add(imp.id);
       records.push(rec);

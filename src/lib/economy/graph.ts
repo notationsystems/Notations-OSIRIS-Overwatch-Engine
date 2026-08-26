@@ -45,7 +45,11 @@ export function buildGraph(state: EconomyState): EconomyGraph {
 
   const edges: GraphEdge[] = [];
   for (const f of state.flows) {
-    edges.push({ kind: 'flow', id: f.id, from: f.fromEntityId, to: f.toEntityId, ktPerYear: toKtPerYear(f.quantity, f.unit), flow: f });
+    // Basis firewall: a gross-weight flow must never contribute throughput —
+    // mixed bases would skew inbound shares (and thus propagation impairment)
+    // toward whichever supplier reports on the fatter basis, silently.
+    const ktPerYear = f.basis === 'gross_weight' ? null : toKtPerYear(f.quantity, f.unit);
+    edges.push({ kind: 'flow', id: f.id, from: f.fromEntityId, to: f.toEntityId, ktPerYear, flow: f });
   }
   for (const d of state.dependencies) {
     // located_in is geography, not material structure — keep it out of the
