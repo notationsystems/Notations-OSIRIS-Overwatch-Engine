@@ -23,6 +23,16 @@
 
 Osiris is a production-grade OSINT platform that provides situational awareness across multiple intelligence domains. Built with Next.js 16 and MapLibre GL, every data point is rendered via WebGL for 60fps performance even with thousands of concurrent entities on-screen.
 
+> **Notations OSIRIS Overwatch Engine** — this fork extends OSIRIS with a
+> **physical-economy intelligence engine**: a canonical, provenance-preserving
+> world state (entities / observations / flows / capacities / dependencies /
+> events), a directed flow-dependency graph, analytical systems (HHI
+> concentration, flow centrality, candidate bottlenecks, anomaly signals,
+> event propagation), and a copper vertical slice rendered as map layers plus a
+> research panel with evidence-backed drill-down. See
+> [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
+> [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
+
 ### Key Capabilities
 
 | Domain | Data Points | Sources |

@@ -89,6 +89,39 @@ function computeSolarTerminator(): [number, number][] {
 
 const EMPTY_FC = { type: 'FeatureCollection' as const, features: [] };
 
+/**
+ * Great-circle interpolation for material-flow lines. A straight LineString
+ * from Chile to Shanghai would streak across the Atlantic; the geodesic
+ * crosses the Pacific. Longitudes are unwrapped so the antimeridian does not
+ * split the line.
+ */
+function greatCircleArc(from: [number, number], to: [number, number], segments = 24): [number, number][] {
+  const rad = Math.PI / 180;
+  const lng1 = from[0] * rad, lat1 = from[1] * rad;
+  const lng2 = to[0] * rad, lat2 = to[1] * rad;
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lng2 - lng1) / 2) ** 2,
+  ));
+  if (d === 0 || !Number.isFinite(d)) return [from, to];
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2);
+    const y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    coords.push([Math.atan2(y, x) / rad, Math.atan2(z, Math.sqrt(x * x + y * y)) / rad]);
+  }
+  for (let i = 1; i < coords.length; i++) {
+    let lng = coords[i][0];
+    while (lng - coords[i - 1][0] > 180) lng -= 360;
+    while (lng - coords[i - 1][0] < -180) lng += 360;
+    coords[i][0] = lng;
+  }
+  return coords;
+}
+
 function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: OsirisMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -265,8 +298,50 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks'];
+      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks', 'econ-entities', 'econ-flows'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
+
+      // ── PHYSICAL ECONOMY (copper vertical slice) ──
+      // Flows under entity dots; bottleneck rings under dots so the fill stays legible.
+      const econRadius: any = ['interpolate', ['linear'], ['sqrt', ['coalesce', ['get', 'production'], ['get', 'capacity'], 100]],
+        5, 3, 15, 5, 25, 7.5, 35, 10];
+      map.addLayer({ id: 'econ-flow-lines', type: 'line', source: 'econ-flows',
+        layout: { 'line-cap': 'round' },
+        paint: {
+          'line-color': ['match', ['get', 'form'],
+            'concentrate', '#FFB300',
+            'blister', '#FF7043', 'anode', '#FF7043',
+            'cathode', '#4FC3F7', 'refined', '#4FC3F7',
+            '#90A4AE'],
+          'line-width': ['interpolate', ['linear'], ['get', 'quantity'], 100, 0.8, 500, 2, 1000, 3.2, 1600, 4.5],
+          'line-opacity': 0.5,
+        } });
+      map.addLayer({ id: 'econ-bottleneck-ring', type: 'circle', source: 'econ-entities',
+        filter: ['>=', ['coalesce', ['get', 'bottleneckScore'], 0], 0.45],
+        paint: {
+          'circle-radius': ['+', econRadius, 5],
+          'circle-color': 'rgba(0,0,0,0)',
+          'circle-stroke-color': '#FF3D3D',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-opacity': 0.85,
+        } });
+      map.addLayer({ id: 'econ-dots', type: 'circle', source: 'econ-entities',
+        paint: {
+          'circle-radius': econRadius,
+          'circle-color': ['match', ['get', 'stage'],
+            'production', '#D4AF37',
+            'smelting', '#FF7043',
+            'refining', '#4FC3F7',
+            'logistics', '#78909C',
+            'manufacturing', '#AB47BC',
+            '#B0BEC5'],
+          'circle-opacity': 0.85,
+          'circle-stroke-color': '#0A0A0A',
+          'circle-stroke-width': 1,
+        } });
+      map.addLayer({ id: 'econ-labels', type: 'symbol', source: 'econ-entities', minzoom: 3,
+        layout: { 'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true },
+        paint: { 'text-color': '#E8E6E0', 'text-halo-color': '#000000', 'text-halo-width': 1 } });
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
 
@@ -1417,6 +1492,41 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       </div>`);
     });
 
+    // ── Physical economy entities ──
+    map.on('click', 'econ-dots', e => {
+      const p = e.features?.[0]?.properties;
+      if (!p) return;
+      const coords = (e.features![0].geometry as any).coordinates;
+      const stageCol = ({ production: '#D4AF37', smelting: '#FF7043', refining: '#4FC3F7', logistics: '#78909C', manufacturing: '#AB47BC' } as Record<string, string>)[p.stage] || '#B0BEC5';
+      const bScore = p.bottleneckScore !== null && p.bottleneckScore !== undefined && p.bottleneckScore !== 'null' ? Number(p.bottleneckScore) : null;
+      const prod = p.production !== null && p.production !== undefined && p.production !== 'null' ? Number(p.production) : null;
+      const cap = p.capacity !== null && p.capacity !== undefined && p.capacity !== 'null' ? Number(p.capacity) : null;
+      popup(coords, `<div style="${pStyle}border:1px solid ${stageCol}40;">
+        <div style="color:${stageCol};font-weight:bold;font-size:11px;margin-bottom:2px;">${p.name}</div>
+        <div style="color:#999;font-size:9px;margin-bottom:6px;">${String(p.kind || '').toUpperCase()}${p.stage ? ' — ' + String(p.stage).toUpperCase() : ''}${p.country && p.country !== 'null' ? ' — ' + p.country : ''}</div>
+        ${prod ? `<div style="font-size:9px;color:#aaa;">Output: <span style="color:${stageCol};font-weight:bold;">${prod.toLocaleString()} ${p.productionUnit && p.productionUnit !== 'null' ? p.productionUnit : 'kt/y'}</span></div>` : ''}
+        ${cap ? `<div style="font-size:9px;color:#aaa;">Capacity: <span style="color:#FF9500;font-weight:bold;">${cap.toLocaleString()} kt/y</span></div>` : ''}
+        ${bScore !== null && Number.isFinite(bScore) ? `<div style="font-size:9px;color:#aaa;">Bottleneck candidate: <span style="color:${bScore > 0.6 ? '#FF3D3D' : bScore > 0.45 ? '#FF9500' : '#00BCD4'};font-weight:bold;">${bScore.toFixed(2)}</span></div>` : ''}
+        ${Number(p.eventCount) > 0 ? `<div style="font-size:9px;color:#FF3D3D;margin-top:2px;">⚠ ${p.eventCount} event(s) on record</div>` : ''}
+        <div style="font-size:8px;color:#5C5A54;margin-top:6px;">geo:${p.geoPrecision} — evidence & dependencies in the ECONOMY panel</div>
+      </div>`);
+      onEntityClick?.({ type: 'econ_entity', id: p.id, name: p.name });
+    });
+    map.on('mouseenter', 'econ-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'econ-dots', () => { map.getCanvas().style.cursor = ''; });
+
+    // ── Physical economy flows ──
+    map.on('click', 'econ-flow-lines', e => {
+      const p = e.features?.[0]?.properties;
+      if (!p) return;
+      const formCol = ({ concentrate: '#FFB300', blister: '#FF7043', anode: '#FF7043', cathode: '#4FC3F7', refined: '#4FC3F7' } as Record<string, string>)[p.form] || '#90A4AE';
+      popup([e.lngLat.lng, e.lngLat.lat], `<div style="${pStyle}border:1px solid ${formCol}40;">
+        <div style="color:${formCol};font-weight:bold;font-size:11px;margin-bottom:4px;">MATERIAL FLOW — ${String(p.form || '').toUpperCase()}</div>
+        <div style="font-size:9px;color:#aaa;">Quantity: <span style="color:${formCol};font-weight:bold;">${Number(p.quantity).toLocaleString()} ${p.unit}</span></div>
+        <div style="font-size:9px;color:#aaa;">Mode: <span style="color:#fff;">${p.mode}</span> — Confidence: <span style="color:${p.confidence === 'high' ? '#00E676' : p.confidence === 'medium' ? '#FF9500' : '#FF3D3D'};">${p.confidence}</span></div>
+      </div>`);
+    });
+
     // ── Live News (opens feed viewer) ──
     map.on('click', 'news-dots', e => {
       const p = e.features?.[0]?.properties;
@@ -1766,6 +1876,41 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     setGeo('maritime-choke', activeLayers.maritime && data.maritime_chokepoints ? data.maritime_chokepoints.map((c: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [c.lng, c.lat] }, properties: { name: c.name, traffic: c.traffic, risk: c.risk } })) : []);
     setGeo('maritime-ships', activeLayers.maritime && data.maritime_ships ? data.maritime_ships.map((s: any) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [s.lng, s.lat] }, properties: { name: s.name || s.mmsi?.toString(), type: s.type || 'cargo', speed: s.speed, heading: s.heading, destination: s.destination, flag: s.flag } })) : []);
   }, [mapReady, data.maritime_ports, data.maritime_chokepoints, data.maritime_ships, activeLayers.maritime, setGeo]);
+
+  // Physical economy (copper vertical slice)
+  useEffect(() => {
+    if (!mapReady) return;
+    const al = activeLayers as any;
+    const stageVisible = (stage: string | null) =>
+      stage === 'production' ? al.econ_production
+        : stage === 'smelting' || stage === 'refining' || stage === 'manufacturing' ? al.econ_processing
+          : stage === 'logistics' ? al.econ_ports
+            : al.econ_production;
+    const ents = data.econ_entities || [];
+    // A stage toggle hides its dots, but the bottleneck layer keeps flagged
+    // nodes visible — a constraint you have hidden is still a constraint.
+    const features = ents
+      .filter((e: any) => stageVisible(e.stage) || (al.econ_bottlenecks && (e.bottleneckScore ?? 0) >= 0.45))
+      .map((e: any) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+        properties: {
+          id: e.id, name: e.name, kind: e.kind, stage: e.stage, country: e.country,
+          operator: e.operator, production: e.production, productionUnit: e.productionUnit,
+          capacity: e.capacity, bottleneckScore: al.econ_bottlenecks ? e.bottleneckScore : null,
+          eventCount: e.eventCount, geoPrecision: e.geoPrecision,
+        },
+      }));
+    setGeo('econ-entities', features);
+    const flows = al.econ_flows && data.econ_flows
+      ? data.econ_flows.map((f: any) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: greatCircleArc(f.fromCoord, f.toCoord) },
+        properties: { id: f.id, form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence },
+      }))
+      : [];
+    setGeo('econ-flows', flows);
+  }, [mapReady, data.econ_entities, data.econ_flows, (activeLayers as any).econ_production, (activeLayers as any).econ_processing, (activeLayers as any).econ_ports, (activeLayers as any).econ_flows, (activeLayers as any).econ_bottlenecks, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;

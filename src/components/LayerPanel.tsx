@@ -39,6 +39,18 @@ interface LayerGroupDef {
 
 const LAYER_GROUPS: LayerGroupDef[] = [
   {
+    label: 'ECONOMY',
+    fullLabel: 'PHYSICAL ECONOMY',
+    icon: Mountain,
+    layers: [
+      { key: 'econ_production', label: 'Cu Production', dataKey: 'econ_entities' },
+      { key: 'econ_processing', label: 'Smelting / Refining', dataKey: 'econ_entities' },
+      { key: 'econ_ports', label: 'Ports & Logistics', dataKey: 'econ_entities' },
+      { key: 'econ_flows', label: 'Material Flows', dataKey: 'econ_flows' },
+      { key: 'econ_bottlenecks', label: 'Bottleneck Candidates', dataKey: 'econ_entities' },
+    ],
+  },
+  {
     label: 'SDK',
     fullLabel: 'OSIRIS SDK',
     icon: Network,

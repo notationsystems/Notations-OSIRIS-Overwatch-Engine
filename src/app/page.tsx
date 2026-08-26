@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine } from 'lucide-react';
+import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine, Mountain } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import ScmPanel from '@/components/ScmPanel';
@@ -36,6 +36,7 @@ import { selectInPolygon } from '@/lib/aoi';
 import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/lib/watch';
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 const TokenPanel = dynamic(() => import('@/components/TokenPanel'));
+const CommodityPanel = dynamic(() => import('@/components/CommodityPanel'));
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -116,6 +117,8 @@ export default function Dashboard() {
   const [spaceWeather, setSpaceWeather] = useState<any>(null);
   const [showLayers, setShowLayers] = useState(true);
   const [showMarkets, setShowMarkets] = useState(false);
+  const [showEconomy, setShowEconomy] = useState(false);
+  const [econSelected, setEconSelected] = useState<string | null>(null);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showSpaceCam, setShowSpaceCam] = useState(false);
   const [showScmPanel, setShowScmPanel] = useState(true);
@@ -274,6 +277,13 @@ export default function Dashboard() {
     gdelt_events: false,
     cf_outages: false,
     cf_attacks: false,
+    // Physical economy (copper vertical slice) — on by default: it is the
+    // Overwatch Engine's primary research surface.
+    econ_production: true,
+    econ_processing: true,
+    econ_ports: true,
+    econ_flows: true,
+    econ_bottlenecks: true,
   });
   // Server-side capability flags — gate layers that need credentials.
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
@@ -413,6 +423,10 @@ export default function Dashboard() {
   }, []);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
+    if (entity?.type === 'econ_entity' && entity.id) {
+      setEconSelected(entity.id);
+      setShowEconomy(true);
+    }
     if (entity?.type === 'cctv') setActiveCamera(entity);
     if (entity?.type === 'live_news' && entity.url) {
       setLiveFeedUrl(entity.url);
@@ -587,6 +601,12 @@ export default function Dashboard() {
     if (activeLayers.cctv && !layerFetchedRef.current.has('cctv')) {
       fetchEndpoint(`/api/cctv?region=all&_t=${Date.now()}`);
       layerFetchedRef.current.add('cctv');
+    }
+    // Physical economy (copper) — one fetch serves all five econ layers
+    const anyEcon = activeLayers.econ_production || activeLayers.econ_processing || activeLayers.econ_ports || activeLayers.econ_flows || activeLayers.econ_bottlenecks;
+    if (anyEcon && !layerFetchedRef.current.has('economy')) {
+      fetchEndpoint('/api/economy?commodity=copper&view=map', d => ({ econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events }));
+      layerFetchedRef.current.add('economy');
     }
     // Maritime
     if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
@@ -1305,7 +1325,35 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowMarkets(!showMarkets); setShowIntel(false); setShowAlerts(false); setShowSpaceCam(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
+          <button onClick={() => { setShowEconomy(!showEconomy); setShowIntel(false); setShowAlerts(false); setShowSpaceCam(false); setShowMarkets(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showEconomy ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Physical Economy — copper flows, concentration, bottlenecks" aria-label="Physical Economy" aria-expanded={showEconomy}>
+            <Mountain className={`w-4 h-4 ${showEconomy ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
+            {showEconomy && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--gold-primary)]"
+              />
+            )}
+          </button>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[9px] font-mono tracking-wider text-white/80 bg-black/80 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">ECONOMY</span>
+          <AnimatePresence>
+            {showEconomy && (
+              /* Fixed, not rail-centered: the research panel is taller than
+                 half the viewport, so centering on the button would push the
+                 top sections off-screen. */
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="fixed right-12 top-16 z-40">
+                <CommodityPanel
+                  selectedId={econSelected}
+                  onSelectEntity={setEconSelected}
+                  onClose={() => setShowEconomy(false)}
+                  onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="relative group">
+          <button onClick={() => { setShowMarkets(!showMarkets); setShowIntel(false); setShowAlerts(false); setShowSpaceCam(false); setShowEconomy(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
             <BarChart3 className={`w-4 h-4 ${showMarkets ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showMarkets && (
               <span
