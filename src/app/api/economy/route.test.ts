@@ -41,9 +41,57 @@ describe('GET /api/economy', () => {
     expect(body.state.observations.every((o: { provenance?: { sourceId?: string } }) => o.provenance?.sourceId)).toBe(true);
   });
 
-  it('404s unknown commodities and 400s unknown views', async () => {
+  it('404s unknown commodities and 400s unknown views and malformed asOf', async () => {
     expect((await economyGet(req('/api/economy?commodity=vibranium'))).status).toBe(404);
     expect((await economyGet(req('/api/economy?commodity=copper&view=nope'))).status).toBe(400);
+    expect((await economyGet(req('/api/economy?commodity=copper&asOf=last-tuesday'))).status).toBe(400);
+  });
+
+  it('evaluates disruption flags at asOf for temporal playback', async () => {
+    // During the Grasberg halt (started 2025-09-08): mine + its flows disrupted.
+    const during = await (await economyGet(req('/api/economy?commodity=copper&view=map&asOf=2025-10-01'))).json();
+    const grasberg = during.econ_entities.find((e: { id: string }) => e.id === 'ent:mine:grasberg');
+    expect(grasberg.disrupted).toBe(true);
+    const grasbergFlow = during.econ_flows.find((f: { id: string }) => f.id === 'flow:grasberg-amamapare');
+    expect(grasbergFlow.disrupted).toBe(true);
+    expect(during.asOf).toBe('2025-10-01');
+    // Before any event window (mid-2023, canal drought already active but
+    // Grasberg fine): grasberg not disrupted.
+    const before = await (await economyGet(req('/api/economy?commodity=copper&view=map&asOf=2023-01-01'))).json();
+    const grasbergBefore = before.econ_entities.find((e: { id: string }) => e.id === 'ent:mine:grasberg');
+    expect(grasbergBefore.disrupted).toBe(false);
+  });
+
+  it('serves the timeline view with a playback range and dated events', async () => {
+    const res = await economyGet(req('/api/economy?commodity=copper&view=timeline'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.range.min <= '2023-06').toBe(true);
+    expect(body.range.max >= '2026-08').toBe(true);
+    expect(body.events.length).toBeGreaterThan(3);
+    const grasberg = body.events.find((e: { id: string }) => e.id === 'evt:grasberg-mud-rush-2025');
+    expect(grasberg).toMatchObject({ start: '2025-09-08', disruptive: true, entityName: 'Grasberg' });
+    // Sorted by start date.
+    const starts = body.events.map((e: { start: string }) => e.start);
+    expect([...starts].sort()).toEqual(starts);
+  });
+
+  it('serves the graph view with no dangling link endpoints', async () => {
+    const res = await economyGet(req('/api/economy?commodity=copper&view=graph'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.nodes.length).toBeGreaterThan(30);
+    // Countries and the commodity node are aggregates, not graph structure.
+    expect(body.nodes.some((n: { kind: string }) => n.kind === 'country' || n.kind === 'commodity')).toBe(false);
+    const ids = new Set(body.nodes.map((n: { id: string }) => n.id));
+    for (const l of body.links) {
+      expect(ids.has(l.source), `link ${l.id} source`).toBe(true);
+      expect(ids.has(l.target), `link ${l.id} target`).toBe(true);
+    }
+    expect(body.links.some((l: { kind: string }) => l.kind === 'flow')).toBe(true);
+    expect(body.links.some((l: { kind: string }) => l.kind === 'dependency')).toBe(true);
+    const guixi = body.nodes.find((n: { id: string }) => n.id === 'ent:smelter:guixi');
+    expect(guixi.throughputKt).toBeGreaterThan(1000);
   });
 });
 

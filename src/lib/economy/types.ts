@@ -106,7 +106,17 @@ export type Metric =
   | 'consumption'
   | 'exports'
   | 'imports'
+  /* Trade metrics are split by material form so a gross-weight concentrate
+   * figure can never be collapsed with a refined-cathode figure. */
+  | 'concentrate_exports'
+  | 'refined_exports'
+  | 'concentrate_imports'
+  | 'refined_imports'
   | 'reserves'
+  /** Exchange price of the commodity itself (context, not physical flow). */
+  | 'price'
+  /** Futures positioning (e.g. managed-money net contracts). */
+  | 'net_positioning'
   | 'throughput';
 
 export interface Observation {

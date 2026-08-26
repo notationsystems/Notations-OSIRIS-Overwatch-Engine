@@ -16,6 +16,10 @@ import {
   COPPER_ENTITIES, COPPER_OBSERVATIONS, COPPER_FLOWS, COPPER_CAPACITIES,
   COPPER_DEPENDENCIES, COPPER_EVENTS, COPPER_SOURCES,
 } from '@/data/economy/copper';
+import { COPPER_SERIES_OBSERVATIONS, COPPER_SERIES_SOURCES } from '@/data/economy/copper-series';
+// Runtime-safe despite the apparent cycle: liveAdapters imports only TYPES
+// from this module, so nothing evaluates back into it at load time.
+import { LIVE_ADAPTERS } from './liveAdapters';
 
 export interface AdapterPayload {
   commodity: string;
@@ -53,19 +57,19 @@ export const curatedCopperAdapter: EconomyAdapter = {
       commodity: 'copper',
       commodityName: 'Copper',
       entities: COPPER_ENTITIES,
-      observations: COPPER_OBSERVATIONS,
+      observations: [...COPPER_OBSERVATIONS, ...COPPER_SERIES_OBSERVATIONS],
       flows: COPPER_FLOWS,
       capacities: COPPER_CAPACITIES,
       dependencies: COPPER_DEPENDENCIES,
       events: COPPER_EVENTS,
-      sources: COPPER_SOURCES,
+      sources: [...COPPER_SOURCES, ...COPPER_SERIES_SOURCES],
     };
   },
 };
 
 /* ── Registry ── */
 
-const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter];
+const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter, ...LIVE_ADAPTERS];
 
 export function listAdapters(): EconomyAdapter[] {
   return [...ADAPTERS];
@@ -80,4 +84,9 @@ export function registerAdapter(adapter: EconomyAdapter): void {
   const i = ADAPTERS.findIndex(a => a.providerId === adapter.providerId);
   if (i >= 0) ADAPTERS[i] = adapter;
   else ADAPTERS.push(adapter);
+}
+
+export function unregisterAdapter(providerId: string): void {
+  const i = ADAPTERS.findIndex(a => a.providerId === providerId);
+  if (i >= 0) ADAPTERS.splice(i, 1);
 }

@@ -42,21 +42,59 @@ export interface Concentration {
   shares: ConcentrationShare[];
 }
 
+/** When two sources cover the same (entity, metric, period), the harder
+ *  evidence wins: reported beats estimated beats curated-representative
+ *  beats derived. */
+const VALUE_KIND_RANK: Record<Observation['valueKind'], number> = {
+  reported: 3, estimated: 2, representative: 1, derived: 0,
+};
+
+/**
+ * One observation per entity for a metric: the latest whose period ends at or
+ * before `asOf` (default: latest available). This is what makes time-series
+ * state safe — a ten-year production series must never be summed as if the
+ * years were siblings. Same-period duplicates from different providers
+ * resolve by valueKind rank, then confidence.
+ */
+export function observationsAt(
+  state: EconomyState,
+  metric: Metric,
+  kind: 'country' | 'mine' | 'smelter' | 'refinery' | 'region',
+  asOf?: string,
+): Observation[] {
+  const cutoff = asOf ?? '9999-12-31';
+  const confRank = { high: 2, medium: 1, low: 0 } as const;
+  const best = new Map<string, Observation>();
+  for (const o of state.observations) {
+    if (o.metric !== metric || o.period.end > cutoff) continue;
+    const ent = state.entities.find(e => e.id === o.entityId);
+    if (ent?.kind !== kind) continue;
+    const prev = best.get(o.entityId);
+    if (!prev
+      || o.period.end > prev.period.end
+      || (o.period.end === prev.period.end && (
+        VALUE_KIND_RANK[o.valueKind] > VALUE_KIND_RANK[prev.valueKind]
+        || (VALUE_KIND_RANK[o.valueKind] === VALUE_KIND_RANK[prev.valueKind] && confRank[o.confidence] > confRank[prev.confidence])
+      ))) {
+      best.set(o.entityId, o);
+    }
+  }
+  return [...best.values()];
+}
+
 /**
  * Concentration of a metric across the entities that report it, restricted
  * to one entity kind so country totals and facility figures never mix in a
- * single calculation (they would double-count the same material).
+ * single calculation (they would double-count the same material). With
+ * `asOf`, computed from each entity's latest observation at that date.
  */
 export function concentration(
   state: EconomyState,
   metric: Metric,
   kind: 'country' | 'mine' | 'smelter' | 'refinery' | 'region',
+  asOf?: string,
 ): AnalyticalResult<Concentration> {
-  const obs = state.observations.filter(o => {
-    if (o.metric !== metric) return false;
-    const ent = state.entities.find(e => e.id === o.entityId);
-    return ent?.kind === kind;
-  });
+  const obs = observationsAt(state, metric, kind, asOf);
   const total = obs.reduce((s, o) => s + o.value, 0);
   const shares: ConcentrationShare[] = obs
     .map(o => ({
@@ -70,9 +108,66 @@ export function concentration(
   const band = hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
   return wrap(
     'concentration',
-    { metric, kind },
+    { metric, kind, asOf },
     { observationIds: obs.map(o => o.id) },
     { metric, hhi, band, total, unit: obs[0]?.unit ?? '', shares },
+  );
+}
+
+export interface TrajectoryPoint {
+  period: string;   // year, e.g. "2019"
+  hhi: number;
+  band: Concentration['band'];
+  topName: string;
+  topShare: number; // 0..1
+  participants: number;
+}
+
+/**
+ * How concentration evolved: HHI recomputed at each year-end from the
+ * observations available then. Years where fewer than `minParticipants`
+ * entities report are dropped rather than shown as spuriously concentrated.
+ */
+export function concentrationTrajectory(
+  state: EconomyState,
+  metric: Metric,
+  kind: 'country' | 'mine' | 'smelter' | 'refinery' | 'region',
+  { minParticipants = 5 } = {},
+): AnalyticalResult<TrajectoryPoint[]> {
+  const years = new Set<string>();
+  for (const o of state.observations) {
+    if (o.metric === metric) years.add(o.period.end.slice(0, 4));
+  }
+  const points: TrajectoryPoint[] = [];
+  const usedObs = new Set<string>();
+  for (const year of [...years].sort()) {
+    // Only observations FROM that year — a year where most reporters are
+    // stale carry-forwards would fabricate a concentration figure.
+    const obs = observationsAt(state, metric, kind, `${year}-12-31`)
+      .filter(o => o.period.end.slice(0, 4) === year);
+    if (obs.length < minParticipants) continue;
+    const total = obs.reduce((s, o) => s + o.value, 0);
+    if (total <= 0) continue;
+    const shares = obs.map(o => ({
+      name: state.entities.find(e => e.id === o.entityId)?.name ?? o.entityId,
+      share: o.value / total,
+    })).sort((a, b) => b.share - a.share);
+    const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
+    obs.forEach(o => usedObs.add(o.id));
+    points.push({
+      period: year,
+      hhi,
+      band: hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated',
+      topName: shares[0].name,
+      topShare: shares[0].share,
+      participants: obs.length,
+    });
+  }
+  return wrap(
+    'concentrationTrajectory',
+    { metric, kind, minParticipants },
+    { observationIds: [...usedObs] },
+    points,
   );
 }
 

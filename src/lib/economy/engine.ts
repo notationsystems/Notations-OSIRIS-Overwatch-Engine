@@ -21,15 +21,22 @@ import type { EconomyGraph } from './graph';
 import { buildGraph } from './graph';
 import { getEconomyState } from './store';
 import {
-  bottleneckCandidates, capacityConcentration, concentration, detectAnomalies, flowCentrality,
+  bottleneckCandidates, capacityConcentration, concentration, concentrationTrajectory,
+  detectAnomalies, flowCentrality,
 } from './analytics';
 import { propagateEvents } from './propagation';
+
+export interface SystemContext {
+  /** Evaluation date (ISO, YYYY-MM-DD). Temporal systems compute state as of
+   *  this date; omitted means "now" / latest available. */
+  asOf?: string;
+}
 
 export interface EconomySystem {
   name: string;
   /** What the system derives — shown to researchers, so write it plainly. */
   describes: string;
-  run(state: EconomyState, graph: EconomyGraph): AnalyticalResult<unknown>;
+  run(state: EconomyState, graph: EconomyGraph, ctx: SystemContext): AnalyticalResult<unknown>;
 }
 
 /* Built-in systems. Order is presentation order, not a dependency chain —
@@ -39,19 +46,20 @@ const SYSTEMS: EconomySystem[] = [
   {
     name: 'concentration',
     describes: 'HHI concentration of production, refining and consumption plus capacity structure',
-    run: (state) => ({
+    run: (state, _graph, ctx) => ({
       // Compound projection of several concentration operations; each inner
       // result keeps its own operation/execution/evidence identity.
-      operation: { name: 'concentration-suite', params: {} },
+      operation: { name: 'concentration-suite', params: { asOf: ctx.asOf } },
       execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
       inputs: {},
       result: {
-        mineProductionByCountry: concentration(state, 'production', 'country'),
-        mineProductionByMine: concentration(state, 'production', 'mine'),
-        refinedProductionByCountry: concentration(state, 'refined_production', 'country'),
-        consumptionByRegion: concentration(state, 'consumption', 'region'),
+        mineProductionByCountry: concentration(state, 'production', 'country', ctx.asOf),
+        mineProductionByMine: concentration(state, 'production', 'mine', ctx.asOf),
+        refinedProductionByCountry: concentration(state, 'refined_production', 'country', ctx.asOf),
+        consumptionByRegion: concentration(state, 'consumption', 'region', ctx.asOf),
         smeltingCapacityByCountry: capacityConcentration(state, 'smelting'),
         refiningCapacityByCountry: capacityConcentration(state, 'refining'),
+        trajectory: concentrationTrajectory(state, 'production', 'country'),
       },
     }),
   },
@@ -73,7 +81,7 @@ const SYSTEMS: EconomySystem[] = [
   {
     name: 'propagation',
     describes: 'Event → state-change propagation: disrupted flow, downstream exposure, alternative capacity',
-    run: (state, graph) => propagateEvents(state, graph),
+    run: (state, graph, ctx) => propagateEvents(state, graph, ctx.asOf ? { asOf: ctx.asOf } : {}),
   },
 ];
 
@@ -89,6 +97,8 @@ export function registerSystem(system: EconomySystem): void {
 
 export interface EngineRun {
   commodity: string;
+  /** Evaluation date the systems ran at (undefined = latest/now). */
+  asOf?: string;
   state: EconomyState;
   graph: EconomyGraph;
   providers: string[];
@@ -101,12 +111,12 @@ export interface EngineRun {
  * store; systems are cheap enough to run per call, which keeps a run
  * consistent with the state it was computed from.
  */
-export async function runEngine(commodity: string): Promise<EngineRun> {
+export async function runEngine(commodity: string, ctx: SystemContext = {}): Promise<EngineRun> {
   const { state, providers } = await getEconomyState(commodity);
   const graph = buildGraph(state);
   const systems: Record<string, AnalyticalResult<unknown>> = {};
   for (const system of SYSTEMS) {
-    systems[system.name] = system.run(state, graph);
+    systems[system.name] = system.run(state, graph, ctx);
   }
-  return { commodity, state, graph, providers, systems };
+  return { commodity, asOf: ctx.asOf, state, graph, providers, systems };
 }

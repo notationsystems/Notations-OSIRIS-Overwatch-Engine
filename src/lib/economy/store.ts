@@ -43,18 +43,21 @@ function deriveLocatedIn(entities: Entity[]): Dependency[] {
   return deps;
 }
 
-const stateCache = new Map<string, Promise<AssembledState>>();
+const stateCache = new Map<string, { promise: Promise<AssembledState>; at: number }>();
+/** Assembly memo TTL — long enough to serve a browsing session from one
+ *  assembly, short enough that live-adapter refreshes propagate. */
+const ASSEMBLY_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Assemble (and memoize) the canonical state for a commodity from every
- * registered adapter that serves it. Module-level memoization is safe: the
- * curated dataset is immutable per process; live adapters should manage
- * their own TTLs behind load().
+ * registered adapter that serves it. The memo expires so adapters with live
+ * providers get re-consulted; they manage their own fetch TTLs behind load().
  */
 export function getEconomyState(commodity: string, { fresh = false } = {}): Promise<AssembledState> {
-  if (!fresh && stateCache.has(commodity)) return stateCache.get(commodity)!;
+  const cached = stateCache.get(commodity);
+  if (!fresh && cached && Date.now() - cached.at < ASSEMBLY_TTL_MS) return cached.promise;
   const promise = assemble(commodity);
-  stateCache.set(commodity, promise);
+  stateCache.set(commodity, { promise, at: Date.now() });
   // A failed assembly must not poison the cache forever.
   promise.catch(() => stateCache.delete(commodity));
   return promise;
@@ -64,7 +67,27 @@ async function assemble(commodity: string): Promise<AssembledState> {
   const adapters = adaptersFor(commodity);
   if (adapters.length === 0) throw new Error(`No adapter registered for commodity "${commodity}"`);
 
-  const payloads = await Promise.all(adapters.map(a => a.load(commodity)));
+  // Graceful source degradation: one dead provider must not take down the
+  // canonical state. Failures become warnings; only total failure throws.
+  const issues: ValidationIssue[] = [];
+  const settled = await Promise.allSettled(adapters.map(a => a.load(commodity)));
+  const payloads = [];
+  const providers: string[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const result = settled[i];
+    if (result.status === 'fulfilled') {
+      payloads.push(result.value);
+      providers.push(adapters[i].providerId);
+    } else {
+      issues.push({
+        severity: 'warning',
+        message: `Adapter ${adapters[i].providerId} failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+      });
+    }
+  }
+  if (payloads.length === 0) {
+    throw new Error(`All adapters failed for commodity "${commodity}":\n` + issues.map(i => `  - ${i.message}`).join('\n'));
+  }
 
   const state: EconomyState = {
     commodity,
@@ -94,14 +117,14 @@ async function assemble(commodity: string): Promise<AssembledState> {
 
   state.dependencies.push(...deriveLocatedIn(state.entities));
 
-  const issues = validateState(state);
-  const errors = issues.filter(i => i.severity === 'error');
+  const validation = validateState(state);
+  const errors = validation.filter(i => i.severity === 'error');
   if (errors.length > 0) {
     // A state that fails referential integrity must never reach analytics/UI.
     throw new Error(`Economy state for "${commodity}" failed validation:\n` + errors.map(e => `  - ${e.message}`).join('\n'));
   }
 
-  return { state, issues, providers: adapters.map(a => a.providerId) };
+  return { state, issues: [...issues, ...validation], providers };
 }
 
 /* ── Lookup helpers ── */

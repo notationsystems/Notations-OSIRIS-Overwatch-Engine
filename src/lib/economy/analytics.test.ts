@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  concentration, capacityConcentration, flowCentrality, bottleneckCandidates, detectAnomalies, extractSeries,
+  concentration, capacityConcentration, concentrationTrajectory, flowCentrality,
+  bottleneckCandidates, detectAnomalies, extractSeries, observationsAt,
 } from './analytics';
 import { buildGraph } from './graph';
 import { syntheticState } from './fixtures';
@@ -24,6 +25,47 @@ describe('concentration (synthetic, hand-computable)', () => {
     // silently borrowing the country numbers.
     expect(r.result.shares).toEqual([]);
     expect(r.result.total).toBe(0);
+  });
+
+  it('uses only the latest observation per entity when a series exists', () => {
+    const s = syntheticState();
+    // Add an OLDER year for country aa with a wildly different value: it
+    // must not be summed with 2024, and asOf must be able to reach it.
+    s.observations.push({
+      id: 'obs:prod:aa:2020', entityId: 'ent:country:aa', metric: 'production',
+      value: 100, unit: 'kt/y', period: { start: '2020-01-01', end: '2020-12-31' },
+      valueKind: 'reported', confidence: 'high', provenance: s.observations[0].provenance,
+    });
+    const latest = concentration(s, 'production', 'country');
+    expect(latest.result.shares.find(x => x.entityId === 'ent:country:aa')?.value).toBe(800);
+    expect(latest.result.hhi).toBe(6800);
+    const asOf2020 = concentration(s, 'production', 'country', '2020-12-31');
+    // At end-2020 only aa has reported → 100% share.
+    expect(asOf2020.result.shares).toHaveLength(1);
+    expect(asOf2020.result.hhi).toBe(10000);
+    expect(observationsAt(s, 'production', 'country', '2021-06-30').map(o => o.id)).toEqual(['obs:prod:aa:2020']);
+  });
+});
+
+describe('concentration trajectory', () => {
+  it('shows falling mine-production concentration as central Africa ramped (copper)', async () => {
+    const { state } = await getEconomyState('copper');
+    const r = concentrationTrajectory(state, 'production', 'country');
+    const byYear = new Map(r.result.map(p => [p.period, p]));
+    expect(byYear.has('2015')).toBe(true);
+    expect(byYear.has('2023')).toBe(true);
+    expect(byYear.get('2015')!.hhi).toBeGreaterThan(byYear.get('2023')!.hhi);
+    expect(byYear.get('2015')!.topName).toBe('Chile');
+    // Every point is computed from that year's own observations.
+    for (const p of r.result) expect(p.participants).toBeGreaterThanOrEqual(5);
+    expect(r.inputs.observationIds!.length).toBeGreaterThan(50);
+  });
+
+  it('drops years with too few reporters instead of fabricating concentration', () => {
+    const s = syntheticState();
+    // Only 2 country observations in 2024 → below minParticipants.
+    const r = concentrationTrajectory(s, 'production', 'country');
+    expect(r.result).toEqual([]);
   });
 });
 

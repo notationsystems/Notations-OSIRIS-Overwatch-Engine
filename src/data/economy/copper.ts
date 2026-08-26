@@ -60,6 +60,7 @@ const countries: Entity[] = [
   { id: 'ent:country:de', kind: 'country', name: 'Germany', countryCode: 'DE', commodity: 'copper', lat: 51.2, lng: 10.4, geoPrecision: 'country' },
   { id: 'ent:country:in', kind: 'country', name: 'India', countryCode: 'IN', commodity: 'copper', lat: 20.6, lng: 79.0, geoPrecision: 'country' },
   { id: 'ent:country:pa', kind: 'country', name: 'Panama', countryCode: 'PA', commodity: 'copper', lat: 8.5, lng: -80.8, geoPrecision: 'country' },
+  { id: 'ent:country:ca', kind: 'country', name: 'Canada', countryCode: 'CA', commodity: 'copper', lat: 56.1, lng: -106.3, geoPrecision: 'country', notes: 'Carried for live USGS/Comtrade observations; no curated facility detail yet.' },
 ];
 
 const mines: Entity[] = [

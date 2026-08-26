@@ -45,7 +45,13 @@ export interface EventImpact {
   explanation: string[];
 }
 
-const DISRUPTIVE: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather'];
+export const DISRUPTIVE_EVENT_TYPES: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather'];
+const DISRUPTIVE = DISRUPTIVE_EVENT_TYPES;
+
+/** Whether an event's window covers the evaluation date. */
+export function isEventActive(ev: EconEvent, asOf: string): boolean {
+  return ev.start <= asOf && (!ev.end || ev.end >= asOf);
+}
 
 export function propagateEvents(
   state: EconomyState,
@@ -60,7 +66,7 @@ export function propagateEvents(
     const entity = graph.nodes.get(ev.entityId);
     if (!entity) continue;
 
-    const active = ev.start <= asOf && (!ev.end || ev.end >= asOf);
+    const active = isEventActive(ev, asOf);
     const t = throughput.get(ev.entityId);
     const disrupted = t ? Math.max(t.inKt, t.outKt) : 0;
 

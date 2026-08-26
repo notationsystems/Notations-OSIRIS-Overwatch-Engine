@@ -37,6 +37,8 @@ import { diffSweep, appendEvents, type WatchBaseline, type WatchEvent } from '@/
 import { STORAGE_KEY, serializeShapes, deserializeShapes, shapesToGeoJSON, downloadFile } from '@/lib/aoi-export';
 const TokenPanel = dynamic(() => import('@/components/TokenPanel'));
 const CommodityPanel = dynamic(() => import('@/components/CommodityPanel'));
+const EconTimeBar = dynamic(() => import('@/components/EconTimeBar'), { ssr: false });
+const EconGraphView = dynamic(() => import('@/components/EconGraphView'), { ssr: false });
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -119,6 +121,9 @@ export default function Dashboard() {
   const [showMarkets, setShowMarkets] = useState(false);
   const [showEconomy, setShowEconomy] = useState(false);
   const [econSelected, setEconSelected] = useState<string | null>(null);
+  /** Temporal playback: evaluation date override (null = present state). */
+  const [econAsOf, setEconAsOf] = useState<string | null>(null);
+  const [showEconGraph, setShowEconGraph] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [showSpaceCam, setShowSpaceCam] = useState(false);
   const [showScmPanel, setShowScmPanel] = useState(true);
@@ -602,12 +607,6 @@ export default function Dashboard() {
       fetchEndpoint(`/api/cctv?region=all&_t=${Date.now()}`);
       layerFetchedRef.current.add('cctv');
     }
-    // Physical economy (copper) — one fetch serves all five econ layers
-    const anyEcon = activeLayers.econ_production || activeLayers.econ_processing || activeLayers.econ_ports || activeLayers.econ_flows || activeLayers.econ_bottlenecks;
-    if (anyEcon && !layerFetchedRef.current.has('economy')) {
-      fetchEndpoint('/api/economy?commodity=copper&view=map', d => ({ econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events }));
-      layerFetchedRef.current.add('economy');
-    }
     // Maritime
     if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
       fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
@@ -725,6 +724,25 @@ export default function Dashboard() {
     }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
+
+  // ── PHYSICAL ECONOMY — layer-aware + temporal-playback-aware fetch ──
+  const anyEconLayer = activeLayers.econ_production || activeLayers.econ_processing || activeLayers.econ_ports || activeLayers.econ_flows || activeLayers.econ_bottlenecks;
+  const econFetchKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!anyEconLayer) return;
+    const key = econAsOf ?? 'live';
+    if (econFetchKeyRef.current === key) return;
+    // Debounce scrubbing; mark the key only once the request actually fires
+    // so a cancelled debounce doesn't leave the layer stuck on stale data.
+    const t = setTimeout(() => {
+      econFetchKeyRef.current = key;
+      fetchEndpoint(
+        `/api/economy?commodity=copper&view=map${econAsOf ? `&asOf=${econAsOf}` : ''}`,
+        d => ({ econ_entities: d.econ_entities, econ_flows: d.econ_flows, econ_events: d.econ_events }),
+      );
+    }, econAsOf ? 200 : 0);
+    return () => clearTimeout(t);
+  }, [anyEconLayer, econAsOf, fetchEndpoint]);
 
   // CCTV: loaded once on layer toggle via layerFetchedRef (no viewport polling)
 
@@ -1346,6 +1364,8 @@ export default function Dashboard() {
                   onSelectEntity={setEconSelected}
                   onClose={() => setShowEconomy(false)}
                   onFlyTo={(lat, lng, zoom) => setFlyToLocation({ lat, lng, zoom, ts: Date.now() })}
+                  onOpenGraph={() => setShowEconGraph(true)}
+                  asOf={econAsOf}
                 />
               </motion.div>
             )}
@@ -1714,6 +1734,25 @@ export default function Dashboard() {
           </AnimatePresence>
         </>
       )}
+
+      {/* ── PHYSICAL ECONOMY — temporal playback scrubber ── */}
+      {anyEconLayer && !isMobile && (
+        <div className="absolute bottom-[64px] left-1/2 -translate-x-1/2 z-[250] pointer-events-none">
+          <EconTimeBar asOf={econAsOf} onChange={setEconAsOf} />
+        </div>
+      )}
+
+      {/* ── PHYSICAL ECONOMY — flow graph explorer ── */}
+      <AnimatePresence>
+        {showEconGraph && (
+          <EconGraphView
+            selectedId={econSelected}
+            asOf={econAsOf}
+            onSelectEntity={(id) => { setEconSelected(id); setShowEconomy(true); setShowEconGraph(false); }}
+            onClose={() => setShowEconGraph(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── BOTTOM CURSOR INFO (desktop) ── */}
       {!isMobile && (

@@ -306,6 +306,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       const econRadius: any = ['interpolate', ['linear'], ['sqrt', ['coalesce', ['get', 'production'], ['get', 'capacity'], 100]],
         5, 3, 15, 5, 25, 7.5, 35, 10];
       map.addLayer({ id: 'econ-flow-lines', type: 'line', source: 'econ-flows',
+        filter: ['!=', ['get', 'disrupted'], true],
         layout: { 'line-cap': 'round' },
         paint: {
           'line-color': ['match', ['get', 'form'],
@@ -315,6 +316,16 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
             '#90A4AE'],
           'line-width': ['interpolate', ['linear'], ['get', 'quantity'], 100, 0.8, 500, 2, 1000, 3.2, 1600, 4.5],
           'line-opacity': 0.5,
+        } });
+      // Flows touched by a live disruptive event (temporal playback) render
+      // dashed red — the interruption must be visible at a glance.
+      map.addLayer({ id: 'econ-flow-disrupted', type: 'line', source: 'econ-flows',
+        filter: ['==', ['get', 'disrupted'], true],
+        paint: {
+          'line-color': '#FF3D3D',
+          'line-width': ['interpolate', ['linear'], ['get', 'quantity'], 100, 0.8, 500, 2, 1000, 3.2, 1600, 4.5],
+          'line-opacity': 0.75,
+          'line-dasharray': [1.5, 2],
         } });
       map.addLayer({ id: 'econ-bottleneck-ring', type: 'circle', source: 'econ-entities',
         filter: ['>=', ['coalesce', ['get', 'bottleneckScore'], 0], 0.45],
@@ -336,8 +347,8 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
             'manufacturing', '#AB47BC',
             '#B0BEC5'],
           'circle-opacity': 0.85,
-          'circle-stroke-color': '#0A0A0A',
-          'circle-stroke-width': 1,
+          'circle-stroke-color': ['case', ['==', ['get', 'disrupted'], true], '#FF3D3D', '#0A0A0A'],
+          'circle-stroke-width': ['case', ['==', ['get', 'disrupted'], true], 2, 1],
         } });
       map.addLayer({ id: 'econ-labels', type: 'symbol', source: 'econ-entities', minzoom: 3,
         layout: { 'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true },
@@ -1507,6 +1518,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
         ${prod ? `<div style="font-size:9px;color:#aaa;">Output: <span style="color:${stageCol};font-weight:bold;">${prod.toLocaleString()} ${p.productionUnit && p.productionUnit !== 'null' ? p.productionUnit : 'kt/y'}</span></div>` : ''}
         ${cap ? `<div style="font-size:9px;color:#aaa;">Capacity: <span style="color:#FF9500;font-weight:bold;">${cap.toLocaleString()} kt/y</span></div>` : ''}
         ${bScore !== null && Number.isFinite(bScore) ? `<div style="font-size:9px;color:#aaa;">Bottleneck candidate: <span style="color:${bScore > 0.6 ? '#FF3D3D' : bScore > 0.45 ? '#FF9500' : '#00BCD4'};font-weight:bold;">${bScore.toFixed(2)}</span></div>` : ''}
+        ${p.disrupted === true || p.disrupted === 'true' ? '<div style="font-size:9px;color:#FF3D3D;font-weight:bold;margin-top:2px;">■ ACTIVE DISRUPTION</div>' : ''}
         ${Number(p.eventCount) > 0 ? `<div style="font-size:9px;color:#FF3D3D;margin-top:2px;">⚠ ${p.eventCount} event(s) on record</div>` : ''}
         <div style="font-size:8px;color:#5C5A54;margin-top:6px;">geo:${p.geoPrecision} — evidence & dependencies in the ECONOMY panel</div>
       </div>`);
@@ -1898,7 +1910,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
           id: e.id, name: e.name, kind: e.kind, stage: e.stage, country: e.country,
           operator: e.operator, production: e.production, productionUnit: e.productionUnit,
           capacity: e.capacity, bottleneckScore: al.econ_bottlenecks ? e.bottleneckScore : null,
-          eventCount: e.eventCount, geoPrecision: e.geoPrecision,
+          eventCount: e.eventCount, geoPrecision: e.geoPrecision, disrupted: e.disrupted === true,
         },
       }));
     setGeo('econ-entities', features);
@@ -1906,7 +1918,7 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       ? data.econ_flows.map((f: any) => ({
         type: 'Feature',
         geometry: { type: 'LineString', coordinates: greatCircleArc(f.fromCoord, f.toCoord) },
-        properties: { id: f.id, form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence },
+        properties: { id: f.id, form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence, disrupted: f.disrupted === true },
       }))
       : [];
     setGeo('econ-flows', flows);

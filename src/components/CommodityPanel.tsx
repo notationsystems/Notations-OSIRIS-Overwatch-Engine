@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mountain, X, ChevronLeft, ChevronDown, ChevronRight, Crosshair, AlertTriangle, Activity, Database } from 'lucide-react';
+import { Mountain, X, ChevronLeft, ChevronDown, ChevronRight, Crosshair, AlertTriangle, Activity, Database, Network } from 'lucide-react';
 
 /**
  * OSIRIS — Physical Economy research panel (phase 1: copper).
@@ -19,6 +19,9 @@ interface CommodityPanelProps {
   onSelectEntity: (id: string | null) => void;
   onClose: () => void;
   onFlyTo?: (lat: number, lng: number, zoom?: number) => void;
+  onOpenGraph?: () => void;
+  /** Temporal playback date (null = present) — analytics re-evaluate at it. */
+  asOf?: string | null;
 }
 
 interface Share { entityId: string; name: string; value: number; share: number }
@@ -35,10 +38,12 @@ interface Bottleneck {
 interface Anomaly { entityId: string; metric: string; kind: string; period: string; magnitude: number; explanation: string; observationIds: string[] }
 interface EconEvent { id: string; entityId?: string; type: string; title: string; start: string; end?: string; severity: string; description?: string }
 
+interface TrajectoryPoint { period: string; hhi: number; band: string; topName: string; topShare: number; participants: number }
+
 interface Analytics {
   commodityName: string;
   providers: string[];
-  concentration: Record<string, ConcentrationBlock>;
+  concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
   bottlenecks: { result: Bottleneck[] };
   anomalies: { result: Anomaly[] };
   events: EconEvent[];
@@ -85,6 +90,30 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
   );
 }
 
+/** Inline series sparkline — enough to see shape; the numbers stay in the list. */
+function Sparkline({ points, color = '#00BCD4', width = 120, height = 26 }: {
+  points: Array<{ x: string; y: number }>; color?: string; width?: number; height?: number;
+}) {
+  if (points.length < 2) return null;
+  const ys = points.map(p => p.y);
+  const min = Math.min(...ys);
+  const max = Math.max(...ys);
+  const span = max - min || 1;
+  const path = points
+    .map((p, i) => `${((i / (points.length - 1)) * (width - 2) + 1).toFixed(1)},${(height - 3 - ((p.y - min) / span) * (height - 6)).toFixed(1)}`)
+    .join(' ');
+  return (
+    <svg width={width} height={height} className="block" aria-hidden="true">
+      <polyline points={path} fill="none" stroke={color} strokeWidth="1.3" />
+      <circle
+        cx={(width - 1).toFixed(1)}
+        cy={(height - 3 - ((points[points.length - 1].y - min) / span) * (height - 6)).toFixed(1)}
+        r="1.8" fill={color}
+      />
+    </svg>
+  );
+}
+
 function Section({ id, title, icon, children, count, open, onToggle }: {
   id: string; title: string; icon?: React.ReactNode; children: React.ReactNode; count?: number;
   open: boolean; onToggle: (id: string) => void;
@@ -114,7 +143,7 @@ function ProvLine({ p, valueKind, confidence }: { p: Prov; valueKind?: string; c
   );
 }
 
-export default function CommodityPanel({ selectedId, onSelectEntity, onClose, onFlyTo }: CommodityPanelProps) {
+export default function CommodityPanel({ selectedId, onSelectEntity, onClose, onFlyTo, onOpenGraph, asOf = null }: CommodityPanelProps) {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [analyticsError, setAnalyticsError] = useState(false);
   const [detailById, setDetailById] = useState<EntityDetail | null>(null);
@@ -124,12 +153,15 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/economy?commodity=copper&view=analytics', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(d => { if (!cancelled) setAnalytics(d); })
-      .catch(() => { if (!cancelled) setAnalyticsError(true); });
-    return () => { cancelled = true; };
-  }, []);
+    // Debounce so timeline scrubbing doesn't fire a request per tick.
+    const t = setTimeout(() => {
+      fetch(`/api/economy?commodity=copper&view=analytics${asOf ? `&asOf=${asOf}` : ''}`, { cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then(d => { if (!cancelled) setAnalytics(d); })
+        .catch(() => { if (!cancelled) setAnalyticsError(true); });
+    }, asOf ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [asOf]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -145,6 +177,21 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
   const detail = selectedId && detailById?.entity.id === selectedId ? detailById : null;
   const detailFailed = selectedId !== null && detailFailedId === selectedId;
   const detailLoading = selectedId !== null && !detail && !detailFailed;
+
+  // Observations grouped by metric: series (≥4 points) render as sparklines,
+  // point facts as rows — a decade of history must not bury the inspector.
+  const obsGroups = useMemo(() => {
+    if (!detail) return [];
+    const groups = new Map<string, Obs[]>();
+    for (const o of detail.observations) {
+      if (!groups.has(o.metric)) groups.set(o.metric, []);
+      groups.get(o.metric)!.push(o);
+    }
+    return [...groups.entries()].map(([metric, list]) => ({
+      metric,
+      list: [...list].sort((a, b) => a.period.start.localeCompare(b.period.start)),
+    }));
+  }, [detail]);
 
   const toggle = useCallback((key: string) => setOpenSections(s => ({ ...s, [key]: !s[key] })), []);
   const toggleEvidence = useCallback((key: string) => setOpenEvidence(s => ({ ...s, [key]: !s[key] })), []);
@@ -171,8 +218,18 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
           <span className="hud-text text-[11px] text-[var(--text-primary)] truncate">
             PHYSICAL ECONOMY — {analytics?.commodityName?.toUpperCase() ?? 'COPPER'}
           </span>
+          {asOf && (
+            <span className="text-[8px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1 shrink-0">AS OF {asOf}</span>
+          )}
         </div>
-        <button onClick={onClose} className="hover:bg-white/10 rounded p-0.5"><X className="w-3.5 h-3.5 text-[var(--text-muted)]" /></button>
+        <div className="flex items-center gap-1">
+          {onOpenGraph && (
+            <button onClick={onOpenGraph} className="hover:bg-white/10 rounded p-0.5" title="Open flow graph explorer" aria-label="Open flow graph explorer">
+              <Network className="w-3.5 h-3.5 text-[#00BCD4]" />
+            </button>
+          )}
+          <button onClick={onClose} className="hover:bg-white/10 rounded p-0.5" aria-label="Close panel"><X className="w-3.5 h-3.5 text-[var(--text-muted)]" /></button>
+        </div>
       </div>
 
       <div className="overflow-y-auto styled-scrollbar px-3 py-2 flex-1 min-h-0">
@@ -214,23 +271,51 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                 </div>
               )}
 
-              {detail.observations.length > 0 && (
+              {obsGroups.length > 0 && (
                 <div className="mb-2">
                   <div className="text-[10px] font-mono tracking-widest text-[var(--text-muted)] font-bold mb-1">OBSERVATIONS</div>
                   <div className="space-y-1.5">
-                    {detail.observations.slice(0, 14).map(o => (
-                      <div key={o.id} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-[10px] font-mono text-[#E8E6E0]">{o.metric.replace(/_/g, ' ')}</span>
-                          <span className="text-[11px] font-mono font-bold text-[var(--cyan-primary)] tabular-nums">{o.value.toLocaleString()} <span className="text-[8px] text-[var(--text-muted)]">{o.unit}</span></span>
+                    {obsGroups.map(({ metric, list }) => {
+                      const latest = list[list.length - 1];
+                      if (list.length < 4) {
+                        return list.map(o => (
+                          <div key={o.id} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-[10px] font-mono text-[#E8E6E0]">{o.metric.replace(/_/g, ' ')}</span>
+                              <span className="text-[11px] font-mono font-bold text-[var(--cyan-primary)] tabular-nums">{o.value.toLocaleString()} <span className="text-[8px] text-[var(--text-muted)]">{o.unit}</span></span>
+                            </div>
+                            <div className="text-[8px] font-mono text-[var(--text-muted)]">{o.period.start} → {o.period.end}</div>
+                            <ProvLine p={o.provenance} valueKind={o.valueKind} confidence={o.confidence} />
+                          </div>
+                        ));
+                      }
+                      const seriesKey = `series:${metric}`;
+                      return (
+                        <div key={metric} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
+                          <button onClick={() => toggleEvidence(seriesKey)} className="w-full text-left">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-[10px] font-mono text-[#E8E6E0]">{metric.replace(/_/g, ' ')} <span className="text-[8px] text-[var(--text-muted)]">({list.length} pts)</span></span>
+                              <span className="text-[11px] font-mono font-bold text-[var(--cyan-primary)] tabular-nums">{latest.value.toLocaleString()} <span className="text-[8px] text-[var(--text-muted)]">{latest.unit}</span></span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 mt-0.5">
+                              <Sparkline points={list.map(o => ({ x: o.period.start, y: o.value }))} />
+                              <span className="text-[8px] font-mono text-[var(--text-muted)] tabular-nums shrink-0">{list[0].period.start.slice(0, 7)} → {latest.period.end.slice(0, 7)}</span>
+                            </div>
+                          </button>
+                          {openEvidence[seriesKey] && (
+                            <div className="mt-1 border-t border-white/5 pt-1 max-h-44 overflow-y-auto styled-scrollbar">
+                              {[...list].reverse().map(o => (
+                                <div key={o.id} className="flex justify-between items-baseline text-[9px] font-mono py-0.5">
+                                  <span className="text-[var(--text-muted)] tabular-nums">{o.period.start.slice(0, 7)}</span>
+                                  <span className="text-[#E8E6E0] tabular-nums">{o.value.toLocaleString()} {o.unit} · <span className="text-[#FF9500]">{o.valueKind}</span></span>
+                                </div>
+                              ))}
+                              <ProvLine p={latest.provenance} valueKind={latest.valueKind} confidence={latest.confidence} />
+                            </div>
+                          )}
                         </div>
-                        <div className="text-[8px] font-mono text-[var(--text-muted)]">{o.period.start} → {o.period.end}</div>
-                        <ProvLine p={o.provenance} valueKind={o.valueKind} confidence={o.confidence} />
-                      </div>
-                    ))}
-                    {detail.observations.length > 14 && (
-                      <div className="text-[9px] font-mono text-[var(--text-muted)]">… {detail.observations.length - 14} more observations</div>
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -300,7 +385,28 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
             <div>
               <Section id="concentration" open={!!openSections['concentration']} onToggle={toggle} title="CONCENTRATION (HHI)" icon={<Database className="w-3 h-3 text-[var(--gold-primary)]" />}>
                 <div className="space-y-2">
-                  {Object.entries(analytics.concentration).map(([key, block]) => (
+                  {(analytics.concentration.trajectory?.result?.length ?? 0) >= 3 && (() => {
+                    const traj = analytics.concentration.trajectory!.result;
+                    const first = traj[0];
+                    const last = traj[traj.length - 1];
+                    return (
+                      <div className="px-2 py-1.5 rounded bg-white/[0.03] border border-white/5">
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[9px] font-mono text-[var(--text-muted)] tracking-wider">MINE PRODUCTION HHI · {first.period}–{last.period}</span>
+                          <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: BAND_COLOR[last.band] }}>
+                            {first.hhi} → {last.hhi}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <Sparkline points={traj.map(p => ({ x: p.period, y: p.hhi }))} color="#D4AF37" width={200} />
+                          <span className="text-[8px] font-mono text-[var(--text-muted)] shrink-0">
+                            top: {last.topName} {(last.topShare * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {(Object.entries(analytics.concentration).filter(([key]) => key !== 'trajectory') as Array<[string, ConcentrationBlock]>).map(([key, block]) => (
                     <div key={key} className="px-2 py-1.5 rounded bg-white/[0.03] border border-white/5">
                       <button onClick={() => toggleEvidence(key)} className="w-full text-left">
                         <div className="flex justify-between items-baseline">
