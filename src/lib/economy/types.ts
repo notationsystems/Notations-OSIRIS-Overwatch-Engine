@@ -221,8 +221,11 @@ export interface Flow {
   form: MaterialForm;
   quantity: number;
   unit: string;
-  /** Mass basis. Only cu_content flows may enter graph throughput — a
-   *  gross-weight edge would carry ~4x its true weight in inbound shares. */
+  /** Mass basis. Gross-weight flows enter graph throughput only after
+   *  conversion via a mirror-implied corridor grade (basis.ts) — at face
+   *  value an edge would carry ~4x its true weight in inbound shares, and
+   *  discarded as zero it would claim the flow carries nothing. Where no
+   *  grade exists, throughput consumers refuse shares visibly. */
   basis?: QuantityBasis;
   period: Period;
   mode: TransportMode;
@@ -368,6 +371,22 @@ export interface Divergence {
    *  held with consistent direction. */
   persistence: number;
   class: 'revision_lag' | 'coverage' | 'definitional' | 'unexplained';
+  /**
+   * Present when the pair was normalized at the reference concentrate grade.
+   * A definitional class without this is a dismissal; with it, the residual
+   * is a STATEMENT ("the basis explains the entire gap") and a BASELINE —
+   * ranking uses the residual, not the raw spread, so a definitional pair
+   * whose residual drifts climbs back into view instead of staying
+   * permanently classed and unwatched.
+   */
+  basisNormalization?: {
+    referenceGrade: number;
+    impliedGrade: number;
+    /** (content-declared − gross×reference) ÷ (gross×reference). */
+    residual: number;
+    /** Residual across the 20–33% grade uncertainty band. */
+    residualBand: [number, number];
+  };
   explanation: string;
 }
 

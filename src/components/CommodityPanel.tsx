@@ -36,7 +36,8 @@ interface ConcentrationBlock {
   };
 }
 interface Bottleneck {
-  entityId: string; name: string; kind: string; score: number;
+  /** score null = refused: unquantifiable basis at this node. */
+  entityId: string; name: string; kind: string; score: number | null;
   components: { throughputShare: number; utilization: number | null; redundancy: number; dependencyLoad: number };
   explanation: string[];
 }
@@ -477,8 +478,14 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] font-mono text-[#E8E6E0] truncate">{b.name}</span>
                           <span className="flex items-center gap-1.5 shrink-0">
-                            <ScoreBar value={b.score} color={b.score > 0.6 ? '#FF3D3D' : b.score > 0.45 ? '#FF9500' : '#00BCD4'} />
-                            <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: b.score > 0.6 ? '#FF3D3D' : b.score > 0.45 ? '#FF9500' : '#00BCD4' }}>{b.score.toFixed(2)}</span>
+                            {b.score === null ? (
+                              <span className="text-[9px] font-mono font-bold text-[#FF3D3D]">SCORE REFUSED</span>
+                            ) : (
+                              <>
+                                <ScoreBar value={b.score} color={b.score > 0.6 ? '#FF3D3D' : b.score > 0.45 ? '#FF9500' : '#00BCD4'} />
+                                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: b.score > 0.6 ? '#FF3D3D' : b.score > 0.45 ? '#FF9500' : '#00BCD4' }}>{b.score.toFixed(2)}</span>
+                              </>
+                            )}
                           </span>
                         </div>
                         <div className="text-[8px] font-mono text-[var(--text-muted)]">{b.kind.toUpperCase()} · {b.explanation[0]}</div>

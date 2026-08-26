@@ -137,6 +137,56 @@ gross weight on the other. Shipped in response:
   reachable with contemporaneous knowledge, and posing the event two days
   earlier recovers the same conclusion.
 
+## Phase 5 — conversion over discard, residuals over dismissal, measurement before wiring
+
+Round-3 review caught two errors in *how* phase 4 landed its right things,
+one of which would have silenced part of the graph the moment bilateral
+trade edges arrive:
+
+1. **The graph firewall's zero was a claim.** Discarding a gross-weight flow
+   from throughput asserts the flow carries nothing: supplier counts drop,
+   redundancy inverts (0.0 → 1.0), disruptions at gross-reported suppliers
+   propagate nothing, and an all-gross node drops out of the throughput map
+   entirely — an error running opposite to the skew it fixed. (Verified: no
+   flow in the current graph is gross-declared — all curated edges carry
+   `cu_content` and Comtrade rows enter as observations, so nothing was dark
+   *yet*; the mechanism was wrong for what comes next.) Fix shipped:
+   **conversion, not discard** — the divergence system's mirror-implied
+   corridor grade feeds back as the conversion factor (`basis.ts`), with the
+   20–33% band as `ktRange` uncertainty on the edge; where no grade exists,
+   shares are **refused visibly** (centrality `share: null`, bottleneck
+   `score: null` sorted first with SCORE REFUSED, propagation says "unknown,
+   not zero"; nodes stay present). Pinned by tests for the dual-source case,
+   the converted case, and the all-gross dark-node case.
+2. **Classing definitional and dropping swapped a false positive for a blind
+   spot.** The Chile→China pair is now normalized at the 25% reference grade:
+   8,433 × 0.25 = 2,108 vs 2,125 declared → **+0.8% residual — the basis
+   explains the entire gap; no material suppression signal in this
+   corridor**, a stronger statement than "dismissed", and a baseline:
+   definitional pairs rank on residual (never raw spread, which measures the
+   ore grade), and a residual beyond ±10% reclasses `unexplained` so a
+   drifting corridor climbs back into view instead of staying permanently
+   filed.
+3. **Backtest vacuity guard.** "Identical conclusion under both knowledge
+   modes" also passes if both modes read the same records. The replay test
+   now asserts the observation sets actually differed, and pins as
+   *by-construction* what is (curated dependencies/flows carry no revision
+   history) so the test never overclaims what it establishes.
+4. **LiveAlerts, trust-first, UI last.** The system had already produced two
+   would-be alerts that were wrong (the 10.3σ splice, the CL→CN phantom), so
+   alerting shipped as: derivation (cadence-gated to monthly-or-finer series;
+   reflexive positioning never fires) → **suppression memory** (a signal the
+   divergence system already explains must not fire; the explaining record is
+   referenced) → **retraction** (a fired alert later reclassified is
+   withdrawn with its reason; withdrawals are records, not deletions) →
+   **measured backtest** over 128 month-end knowledge states 2016–2026,
+   strictly as_known_then with the no-lookahead invariant checked per alert.
+   Measured: precision 0.438, recall 0.2, first-detection lead −30 days.
+   That is below the bar for waking anyone, so **no alert panel exists** —
+   the verdict and its reasons are encoded in the test suite, and the report
+   names what would change the answer (weekly stocks feed, facility-cadence
+   series, richer curated event record).
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -147,12 +197,12 @@ gross weight on the other. Shipped in response:
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
 | Search over entities | ❌ | find "Escondida" from the search bar | extend existing `SearchBar`/geosearch with econ entities | medium |
-| Alerting | ❌ | anomaly → LiveAlerts | feed `anomalies`/`propagation` results into existing alerts panel | low |
+| Alerting | engine layer ✅ (suppression memory, retraction, decade backtest) | UI withheld by measurement: precision 0.438 / recall 0.2 / lead −30d | better-cadence stock feed + richer event record, then re-measure | low |
 
 ## Verification
 
-Every subsystem above ships with executable tests (47 economy tests; 407 total
-passing). Build, lint (new modules clean; substrate baseline unchanged), and a
-Playwright smoke run against the production server verified the end-to-end
-research workflow, including screenshots of the map layers, research panel and
-entity inspector.
+Every subsystem above ships with executable tests (120+ economy tests; 476
+total passing). Build, lint (new modules clean; substrate baseline unchanged),
+and a Playwright smoke run against the production server verified the
+end-to-end research workflow, including screenshots of the map layers,
+research panel and entity inspector.

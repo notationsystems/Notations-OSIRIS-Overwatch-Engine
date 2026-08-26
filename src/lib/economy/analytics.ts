@@ -326,8 +326,15 @@ export interface CentralityRow {
   inKt: number;
   outKt: number;
   throughputKt: number;
-  /** Share of the sum of all node throughputs (0..1). */
-  share: number;
+  /**
+   * Share of the sum of all node throughputs (0..1) — or null, REFUSED,
+   * when unquantifiable flows touch this node: zero would be a claim (the
+   * flow carries nothing), and a share over a known-incomplete total is a
+   * fabrication. Refusal is visible; zero isn't.
+   */
+  share: number | null;
+  /** Flow ids whose tonnage could not be quantified at this node. */
+  unquantifiedFlowIds?: string[];
 }
 
 export function flowCentrality(state: EconomyState, graph: EconomyGraph): AnalyticalResult<CentralityRow[]> {
@@ -339,6 +346,7 @@ export function flowCentrality(state: EconomyState, graph: EconomyGraph): Analyt
   const rows: CentralityRow[] = [...throughput.entries()]
     .map(([entityId, t]) => {
       const ent = graph.nodes.get(entityId);
+      const refused = t.unquantifiedFlowIds.length > 0;
       return {
         entityId,
         name: ent?.name ?? entityId,
@@ -346,12 +354,19 @@ export function flowCentrality(state: EconomyState, graph: EconomyGraph): Analyt
         inKt: t.inKt,
         outKt: t.outKt,
         throughputKt: t.inKt + t.outKt,
-        share: grand > 0 ? (t.inKt + t.outKt) / grand : 0,
+        share: refused ? null : grand > 0 ? (t.inKt + t.outKt) / grand : 0,
+        ...(refused ? { unquantifiedFlowIds: t.unquantifiedFlowIds } : {}),
       };
     })
     .sort((a, b) => b.throughputKt - a.throughputKt);
 
-  return wrap('flowCentrality', { commodity: state.commodity }, { flowIds: [...flowIds] }, rows);
+  const unquantified = rows.flatMap(r => r.unquantifiedFlowIds ?? []);
+  return wrap(
+    'flowCentrality',
+    { commodity: state.commodity, ...(unquantified.length > 0 ? { unquantifiedFlows: unquantified.length } : {}) },
+    { flowIds: [...new Set([...flowIds, ...unquantified])] },
+    rows,
+  );
 }
 
 /* ── Candidate bottlenecks ── */
@@ -360,8 +375,14 @@ export interface BottleneckCandidate {
   entityId: string;
   name: string;
   kind: string;
-  /** 0..1 — explicitly a CANDIDATE score, not validated constraint risk. */
-  score: number;
+  /**
+   * 0..1 — explicitly a CANDIDATE score, not validated constraint risk.
+   * Null = REFUSED: unquantifiable flows touch this node, so throughput
+   * share, utilization and redundancy would all be computed against numbers
+   * known to be wrong in a known direction. A refused candidate sorts FIRST —
+   * the researcher must see the refusal, not a plausible ranking without it.
+   */
+  score: number | null;
   components: {
     throughputShare: number;   // material passing through, vs network max
     utilization: number | null; // flow-through vs capacity, when capacity known
@@ -426,29 +447,39 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
       0.25 * redundancy +
       0.15 * dependencyLoad;
 
+    const refused = t.unquantifiedFlowIds.length > 0;
     const explanation: string[] = [];
-    explanation.push(`${Math.round(through)} kt/y passes through (${Math.round(throughputShare * 100)}% of network max)`);
-    if (utilization !== null) explanation.push(`utilization ≈ ${Math.round(utilization * 100)}% of stated capacity`);
-    else explanation.push('no stated capacity — flow pressure used as proxy');
-    explanation.push(alternatives === 0 ? 'no modeled alternative at this stage' : `${alternatives} modeled alternative(s) at this stage`);
-    if (deps.length > 0) explanation.push(`${deps.length} entity(ies) explicitly depend on it`);
+    if (refused) {
+      explanation.push(`SCORE REFUSED: ${t.unquantifiedFlowIds.length} flow(s) at this node (${t.unquantifiedFlowIds.join(', ')}) declare gross weight with no corridor grade (or an unconvertible unit) — shares and redundancy would be computed against a total known to be wrong. Supply a mirror-implied corridor grade or a cu_content declaration.`);
+      explanation.push(`Quantified lower bound: ${Math.round(through)} kt/y.`);
+    } else {
+      explanation.push(`${Math.round(through)} kt/y passes through (${Math.round(throughputShare * 100)}% of network max)`);
+      if (utilization !== null) explanation.push(`utilization ≈ ${Math.round(utilization * 100)}% of stated capacity`);
+      else explanation.push('no stated capacity — flow pressure used as proxy');
+      explanation.push(alternatives === 0 ? 'no modeled alternative at this stage' : `${alternatives} modeled alternative(s) at this stage`);
+      if (deps.length > 0) explanation.push(`${deps.length} entity(ies) explicitly depend on it`);
+    }
 
     t.flowIds.forEach(id => allFlowIds.add(id));
+    t.unquantifiedFlowIds.forEach(id => allFlowIds.add(id));
     caps.forEach(c => allCapIds.add(c.id));
     deps.forEach(d => allDepIds.add(d.id));
 
     candidates.push({
       entityId, name: ent.name, kind: ent.kind,
-      score: Math.min(1, score),
+      score: refused ? null : Math.min(1, score),
       components: { throughputShare, utilization, redundancy, dependencyLoad },
       explanation,
-      flowIds: t.flowIds,
+      flowIds: [...t.flowIds, ...t.unquantifiedFlowIds],
       capacityIds: caps.map(c => c.id),
       dependencyIds: deps.map(d => d.id),
     });
   }
 
-  candidates.sort((a, b) => b.score - a.score);
+  // Refusals first — the researcher must see them — then by score.
+  candidates.sort((a, b) =>
+    Number(b.score === null) - Number(a.score === null)
+    || (b.score ?? 0) - (a.score ?? 0));
   return wrap(
     'bottleneckCandidates',
     { commodity: state.commodity },

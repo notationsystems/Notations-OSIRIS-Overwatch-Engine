@@ -143,6 +143,22 @@ structure). Traversal:
 Both are cycle-safe breadth-first walks returning depth-tagged steps with the edge
 that reached each node.
 
+**Basis handling.** A gross-weight flow must never enter throughput at face
+value (mixed bases skew inbound shares ~4× toward the fat-basis supplier) —
+but it must not enter as zero either: zero is a value, the claim that the
+flow carries *nothing*, and it inverts supplier counts and redundancy while
+making disruptions at gross-reported suppliers propagate nothing. The
+resolution is conversion (`basis.ts`): the divergence system's mirror
+analysis already implies a per-corridor grade (content-declared ÷
+gross-declared where the ratio sits in the 3.0–5.0× band), and `buildGraph`
+applies it as the conversion factor, carrying the 20–33% grade band as a
+`ktRange` uncertainty on the edge. Where no corridor grade exists, the
+tonnage is **refused, visibly**: the node stays in the throughput map with
+the unquantified flow ids attached, centrality returns `share: null` for it,
+bottleneck scoring emits `score: null` sorted *first* with a SCORE REFUSED
+explanation, and propagation states that disrupted tonnage is unknown rather
+than zero. Refusal is visible; zero isn't.
+
 ## Analytical systems
 
 Registered in `src/lib/economy/engine.ts`; each is a pure, independent computation
@@ -169,9 +185,43 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 | `bottlenecks` | **Candidate** bottleneck score: 0.35·throughput share + 0.25·utilization (flow vs stated capacity) + 0.25·redundancy (alternatives at same stage) + 0.15·dependency load. Explicitly a triage signal, not validated risk; every score exposes its components, explanation and evidence ids. Countries/regions are excluded (aggregates are not chokepoints). |
 | `anomalies` | Rolling z-score vs trailing window + period-over-period rate of change on every (entity, metric) series with enough points. Series resolve one observation per period by evidence rank before detection (provider disagreement is never a time step). The continuous front-month price series is excluded (roll discontinuities are contract artifacts, not moves); positioning signals are tagged `financial_positioning` and rendered as reflexive market context, never physical evidence. |
 | `coverage` | Facility-model coverage per country: rolled-up facility observations ÷ the country's own observation. ≈1 complete, <1 the unmodelled share, >1 a contradiction. This is the standing integrity check that keeps facility- and country-level populations from ever being conflated — they meet only here, explicitly, as a ratio. The coverage range is also **attached to the facility-level HHI** (`coverageBias`), because differential coverage biases facility concentration toward better-modeled countries and the number must not travel without that caveat. |
-| `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
+| `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. Classing definitional is **normalization, not dismissal**: the pair is converted at the fixed 25% reference grade and the residual recorded (`basisNormalization`) — Chile→China: 8,433 × 0.25 = 2,108 vs 2,125 declared, a **+0.8% residual: the basis explains the entire gap, no material suppression signal in this corridor**. The residual is the watched baseline — definitional pairs rank on residual, not raw spread, and a residual drifting beyond ±10% reclasses the pair `unexplained` so it climbs back into view. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
 | `scenario` (via `POST /api/economy/scenario`) | Counterfactual event injection: hypothetical events run through the same engine on an explicit **EvaluationFrame** (`kind: counterfactual`, scenario id, asOf, knowledge) so a hypothetical can never be read as a reconstruction. Returns baseline + counterfactual frames and the structural delta (newly disrupted entities, newly affected downstream, disrupted kt/y). Combined with `as_known_then` it backtests the analytical layer itself: posing Grasberg's halt into the 2025-09-09 knowledge state recovers the same dependent-smelter conclusion the best-known reconstruction reaches — evidence the analytics' structural calls do not depend on hindsight. |
 | `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. |
+
+### Alerts (engine layer only — deliberately no UI yet)
+
+`alerts.ts` derives alerts as a *projection* of signals the engine already
+computed — never a fresh computation. Trust discipline, in order:
+
+1. **Derivation** — anomaly signals (physical classes only: reflexive
+   positioning never wakes anyone) and newly-reported events. A **cadence
+   gate** admits only monthly-or-finer series: an annual aggregate is history
+   at publication, an anomaly but never an alert. Event alerts carry their
+   detection latency (`firstReportedAt − start`) so notification speed is
+   never mistaken for detection skill.
+2. **Suppression memory** — an alert whose signal is already explained by the
+   divergence system (`definitional` / `coverage` / `revision_lag`) must not
+   fire; the withheld alert references the explaining divergence record.
+   `unexplained` never suppresses.
+3. **Retraction** — `reconcileAlerts` carries a ledger across evaluations: a
+   fired alert whose signal is later reclassified (or is no longer derivable
+   from revised evidence) is retracted with its reason and the divergence id.
+   Retractions are records, not deletions; a re-firing signal names its prior
+   retraction. A system that cannot withdraw a claim becomes one nobody reads.
+4. **Backtest before wiring** (`alertBacktest.ts`) — the detector runs
+   against a decade of month-end knowledge states, strictly `as_known_then`,
+   with the no-lookahead invariant *checked* per alert (violations counted;
+   must be 0). Measured on current data (2016–2026, 128 evaluations):
+   **precision 0.438** (7/16 fired inventory alerts match the curated event
+   record; the 9 false positives are the real-but-uncurated mid-2025 LME
+   drawdown), **recall 0.2** (only the exchange-stock event is detectable —
+   the mine/logistics events have no monthly-cadence series near them), and
+   **first-detection lead −30 days** (monthly period-end knowability trails
+   public reporting by a month). Verdict encoded in the test suite: **alerts
+   are not ready to wake anyone**, and no alert panel is wired until the
+   measurement says otherwise. What would change the answer: a weekly/daily
+   stocks feed, facility-cadence series, a richer curated event record.
 
 ## API projections
 
@@ -223,7 +273,7 @@ inspect supporting evidence.
 
 ## Testing
 
-70+ economy tests among the repo's 430 (`npm test`):
+120+ economy tests among the repo's 476 (`npm test`):
 
 - schema/validation (`types.test.ts`), store assembly + provenance discipline +
   adapter-failure degradation (`store.test.ts`), flow direction/traversal/cycles
@@ -232,7 +282,11 @@ inspect supporting evidence.
   event propagation + engine lifecycle (`propagation.test.ts`), live-adapter
   parsers against committed real captures + evidence-ranking integration
   (`liveAdapters.test.ts`), API data contracts incl. temporal/timeline/graph
-  views (`route.test.ts`).
+  views (`route.test.ts`), divergence classification incl. residual
+  normalization and reclassification (`divergence.test.ts`), scenario
+  injection + the as-known-then replay with its vacuity guard
+  (`scenario.test.ts`), and alert derivation / suppression / retraction plus
+  the decade backtest with its measured precision pinned (`alerts.test.ts`).
 - Synthetic fixture (`fixtures.ts`): a 2-mine → port → smelter → demand chain with
   hand-computable numbers (80/20 split → HHI 6800, etc.).
 - Tests are hermetic: live fetches are disabled under vitest; parsers run on the
@@ -244,9 +298,16 @@ inspect supporting evidence.
   commodity-agnostic; a second commodity needs only a dataset + adapter.
 - Comtrade bilateral rows are not yet materialized as Flow edges (world totals
   only) — facility-level flows would double-count against country-level trade
-  edges without an allocation model.
-- Concentrate trade uses gross shipped weight (as reported); copper-content
-  conversion would require grade assumptions we refuse to fabricate.
+  edges without an allocation model. When they land, the basis machinery is
+  ready: gross-weight edges convert via mirror-implied corridor grades (with
+  the grade band as uncertainty), and corridors without a grade refuse shares
+  visibly instead of entering as zero.
+- The reference concentrate grade (25%) and the 20–33% band are industry-typical
+  constants, not per-corridor assays; residuals inherit that uncertainty and
+  the `residualBand` says so.
+- Alerting is engine-only by measurement: backtested precision 0.438 / recall
+  0.2 / lead −30 days on current data — below the bar for waking anyone, so
+  no alert UI exists yet.
 - Flow records are 2024 annual snapshots; playback re-evaluates events,
   propagation and observation selection over time, but flow tonnage itself is
   not yet time-resolved.

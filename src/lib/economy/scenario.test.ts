@@ -62,6 +62,25 @@ describe('scenario: counterfactual injection', () => {
     const affected = (i: EventImpact) => i.affected.map(a => a.entityId).sort();
     expect(deps(thenGrasberg)).toEqual(deps(nowGrasberg));
     expect(affected(thenGrasberg)).toEqual(affected(nowGrasberg));
+
+    // Vacuity guard. "Identical conclusion under both knowledge modes" has
+    // two explanations: the analytics are robust to revision, or the two
+    // runs read the same records and the test passes regardless of how
+    // fragile the analytics are. So assert the inputs actually differed:
+    // as_known_then must have withheld observations best_known can see.
+    const thenObs = new Set(then.state.observations.map(o => o.id));
+    const onlyNow = now.state.observations.filter(o => !thenObs.has(o.id));
+    expect(onlyNow.length).toBeGreaterThan(0);
+    // And label what is identical BY CONSTRUCTION, so the assertion above
+    // never silently overclaims: dependency and flow records are curated
+    // with a single vintage and no revision history, so the equality of the
+    // structural walk itself is partially guaranteed. What this test
+    // genuinely establishes is the event-visibility gate (below) and that
+    // the conclusion holds while the observation layer differs — NOT that
+    // the analytics survive dependency-graph revisions, which the dataset
+    // cannot yet exercise.
+    expect(then.state.dependencies.map(d => d.id)).toEqual(now.state.dependencies.map(d => d.id));
+    expect(then.state.flows.map(f => f.id)).toEqual(now.state.flows.map(f => f.id));
     // And the frames make the two runs distinguishable — without knowledge in
     // the fingerprint, a disagreeing replay could not tell "baseline moved"
     // from "we know more now".

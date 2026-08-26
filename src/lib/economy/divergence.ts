@@ -22,6 +22,7 @@
 
 import type { AnalyticalResult, Divergence, DivergenceClaim, EconomyState, Metric, Observation } from './types';
 import { knownAtOf, outranksObservation } from './analytics';
+import { CONCENTRATE_GRADE_BAND, CONCENTRATE_GRADE_FRACTION_BAND, REFERENCE_CONCENTRATE_GRADE } from './basis';
 
 const MIRROR_PAIRS: Array<[exportMetric: Metric, importMetric: Metric]> = [
   ['concentrate_exports', 'concentrate_imports'],
@@ -29,18 +30,30 @@ const MIRROR_PAIRS: Array<[exportMetric: Metric, importMetric: Metric]> = [
 ];
 
 /**
+ * Residuals within ±10% of the reference-grade normalization read as grade
+ * variation, not as a signal — concentrate grades genuinely spread around
+ * the reference. Beyond the tolerance the basis story requires an atypical
+ * grade, and the pair re-earns 'unexplained' scrutiny: classing a pair
+ * definitional must never permanently blind the system to its drift.
+ */
+const RESIDUAL_TOLERANCE = 0.10;
+
+interface BasisVerdict {
+  class: 'definitional' | 'unexplained';
+  explanation: string;
+  normalization?: Divergence['basisNormalization'];
+}
+
+/**
  * Copper concentrate typically grades 20–33% Cu, so contained-metal and
  * gross-weight declarations of the SAME flow differ by a factor of ~3.0–5.0.
  * A mirror ratio landing inside that band is the fingerprint of a basis
- * mismatch, not of suppression — the gap reproduces the industry grade, and
- * chasing it would send an analyst after phantom tonnage. The gate runs
- * BEFORE 'unexplained' can be assigned: unexplained is the hardest class to
- * earn, never the default residue.
+ * mismatch, not of suppression. The gate runs BEFORE 'unexplained' can be
+ * assigned — unexplained is the hardest class to earn, never the default
+ * residue — but classing definitional is not dismissal: the pair is
+ * NORMALIZED at the reference grade and the residual becomes the watched
+ * quantity. "Basis explains the entire gap" is a statement, and a baseline.
  */
-const CONCENTRATE_GRADE_BAND = { minRatio: 3.0, maxRatio: 5.0 };
-
-interface BasisVerdict { class: 'definitional'; explanation: string }
-
 function basisGate(
   metric: Metric,
   values: number[],
@@ -58,14 +71,37 @@ function basisGate(
   const lo = Math.min(...values);
   if (lo <= 0) return null;
   const ratio = hi / lo;
-  if (ratio >= CONCENTRATE_GRADE_BAND.minRatio && ratio <= CONCENTRATE_GRADE_BAND.maxRatio) {
-    const impliedGrade = (100 / ratio).toFixed(1);
+  if (ratio < CONCENTRATE_GRADE_BAND.minRatio || ratio > CONCENTRATE_GRADE_BAND.maxRatio) return null;
+
+  // Normalize: treat the larger value as gross weight, the smaller as
+  // contained metal, and convert the gross side at the fixed reference grade
+  // (NEVER the pair's own implied grade, which zeroes every residual by
+  // construction). What survives normalization is the real statement.
+  const impliedGrade = lo / hi;
+  const residual = lo / (hi * REFERENCE_CONCENTRATE_GRADE) - 1;
+  const [gLo, gHi] = CONCENTRATE_GRADE_FRACTION_BAND;
+  const residualBand: [number, number] = [lo / (hi * gHi) - 1, lo / (hi * gLo) - 1];
+  const normalization: Divergence['basisNormalization'] = {
+    referenceGrade: REFERENCE_CONCENTRATE_GRADE,
+    impliedGrade: Number(impliedGrade.toFixed(4)),
+    residual: Number(residual.toFixed(4)),
+    residualBand: [Number(residualBand[0].toFixed(4)), Number(residualBand[1].toFixed(4))],
+  };
+  const pct = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
+  const fingerprint = `Ratio ${ratio.toFixed(2)}x implies ${(impliedGrade * 100).toFixed(1)}% Cu content — inside the typical concentrate grade band (20–33%): contained metal on one side, gross shipped weight on the other (candidate basis mismatch).`;
+
+  if (Math.abs(residual) > RESIDUAL_TOLERANCE) {
     return {
-      class: 'definitional',
-      explanation: `Ratio ${ratio.toFixed(2)}x implies ${impliedGrade}% Cu content — inside the typical concentrate grade band (20–33%). Almost certainly contained metal on one side and gross shipped weight on the other (candidate basis mismatch), not suppression or transshipment. The residual after basis normalization, much smaller, would be the finding.`,
+      class: 'unexplained',
+      explanation: `${fingerprint} But normalized at the ${(REFERENCE_CONCENTRATE_GRADE * 100).toFixed(0)}% reference grade a ${pct(residual)} residual remains — larger than grade variation normally explains (±${(RESIDUAL_TOLERANCE * 100).toFixed(0)}%). The basis accounts for most of the raw gap, not all of it; the residual is the finding.`,
+      normalization,
     };
   }
-  return null;
+  return {
+    class: 'definitional',
+    explanation: `${fingerprint} Normalized at the ${(REFERENCE_CONCENTRATE_GRADE * 100).toFixed(0)}% reference grade the residual is ${pct(residual)} — the basis explains the entire gap; no material suppression signal in this corridor. The residual is the watched baseline: drift beyond ±${(RESIDUAL_TOLERANCE * 100).toFixed(0)}% re-earns scrutiny.`,
+    normalization,
+  };
 }
 
 /** Relative gaps below this read as measurement noise, not disagreement. */
@@ -115,7 +151,7 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
     const supersedesLink = group.some(a => group.some(b => a.supersedes === b.id));
     const sameFamily = new Set(group.map(o => o.provenance.sourceId.replace(/\d{4}.*$/, ''))).size === 1;
     const hasRepresentative = others.some(o => o.valueKind === 'representative');
-    const cls: Divergence['class'] = basisVerdict ? 'definitional'
+    const cls: Divergence['class'] = basisVerdict ? basisVerdict.class
       : supersedesLink || sameFamily ? 'revision_lag'
         : hasRepresentative ? 'coverage'
           : 'unexplained';
@@ -140,6 +176,7 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
       direction,
       persistence: 1, // filled below
       class: cls,
+      basisNormalization: basisVerdict?.normalization,
       explanation: basisVerdict ? basisVerdict.explanation
         : cls === 'revision_lag'
           ? `Later vintage (${winner.provenance.sourceId}, knowable ${knownAtOf(winner)}) revises an earlier figure for the same period.`
@@ -174,7 +211,7 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
       // below ~8% they are usually timing (year-boundary shipments) and
       // coverage. Only what survives both gates earns 'unexplained'.
       const basisVerdict = basisGate(exportMetric, [exp.value, imp.value], new Set([exp.basis ?? 'unspecified', imp.basis ?? 'unspecified']));
-      const cls: Divergence['class'] = basisVerdict ? 'definitional'
+      const cls: Divergence['class'] = basisVerdict ? basisVerdict.class
         : relativeSpread < 0.08 ? 'coverage' : 'unexplained';
       const rec: Divergence = {
         id: `div:mirror:${slug(exp.entityId)}-${slug(imp.entityId)}:${exportMetric}:${exp.period.start.slice(0, 4)}`,
@@ -192,6 +229,7 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
         direction: exp.value > imp.value ? 'reporter_higher' : 'partner_higher',
         persistence: 1,
         class: cls,
+        basisNormalization: basisVerdict?.normalization,
         explanation: basisVerdict ? `Exporter declares ${exp.value.toLocaleString()}; importer records ${imp.value.toLocaleString()} ${exp.unit}. ${basisVerdict.explanation}`
           : cls === 'coverage'
             ? `Exporter and importer declarations differ by ${(relativeSpread * 100).toFixed(1)}% — within the range year-boundary timing and coverage normally explain.`
@@ -217,12 +255,18 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
     }
   }
 
-  // Largest, most persistent, least explained first.
+  // Largest, most persistent, least explained first. Normalized pairs rank
+  // on their RESIDUAL, not the raw spread: the raw spread of a basis
+  // mismatch measures the ore grade, and ranking on it would either bury a
+  // drifting corridor under its own dismissal or keep a fully-explained one
+  // artificially prominent.
   const clsRank = { unexplained: 3, coverage: 2, definitional: 1, revision_lag: 0 } as const;
+  const effectiveSpread = (d: Divergence) =>
+    d.basisNormalization ? Math.abs(d.basisNormalization.residual) : d.relativeSpread;
   records.sort((a, b) =>
     clsRank[b.class] - clsRank[a.class]
     || b.persistence - a.persistence
-    || b.relativeSpread - a.relativeSpread);
+    || effectiveSpread(b) - effectiveSpread(a));
 
   return {
     operation: { name: 'detectDivergences', params: { minRelativeSpread: MIN_RELATIVE_SPREAD } },

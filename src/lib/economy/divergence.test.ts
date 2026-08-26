@@ -44,6 +44,44 @@ describe('divergence detection (synthetic)', () => {
     expect(d.resolvedTo).toBe('obs:prod:aa:v2');
   });
 
+  it('normalizes an in-band mirror pair and keeps the residual as the watched baseline', () => {
+    // Ratio 4.0 → dead-center grade fingerprint; at the 25% reference the
+    // residual is exactly 0. Classed definitional WITH the normalization
+    // attached — a statement and a baseline, not a dismissal.
+    const s = syntheticState();
+    const prov = s.observations[0].provenance;
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:m:aa-exp', entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb', metric: 'concentrate_exports', value: 100, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+      { id: 'obs:m:bb-imp', entityId: 'ent:country:bb', partnerEntityId: 'ent:country:aa', metric: 'concentrate_imports', value: 400, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+    );
+    const d = detectDivergences(s).result.find(x => x.kind === 'mirror')!;
+    expect(d.class).toBe('definitional');
+    expect(d.basisNormalization).toBeDefined();
+    expect(d.basisNormalization!.impliedGrade).toBeCloseTo(0.25, 4);
+    expect(d.basisNormalization!.residual).toBeCloseTo(0, 4);
+    expect(d.basisNormalization!.residualBand[0]).toBeLessThan(0);
+    expect(d.basisNormalization!.residualBand[1]).toBeGreaterThan(0);
+    expect(d.explanation).toContain('no material suppression signal');
+  });
+
+  it('a residual beyond tolerance re-earns unexplained — definitional is never a permanent blind spot', () => {
+    // Ratio 3.33 is still inside the grade band, but at the 25% reference
+    // the residual is +20%: the basis story requires an atypical grade, so
+    // the pair climbs back to the hardest class instead of staying filed.
+    const s = syntheticState();
+    const prov = s.observations[0].provenance;
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:m:aa-exp', entityId: 'ent:country:aa', partnerEntityId: 'ent:country:bb', metric: 'concentrate_exports', value: 120, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+      { id: 'obs:m:bb-imp', entityId: 'ent:country:bb', partnerEntityId: 'ent:country:aa', metric: 'concentrate_imports', value: 400, unit: 'kt', period, valueKind: 'reported', confidence: 'medium', provenance: prov },
+    );
+    const d = detectDivergences(s).result.find(x => x.kind === 'mirror')!;
+    expect(d.class).toBe('unexplained');
+    expect(d.basisNormalization!.residual).toBeCloseTo(0.20, 4);
+    expect(d.explanation).toContain('residual');
+  });
+
   it('ignores sub-noise disagreement', () => {
     const s = syntheticState();
     const base = s.observations.find(o => o.id === 'obs:prod:aa')!;
@@ -91,6 +129,16 @@ describe('divergence detection (copper, real captures)', () => {
     expect(clCn.explanation).toContain('3.97');
     expect(clCn.explanation).toContain('25.2% Cu');
     expect(clCn.explanation).toContain('basis mismatch');
+    // Not dismissed — NORMALIZED: 8,433 × 0.25 = 2,108 against Chile's
+    // 2,125 leaves a +0.8% residual. Effectively zero, which is the strong
+    // statement: the basis explains the entire gap, and the residual is the
+    // baseline the corridor is watched against from here on.
+    expect(clCn.basisNormalization).toBeDefined();
+    expect(clCn.basisNormalization!.referenceGrade).toBe(0.25);
+    expect(clCn.basisNormalization!.impliedGrade).toBeCloseTo(0.252, 3);
+    expect(clCn.basisNormalization!.residual).toBeCloseTo(0.008, 3);
+    expect(clCn.explanation).toContain('+0.8%');
+    expect(clCn.explanation).toContain('no material suppression signal');
 
     // DRC → China refined: −25% gap. Refined cathode is ~99.99% Cu, so basis
     // cannot be the mechanism — this one legitimately earns 'unexplained'

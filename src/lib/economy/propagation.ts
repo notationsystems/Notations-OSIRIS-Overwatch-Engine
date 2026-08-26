@@ -101,10 +101,13 @@ export function propagateEvents(
     }));
 
     const totalSpare = alternatives.reduce((s, a) => s + a.spareKtPerYear, 0);
+    const unquantified = t?.unquantifiedFlowIds ?? [];
     const explanation: string[] = [];
     explanation.push(active ? 'Event window covers the evaluation date — treated as a live state change.' : 'Event window closed — shown as structural context.');
     if (disrupted > 0) explanation.push(`~${Math.round(disrupted)} kt/y of material moves through ${entity.name} in the modeled graph.`);
+    else if (unquantified.length > 0) explanation.push(`${entity.name} carries ${unquantified.length} flow(s) whose tonnage is REFUSED (gross-weight basis with no corridor grade) — disrupted tonnage is unknown, not zero; impact below is structural reach only.`);
     else explanation.push(`${entity.name} carries no modeled flow — impact is structural (capacity/dependency), not flow interruption.`);
+    if (disrupted > 0 && unquantified.length > 0) explanation.push(`${unquantified.length} additional flow(s) at this node could not be quantified — the disrupted tonnage is a lower bound.`);
     explanation.push(affected.length > 0 ? `${affected.length} downstream entity(ies) within ${maxDepth} hops.` : 'No modeled downstream entities.');
     if (disrupted > 0) {
       explanation.push(totalSpare >= disrupted
@@ -120,7 +123,7 @@ export function propagateEvents(
       entityId: ev.entityId, entityName: entity.name,
       disruptedKtPerYear: Math.round(disrupted),
       affected, alternatives, dependents,
-      flowIds: t?.flowIds ?? [],
+      flowIds: [...(t?.flowIds ?? []), ...unquantified],
       capacityIds: altCapacityIds,
       dependencyIds: deps.map(d => d.id),
       explanation,

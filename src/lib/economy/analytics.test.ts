@@ -151,9 +151,39 @@ describe('bottleneck candidates', () => {
 
   it('is deterministic across runs', () => {
     const s = syntheticState();
-    const a = bottleneckCandidates(s, buildGraph(s)).result.map(b => `${b.entityId}:${b.score.toFixed(6)}`);
-    const b = bottleneckCandidates(s, buildGraph(s)).result.map(x => `${x.entityId}:${x.score.toFixed(6)}`);
+    const a = bottleneckCandidates(s, buildGraph(s)).result.map(b => `${b.entityId}:${b.score!.toFixed(6)}`);
+    const b = bottleneckCandidates(s, buildGraph(s)).result.map(x => `${x.entityId}:${x.score!.toFixed(6)}`);
     expect(a).toEqual(b);
+  });
+
+  it('refuses to score a node touched by unquantifiable basis — and sorts the refusal first', () => {
+    const s = syntheticState();
+    // Gross-weight inbound with no corridor grade: shares and redundancy at
+    // the smelter would be computed against a total known to be wrong. A
+    // zero would report a fragility that doesn't exist (single-sourced,
+    // irredundant); a refusal reports exactly what is missing.
+    s.flows.push({
+      ...s.flows[0], id: 'flow:gate-omega-gross', fromEntityId: 'ent:port:gate', toEntityId: 'ent:smelter:omega', quantity: 1600, basis: 'gross_weight',
+    });
+    const g = buildGraph(s);
+    const r = bottleneckCandidates(s, g);
+    const omega = r.result.find(b => b.entityId === 'ent:smelter:omega')!;
+    expect(omega.score).toBeNull();
+    expect(omega.explanation[0]).toContain('SCORE REFUSED');
+    expect(omega.explanation[0]).toContain('flow:gate-omega-gross');
+    // Refusals sort first (the gross edge touches both its endpoints).
+    expect(r.result[0].score).toBeNull();
+    expect(r.result.filter(b => b.score === null).map(b => b.entityId).sort())
+      .toEqual(['ent:port:gate', 'ent:smelter:omega']);
+    expect(omega.flowIds).toContain('flow:gate-omega-gross'); // evidence keeps the refused flow
+    // Centrality refuses the share for the same node, keeps the lower bound.
+    const c = flowCentrality(s, g);
+    const omegaRow = c.result.find(x => x.entityId === 'ent:smelter:omega')!;
+    expect(omegaRow.share).toBeNull();
+    expect(omegaRow.inKt).toBe(400); // quantified lower bound, not zero
+    expect(omegaRow.unquantifiedFlowIds).toEqual(['flow:gate-omega-gross']);
+    // Untouched nodes still get shares.
+    expect(c.result.find(x => x.entityId === 'ent:mine:alpha')!.share).not.toBeNull();
   });
 });
 

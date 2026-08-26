@@ -46,17 +46,74 @@ describe('economy graph (synthetic)', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('basis firewall: a gross-weight flow never contributes throughput', () => {
+  it('basis: a gross-weight flow enters throughput only after face-value refusal — and the refusal is visible', () => {
     const s = syntheticState();
     // Same route, declared gross weight — ~4x fatter than its content basis.
-    // If this leaked into throughput, inbound shares (and propagation
-    // impairment) would skew toward the fat-basis supplier, silently.
+    // At face value it would skew inbound shares toward the fat-basis
+    // supplier; as silent zero it would claim the flow carries nothing.
     s.flows.push({
       ...s.flows[0], id: 'flow:alpha-gate-gross', quantity: 1200, basis: 'gross_weight',
     });
     const t = nodeThroughput(buildGraph(s));
-    expect(t.get('ent:port:gate')!.inKt).toBe(400); // unchanged
+    expect(t.get('ent:port:gate')!.inKt).toBe(400); // face value never leaks
     expect(t.get('ent:port:gate')!.flowIds).not.toContain('flow:alpha-gate-gross');
+    // With no corridor grade, the tonnage is REFUSED, visibly — on both ends.
+    expect(t.get('ent:port:gate')!.unquantifiedFlowIds).toContain('flow:alpha-gate-gross');
+    expect(t.get('ent:mine:alpha')!.unquantifiedFlowIds).toContain('flow:alpha-gate-gross');
+  });
+
+  it('basis conversion: a gross-only supplier keeps its tonnage via the corridor-implied grade', () => {
+    // The case the old firewall silenced: a smelter drawing 100 kt cu_content
+    // from A and 400 kt gross from B is DUAL-sourced. Zeroing B made it read
+    // single-sourced — supplier count dropped, redundancy inverted, and a
+    // disruption at B propagated nothing. Here the mirror pair implies the
+    // corridor grade (400 gross vs 100 content → 25%), and B's edge converts.
+    const s = syntheticState();
+    s.entities.push({ id: 'ent:mine:gamma', kind: 'mine', name: 'Gamma Mine', countryCode: 'BB', lat: 23, lng: 23, geoPrecision: 'site', stage: 'production' });
+    s.flows.push({
+      ...s.flows[0], id: 'flow:gamma-gate', fromEntityId: 'ent:mine:gamma', quantity: 400, basis: 'gross_weight',
+    });
+    const prov = s.observations[0].provenance;
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:mirror:gamma-exp', entityId: 'ent:mine:gamma', partnerEntityId: 'ent:port:gate', metric: 'concentrate_exports', value: 100, unit: 'kt', period, basis: 'cu_content', valueKind: 'reported', confidence: 'medium', provenance: prov },
+      { id: 'obs:mirror:gate-imp', entityId: 'ent:port:gate', partnerEntityId: 'ent:mine:gamma', metric: 'concentrate_imports', value: 400, unit: 'kt', period, basis: 'gross_weight', valueKind: 'reported', confidence: 'medium', provenance: prov },
+    );
+    const g = buildGraph(s);
+    const edge = g.edges.find(e => e.id === 'flow:gamma-gate')!;
+    expect(edge.kind).toBe('flow');
+    if (edge.kind !== 'flow') return;
+    expect(edge.ktPerYear).toBeCloseTo(100, 6); // 400 gross × 0.25 implied grade
+    expect(edge.basisConversion).toBeDefined();
+    expect(edge.basisConversion!.grade).toBeCloseTo(0.25, 6);
+    // The uncertainty band travels with the conversion: 20–33% Cu.
+    expect(edge.basisConversion!.ktRange[0]).toBeCloseTo(80, 6);
+    expect(edge.basisConversion!.ktRange[1]).toBeCloseTo(132, 6);
+    expect(edge.basisConversion!.derivedFrom).toEqual(['obs:mirror:gamma-exp', 'obs:mirror:gate-imp']);
+    // The port is dual-plus-sourced again: gamma's tonnage is real throughput.
+    const t = nodeThroughput(g);
+    expect(t.get('ent:port:gate')!.inKt).toBeCloseTo(500, 6); // 300 + 100 + 100
+    expect(t.get('ent:port:gate')!.flowIds).toContain('flow:gamma-gate');
+    expect(t.get('ent:port:gate')!.unquantifiedFlowIds).toEqual([]);
+  });
+
+  it('basis refusal: a gross-only node without a grade stays PRESENT, with shares refused', () => {
+    // The worst case: every inbound edge gross-reported, no counterpart.
+    // Under the zeroing firewall total_in read 0 and the node (plus its
+    // downstream propagation tonnage) went dark. Now it must stay visible
+    // with its tonnage explicitly refused.
+    const s = syntheticState();
+    s.entities.push({ id: 'ent:smelter:dark', kind: 'smelter', name: 'Dark Smelter', countryCode: 'BB', lat: 24, lng: 24, geoPrecision: 'site', stage: 'smelting' });
+    s.flows.push({
+      ...s.flows[0], id: 'flow:gate-dark', fromEntityId: 'ent:port:gate', toEntityId: 'ent:smelter:dark', quantity: 800, basis: 'gross_weight',
+    });
+    const g = buildGraph(s);
+    const t = nodeThroughput(g);
+    // Present, not vanished.
+    expect(t.has('ent:smelter:dark')).toBe(true);
+    expect(t.get('ent:smelter:dark')!.unquantifiedFlowIds).toEqual(['flow:gate-dark']);
+    // Reachability was never in question — the edge traverses.
+    expect(downstream(g, 'ent:port:gate').map(x => x.entityId)).toContain('ent:smelter:dark');
   });
 
   it('sums throughput per node from flow edges', () => {

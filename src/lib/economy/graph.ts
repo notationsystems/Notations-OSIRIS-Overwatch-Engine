@@ -8,14 +8,34 @@
 
 import type { Dependency, EconomyState, Entity, Flow } from './types';
 import { toKtPerYear } from './types';
+import { impliedCorridorGrades } from './basis';
+
+export interface BasisConversion {
+  /** Corridor-implied Cu mass fraction applied to the gross quantity. */
+  grade: number;
+  /** kt/y range across the concentrate grade uncertainty band. */
+  ktRange: [number, number];
+  /** Mirror observation ids the grade was implied from. */
+  derivedFrom: [string, string];
+}
 
 export interface FlowEdge {
   kind: 'flow';
   id: string;
   from: string;
   to: string;
-  /** kt Cu/y where convertible, else null (edge kept, quantity unknown). */
+  /** kt Cu/y where convertible (directly or via corridor grade), else null. */
   ktPerYear: number | null;
+  /** Present when a gross-weight quantity was converted to Cu content. */
+  basisConversion?: BasisConversion;
+  /**
+   * True when the flow declares gross weight and no corridor grade exists to
+   * convert it. The edge stays in the graph (reachability is real) but its
+   * tonnage is REFUSED, not zeroed: zero is a value — the claim that the
+   * flow carries nothing — and consumers must surface the refusal instead of
+   * silently dropping the supplier from shares and redundancy.
+   */
+  basisUnresolved?: boolean;
   flow: Flow;
 }
 
@@ -43,13 +63,30 @@ export function buildGraph(state: EconomyState): EconomyGraph {
   const nodes = new Map<string, Entity>();
   for (const e of state.entities) nodes.set(e.id, e);
 
+  // Basis handling: a gross-weight flow must never enter throughput at face
+  // value (mixed bases skew inbound shares toward the fat-basis supplier) —
+  // but it must not enter as zero either, which claims the flow carries
+  // nothing and inverts supplier counts and redundancy. Convert where the
+  // mirror system has implied a corridor grade; refuse visibly where not.
+  const corridorGrades = impliedCorridorGrades(state);
+
   const edges: GraphEdge[] = [];
   for (const f of state.flows) {
-    // Basis firewall: a gross-weight flow must never contribute throughput —
-    // mixed bases would skew inbound shares (and thus propagation impairment)
-    // toward whichever supplier reports on the fatter basis, silently.
-    const ktPerYear = f.basis === 'gross_weight' ? null : toKtPerYear(f.quantity, f.unit);
-    edges.push({ kind: 'flow', id: f.id, from: f.fromEntityId, to: f.toEntityId, ktPerYear, flow: f });
+    const raw = toKtPerYear(f.quantity, f.unit);
+    let ktPerYear: number | null = raw;
+    let basisConversion: BasisConversion | undefined;
+    let basisUnresolved: true | undefined;
+    if (f.basis === 'gross_weight') {
+      const g = corridorGrades.get(`${f.fromEntityId}|${f.toEntityId}`);
+      if (g && raw !== null) {
+        ktPerYear = raw * g.grade;
+        basisConversion = { grade: g.grade, ktRange: [raw * g.band[0], raw * g.band[1]], derivedFrom: g.derivedFrom };
+      } else {
+        ktPerYear = null;
+        basisUnresolved = true;
+      }
+    }
+    edges.push({ kind: 'flow', id: f.id, from: f.fromEntityId, to: f.toEntityId, ktPerYear, basisConversion, basisUnresolved, flow: f });
   }
   for (const d of state.dependencies) {
     // located_in is geography, not material structure — keep it out of the
@@ -122,15 +159,35 @@ function walk(
   return result;
 }
 
+export interface NodeThroughput {
+  inKt: number;
+  outKt: number;
+  flowIds: string[];
+  /**
+   * Flow edges at this node whose tonnage could not be quantified (a
+   * gross-weight basis with no corridor grade, or an unconvertible unit).
+   * Non-empty means inKt/outKt are LOWER BOUNDS and any share computed from
+   * them is unsafe — consumers must refuse shares for this node, visibly.
+   */
+  unquantifiedFlowIds: string[];
+}
+
 /** Total material throughput (in + out, kt/y) per node — flow edges only. */
-export function nodeThroughput(graph: EconomyGraph): Map<string, { inKt: number; outKt: number; flowIds: string[] }> {
-  const acc = new Map<string, { inKt: number; outKt: number; flowIds: string[] }>();
+export function nodeThroughput(graph: EconomyGraph): Map<string, NodeThroughput> {
+  const acc = new Map<string, NodeThroughput>();
   const get = (id: string) => {
-    if (!acc.has(id)) acc.set(id, { inKt: 0, outKt: 0, flowIds: [] });
+    if (!acc.has(id)) acc.set(id, { inKt: 0, outKt: 0, flowIds: [], unquantifiedFlowIds: [] });
     return acc.get(id)!;
   };
   for (const edge of graph.edges) {
-    if (edge.kind !== 'flow' || edge.ktPerYear === null) continue;
+    if (edge.kind !== 'flow') continue;
+    if (edge.ktPerYear === null) {
+      // A node reached only by unquantifiable flows must still EXIST here —
+      // vanishing from the throughput map is how nodes went dark before.
+      get(edge.from).unquantifiedFlowIds.push(edge.id);
+      get(edge.to).unquantifiedFlowIds.push(edge.id);
+      continue;
+    }
     const from = get(edge.from); from.outKt += edge.ktPerYear; from.flowIds.push(edge.id);
     const to = get(edge.to); to.inKt += edge.ktPerYear; to.flowIds.push(edge.id);
   }
