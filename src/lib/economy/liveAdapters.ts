@@ -34,6 +34,7 @@ import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
+import comtradeDa from '@/data/economy/snapshots/comtrade-da.json';
 
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
@@ -322,6 +323,59 @@ interface ComtradeRow {
 }
 interface ComtradeResponse { data?: ComtradeRow[] }
 
+/*
+ * Publication dates from the UN Comtrade data-availability API (getDA),
+ * captured as a committed snapshot. Two properties shape everything here:
+ *
+ *   1. knownAt is real, not a retrieval-time fallback: each (reporter,
+ *      period) dataset carries firstReleased and lastReleased.
+ *   2. Comtrade keeps ONE version of a dataset — revisions overwrite in
+ *      place with no archive of prior versions. The figure OSIRIS holds is
+ *      therefore the lastReleased version, and is stamped with THAT date:
+ *      as_known_then earlier than lastReleased is honestly blind for this
+ *      value, because the vintage that WAS knowable then no longer exists
+ *      anywhere (both Chile years have already been revised in place).
+ *      This is also why the archival rung below exists: OSIRIS's own
+ *      snapshots are the only Comtrade vintage archive there will ever be.
+ */
+interface ComtradeDaRow { reporterCode: number; period: number; firstReleased: string; lastReleased: string }
+const COMTRADE_DA = new Map<string, ComtradeDaRow>();
+for (const r of (comtradeDa as { rows: ComtradeDaRow[] }).rows) {
+  const key = `${r.reporterCode}-${r.period}`;
+  const prev = COMTRADE_DA.get(key);
+  if (!prev || r.lastReleased > prev.lastReleased) COMTRADE_DA.set(key, r);
+}
+
+function comtradeKnownAt(m49: string | number, year: string | number): { knownAt?: string; daNote?: string } {
+  const row = COMTRADE_DA.get(`${m49}-${year}`);
+  if (!row) return {};
+  const first = row.firstReleased.slice(0, 10);
+  const held = row.lastReleased.slice(0, 10);
+  return {
+    knownAt: held,
+    daNote: held === first
+      ? `Released ${first} (Comtrade getDA).`
+      : `First released ${first}; held version released ${held} — revised in place, the original vintage is unrecoverable unless archived.`,
+  };
+}
+
+/**
+ * Best-effort vintage archival. Comtrade revises datasets in place and keeps
+ * no prior versions, so every successful retrieval is written to
+ * data-archive/comtrade/<date>/ — the only vintage archive of Comtrade that
+ * will ever exist. Failure (read-only filesystem) must never break
+ * acquisition.
+ */
+async function archiveComtradeVintage(key: string, raw: unknown): Promise<void> {
+  try {
+    const fs = await import('node:fs/promises');
+    const day = new Date().toISOString().slice(0, 10);
+    const dir = `${process.cwd()}/data-archive/comtrade/${day}`;
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(`${dir}/${key}.json`, JSON.stringify(raw));
+  } catch { /* best-effort by design */ }
+}
+
 export function parseComtradeResponse(
   key: string,
   raw: ComtradeResponse,
@@ -354,6 +408,7 @@ export function parseComtradeResponse(
     ? 'HS 2603 copper ores & concentrates — GROSS shipped weight, not contained copper (typical concentrate grades run ~20–30% Cu).'
     : 'HS 7403 refined copper — gross weight ≈ copper content.';
   const slug = entityId.split(':')[2];
+  const { knownAt, daNote } = comtradeKnownAt(m49Str, yearStr);
   return {
     id: `obs:comtrade:${slug}:${hs}:${flow}:${yearStr}`,
     entityId, metric,
@@ -365,13 +420,14 @@ export function parseComtradeResponse(
     // appears to declare contained metal under HS 2603).
     basis: hs === '2603' ? 'gross_weight' : 'cu_content',
     period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
+    ...(knownAt ? { knownAt } : {}),
     // A world total OSIRIS computed by summing partner rows is inference,
     // not the reporter's own aggregate — the identity charter says so.
     valueKind: derivedFromPartners ? 'derived' : 'reported',
     confidence: estimated ? 'medium' : 'high',
     provenance: prov(
       `HS ${hs} flow ${flow} reporter ${m49Str} period ${yearStr}`,
-      [formNote, derivedFromPartners ? 'World total summed from bilateral partner rows (reporter aggregate weight was null).' : null].filter(Boolean).join(' '),
+      [formNote, derivedFromPartners ? 'World total summed from bilateral partner rows (reporter aggregate weight was null).' : null, daNote].filter(Boolean).join(' '),
     ),
   };
 }
@@ -404,6 +460,7 @@ export function parseComtradeBilateral(
     if (!row.partnerCode || row.partnerCode === 0) continue;
     const partnerEntityId = M49_TO_ENTITY[row.partnerCode];
     if (!partnerEntityId || row.netWgt === null || row.netWgt === undefined || row.netWgt < minKg) continue;
+    const { knownAt, daNote } = comtradeKnownAt(m49Str, yearStr);
     obs.push({
       id: `obs:comtrade:${entitySlug(entityId)}:${hs}:${flow}:${yearStr}:${entitySlug(partnerEntityId)}`,
       entityId, partnerEntityId, metric,
@@ -411,11 +468,12 @@ export function parseComtradeBilateral(
       unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
       basis: hs === '2603' ? 'gross_weight' : 'cu_content',
       period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
+      ...(knownAt ? { knownAt } : {}),
       valueKind: 'reported',
       confidence: row.isNetWgtEstimated === true ? 'medium' : 'high',
       provenance: prov(
         `HS ${hs} flow ${flow} reporter ${m49Str} partner ${row.partnerCode} period ${yearStr}`,
-        'Bilateral declaration (mirror evidence) — excluded from aggregate analytics; compared against the counterparty\'s declaration by the divergence system.',
+        ['Bilateral declaration (mirror evidence) — excluded from aggregate analytics; compared against the counterparty\'s declaration by the divergence system.', daNote].filter(Boolean).join(' '),
       ),
     });
   }
@@ -445,6 +503,10 @@ async function fetchComtradeLive(): Promise<Observation[]> {
         const url = `https://comtradeapi.un.org/public/v1/preview/C/A/HS?reporterCode=${m49}&period=${year}&cmdCode=${hs}&flowCode=${flow}`;
         const raw = await fetchJson<ComtradeResponse>(url, 20000);
         rawByKey.set(key, raw);
+        // Archive the vintage NOW: Comtrade revises in place with no prior-
+        // version archive, so this write is the only copy that will survive
+        // the next revision.
+        await archiveComtradeVintage(key, raw);
         one = parseComtradeResponse(key, raw, prov);
         // A 200 with an empty data array is NOT live coverage — counting it
         // would let an all-snapshot result be cached as a fresh success.

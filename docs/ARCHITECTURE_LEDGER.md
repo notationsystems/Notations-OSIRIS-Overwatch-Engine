@@ -77,7 +77,7 @@ parseable here, with verbatim response captures committed as snapshots:
 | Yahoo HG=F chart API | works with browser UA; monthly USD/lb 10y | `yahoo-copper-price` |
 | CFTC COT (Socrata) | works, no key; weekly positioning (dataset ids inverted vs docs: 72hh-3qpy = disaggregated) | `cftc-positioning` |
 | WB Pink Sheet xlsx | works ($/mt monthly since 1960) but xlsx parsing + hash discovery | deferred (Yahoo covers price) |
-| LME/SHFE stocks | no free API confirmed (phase 2); phase 6 recon: LME pages + CME delivery reports bot-blocked (403), SHFE .dat paths 404, but Westmetall republishes LME daily headline stocks as public HTML | `westmetall-lme-stocks` (daily, year-to-date; licensing noted) |
+| LME/SHFE stocks | no free API confirmed (phase 2); phase 6 recon: LME pages + CME delivery reports bot-blocked (403), SHFE .dat paths 404, but Westmetall republishes LME daily headline stocks as public HTML | `westmetall-lme-stocks` (daily, year-to-date; licensing noted). **Known fragility:** the corpus's only positive-lead series is this single scraped republisher — corpus-health alerts watch its cadence, and the stated remedy is the licensed LME feed at the top of the acquisition shopping list, at which point the scrape becomes a divergence check against the feed rather than a silent dependency (provenance already names LME as originating and Westmetall as republishing). |
 
 Patterns adapted from the OSINT-War-Room study now live in code: the
 degradation ladder and in-flight coalescing wrap every live adapter (reusing
@@ -236,6 +236,58 @@ review's order:
    non-negative lead, delivered by acquisition, exactly as the horizon table
    predicted. Next binding constraint, per the report's own caveat: the
    monthly evaluation grid.
+
+## Phase 7 — what the 1.0 does and does not mean (external review round 5)
+
+Round-5 review named the hazard in phase 6's own success: precision moving
+0.438 → 1.0 with the detector untouched proves the number measures curation
+— and a flattering artifact gets quoted far more readily than an
+unflattering one. Shipped, in the review's order:
+
+1. **Scorecard restructuring** before the number could propagate. Events now
+   carry `curation: independent | post_hoc` (a truth set assembled by
+   looking at what the detector fired on cannot score that detector; both
+   detectable exchange-stock events are post-hoc — one was curated after
+   the phase-6 false positives, the other was written around the very
+   series the detector runs on). The headline is
+   `precisionPreRegisteredOnly`, and on the current corpus it is **null: no
+   measurement of detector precision is possible on the clean truth set** —
+   which is the finding, not a defect. Also reported: episodes (2 matched,
+   0 unmatched — 19 alerts on two drawdowns are two successes, not
+   nineteen), the attribution window as an explicit sensitivity table (0
+   pre-window days → precision 0.947 / lead −5; 30+ days → 1.0 / +7: the
+   knob raises both together, so it is published, not buried), and the
+   quiet-period alert rate (0 across 54 event-free months) — the volume
+   axis precision cannot see.
+2. **leadVsPrice**: lead is now benchmarked against the market, not only
+   journalism, using monthly COMEX closes as a benchmark — never an input,
+   so the round-4 reflexivity firewall stands (price may grade physical
+   analytics; it may not feed them). Measured: the market moved first on
+   BOTH exchange-stock events (−31 and −13 days at monthly resolution),
+   confirming the review's stated expectation. A positive lead over a press
+   report on a series every desk watches is not an information edge; the
+   valuable target remains mine/logistics events, where recall is zero
+   pending closer-cadence sources.
+3. **Corpus health as an alert kind**: after phase 6 exactly one series
+   could produce positive lead — a scraped third-party republisher — and
+   graceful degradation on the only load-bearing source is indistinguishable
+   from working. `corpusHealthSignals` fires when the lead ceiling degrades
+   (staleness > 3× the source's own arrival cadence), names the serving
+   rung, computes ceiling-before vs ceiling-now, and marks load-bearing
+   sources; cleared conditions resolve as "condition cleared", distinct
+   from retraction. The one alert class ready to wake someone today.
+4. **Comtrade, fillable and now-or-never**: the getDA availability API
+   supplies real release dates (committed snapshot), so `knownAt` is no
+   longer a retrieval-time fallback — and it is stamped with the HELD
+   version's release date, because Comtrade keeps one version and revises
+   in place (both Chilean years already revised). The committed-snapshot
+   rung is therefore not a fallback but the only Comtrade vintage archive
+   that will ever exist: every successful live retrieval is archived to
+   `data-archive/comtrade/` before parsing, and as_known_then blindness
+   before the archive began is labeled in the backtest caveats.
+5. **Hybrid evaluation grid** (month-ends + daily dates where daily
+   evidence exists, 312 states): with the daily source in the corpus, the
+   evaluation grid had become the binding constraint on measurable lead.
 
 ## Capability gap analysis (post-phase-2)
 

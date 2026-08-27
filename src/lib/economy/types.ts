@@ -300,6 +300,17 @@ export interface EconEvent {
    *  number a backtest match can be sized against. Estimates say so in
    *  `note`; absence means "not curated", never zero. */
   magnitude?: { value: number; unit: string; basis?: QuantityBasis; note?: string };
+  /**
+   * How this event entered the record — the split that decides whether it
+   * may score a detector. 'independent': curated from the external public
+   * record without reference to detector output. 'post_hoc': curated after
+   * observing detector firings, or written around a series the detector
+   * runs on. A truth set assembled by looking at what the detector fired on
+   * cannot be used to score that detector, so post-hoc events are excluded
+   * from the headline precision. Absent = treated as post_hoc (independence
+   * must be claimed, never presumed).
+   */
+  curation?: 'independent' | 'post_hoc';
   description?: string;
   provenance: Provenance;
 }

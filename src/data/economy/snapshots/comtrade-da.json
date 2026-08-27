@@ -1,0 +1,77 @@
+{
+ "retrievedAt": "2026-08-27T00:00:00Z",
+ "sourceUrl": "https://comtradeapi.un.org/public/v1/getDA/C/A/HS",
+ "note": "UN Comtrade data-availability rows for OSIRIS reporters (annual HS, 2023-2024). firstReleased = original publication; lastReleased = release date of the CURRENT version (Comtrade revises in place and keeps no prior versions). The version OSIRIS holds is the lastReleased one.",
+ "rows": [
+  {
+   "reporterCode": 152,
+   "reporterISO": "CHL",
+   "period": 2023,
+   "classificationCode": "H6",
+   "firstReleased": "2024-02-05T22:45:03.73",
+   "lastReleased": "2026-04-26T23:03:30.79",
+   "totalRecords": 181274,
+   "datasetChecksum": -1220726972
+  },
+  {
+   "reporterCode": 156,
+   "reporterISO": "CHN",
+   "period": 2023,
+   "classificationCode": "H6",
+   "firstReleased": "2024-04-07T08:24:25.7933333",
+   "lastReleased": "2024-04-07T08:24:25.7933333",
+   "totalRecords": 832183,
+   "datasetChecksum": -403675329
+  },
+  {
+   "reporterCode": 180,
+   "reporterISO": "COD",
+   "period": 2023,
+   "classificationCode": "H4",
+   "firstReleased": "2025-02-07T16:44:27.1066667",
+   "lastReleased": "2025-02-07T16:44:27.1066667",
+   "totalRecords": 73522,
+   "datasetChecksum": 1017815960
+  },
+  {
+   "reporterCode": 604,
+   "reporterISO": "PER",
+   "period": 2023,
+   "classificationCode": "H6",
+   "firstReleased": "2024-10-18T22:12:19.4566667",
+   "lastReleased": "2024-10-18T22:12:19.4566667",
+   "totalRecords": 151495,
+   "datasetChecksum": 217491176
+  },
+  {
+   "reporterCode": 152,
+   "reporterISO": "CHL",
+   "period": 2024,
+   "classificationCode": "H6",
+   "firstReleased": "2025-04-24T02:10:21.38",
+   "lastReleased": "2026-04-29T03:43:44.1866667",
+   "totalRecords": 179747,
+   "datasetChecksum": 1769654839
+  },
+  {
+   "reporterCode": 156,
+   "reporterISO": "CHN",
+   "period": 2024,
+   "classificationCode": "H6",
+   "firstReleased": "2025-06-14T15:07:48.2233333",
+   "lastReleased": "2025-07-04T17:03:56.8933333",
+   "totalRecords": 855028,
+   "datasetChecksum": 1903694698
+  },
+  {
+   "reporterCode": 604,
+   "reporterISO": "PER",
+   "period": 2024,
+   "classificationCode": "H6",
+   "firstReleased": "2025-08-05T20:54:19.3866667",
+   "lastReleased": "2025-08-05T20:54:19.3866667",
+   "totalRecords": 1532900,
+   "datasetChecksum": 807867662
+  }
+ ]
+}

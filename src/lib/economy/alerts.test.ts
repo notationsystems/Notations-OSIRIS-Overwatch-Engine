@@ -167,10 +167,62 @@ describe('alert reconciliation (retraction)', () => {
   });
 });
 
+describe('corpus health (the system watching its own blindness)', () => {
+  const dailyStockObs = (s: EconomyState, lastDay: number, note?: string) => {
+    const prov = s.observations[0].provenance;
+    for (let d = 1; d <= lastDay; d++) {
+      const date = `2026-03-${String(d).padStart(2, '0')}`;
+      s.observations.push({
+        id: `obs:daily:${date}`, entityId: 'ent:port:gate', metric: 'inventory', value: 100 + d, unit: 'kt',
+        period: { start: date, end: date }, knownAt: date,
+        valueKind: 'reported', confidence: 'medium',
+        provenance: { ...prov, sourceId: 'test-daily-scrape', ...(note ? { note } : {}) },
+      });
+    }
+  };
+
+  it('fires when the lead ceiling degrades — not merely when a fetch fails', () => {
+    const s = syntheticState();
+    // A daily source whose newest knowable value is 16 days old, served from
+    // the snapshot rung: graceful degradation on the only daily source is
+    // indistinguishable from working unless something says so.
+    dailyStockObs(s, 15, 'bundled snapshot (live fetch failed)');
+    const alerts = generateAlerts(fakeRun(s, '2026-03-31'));
+    const scrape = alerts.find(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape')!;
+    expect(scrape).toBeDefined();
+    expect(scrape.signalKind).toBe('corpus_health');
+    expect(scrape.signalKey).toBe('corpus:ladder_rung_pinned:test-daily-scrape');
+    expect(scrape.severity).toBe('high'); // the best-lead source is load-bearing
+    expect(scrape.explanation).toContain('16d old');
+    expect(scrape.explanation).toContain('BEST-LEAD SOURCE');
+    // A current daily source stays silent.
+    const healthy = syntheticState();
+    dailyStockObs(healthy, 30);
+    expect(generateAlerts(fakeRun(healthy, '2026-03-31')).filter(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape')).toEqual([]);
+  });
+
+  it('a cleared condition resolves — it is not a withdrawn claim', () => {
+    const stale = syntheticState();
+    dailyStockObs(stale, 15);
+    const fired = generateAlerts(fakeRun(stale, '2026-03-31')).filter(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape');
+    expect(fired.length).toBe(1);
+    const recovered = syntheticState();
+    dailyStockObs(recovered, 31);
+    const current = generateAlerts(fakeRun(recovered, '2026-04-01')).filter(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape');
+    expect(current).toEqual([]);
+    const ledger = reconcileAlerts(fired, current, '2026-04-01');
+    expect(ledger[0].status).toBe('retracted');
+    expect(ledger[0].retraction!.reason).toContain('Condition cleared');
+  });
+});
+
 describe('alert backtest (decade of monthly knowledge states)', () => {
   it('pins the procedure and the horizon — the numbers move as curation and acquisition improve', async () => {
     const r = await backtestAlerts('copper', { from: '2016-01-01', to: '2026-08-31' });
-    expect(r.evaluations.length).toBe(128);
+    // Hybrid grid: 128 month-ends plus a daily grid where daily evidence
+    // exists (the daily stocks stream) — evaluation cadence was the binding
+    // constraint on measurable lead after the daily adapter landed.
+    expect(r.evaluations.length).toBeGreaterThan(128);
     expect(r.knowledge).toBe('as_known_then');
 
     /* ── Procedure invariants (these never move) ── */
@@ -194,6 +246,41 @@ describe('alert backtest (decade of monthly knowledge states)', () => {
     expect(r.revisionAlerts.length).toBeGreaterThan(0);
     expect(r.revisionAlerts.every(a => a.signalKind === 'revision')).toBe(true);
     expect(r.caveats.length).toBeGreaterThan(0);
+
+    /* ── The scorecard: populations split, knob visible, volume reported ── */
+    const sc = r.scorecard;
+    // Both LME events are post-hoc (one curated after detector firings, one
+    // written around the series the detector runs on); every mine/logistics
+    // event is independent public record.
+    expect(sc.postHocEvents.sort()).toEqual(['evt:lme-stock-drawdown', 'evt:lme-tariff-drawdown-2025']);
+    expect(sc.preRegisteredEvents.length).toBeGreaterThanOrEqual(9);
+    // THE headline: on the clean (pre-registered) truth set, no measurement
+    // is currently possible — no independent event is detectable and no
+    // alert went unmatched. Null IS the honest answer; a number here must
+    // come from detecting an independent event, never from curation.
+    expect(sc.precisionPreRegisteredOnly).toBeNull();
+    // precisionAll exists for context and is never the headline.
+    expect(sc.precisionAll).not.toBeNull();
+    // Episodes, not alerts: many firings on one drawdown are one success.
+    expect(sc.episodes.total).toBeLessThan(r.records.length);
+    expect(sc.episodes.matched + sc.episodes.unmatched).toBe(sc.episodes.total);
+    // The attribution window is exposed as the knob it is — tightening it to
+    // zero pre-window days must change the measured answer.
+    expect(sc.attributionSensitivity.map(row => row.preWindowDays)).toEqual([0, 30, 60, 90]);
+    const w0 = sc.attributionSensitivity[0];
+    const w90 = sc.attributionSensitivity[3];
+    expect(w0.precisionAll !== w90.precisionAll || w0.medianLeadDays !== w90.medianLeadDays).toBe(true);
+    // The axis precision cannot see: firing volume when nothing happens.
+    expect(sc.quietMonths).toBeGreaterThan(0);
+    expect(sc.quietPeriodAlertRate).toBe(0); // silent in quiet months — corpus fact
+
+    /* ── Lead vs the market (COMEX benchmarks, never feeds) ── */
+    for (const t of r.truthEvents.filter(x => x.detected && x.leadVsPriceDays !== undefined)) {
+      // Corpus fact, predicted before measurement: on exchange-stock series
+      // the price reaction is simultaneous-or-earlier at monthly resolution
+      // — the +lead over journalism is NOT a lead over the market.
+      expect(t.leadVsPriceDays!).toBeLessThanOrEqual(0);
+    }
 
     /* ── The horizon (corpus facts — the honest headline) ── */
     const sources = r.horizons.sources;

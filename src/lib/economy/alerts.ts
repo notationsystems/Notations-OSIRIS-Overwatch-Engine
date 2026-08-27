@@ -31,7 +31,7 @@ import type { AnomalySignal } from './analytics';
 import { knownAtOf } from './analytics';
 import type { EngineRun } from './engine';
 import { DISRUPTIVE_EVENT_TYPES } from './propagation';
-import { arrivalGapDays } from './horizon';
+import { arrivalGapDays, corpusHealthSignals } from './horizon';
 
 export type AlertStatus = 'fired' | 'suppressed' | 'retracted';
 
@@ -40,11 +40,12 @@ export interface Alert {
   id: string;
   /** Stable identity of the underlying signal across evaluations. */
   signalKey: string;
-  kind: 'anomaly' | 'event';
+  kind: 'anomaly' | 'event' | 'corpus';
   /** What produced the signal. 'revision' = the world's best estimate moved
-   *  (a publisher's explicit act) — scored separately from disruption
+   *  (a publisher's explicit act); 'corpus_health' = the corpus's own
+   *  warning capability degraded — both scored separately from disruption
    *  detection everywhere downstream. */
-  signalKind: 'rolling-deviation' | 'rate-of-change' | 'revision' | 'event';
+  signalKind: 'rolling-deviation' | 'rate-of-change' | 'revision' | 'event' | 'corpus_health';
   entityId: string;
   entityName: string;
   title: string;
@@ -220,6 +221,31 @@ export function generateAlerts(run: EngineRun): Alert[] {
     });
   }
 
+  // Corpus health: the system watching its own blindness. Fires when a
+  // source's lead ceiling degrades (not merely when a fetch fails) — the one
+  // alert class ready to wake someone regardless of the detector verdict:
+  // "best achievable warning fell from +1d to −Nd because the only daily
+  // source has served snapshot for N days" outranks any market signal the
+  // system could produce in that window.
+  for (const s of corpusHealthSignals(state, asOf)) {
+    alerts.push({
+      id: `alert:corpus:${s.kind}:${s.sourceId}`,
+      signalKey: `corpus:${s.kind}:${s.sourceId}`,
+      kind: 'corpus',
+      signalKind: 'corpus_health',
+      entityId: s.sourceId,
+      entityName: s.sourceId,
+      title: `${s.loadBearing ? 'WARNING CAPABILITY DEGRADED: ' : ''}${s.sourceId} ${s.kind === 'ladder_rung_pinned' ? 'pinned to snapshot' : 'stale'} — lead ceiling ${s.leadCeilingBefore >= 0 ? '+' : ''}${s.leadCeilingBefore}d → ${s.leadCeilingNow}d`,
+      severity: s.loadBearing ? 'high' : 'medium',
+      detectedAt: asOf,
+      signalPeriod: asOf.slice(0, 7),
+      detectionLatencyDays: null,
+      status: 'fired',
+      evidence: {},
+      explanation: s.explanation,
+    });
+  }
+
   alerts.sort((a, b) =>
     Number(a.status === 'suppressed') - Number(b.status === 'suppressed')
     || sevRank[b.severity] - sevRank[a.severity]
@@ -278,7 +304,14 @@ export function reconcileAlerts(previous: Alert[], current: Alert[], asOf: strin
       out.push({
         ...prev,
         status: 'retracted',
-        retraction: { at: asOf, reason: 'Signal no longer derivable from current evidence — the observations behind it were revised or superseded.' },
+        retraction: {
+          at: asOf,
+          // A cleared corpus condition is resolution, not a withdrawn claim —
+          // the staleness was real while it held.
+          reason: prev.kind === 'corpus'
+            ? 'Condition cleared — the source resumed its expected arrival cadence.'
+            : 'Signal no longer derivable from current evidence — the observations behind it were revised or superseded.',
+        },
       });
       continue;
     }

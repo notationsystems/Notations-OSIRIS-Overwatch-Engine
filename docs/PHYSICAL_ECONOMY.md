@@ -98,7 +98,15 @@ Adapters are registered, not hard-coded. Six serve copper:
 - **`comtrade-trade`** — UN Comtrade public preview: reported physical trade
   weights (HS 2603 concentrate — *gross* weight; HS 7403 refined). Requests are
   throttled; on a 429 each remaining request degrades individually to its
-  snapshot slice. TTL 30 days.
+  snapshot slice. TTL 30 days. `knownAt` is stamped from the getDA
+  data-availability API (real release dates, committed as
+  `snapshots/comtrade-da.json`) — and stamped with the **held version's**
+  release date, because Comtrade keeps one version of a dataset and revises
+  in place (both Chilean years have already been revised): the vintage that
+  was knowable earlier no longer exists upstream. For the same reason every
+  successful live retrieval is archived to `data-archive/comtrade/` before
+  parsing — the snapshot rung is not a fallback for Comtrade, it is the only
+  vintage archive of Comtrade that will ever exist.
 - **`yahoo-copper-price`** — COMEX HG=F monthly closes (USD/lb, 10 years) on the
   commodity entity; the in-progress month is flagged partial. TTL 12 h.
 - **`cftc-positioning`** — CFTC COT managed-money net positioning, weekly, on
@@ -229,31 +237,65 @@ computed — never a fresh computation. Trust discipline, in order:
    Retractions are records, not deletions; a re-firing signal names its prior
    retraction. A system that cannot withdraw a claim becomes one nobody reads.
 4. **Backtest before wiring** (`alertBacktest.ts`) — the detector runs
-   against a decade of month-end knowledge states, strictly `as_known_then`,
+   against a decade of knowledge states on a hybrid grid (month-ends
+   everywhere, daily where daily evidence exists), strictly `as_known_then`,
    with the no-lookahead invariant *checked* per alert (violations counted;
    must be 0). The report leads with the **information horizon**
    (`horizon.ts`): per-source distributions of `knownAt − periodEnd`, and
    `firstReportedAt − occurredAt` across the event record — the ceiling on
    lead time as a property of the SOURCES, computable without a detector.
-   That table is the honest headline: no threshold tuning moves it, and it
-   converts "we need better data" into a shopping list with numbers. On the
-   current corpus: USGS annual best-case −30 days / typical −213; Comtrade
-   unstamped (retrieval-fallback shows the corpus cannot measure its true
-   ~2–3-month delay); CFTC −3 days but reflexive; the curated monthly stock
-   series best-case 0 (can tie, never beat); the daily Westmetall stream
-   best-case −1 day — the only physical series capable of non-negative lead.
-   Measured on the curated record (11 events, 2016–2026, 128 evaluations):
-   precision 1.0, recall 0.18, and the 2026 drawdown detected at **+1 day
-   lead** — the first non-negative lead in the system's history, arriving
-   with the daily adapter, exactly as the horizon table predicted. The
-   precision VALUE is deliberately not pinned in tests: an earlier revision
+   No threshold tuning moves it, and it converts "we need better data" into
+   a shopping list with numbers. On the current corpus: USGS annual
+   best-case −30 days / typical −213; Comtrade first-release delays of 1–13
+   months (real dates from the getDA availability API); CFTC −3 days but
+   reflexive; the daily Westmetall stream best-case −1 day — the only
+   physical series capable of non-negative lead.
+
+   Results are reported through the **scorecard**, which splits populations
+   a single precision number pools together. The truth set is divided into
+   pre-registered events (curated from the public record, independent of
+   detector output) and post-hoc events (curated after observing firings,
+   or written around a series the detector runs on) — a truth set assembled
+   by looking at what the detector fired on cannot score that detector, and
+   both currently-detectable exchange-stock events are post-hoc. **The
+   headline is `precisionPreRegisteredOnly`, and on the current corpus it
+   is `null`: no measurement of detector precision is possible on the clean
+   truth set**, because no independent event is detectable and no alert
+   went unmatched. `precisionAll` (currently 1.0 over 19 alerts) exists as
+   context and is never quotable alone — an earlier revision of the suite
    pinned 0.438, and completing one missing event record moved it to 1.0
-   with the detector untouched — the number measures curation, so the tests
-   pin the procedure and the horizon and let the number move. Recall is the
-   corpus speaking: mine-level events stay undetectable until something
-   near them reports at daily/weekly cadence. Evaluation runs on a monthly
-   grid, which now bounds measurable lead — the next knob, noted in the
-   caveats.
+   with the detector untouched, which is why the tests pin the procedure
+   and the horizon, never the values. Alerts are also counted as episodes
+   (a contiguous run on one subject; many firings on one drawdown are one
+   success, not many), the attribution window is published as the free
+   parameter it is (`attributionSensitivity`: at 0 pre-window days
+   precision 0.947 / median lead −5; at 30+ days 1.0 / +7 — the knob moves
+   both), and the axis precision cannot see is reported: the quiet-period
+   alert rate (currently 0 across 54 event-free months). Lead is
+   benchmarked twice: against journalism (`firstReportedAt`) and against
+   the market (`leadVsPrice`, monthly COMEX closes as a benchmark, never an
+   input — the reflexivity firewall stands; price may grade physical
+   analytics, never feed them). On exchange-stock events the market moved
+   first both times (−31 and −13 days at monthly resolution): the positive
+   lead over journalism is not a lead over the market, and the genuinely
+   valuable target remains the mine/logistics events where recall is zero
+   pending daily/weekly series near them.
+
+5. **Corpus health** (`corpusHealthSignals`) — the system watching its own
+   blindness, as a first-class alert kind alongside anomaly, event and
+   revision. Exactly one series is capable of positive lead and it is a
+   scrape of a third-party republisher; if its markup changes, the ladder
+   degrades *gracefully* to snapshot — correct behaviour and also the
+   failure mode, because recall silently returns to zero. These signals
+   fire when the **lead ceiling degrades**, not merely when a fetch fails:
+   a source whose newest knowable value is older than 3× its own arrival
+   cadence raises `source_stale` (or `ladder_rung_pinned` when serving from
+   snapshot), with the consequence computed, not asserted — "best
+   achievable warning fell from −1d to −16d" — and load-bearing sources
+   (the corpus's best lead ceiling) marked and sorted first at high
+   severity. A cleared condition resolves in the ledger as "condition
+   cleared", distinct from a retracted claim: the staleness was real while
+   it held.
 
 ## API projections
 
@@ -344,10 +386,11 @@ inspect supporting evidence.
   recall is bounded at the exchange-stock event class until mine-adjacent
   daily/weekly series exist. The backtest evaluation grid is monthly, which
   bounds measurable lead now that a daily source exists.
-- Comtrade observations carry no knownAt stamp (publication timing untracked),
-  so the horizon table can only show the retrieval-time fallback (~2.6 years)
-  rather than Comtrade's true ~2–3-month publication delay — stamping release
-  dates is a known gap.
+- Comtrade `as_known_then` is blind before the release date of the held
+  version of each dataset (the source revises in place with no upstream
+  archive), and pre-revision vintages that predate OSIRIS's own archive
+  (begun 2026-08) are permanently unrecoverable — labeled in the backtest
+  caveats, never silently interpolated.
 - Flow records are 2024 annual snapshots; playback re-evaluates events,
   propagation and observation selection over time, but flow tonnage itself is
   not yet time-resolved.

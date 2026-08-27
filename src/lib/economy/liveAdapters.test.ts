@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import type { Provenance } from './types';
 import { validateState } from './types';
 import {
-  parseMcsWorldCsv, parseComtradeResponse, parseYahooChart, parseCftcRows,
+  parseMcsWorldCsv, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
   parseWestmetallTable, westmetallObs,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
 } from './liveAdapters';
@@ -120,6 +120,26 @@ describe('parseCftcRows (against the committed real capture)', () => {
     expect(latest.unit).toBe('contracts');
     // Sorted ascending by date.
     expect(obs[0].period.start < latest.period.start).toBe(true);
+  });
+});
+
+describe('Comtrade publication dates (data-availability snapshot)', () => {
+  it('stamps knownAt from the getDA release dates — the held version\'s, not the first', () => {
+    const responses = (comtradeSnapshot as { responses: Record<string, Parameters<typeof parseComtradeResponse>[1]> }).responses;
+    // Chile 2024: first released 2025-04-24, then REVISED IN PLACE — the
+    // version we hold was released 2026-04-29 and is stamped with that date.
+    // as_known_then before it is honestly blind: the original vintage no
+    // longer exists anywhere (Comtrade keeps one version).
+    const cl2024 = parseComtradeResponse('152-2603-X-2024', responses['152-2603-X-2024'], prov)!;
+    expect(cl2024.knownAt).toBe('2026-04-29');
+    expect(cl2024.provenance.note).toContain('revised in place');
+    // China 2023: released once — knownAt is its (only) release date.
+    const cn2023 = parseComtradeResponse('156-2603-M-2023', responses['156-2603-M-2023'], prov)!;
+    expect(cn2023.knownAt).toBe('2024-04-07');
+    // Bilateral rows inherit the reporter's release date.
+    const bilateral = parseComtradeBilateral('156-2603-M-2023', responses['156-2603-M-2023'], prov);
+    expect(bilateral.length).toBeGreaterThan(0);
+    for (const o of bilateral) expect(o.knownAt).toBe('2024-04-07');
   });
 });
 

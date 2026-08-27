@@ -81,6 +81,90 @@ export function arrivalGapDays(knownAts: string[]): number | null {
   return gaps[Math.floor(gaps.length / 2)];
 }
 
+/* ── Corpus health: the system watching its own blindness ── */
+
+/**
+ * After the daily-stocks adapter, exactly one series is capable of positive
+ * alert lead — and it is a scrape of a third-party republisher. If its
+ * markup changes, the degradation ladder gracefully serves snapshot, the
+ * snapshot goes stale, recall silently returns to zero, and nothing says
+ * so: graceful degradation on the only load-bearing source is
+ * indistinguishable from working, from the outside. These signals fire when
+ * the LEAD CEILING degrades — not merely when a fetch fails — with the
+ * consequence computed, not asserted.
+ */
+export interface CorpusHealthSignal {
+  kind: 'source_stale' | 'ladder_rung_pinned';
+  sourceId: string;
+  /** Median arrival gap this source normally shows, days. */
+  expectedGapDays: number;
+  /** asOf − latest knowable observation, days. */
+  observedStalenessDays: number;
+  servingRung: 'live' | 'snapshot';
+  consecutivePeriodsDegraded: number;
+  /** The consequence: best achievable lead from this source, before (its
+   *  horizon) and now (bounded by the staleness). */
+  leadCeilingBefore: number;
+  leadCeilingNow: number;
+  /** True when this source holds the best lead ceiling among physical
+   *  sources — losing it degrades the whole system's warning capability. */
+  loadBearing: boolean;
+  explanation: string;
+}
+
+export function corpusHealthSignals(state: EconomyState, asOf: string): CorpusHealthSignal[] {
+  const bySource = new Map<string, typeof state.observations>();
+  for (const o of state.observations) {
+    if (o.partnerEntityId) continue;
+    const key = o.provenance.sourceId;
+    if (!bySource.has(key)) bySource.set(key, []);
+    bySource.get(key)!.push(o);
+  }
+
+  // Establish each source's expected arrival gap and current staleness.
+  const rows: Array<{ sourceId: string; gap: number; staleness: number; rung: 'live' | 'snapshot'; minDelay: number }> = [];
+  for (const [sourceId, obs] of bySource) {
+    const knownAts = obs.map(o => knownAtOf(o)).filter(k => k <= asOf);
+    if (knownAts.length === 0) continue; // nothing knowable yet — not degraded, just early
+    const gap = arrivalGapDays(knownAts);
+    if (gap === null || gap === 0) continue; // cadence unmeasurable — cannot judge staleness
+    const latest = knownAts.reduce((a, b) => (a > b ? a : b));
+    const staleness = days(latest, asOf);
+    const rung: 'live' | 'snapshot' = obs.some(o => (o.provenance.note ?? '').includes('bundled snapshot')) ? 'snapshot' : 'live';
+    const delays = obs.map(o => days(o.period.end, knownAtOf(o)));
+    rows.push({ sourceId, gap, staleness, rung, minDelay: Math.max(0, Math.min(...delays)) });
+  }
+  if (rows.length === 0) return [];
+  const bestCeiling = Math.max(...rows.map(r => -r.minDelay));
+
+  const signals: CorpusHealthSignal[] = [];
+  for (const r of rows) {
+    // Degraded when the newest knowable value is older than the source's own
+    // cadence explains (3× the arrival gap, floor 5 days for weekends and
+    // holidays on daily sources).
+    const threshold = Math.max(5, 3 * r.gap);
+    if (r.staleness <= threshold) continue;
+    const loadBearing = -r.minDelay === bestCeiling;
+    const before = -r.minDelay;
+    const now = -r.staleness;
+    signals.push({
+      kind: r.rung === 'snapshot' ? 'ladder_rung_pinned' : 'source_stale',
+      sourceId: r.sourceId,
+      expectedGapDays: r.gap,
+      observedStalenessDays: r.staleness,
+      servingRung: r.rung,
+      consecutivePeriodsDegraded: Math.floor(r.staleness / r.gap),
+      leadCeilingBefore: before,
+      leadCeilingNow: now,
+      loadBearing,
+      explanation: `${r.sourceId} normally arrives every ~${r.gap}d but its newest knowable value is ${r.staleness}d old${r.rung === 'snapshot' ? ' and it is serving from the bundled snapshot rung' : ''}. Best achievable warning from this source has fallen from ${before >= 0 ? '+' : ''}${before}d to ${now}d.${loadBearing ? ' THIS IS THE CORPUS\'S BEST-LEAD SOURCE: the whole system\'s warning capability degrades with it.' : ''}`,
+    });
+  }
+  // Load-bearing failures first.
+  signals.sort((a, b) => Number(b.loadBearing) - Number(a.loadBearing) || b.observedStalenessDays - a.observedStalenessDays);
+  return signals;
+}
+
 export function informationHorizons(state: EconomyState): AnalyticalResult<{
   sources: InformationHorizon[];
   events: EventHorizon | null;
