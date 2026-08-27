@@ -878,6 +878,45 @@ Backlog after this round: 1) ~~evidence-layer search kinds~~ CLOSED,
 2) sec-edgar structural ingest, 3) OpenOwnership parent chains, 4) flow
 vintages.
 
+## Phase 20 — two decisions taken before the EDGAR ingest, while they are predictions
+
+Doc-and-registry round; nothing built. Both decisions are recorded on the
+`sec-edgar` entry so the ingest is judged against what was said beforehand.
+
+1. **The forced ordering has a stated boundary: it does not extend to
+   flows.** A filing yields facility, production figure, operator, and
+   often capacity — but no filer discloses where the concentrate goes
+   (Freeport reports Grasberg's output, never that it feeds Guixi). So
+   `structuralClassProfile`'s components are predicted to move at
+   different rates: entities and capacities first, attribution edges with
+   them (operator is on the face of the filing), and **flow edges staying
+   at 0% indefinitely** — structural to the source, not a gap it closes.
+   Recorded now precisely so the flat flow component reads as a
+   confirmed prediction rather than needing a post-hoc explanation, and
+   so nobody mistakes a completed EDGAR ingest for a reported flow layer.
+   Flow class change waits on a different source shape entirely
+   (trade/movement data, e.g. the AIS modality or allocation-modeled
+   Comtrade).
+2. **Self-reporting: measured, not labeled.** A filer's disclosed
+   production is `reported` by source class and self-interested by
+   nature — the document establishing the figure is published by the
+   party it reflects on, a materially different epistemic position from
+   USGS compiling third-party statistics, and one the class vocabulary
+   cannot express. Decision: NO new `attribution: self_reported |
+   third_party` axis. The interest question is answered by machinery
+   that exists, with one precision: filer facility figures and compiled
+   country figures are not the same quantity (no third-party
+   per-facility figure exists — that is why EDGAR is worth ingesting),
+   so the check runs at two levels — per-country filer rollups meet the
+   compiled figure in the COVERAGE system, where ratio >1 is already
+   classed a contradiction; genuinely coinciding quantities become
+   DIVERGENCE claims with the residual as the watched baseline. Self-
+   interest thereby becomes a finding (a filer persistently one side of
+   the compiled statistic — the corridor-residual shape), not an
+   assertion. Contamination-direction class and interest-direction are
+   different questions; the second is measured. Provenance continues to
+   name the discloser, which is where "who published this" belongs.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
