@@ -961,6 +961,55 @@ fetch once a contact identity is configured. When the answer lands, the
 attribution scope belongs ON the observation, not inferred at read time,
 per the review.
 
+## Phase 22 — EDGAR build requirements, pre-registered against the gate
+
+The document tier waits on the human operator's contact identity (their
+decision; neither borrowed nor invented). Building the parser without a
+document would mean building against imagined tables — against the
+recon-first doctrine — so this round pre-registers the requirements the
+build will be judged against, the phase-20 move applied to the parse.
+
+1. **Operational**: the UA is operator-supplied config in SEC's
+   documented form "OrgName role@org" (a firm role address over a
+   personal one — survives turnover, and reaches whoever owns the
+   pipeline); generic UAs are the documented 403 cause, matching the
+   recon's two rejections. Rate cap 10 req/s — space at 0.12s rather
+   than sitting on the boundary; NEVER immediate-retry a 403 (it
+   lengthens the block). A decade × several operators is a few hundred
+   documents: a throttle-and-cache problem, and the archive rung is
+   already the cache.
+2. **The district finding is a subject-precision invariant, not a
+   mapping chore.** Attaching a district figure to a mine entity is
+   fabricated precision at the SUBJECT level — the same invariant as
+   coordinates on a country-precision claim, one axis over. Decision:
+   districts become entities in their own right with `contains` edges to
+   facilities; the observation attaches to what the filing actually
+   describes, and any facility-level split is an explicit derived step
+   that CAN REFUSE. (The `contains` dependency type and its graph
+   semantics land with the ingest, designed against real reporting
+   units, not guessed ones.)
+3. **Comparatives make the backfill dense, not just deep.** Each 10-K
+   carries 2–3 years of comparatives, so FY2020 production appears in
+   the FY2020, FY2021 and FY2022 filings with three distinct knownAt
+   stamps and occasional restatement between them. The ingest parses
+   every comparative column, each stamped with its filing's own
+   knownAt — revision chains arrive densely on first ingest rather than
+   accumulating over years, the opposite of Comtrade, and the
+   supersedes machinery gets real material immediately.
+4. **The unit hazard is the round-4 error in its purest form.** FCX
+   reports recovered copper in millions of pounds; 1,260 read as kt
+   instead of Mlb is out by 2.2046× — arithmetically valid,
+   semantically wrong, the Westmetall failure mode with more surface.
+   Units are captured from the table header, never assumed, and the
+   plausibility gate generalizes to this adapter on day one (anchor
+   available by construction: a facility figure cannot exceed its
+   country's compiled figure), not retrofitted after a bad parse ships.
+
+When the operator supplies the identity: first document fetch answers
+consolidated-vs-attributable, attribution scope rides ON the
+observation, and the parse is built against the actual table under
+these four requirements.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
