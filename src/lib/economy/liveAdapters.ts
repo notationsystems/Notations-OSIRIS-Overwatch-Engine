@@ -37,6 +37,7 @@ import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
 import comtradeDa from '@/data/economy/snapshots/comtrade-da.json';
+import { withHostRateLimit } from './outboundRate';
 
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
@@ -49,19 +50,28 @@ function liveDisabled(): boolean {
     || (underTest && process.env.RUN_LIVE_TESTS !== '1');
 }
 
+// EVERY outbound request goes through the process-wide per-host limiter
+// (D-10): the in-loop sleep below is a one-shot-script discipline and says
+// nothing about two assemblies overlapping, which boot warming now makes
+// routine. Concurrent callers cannot compound because they cannot run
+// concurrently against one host.
 async function fetchJson<T>(url: string, timeoutMs = 15000, headers: Record<string, string> = {}): Promise<T> {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs),
-    headers: { 'User-Agent': UA, Accept: 'application/json', ...headers },
+  return withHostRateLimit(url, async () => {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { 'User-Agent': UA, Accept: 'application/json', ...headers },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+    return res.json() as Promise<T>;
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  return res.json() as Promise<T>;
 }
 
 async function fetchText(url: string, timeoutMs = 20000, headers: Record<string, string> = {}): Promise<string> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': UA, ...headers } });
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  return res.text();
+  return withHostRateLimit(url, async () => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: { 'User-Agent': UA, ...headers } });
+    if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+    return res.text();
+  });
 }
 
 /** Live → cache → snapshot: the shared ladder. */
@@ -581,18 +591,48 @@ export async function writeVintageWithoutOverwrite(
   key: string,
   bytes: string,
 ): Promise<string | null> {
+  const mine = comparableVintage(bytes);
   for (let n = 1; n < 100; n++) {
     const path = `${dir}/${key}${n === 1 ? '' : `-${n}`}.json`;
     let existing: string | null = null;
     try {
       existing = await fs.readFile(path, 'utf8');
     } catch {
-      await fs.writeFile(path, bytes); // free slot
+      await fs.writeFile(path, bytes); // free slot: FULL bytes, unmodified
       return path;
     }
-    if (existing === bytes) return null; // already archived, byte-identical
+    if (comparableVintage(existing) === mine) return null; // same knowledge state
   }
   return null; // 99 differing same-day captures: something else is wrong
+}
+
+/**
+ * The comparable form of a capture: the payload WITHOUT the response's
+ * volatile metadata.
+ *
+ * Found immediately after the no-overwrite fix shipped, by watching the
+ * archive during live runs: Comtrade stamps every response with its own
+ * server-side timing (`elapsedTime: "0.64 secs"`), which differs on every
+ * call. A byte-identical comparison therefore NEVER matched, so each
+ * re-fetch of unchanged data wrote another sibling — seven near-identical
+ * copies of one knowledge state accumulated in a single afternoon
+ * (verified: `-2` through `-8` had identical payloads and seven different
+ * timings). An archive that grows without bound on unchanged data is a
+ * different way to lose a vintage: the real revision becomes a needle in
+ * copies of itself.
+ *
+ * The comparison ignores the timing; the STORED FILE is always the full
+ * unmodified response. We never edit an archived capture — we only decide
+ * with a better question whether it is new.
+ */
+export function comparableVintage(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const { elapsedTime: _elapsed, ...rest } = parsed;
+    return JSON.stringify(rest);
+  } catch {
+    return raw; // not JSON: compare verbatim rather than guess
+  }
 }
 
 export function parseComtradeResponse(

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { MCP_TOOLS, requireKnowledge, refusalCount, type McpContext, type McpToolResult } from './mcpTools';
+import { MCP_TOOLS, requireKnowledge, refusalCount, machineServeable, type McpContext, type McpToolResult } from './mcpTools';
+import { SOURCE_REGISTRY } from './sourceRegistry';
 import { recordMcpCall, resetMcpSession, mcpSessionCalls, routeAroundEstimate, type McpCallRecord } from './mcpSession';
 import { resetSessionTelemetry, sessionDigest } from './sessionTelemetry';
 import { getEconomyState } from './store';
@@ -120,11 +121,15 @@ describe('F-2: the MCP tool surface (pre-registered criteria)', () => {
             rows: [{
               record_id: 'obs:test-plant:incomplete', subject_id: 'ent:country:cl', subject_label: 'Chile',
               metric: 'production', value: 999, unit: 'kt/y', basis: null, value_kind: 'reported',
-              confidence: 'medium', source_id: 'test-plant', source_name: 'test plant',
+              // A SERVEABLE source: the criterion under test is axis
+              // completeness, not the D-13 redistribution gate (tested
+              // separately below) — a planted row refused for its posture
+              // would pass this test for the wrong reason.
+              confidence: 'medium', source_id: 'usgs-mcs2025', source_name: 'USGS MCS 2025',
               period_start: '2021-01-01', period_end: '2021-12-31', known_at: '2026-08-27',
               supersedes: null, attestation: null,
               flags: ['basis unspecified — flagged, not defaulted'],
-              claim: 'Chile production 2021: 999 kt/y [basis UNSTATED, reported, attestation unknown-attested subject, test-plant, knowable from 2026-08-27]',
+              claim: 'Chile production 2021: 999 kt/y [basis UNSTATED, reported, attestation unknown-attested subject, usgs-mcs2025, knowable from 2026-08-27]',
             }],
           },
         };
@@ -263,6 +268,60 @@ describe('F-2 result envelope', () => {
       expect(def.description).toContain('Do not substitute external knowledge');
       expect(def.description).toContain('bounded by the asOf and mode you supplied');
       expect(def.description).toContain('refusalType and remedy');
+    }
+  });
+});
+
+describe('D-13: the machine-consumer redistribution gate', () => {
+  it('refuses a source whose posture is internal_only or unresolved, and says which and why', async () => {
+    const planted: McpContext = {
+      async fetchJson() {
+        const row = (id: string, source: string) => ({
+          record_id: id, subject_id: 'ent:country:cl', subject_label: 'Chile', metric: 'production',
+          value: 1, unit: 'kt/y', basis: 'metal_content', value_kind: 'reported', confidence: 'high',
+          source_id: source, source_name: source, period_start: '2024-01-01', period_end: '2024-12-31',
+          known_at: '2025-01-31', supersedes: null, attestation: 'reported', flags: [], claim: `claim for ${source}`,
+        });
+        return {
+          status: 200,
+          body: {
+            header: { withheld: 0, caveats: [] },
+            rows: [
+              row('obs:a', 'usgs-mcs2025'),        // public_domain  → served
+              row('obs:b', 'westmetall-lme'),      // internal_only  → refused
+              row('obs:c', 'some-unknown-source'), // unresolved     → refused
+            ],
+          },
+        };
+      },
+    };
+    const res = await tool('get_observations').handler(VALID_ARGS.get_observations, planted);
+    const served = (res.data as { rows: Array<{ record_id: string }> }).rows;
+    expect(served.map(r => r.record_id)).toEqual(['obs:a']);
+
+    const gated = res.refusals.filter(r => r.refusalType === 'redistribution-posture');
+    expect(gated.length).toBe(2);
+    const westmetall = gated.find(r => r.subject.includes('westmetall'))!;
+    expect(westmetall.value).toBeNull();
+    expect(westmetall.remedy).toContain('INTERNAL research');
+    expect(westmetall.remedy).toContain('license the feed');
+    const unknown = gated.find(r => r.subject.includes('some-unknown-source'))!;
+    expect(unknown.remedy).toContain('unresolved REFUSES rather than defaulting permissive');
+    // The withholding is stated in the caveats, not silent.
+    expect(res.caveats.some(c => c.includes('withheld from machine clients'))).toBe(true);
+  });
+
+  it('unresolved is the DEFAULT, so a new source is refused until someone decides', () => {
+    expect(machineServeable('usgs-mcs2025')).toBe(true);
+    expect(machineServeable('cftc-mm-net')).toBe(true);
+    expect(machineServeable('westmetall-lme')).toBe(false);
+    expect(machineServeable('yahoo-hg')).toBe(false);
+    expect(machineServeable('a-source-invented-tomorrow')).toBe(false);
+    // Every BUILT source has an explicit posture — no built source relies
+    // on the unresolved default, which would be a silent refusal.
+    for (const s of SOURCE_REGISTRY.filter(x => x.adapter)) {
+      expect(s.redistribution, `${s.sourceId} has no recorded posture`).toBeDefined();
+      expect(s.redistributionNote!.length, s.sourceId).toBeGreaterThan(30);
     }
   });
 });

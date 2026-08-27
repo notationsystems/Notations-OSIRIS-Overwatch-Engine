@@ -1711,8 +1711,16 @@ named guard with the deferral's reason attached, instead of shipping.
 Vacuity shown both coarse (a classifier that types everything
 'topology') and subtle (one that gets basis right and scope wrong).
 
-**Guards moved.** One added: `typed-refusal-emission-unbuilt` — the
-seventh deferred decision under validWhile.
+**Guards moved.** One added: `typed-refusal-emission-unbuilt`.
+
+> **Correction (deployment order, D-1):** this line originally called it
+> "the seventh deferred decision under validWhile". It was the EIGHTH —
+> the register already held seven. The miscount propagated from here into
+> the docs and then into two operator orders, both of which state "seven
+> guards". Counted against the register: 8. The runtime guard endpoint
+> now pins the count to `DEFERRED_DECISIONS.length` in a test, so a
+> literal can never drift from the tree again — the same reason
+> `guardEvaluationScope()` is derived rather than listed.
 
 ## Phase 35 — the shipping order: from a green branch to an instrument that is deployed, owned, backed up and measured
 

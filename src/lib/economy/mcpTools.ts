@@ -34,7 +34,7 @@
 
 import { MACHINE_CLIENT_HEADER } from './machineClient';
 import { recordMcpCall } from './mcpSession';
-import { SOURCE_REGISTRY } from './sourceRegistry';
+import { SOURCE_REGISTRY, mayRedistributeToMachines, redistributionPostureOf } from './sourceRegistry';
 
 export interface KnowledgeState {
   asOf: string;
@@ -81,6 +81,65 @@ export function requireKnowledge(args: Record<string, unknown>): KnowledgeState 
 }
 
 const ks = (k: KnowledgeState) => `asOf=${k.asOf}&knowledge=${k.mode}`;
+
+/* ── D-13: machine-consumer redistribution gate ──
+ *
+ * Serving data onward to an external machine consumer is a different act
+ * from reading it internally. Each registered source carries a posture;
+ * an UNRESOLVED posture REFUSES rather than defaulting permissive,
+ * because defaulting to yes is how a licensing question becomes a
+ * licensing incident. A withheld source is not omitted: it comes back as
+ * a typed refusal with the remedy (resolve the posture, or license the
+ * feed), exactly like every other refusal in this system.
+ */
+const SERVEABLE_SOURCE_IDS = new Set(SOURCE_REGISTRY.filter(mayRedistributeToMachines).map(s => s.sourceId));
+
+/** Map an observation/record sourceId onto its registry entry id. Adapter
+ *  source ids are versioned per edition (usgs-mcs2024, usgs-mcs2025), so
+ *  the match is by prefix against the registry's stable ids. */
+export function registrySourceIdFor(recordSourceId: string): string | null {
+  let best: string | null = null;
+  for (const s of SOURCE_REGISTRY) {
+    const stem = s.sourceId.replace(/-lme$|-cot$|-hg$/, '');
+    if (recordSourceId === s.sourceId || recordSourceId.startsWith(s.sourceId) || recordSourceId.startsWith(stem)) {
+      if (!best || s.sourceId.length > best.length) best = s.sourceId;
+    }
+  }
+  return best;
+}
+
+export function machineServeable(recordSourceId: string): boolean {
+  const id = registrySourceIdFor(recordSourceId);
+  if (!id) return false; // unknown source: unresolved, therefore refused
+  return SERVEABLE_SOURCE_IDS.has(id);
+}
+
+/** Partition rows by whether their source may be served to a machine
+ *  consumer, returning the withheld ones as typed refusals. */
+export function gateRowsForMachines<T extends { record_id?: string; source_id: string; subject_id?: string }>(
+  rows: T[],
+): { served: T[]; refusals: ToolRefusal[] } {
+  const served: T[] = [];
+  const withheldBySource = new Map<string, number>();
+  for (const r of rows) {
+    if (machineServeable(r.source_id)) { served.push(r); continue; }
+    withheldBySource.set(r.source_id, (withheldBySource.get(r.source_id) ?? 0) + 1);
+  }
+  const refusals: ToolRefusal[] = [...withheldBySource.entries()].map(([sourceId, count]) => {
+    const registryId = registrySourceIdFor(sourceId);
+    const entry = SOURCE_REGISTRY.find(s => s.sourceId === registryId);
+    const posture = entry ? redistributionPostureOf(entry) : 'unresolved';
+    return {
+      subject: `source:${sourceId}`,
+      value: null as null,
+      refusalType: 'redistribution-posture',
+      remedy: posture === 'internal_only'
+        ? `${count} row(s) from ${sourceId} are withheld from machine clients: this source is carried for INTERNAL research and its terms do not cover onward machine redistribution${entry?.redistributionNote ? ` — ${entry.redistributionNote}` : ''}. Remedy: license the feed, or read it through the human surface.`
+        : `${count} row(s) from ${sourceId} are withheld from machine clients: no redistribution posture has been established for this source, and unresolved REFUSES rather than defaulting permissive. Remedy: record the posture in the source registry.`,
+    };
+  });
+  return { served, refusals };
+}
 
 /** A refusal surfaced through a tool — the successful-return shape. */
 export interface ToolRefusal {
@@ -285,11 +344,23 @@ export const MCP_TOOLS: McpToolDef[] = [
           caveats: [String(get(grid, 'legend') ?? '')],
         });
       }
-      const rows = (get(data, 'rows') as Array<Record<string, unknown>>) ?? [];
+      const allRows = (get(data, 'rows') as Array<Record<string, unknown>>) ?? [];
       const header = get(data, 'header') as Record<string, unknown>;
-      const refusals: ToolRefusal[] = rows
-        .filter(r => r.refusal)
-        .map(r => ({ subject: String(r.subject_id), value: null, refusalType: String((r.refusal as Record<string, unknown>).type), remedy: String((r.refusal as Record<string, unknown>).remedy) }));
+      // D-13: the redistribution gate. A source whose machine-consumer
+      // posture is internal_only or unresolved is WITHHELD from this
+      // surface and returned as a typed refusal with its remedy — never
+      // omitted, and never served on the assumption that silence is
+      // permission. Refusal rows (which carry no servable quantity) pass
+      // through: a refusal is ours to state, not the source's data.
+      const quantitative = allRows.filter(r => !r.refusal) as Array<Record<string, unknown> & { source_id: string }>;
+      const gate = gateRowsForMachines(quantitative);
+      const rows: Array<Record<string, unknown>> = [...gate.served, ...allRows.filter(r => r.refusal)];
+      const refusals: ToolRefusal[] = [
+        ...gate.refusals,
+        ...allRows
+          .filter(r => r.refusal)
+          .map(r => ({ subject: String(r.subject_id), value: null as null, refusalType: String((r.refusal as Record<string, unknown>).type), remedy: String((r.refusal as Record<string, unknown>).remedy) })),
+      ];
       const withheld = (get(header, 'withheld') as number) ?? 0;
       const claims = rows.map(r => String(r.claim));
       if (withheld > 0) claims.push(`${withheld} row(s) withheld: not knowable at ${k.asOf} under ${k.mode} — counted, never silently absent.`);
@@ -297,8 +368,13 @@ export const MCP_TOOLS: McpToolDef[] = [
         claims,
         record_ids: rows.map(r => String(r.record_id)),
         refusals,
-        data,
-        caveats: (get(header, 'caveats') as string[]) ?? [],
+        data: { ...(data as Record<string, unknown>), rows },
+        caveats: [
+          ...((get(header, 'caveats') as string[]) ?? []),
+          ...(gate.refusals.length > 0
+            ? ['Some rows are withheld from machine clients by redistribution posture (see refusals). The human surface serves them; this one does not.']
+            : []),
+        ],
       });
     },
   },

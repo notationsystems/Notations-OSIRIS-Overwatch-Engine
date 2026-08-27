@@ -27,6 +27,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // and would otherwise reach the export log; refused at the boundary.
 const SUBJECT_RE = /^ent:[a-z-]+:[a-z0-9-]+$/;
 const METRIC_RE = /^[a-z_]+$/;
+/** D-5: a default bound, statable and raisable. Uncapped is correct for a
+ *  work queue and a footgun over a decade of observations across two
+ *  commodities — so the return is bounded and the bound is IN THE HEADER,
+ *  never a silent slice. `limit=0` means unbounded, explicitly asked for. */
+const DEFAULT_ROW_LIMIT = 500;
+const MAX_ROW_LIMIT = 10000;
 
 async function archiveExportLog(rec: Record<string, unknown>): Promise<void> {
   if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
@@ -47,6 +53,15 @@ export async function GET(request: Request) {
   const view = searchParams.get('view') ?? 'rows';
   const asOf = searchParams.get('asOf');
   const knowledge = (searchParams.get('knowledge') ?? 'best_known') as 'best_known' | 'as_known_then';
+  const limitParam = searchParams.get('limit');
+  let limit: number | null = DEFAULT_ROW_LIMIT;
+  if (limitParam !== null) {
+    const n = Number(limitParam);
+    if (!Number.isInteger(n) || n < 0 || n > MAX_ROW_LIMIT) {
+      return NextResponse.json({ error: `limit must be an integer 0..${MAX_ROW_LIMIT} (0 = unbounded, stated explicitly)` }, { status: 400 });
+    }
+    limit = n === 0 ? null : n;
+  }
   if (asOf && !DATE_RE.test(asOf)) return NextResponse.json({ error: 'asOf must be YYYY-MM-DD' }, { status: 400 });
   if (subject && !SUBJECT_RE.test(subject)) return NextResponse.json({ error: 'subject must be a canonical ent: identifier' }, { status: 400 });
   if (metric && !METRIC_RE.test(metric)) return NextResponse.json({ error: 'metric must be canonical vocabulary' }, { status: 400 });
@@ -83,10 +98,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ fingerprint: stateFingerprint(state), grid });
   }
 
-  const table = buildCorpusTable(state, { metric, subject }, { asOf, knowledge });
+  const table = buildCorpusTable(state, { metric, subject }, { asOf, knowledge, limit });
   if (!machine) {
     recordExport();
-    await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject: subject ?? null, metric: metric ?? null, asOf, knowledge, rows: table.header.row_count, fingerprint: table.header.baseline_fingerprint });
+    await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject: subject ?? null, metric: metric ?? null, asOf, knowledge, rows: table.header.row_count, truncated: table.header.truncated, fingerprint: table.header.baseline_fingerprint });
   }
   if (format === 'md') return new NextResponse(renderTableMarkdown(table), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
   return NextResponse.json(table);

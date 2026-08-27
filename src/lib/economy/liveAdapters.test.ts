@@ -5,7 +5,7 @@ import {
   parseMcsWorldCsv, parseMcsWorldCsvAccounted, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
   parseWestmetallTable, westmetallObs, checkWestmetallPlausibility, accountComtradeResponses,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
-  writeVintageWithoutOverwrite,
+  writeVintageWithoutOverwrite, comparableVintage,
   MCS2025_SPEC, MCS_COPPER_CSPEC, MCS_ALUMINIUM_CSPEC,
 } from './liveAdapters';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
@@ -362,6 +362,32 @@ describe('the archive never overwrites a capture (final order finding)', () => {
     const third = JSON.stringify({ count: 19, data: [] });
     expect(await writeVintageWithoutOverwrite(fs, '/arch/2026-08-27', '152-2603-X-2023', third))
       .toBe('/arch/2026-08-27/152-2603-X-2023-3.json');
+  });
+
+  it('a re-fetch that differs ONLY in the server\'s own timing is a no-op', async () => {
+    // Found by watching the archive during live runs, immediately after
+    // the no-overwrite fix shipped: Comtrade stamps each response with
+    // its own elapsedTime, so byte-identical NEVER matched and every
+    // re-fetch of unchanged data wrote another sibling — seven copies of
+    // one knowledge state accumulated in an afternoon. An archive that
+    // grows without bound on unchanged data loses the real revision in
+    // copies of itself.
+    const a = JSON.stringify({ elapsedTime: '0.64 secs', count: 18, data: [1, 2, 3] });
+    const b = JSON.stringify({ elapsedTime: '0.11 secs', count: 18, data: [1, 2, 3] });
+    expect(comparableVintage(a)).toBe(comparableVintage(b));
+    const fs = memFs();
+    expect(await writeVintageWithoutOverwrite(fs, '/arch/d', 'k', a)).toBe('/arch/d/k.json');
+    expect(await writeVintageWithoutOverwrite(fs, '/arch/d', 'k', b)).toBeNull();
+    expect(Object.keys(fs.files)).toEqual(['/arch/d/k.json']);
+    // The STORED file keeps the full response, timing included — we never
+    // edit an archived capture, only compare it with a better question.
+    expect(fs.files['/arch/d/k.json']).toBe(a);
+    expect(JSON.parse(fs.files['/arch/d/k.json']).elapsedTime).toBe('0.64 secs');
+
+    // Discriminating: a genuinely different payload still lands beside it,
+    // even when its timing happens to match.
+    const c = JSON.stringify({ elapsedTime: '0.64 secs', count: 4, data: [1] });
+    expect(await writeVintageWithoutOverwrite(fs, '/arch/d', 'k', c)).toBe('/arch/d/k-2.json');
   });
 
   it('a byte-identical re-fetch is a no-op — re-running the instrument does not litter the archive', async () => {

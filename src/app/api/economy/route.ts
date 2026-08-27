@@ -5,6 +5,7 @@ import { DISRUPTIVE_EVENT_TYPES, isEventActive, topologyValidity } from '@/lib/e
 import { selectTopology } from '@/lib/economy/graph';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
 import { corpusHealthSignals } from '@/lib/economy/horizon';
+import { attribution } from '@/lib/economy/attribution';
 import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
 import { toKtPerYear } from '@/lib/economy/types';
 
@@ -72,15 +73,20 @@ export async function GET(request: Request) {
   // Row accounting from the assembly (memoized — no second fetch): every
   // fetched row accepted, rejected with a reason, or filtered with the
   // predicate named. Filtering is never free.
-  const { accounting } = await getEconomyState(commodity);
+  const { accounting, issues: assemblyIssues } = await getEconomyState(commodity);
+
+  // D-3: every response is attributable to a build, a state and a
+  // knowledge mode — otherwise "this number looks wrong" is an anecdote.
+  const attributed = attribution(state, { asOf: run.asOf ?? null, mode: run.knowledge }, { providers, issues: assemblyIssues });
 
   if (view === 'state') {
-    return NextResponse.json({ providers, state, accounting });
+    return NextResponse.json({ attribution: attributed, providers, state, accounting });
   }
 
   if (view === 'analytics') {
     const concentrationSuite = systems.concentration.result as Record<string, unknown>;
     return NextResponse.json({
+      attribution: attributed,
       commodity: state.commodity,
       commodityName: state.commodityName,
       providers,
@@ -257,6 +263,7 @@ export async function GET(request: Request) {
       }));
 
     return NextResponse.json({
+      attribution: attributed,
       commodity: state.commodity,
       commodityName: state.commodityName,
       providers,

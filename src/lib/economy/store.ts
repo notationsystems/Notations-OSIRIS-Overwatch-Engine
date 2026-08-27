@@ -11,6 +11,7 @@
 import type { Dependency, EconomyState, Entity, ValidationIssue } from './types';
 import { validateState } from './types';
 import { adaptersFor, type RowAccounting } from './adapters';
+import { processSingleton } from './processSingleton';
 import { nameCandidates, sortUnresolved } from './resolution';
 
 export interface AssembledState {
@@ -47,7 +48,21 @@ function deriveLocatedIn(entities: Entity[]): Dependency[] {
   return deps;
 }
 
-const stateCache = new Map<string, { promise: Promise<AssembledState>; at: number }>();
+/**
+ * The assembly memo lives on globalThis, for the reason the rest of the
+ * process-wide state does (processSingleton.ts): Next runs the
+ * instrumentation hook in a DIFFERENT module context from the route
+ * handlers, so a module-level cache gives boot one copy and requests
+ * another. Measured in the running configuration: boot reported both
+ * commodities `ready` while /api/health still saw the state as cold,
+ * because boot had warmed a cache no request would ever read. The whole
+ * point of D-2 warming — that the first researcher does not pay for the
+ * assembly — was going to the wrong cache.
+ */
+const stateCache = processSingleton(
+  'economy-state-cache',
+  () => new Map<string, { promise: Promise<AssembledState>; at: number }>(),
+);
 /** Assembly memo TTL — long enough to serve a browsing session from one
  *  assembly, short enough that live-adapter refreshes propagate. */
 const ASSEMBLY_TTL_MS = 10 * 60 * 1000;
@@ -57,6 +72,19 @@ const ASSEMBLY_TTL_MS = 10 * 60 * 1000;
  * registered adapter that serves it. The memo expires so adapters with live
  * providers get re-consulted; they manage their own fetch TTLs behind load().
  */
+/**
+ * Is this commodity's state already assembled and unexpired? Lets a
+ * caller decide whether asking would BLOCK — the health endpoint must
+ * never wait on an assembly (measured: a cold /api/health took 14.8s
+ * because guard evaluation triggered assembly, which is a health check
+ * that fails liveness probes for the one reason a health check exists to
+ * survive). Never triggers an assembly itself.
+ */
+export function isStateWarm(commodity: string): boolean {
+  const cached = stateCache.get(commodity);
+  return !!cached && Date.now() - cached.at < ASSEMBLY_TTL_MS;
+}
+
 export function getEconomyState(commodity: string, { fresh = false } = {}): Promise<AssembledState> {
   const cached = stateCache.get(commodity);
   if (!fresh && cached && Date.now() - cached.at < ASSEMBLY_TTL_MS) return cached.promise;

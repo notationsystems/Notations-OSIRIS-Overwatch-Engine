@@ -16,6 +16,25 @@
 export type SourceYield = 'entity' | 'observation' | 'flow' | 'event' | 'dependency' | 'capacity';
 export type AccessClass = 'open' | 'registered' | 'licensed' | 'blocked';
 
+/**
+ * REDISTRIBUTION POSTURE (deployment order D-13) — distinct from
+ * `accessClass`, which says how WE may acquire the data. This says
+ * whether we may serve it ONWARD to an external machine consumer, which
+ * is a different act from reading it internally.
+ *
+ *   public_domain  US federal work or equivalent — onward serving is
+ *                  unrestricted (USGS, CFTC).
+ *   attributed     Onward serving permitted with attribution; the source
+ *                  id already travels on every record and claim sentence.
+ *   internal_only  Acquired under terms that cover internal research and
+ *                  do NOT clearly cover machine redistribution.
+ *   unresolved     Nobody has established the posture. THIS IS NOT
+ *                  PERMISSIVE: a source whose posture is unresolved is
+ *                  REFUSED to external clients rather than served on the
+ *                  assumption that silence means yes.
+ */
+export type RedistributionPosture = 'public_domain' | 'attributed' | 'internal_only' | 'unresolved';
+
 export interface RegisteredSource {
   sourceId: string;
   name: string;
@@ -36,16 +55,36 @@ export interface RegisteredSource {
   /** The MAINTENANCE cadence — what keeping it true means and how often;
    *  distinct from `cadence`, which is the source's own publication rhythm. */
   maintenance?: string;
+  /** D-13: may this source's data be served onward to an external machine
+   *  consumer? Absent is treated as `unresolved`, and unresolved REFUSES —
+   *  defaulting to permissive is how a licensing question becomes a
+   *  licensing incident. */
+  redistribution?: RedistributionPosture;
+  /** Why the posture is what it is — the reasoning a lawyer would want. */
+  redistributionNote?: string;
+}
+
+/** The posture of a source, with absent meaning UNRESOLVED — never
+ *  permissive. */
+export function redistributionPostureOf(source: RegisteredSource): RedistributionPosture {
+  return source.redistribution ?? 'unresolved';
+}
+
+/** May this source's data be served to an external machine consumer?
+ *  Only an affirmatively-recorded posture permits it. */
+export function mayRedistributeToMachines(source: RegisteredSource): boolean {
+  const p = redistributionPostureOf(source);
+  return p === 'public_domain' || p === 'attributed';
 }
 
 export const SOURCE_REGISTRY: RegisteredSource[] = [
   /* ── Built ── */
-  { sourceId: 'usgs-mcs', name: 'USGS Mineral Commodity Summaries (ScienceBase)', category: 'production', yields: ['observation'], cadence: 'annual', accessClass: 'open', adapter: 'usgs-mcs-live', keywords: ['production', 'reserves', 'usgs', 'mine'], note: 'Multi-vintage (2024+2025), supersedes chains.', owner: 'operator', maintenance: 'Ingest each MCS edition when it lands (annual, ~late January); the new edition supersedes-chains onto the held vintages.' },
-  { sourceId: 'un-comtrade', name: 'UN Comtrade public preview', category: 'trade', yields: ['observation'], cadence: 'annual', accessClass: 'open', adapter: 'comtrade-trade', keywords: ['trade', 'export', 'import', 'bilateral', 'mirror'], note: 'Single-version source; every retrieval archived (the only vintage archive there will ever be).', owner: 'operator', maintenance: 'Archival continues on every live retrieval (archive-before-parse, sealed against test writes); commit new day-directories and regenerate the manifest; refresh the archive mirror.' },
-  { sourceId: 'yahoo-hg', name: 'COMEX HG=F via Yahoo Finance', category: 'price', yields: ['observation'], cadence: 'continuous', accessClass: 'open', adapter: 'yahoo-copper-price', keywords: ['price', 'comex', 'futures'], note: 'Benchmark only; roll-bearing, excluded from physical analytics.', owner: 'operator', maintenance: 'Monitor only — corpus health flags staleness; benchmark, never load-bearing.' },
-  { sourceId: 'cftc-cot', name: 'CFTC Commitments of Traders', category: 'positioning', yields: ['observation'], cadence: 'weekly', accessClass: 'open', adapter: 'cftc-positioning', keywords: ['positioning', 'cot', 'managed money'], note: 'Reflexive market context; never wakes anyone.', owner: 'operator', maintenance: 'Monitor only — corpus health flags staleness; context, never load-bearing.' },
-  { sourceId: 'westmetall-lme', name: 'LME daily stocks via Westmetall', category: 'stocks', yields: ['observation'], cadence: 'daily', accessClass: 'open', adapter: 'westmetall-lme-stocks', keywords: ['stocks', 'inventory', 'warehouse', 'lme'], note: 'Republisher scrape; plausibility-gated; licensed feed is the recorded remedy.', owner: 'operator', maintenance: 'Watch the plausibility gate (source_suspect in corpus health): a markup change degrades the ONLY daily physical stream. The licensed LME feed is the standing remedy.' },
-  { sourceId: 'curated-flow-snapshot', name: 'Curated facility flow snapshot (annual topology)', category: 'trade', yields: ['flow', 'dependency'], cadence: 'annual', accessClass: 'open', adapter: 'curated-copper-v1', keywords: ['flow', 'topology', 'corridor', 'snapshot', 'structure'], note: 'The facility-granularity flow topology, curated annually. Corpus health reports its age against the annual cadence (curated-flow-snapshot signal, 365d + 90d grace); the extrapolation guard holds the 730d hard ceiling. The two are different questions: the cadence asks \"is it due\", the ceiling asks \"is it still admissible\".', owner: 'operator', maintenance: 'Refresh the facility flow snapshot annually against current trade patterns; re-measure the corridor grades; the STRUCTURE HAS MOVED evidence list is the refresh worklist.' },
+  { sourceId: 'usgs-mcs', name: 'USGS Mineral Commodity Summaries (ScienceBase)', category: 'production', yields: ['observation'], cadence: 'annual', accessClass: 'open', adapter: 'usgs-mcs-live', keywords: ['production', 'reserves', 'usgs', 'mine'], note: 'Multi-vintage (2024+2025), supersedes chains.', owner: 'operator', maintenance: 'Ingest each MCS edition when it lands (annual, ~late January); the new edition supersedes-chains onto the held vintages.', redistribution: 'public_domain', redistributionNote: 'USGS is a US federal agency; Mineral Commodity Summaries are US Government works in the public domain. Onward serving to machine consumers is unrestricted.' },
+  { sourceId: 'un-comtrade', name: 'UN Comtrade public preview', category: 'trade', yields: ['observation'], cadence: 'annual', accessClass: 'open', adapter: 'comtrade-trade', keywords: ['trade', 'export', 'import', 'bilateral', 'mirror'], note: 'Single-version source; every retrieval archived (the only vintage archive there will ever be).', owner: 'operator', maintenance: 'Archival continues on every live retrieval (archive-before-parse, sealed against test writes); commit new day-directories and regenerate the manifest; refresh the archive mirror.', redistribution: 'attributed', redistributionNote: "UN Comtrade's public preview permits reuse with attribution to UN Comtrade; the source id travels on every record and in every claim sentence, which is the attribution the terms ask for. Bulk redistribution of the whole dataset is NOT what this serves — per-query rows with provenance are." },
+  { sourceId: 'yahoo-hg', name: 'COMEX HG=F via Yahoo Finance', category: 'price', yields: ['observation'], cadence: 'continuous', accessClass: 'open', adapter: 'yahoo-copper-price', keywords: ['price', 'comex', 'futures'], note: 'Benchmark only; roll-bearing, excluded from physical analytics.', owner: 'operator', maintenance: 'Monitor only — corpus health flags staleness; benchmark, never load-bearing.', redistribution: 'internal_only', redistributionNote: "Yahoo Finance's terms cover personal, non-commercial use and do not clearly permit onward machine redistribution. Benchmark series only — never load-bearing for a physical figure — so refusing it to external clients costs nothing analytically." },
+  { sourceId: 'cftc-cot', name: 'CFTC Commitments of Traders', category: 'positioning', yields: ['observation'], cadence: 'weekly', accessClass: 'open', adapter: 'cftc-positioning', keywords: ['positioning', 'cot', 'managed money'], note: 'Reflexive market context; never wakes anyone.', owner: 'operator', maintenance: 'Monitor only — corpus health flags staleness; context, never load-bearing.', redistribution: 'public_domain', redistributionNote: 'CFTC Commitments of Traders is a US federal publication in the public domain.' },
+  { sourceId: 'westmetall-lme', name: 'LME daily stocks via Westmetall', category: 'stocks', yields: ['observation'], cadence: 'daily', accessClass: 'open', adapter: 'westmetall-lme-stocks', keywords: ['stocks', 'inventory', 'warehouse', 'lme'], note: 'Republisher scrape; plausibility-gated; licensed feed is the recorded remedy.', owner: 'operator', maintenance: 'Watch the plausibility gate (source_suspect in corpus health): a markup change degrades the ONLY daily physical stream. The licensed LME feed is the standing remedy.', redistribution: 'internal_only', redistributionNote: "A republisher scrape of LME data carried for internal research; onward machine redistribution is a different act from internal reading and is NOT covered. The licensed LME feed is the standing remedy and would change this posture. This is the source the shipping order's access decision already flagged." },
+  { sourceId: 'curated-flow-snapshot', name: 'Curated facility flow snapshot (annual topology)', category: 'trade', yields: ['flow', 'dependency'], cadence: 'annual', accessClass: 'open', adapter: 'curated-copper-v1', keywords: ['flow', 'topology', 'corridor', 'snapshot', 'structure'], note: 'The facility-granularity flow topology, curated annually. Corpus health reports its age against the annual cadence (curated-flow-snapshot signal, 365d + 90d grace); the extrapolation guard holds the 730d hard ceiling. The two are different questions: the cadence asks \"is it due\", the ceiling asks \"is it still admissible\".', owner: 'operator', maintenance: 'Refresh the facility flow snapshot annually against current trade patterns; re-measure the corridor grades; the STRUCTURE HAS MOVED evidence list is the refresh worklist.', redistribution: 'attributed', redistributionNote: 'Curated in-house from public sources; ours to serve, with the representative attestation already on every record.' },
   /* ── Reconned, deferred ── */
   { sourceId: 'wb-pink-sheet', name: 'World Bank Pink Sheet (commodity prices)', category: 'price', yields: ['observation'], cadence: 'monthly', accessClass: 'open', adapter: null, keywords: ['price', 'monthly', 'historical'], note: 'Reconned phase 2: works ($/mt since 1960) but xlsx parsing + hash discovery; Yahoo covers price.' },
   { sourceId: 'lme-licensed', name: 'LME licensed data feed', category: 'stocks', yields: ['observation'], cadence: 'daily', accessClass: 'licensed', adapter: null, keywords: ['stocks', 'inventory', 'warehouse', 'lme', 'warrant'], note: 'The remedy for the single-scrape fragility: converts Westmetall into a divergence check.' },

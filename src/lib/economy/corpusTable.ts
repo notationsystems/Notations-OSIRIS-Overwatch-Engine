@@ -61,6 +61,14 @@ export interface CorpusHeader {
   row_count: number;
   /** Rows the knowledge state withheld — counted, never silently absent. */
   withheld: number;
+  /** Bounded returns (deployment order D-5). `total_rows` is what the query
+   *  MATCHED; `row_count` is what this response carries; `truncated` is the
+   *  difference. A silent truncation is a claim that the omitted rows do not
+   *  matter — this system has a standing position on unstated drops, so the
+   *  limit travels with the number in the same shape as `withheld`. */
+  limit: number | null;
+  total_rows: number;
+  truncated: number;
   /** Row accounting carried through to the export. */
   filtered: Array<{ predicate: string; count: number }>;
   caveats: string[];
@@ -99,7 +107,7 @@ function claimSentence(r: Omit<CorpusRow, 'claim'>): string {
 export function buildCorpusTable(
   state: EconomyState,
   query: { metric?: string; subject?: string },
-  { asOf = null as string | null, knowledge = 'best_known' as 'best_known' | 'as_known_then' } = {},
+  { asOf = null as string | null, knowledge = 'best_known' as 'best_known' | 'as_known_then', limit = null as number | null } = {},
 ): CorpusTable {
   const attestation = strongestAttestingClass(state);
   const rows: CorpusRow[] = [];
@@ -159,14 +167,23 @@ export function buildCorpusTable(
     }
   }
 
+  // D-5: bound the return, and STATE the bound. Row accounting's
+  // conservation still holds: total_rows = row_count + truncated.
+  const totalRows = rows.length;
+  const served = limit !== null && limit >= 0 ? rows.slice(0, limit) : rows;
+  const truncated = totalRows - served.length;
+
   const profile = structuralClassProfile(state);
   const header: CorpusHeader = {
     generated_at: new Date().toISOString(),
     knowledge_state: { as_of: asOf, mode: knowledge },
     baseline_fingerprint: stateFingerprint(state),
     query: { commodity: state.commodity, metric: query.metric ?? null, subject: query.subject ?? null },
-    row_count: rows.length,
+    row_count: served.length,
     withheld,
+    limit,
+    total_rows: totalRows,
+    truncated,
     filtered: [
       ...(partnerScoped > 0 ? [{ predicate: 'partner-scoped bilateral row — served by the divergence system, not this table', count: partnerScoped }] : []),
       ...(refusalRows > 0 ? [{ predicate: 'resolution-gate refusal exported as null-valued row (not an omission)', count: refusalRows }] : []),
@@ -174,9 +191,12 @@ export function buildCorpusTable(
     caveats: [
       profile.note,
       'Every facility-level identity in this corpus is representative-attested (curation); country identities may be live-attested — the attestation column says which, per row.',
+      ...(truncated > 0
+        ? [`TRUNCATED: ${truncated} of ${totalRows} matching rows are not in this response (limit ${limit}). Raise the limit or narrow the query — the omitted rows are not a judgement that they do not matter.`]
+        : []),
     ],
   };
-  return { header, rows };
+  return { header, rows: served };
 }
 
 /* ── The two-axis grid: period × source edition ──
@@ -240,6 +260,7 @@ export function renderTableMarkdown(t: CorpusTable): string {
     `query                 ${JSON.stringify(h.query)}`,
     `row_count             ${h.row_count}`,
     `withheld              ${h.withheld}`,
+    `total_rows            ${h.total_rows}${h.truncated > 0 ? ` (TRUNCATED: ${h.truncated} not shown, limit ${h.limit})` : ''}`,
     ...h.filtered.map(f => `filtered              ${f.count} — ${f.predicate}`),
     ...h.caveats.map(c => `caveat                ${c}`),
     '```',
