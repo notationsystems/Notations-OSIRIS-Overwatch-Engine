@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { entityDetail, getEconomyState } from '@/lib/economy/store';
-import { entityAttestation } from '@/lib/economy/analytics';
+import { strongestAttestingClass } from '@/lib/economy/analytics';
 import { buildGraph, downstream, upstream } from '@/lib/economy/graph';
 
 /**
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     entity: detail.entity,
     // Identity-level evidence class: what attests this entity's existence.
     // 'representative' or below = the entity exists purely on curation.
-    attestation: entityAttestation(state).get(id) ?? null,
+    attestation: strongestAttestingClass(state).get(id) ?? null,
     observations: detail.observations,
     capacities: detail.capacities,
     flowsIn: flowWithNames(detail.flowsIn),

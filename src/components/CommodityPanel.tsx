@@ -36,6 +36,8 @@ interface ConcentrationBlock {
     /** Operator concentration: share of facility output the operator model attributes. */
     attributionCoverage?: number;
     unattributedKt?: number;
+    /** Weakest evidence class among the index's inputs (contamination direction). */
+    weakestInputClass?: string | null;
   };
 }
 interface Bottleneck {
@@ -482,6 +484,13 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                         </div>
                         <div className="text-[8px] font-mono text-[var(--text-muted)] mt-0.5">
                           {block.result.shares.slice(0, 3).map(s => `${s.name} ${(s.share * 100).toFixed(0)}%`).join(' · ')}
+                          {/* Contamination direction: the index is only as
+                              strong as its weakest input. */}
+                          {block.result.weakestInputClass && (
+                            <span style={{ color: block.result.weakestInputClass === 'reported' ? '#00E676' : '#FF9500' }}>
+                              {' '}· inputs≥{block.result.weakestInputClass.toUpperCase()}
+                            </span>
+                          )}
                         </div>
                         {block.result.coverageBias && (
                           <div className="text-[8px] font-mono text-[#FF9500] mt-0.5">

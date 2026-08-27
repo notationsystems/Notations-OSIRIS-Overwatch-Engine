@@ -13,7 +13,7 @@
  * pins this.
  */
 
-export type SourceYield = 'entity' | 'observation' | 'flow' | 'event' | 'dependency';
+export type SourceYield = 'entity' | 'observation' | 'flow' | 'event' | 'dependency' | 'capacity';
 export type AccessClass = 'open' | 'registered' | 'licensed' | 'blocked';
 
 export interface RegisteredSource {
@@ -47,7 +47,8 @@ export const SOURCE_REGISTRY: RegisteredSource[] = [
   { sourceId: 'minem-peru', name: 'MINEM Peru mining statistics', category: 'production', yields: ['observation'], cadence: 'monthly', accessClass: 'open', adapter: null, keywords: ['peru', 'production', 'monthly', 'minem'], note: 'Monthly Peruvian production by company/mine.' },
   /* ── Missing modality (the recall bound) ── */
   { sourceId: 'news-events', name: 'News / wire event extraction', category: 'events', yields: ['event'], cadence: 'continuous', accessClass: 'open', adapter: null, keywords: ['news', 'strike', 'announcement', 'accident', 'event', 'disruption'], note: 'The missing modality: labour/regulatory/logistics events are announced in language before they occur in matter. Separately funded programme, deliberately not started.' },
-  { sourceId: 'company-filings', name: 'Company disclosures & filings', category: 'events', yields: ['event', 'observation'], cadence: 'irregular', accessClass: 'open', adapter: null, keywords: ['filings', 'guidance', 'disclosure', 'force majeure', 'company'], note: 'Guidance cuts and force-majeure declarations — the authoritative event stream. Part of the modality programme.' },
+  { sourceId: 'company-filings', name: 'Company disclosures & filings (event stream)', category: 'events', yields: ['event', 'observation'], cadence: 'irregular', accessClass: 'open', adapter: null, keywords: ['filings', 'guidance', 'disclosure', 'force majeure', 'company'], note: 'Guidance cuts and force-majeure declarations — the authoritative event stream. Part of the modality programme. Distinct purpose from sec-edgar (structure): same documents, different yield.' },
+  { sourceId: 'sec-edgar', name: 'SEC EDGAR filings (facility structure)', category: 'production', yields: ['entity', 'observation', 'capacity'], cadence: 'annual', accessClass: 'open', adapter: null, keywords: ['edgar', 'filings', '10-k', '20-f', 'operator', 'facility', 'mine', 'production', 'reported'], note: 'The structure-class source: listed operators disclose production and capacity BY FACILITY in their own filings (Freeport: Grasberg, Morenci, Cerro Verde; Southern Copper; BHP/Rio via 20-F), attributed to the operator by construction — the source that would move the structural layer (and every index standing on it) from representative to reported. Coverage bound: filers only — state operators (Codelco) sit outside it.' },
   { sourceId: 'maritime-ais', name: 'Maritime AIS vessel movement', category: 'movement', yields: ['flow', 'event'], cadence: 'continuous', accessClass: 'licensed', adapter: null, keywords: ['shipping', 'vessel', 'ais', 'port', 'maritime', 'cargo'], note: 'Physical observation of movement — would make logistics events detectable. Part of the modality programme.' },
   /* ── Ownership (two purposes, two costs) ── */
   { sourceId: 'opencorporates', name: 'OpenCorporates company register', category: 'ownership', yields: ['entity', 'dependency'], cadence: 'irregular', accessClass: 'registered', adapter: null, keywords: ['company', 'operator', 'ownership', 'register', 'subsidiary'], note: 'Company identity resolution. Operator-of-record attribution is CLOSED by curation; this serves scale-out beyond copper.' },

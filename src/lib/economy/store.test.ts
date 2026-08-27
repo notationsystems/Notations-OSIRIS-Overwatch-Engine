@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { getEconomyState, entityDetail } from './store';
-import { entityAttestation } from './analytics';
+import { strongestAttestingClass } from './analytics';
 import { registerAdapter, unregisterAdapter } from './adapters';
 
 describe('economy store (curated copper assembly)', () => {
@@ -49,7 +49,7 @@ describe('economy store (curated copper assembly)', () => {
     // attesting class is representative (or below) exists purely on
     // curation — a real name carried entirely by synthetic-class numbers.
     const { state } = await getEconomyState('copper');
-    const att = entityAttestation(state);
+    const att = strongestAttestingClass(state);
     // Every entity classified (the orphan test above guarantees coverage).
     for (const e of state.entities) expect(att.get(e.id), e.id).toBeTruthy();
     // The measured finding this label exists to surface: country-level
@@ -64,6 +64,20 @@ describe('economy store (curated copper assembly)', () => {
     // measured evidence exists.
     expect(att.get('ent:company:antamina-jv')).toBe('structural_only');
     expect(att.get('ent:company:collahuasi-jv')).toBe('structural_only');
+  });
+
+  it('the structural layer is entirely curation-class — pinned so the day it changes is visible', async () => {
+    // The split, stated plainly: the NUMBERS are increasingly reported
+    // (USGS, Comtrade, LME); the WORLD they are arranged in — every flow
+    // edge, every capacity, every operator attribution — is representative-
+    // class curation. Everything computed from structure (facility HHI,
+    // operator HHI, bottlenecks, propagation, scenarios) inherits that
+    // class, and weakestInputClass now says so on the indices. When a
+    // reported structural source lands (sec-edgar in the registry), this
+    // pin breaks deliberately.
+    const { state } = await getEconomyState('copper');
+    for (const f of state.flows) expect(f.valueKind, f.id).toBe('representative');
+    for (const c of state.capacities) expect(c.valueKind, c.id).toBe('representative');
   });
 
   it('keeps curated records representative; reported/estimated only from live providers', async () => {

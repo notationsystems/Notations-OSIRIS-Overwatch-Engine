@@ -68,6 +68,14 @@ export interface Concentration {
    * number so the bias cannot be read as structure.
    */
   coverageBias?: { minRatio: number; maxRatio: number; countries: number; note: string };
+  /**
+   * The weakest evidence class among the inputs this index was computed
+   * from — contamination propagates: one representative input taints a
+   * derived quantity, whatever the others are. null when there were no
+   * inputs. See the lattice note at weakestInputClass(): this is the
+   * OPPOSITE direction from strongestAttestingClass, and both are correct.
+   */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 /** When two sources cover the same (entity, metric, period), the harder
@@ -84,6 +92,30 @@ export function outranksObservation(candidate: Observation, incumbent: Observati
   return outranks(candidate, incumbent);
 }
 
+/* ── Evidence-class aggregation: two questions, opposite lattice directions ──
+ *
+ * The codebase holds BOTH directions and both are correct — never unify them
+ * into a bare "sourceClass":
+ *
+ *   weakestInputClass        derived quantities — contamination propagates:
+ *                            one representative input taints the result.
+ *   strongestAttestingClass  entity existence — one good witness is enough:
+ *                            no quantity of representative records
+ *                            subtracts from a reported one.
+ *
+ * Someone will eventually notice the asymmetry and be tempted to "fix" it.
+ * The asymmetry is the point. */
+
+/** Weakest evidence class among a derived quantity's inputs (contamination
+ *  direction). null for an empty input set — no inputs is not clean inputs. */
+export function weakestInputClass(kinds: Iterable<Observation['valueKind']>): Observation['valueKind'] | null {
+  let weakest: Observation['valueKind'] | null = null;
+  for (const k of kinds) {
+    if (!weakest || VALUE_KIND_RANK[k] < VALUE_KIND_RANK[weakest]) weakest = k;
+  }
+  return weakest;
+}
+
 /* ── Entity attestation ── */
 
 export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structural_only';
@@ -94,15 +126,14 @@ export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structu
  * attesting class is 'representative' (or below) exists, within OSIRIS,
  * purely on curation: a real name carried entirely by synthetic-class
  * numbers, which is the round-3 concern one level up, at identity rather
- * than quantity. (Strongest, not weakest, is the right aggregate: an entity
- * with one reported record is not curation-only however many representative
- * records also touch it.) Tiers below the valueKind ladder: 'event_only' —
- * attested solely by curated real-world events (a reported occurrence, but
- * no quantity of any class); 'structural_only' — attested solely by
- * dependency edges (a curated relationship claim; the JV operating vehicles
- * live here by construction).
+ * than quantity. (Strongest, not weakest, is the right aggregate here —
+ * the witness direction of the lattice note above.) Tiers below the
+ * valueKind ladder: 'event_only' — attested solely by curated real-world
+ * events (a reported occurrence, but no quantity of any class);
+ * 'structural_only' — attested solely by dependency edges (a curated
+ * relationship claim; the JV operating vehicles live here by construction).
  */
-export function entityAttestation(state: EconomyState): Map<string, AttestationKind> {
+export function strongestAttestingClass(state: EconomyState): Map<string, AttestationKind> {
   const best = new Map<string, Observation['valueKind']>();
   const consider = (id: string | undefined, vk: Observation['valueKind']) => {
     if (!id) return;
@@ -201,7 +232,11 @@ export function concentration(
     'concentration',
     { metric, kind, asOf },
     { observationIds: obs.map(o => o.id) },
-    { metric, hhi, band, total, unit: obs[0]?.unit ?? '', shares, ...partitionContext(hhi, shares.length) },
+    {
+      metric, hhi, band, total, unit: obs[0]?.unit ?? '', shares,
+      ...partitionContext(hhi, shares.length),
+      weakestInputClass: weakestInputClass(obs.map(o => o.valueKind)),
+    },
   );
 }
 
@@ -300,7 +335,11 @@ export function capacityConcentration(
     'capacityConcentration',
     { stage },
     { capacityIds: caps.map(c => c.id) },
-    { metric: 'throughput', hhi, band, total, unit: caps[0]?.unit ?? '', shares, ...partitionContext(hhi, shares.length) },
+    {
+      metric: 'throughput', hhi, band, total, unit: caps[0]?.unit ?? '', shares,
+      ...partitionContext(hhi, shares.length),
+      weakestInputClass: weakestInputClass(caps.map(c => c.valueKind)),
+    },
   );
 }
 
@@ -423,6 +462,10 @@ export interface OperatorConcentration {
   groupCount: number;
   effectiveGroups: number;
   partitionFloor: number;
+  /** Contamination direction — see Concentration.weakestInputClass. Includes
+   *  the attribution edges (curated, representative-class by construction),
+   *  so this index cannot read stronger than the structure it stands on. */
+  weakestInputClass: Observation['valueKind'] | null;
   /**
    * The FOURTH comparability axis: a renormalized index over c of the
    * universe inflates every share by 1/c and the HHI by ~1/c². `hhi` is
@@ -553,6 +596,16 @@ export function operatorConcentration(
       attributionCoverage: totalKt > 0 ? Number((allocatedKt / totalKt).toFixed(3)) : 0,
       unattributedKt: Number(unattributedKt.toFixed(1)),
       facilityCount,
+      // Contamination direction: the index's inputs are the facility
+      // observations AND the attribution edges. Dependency edges carry no
+      // valueKind — they are curated structural claims, representative-class
+      // by construction — so the operator index stays representative even on
+      // the day facility observations become reported, until the attribution
+      // edges themselves come from reported disclosures.
+      weakestInputClass: weakestInputClass([
+        ...state.observations.filter(o => usedObs.includes(o.id)).map(o => o.valueKind),
+        ...(usedDeps.length > 0 ? ['representative' as const] : []),
+      ]),
       note: basis === 'control'
         ? 'CONTROL basis: 100% of each facility to its operator of record — who can stop it. JV-operated facilities without a modeled operator fall to the unattributed remainder. `hhi` is renormalized over attributed tonnage (inflated by 1/completeness²); ONLY hhiWithRemainder — unattributed facilities enumerated as their own groups — is comparable against a full-universe index.'
         : 'ECONOMIC-INTEREST basis: ownership shares — who owns the loss. A different question from control; never pool the two. `hhi` is renormalized over attributed tonnage; ONLY hhiWithRemainder is comparable against a full-universe index (per-facility minority residues lump as one group each, biasing slightly toward concentration).',

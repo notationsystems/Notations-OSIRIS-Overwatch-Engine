@@ -295,6 +295,19 @@ describe('operator concentration', () => {
       expect(r.effectiveGroups).toBeCloseTo(10000 / r.hhi!, 0);
       expect(r.partitionFloor).toBe(Math.round(10000 / r.groupCount));
     }
+    // Contamination direction, reaching the result at last — and biting
+    // harder than expected when first measured: the operator indices stand
+    // on representative facility observations AND curated attribution
+    // edges, but the COUNTRY index is representative-class too (two
+    // reporters resolve to curated observations: Mongolia's static entry
+    // and Panama's curated 0), and even without those it would cap at
+    // 'estimated' — USGS's own label for latest-year MCS figures. No index
+    // in the system is currently reported-class end-to-end; the label is
+    // what makes that visible instead of assumed.
+    const countryIdx = concentration(state, 'production', 'country').result;
+    expect(countryIdx.weakestInputClass).toBe('representative');
+    expect(control.weakestInputClass).toBe('representative');
+    expect(economic.weakestInputClass).toBe('representative');
   });
 
   it('refuses market metrics like every other concentration', () => {

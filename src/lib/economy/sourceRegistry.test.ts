@@ -12,7 +12,7 @@ describe('source registry', () => {
   });
 
   it('policy: yields name canonical identity kinds only — no source is registered for natural-person data', () => {
-    const CANONICAL = ['entity', 'observation', 'flow', 'event', 'dependency'];
+    const CANONICAL = ['entity', 'observation', 'flow', 'event', 'dependency', 'capacity'];
     for (const s of SOURCE_REGISTRY) {
       expect(s.yields.length, s.sourceId).toBeGreaterThan(0);
       for (const y of s.yields) expect(CANONICAL, s.sourceId).toContain(y);

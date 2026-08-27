@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
-import { entityAttestation, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
+import { strongestAttestingClass, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `unknown commodity "${commodity}"` }, { status: 404 });
   }
   const knowable = restrictTo ? knowableEntities(state, restrictTo) : null;
-  const attestation = entityAttestation(state);
+  const attestation = strongestAttestingClass(state);
 
   const hits: Array<SearchHit & { _score: number; _rank: number }> = [];
   let withheld = 0;

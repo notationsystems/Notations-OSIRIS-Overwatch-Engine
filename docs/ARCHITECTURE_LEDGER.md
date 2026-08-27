@@ -738,6 +738,60 @@ exposed the class.
    now labeled wherever the identity appears instead of implied by
    drilling into its records.
 
+## Phase 17 — admissibility reaches the result, and the split is priced
+
+1. **Two lattice directions, named so they survive.** The codebase now
+   aggregates evidence class in both directions and both are correct:
+   `weakestInputClass` for derived quantities (contamination propagates —
+   one representative input taints the result) and
+   `strongestAttestingClass` for entity existence (one good witness is
+   enough — no quantity of representative records subtracts from it;
+   `entityAttestation` renamed to carry the direction). Different
+   questions, opposite directions. Someone will eventually notice the
+   asymmetry and be tempted to "fix" it; the asymmetry is the point, the
+   names now say so, and neither is ever a bare `sourceClass`.
+2. **Verified: admissibility stopped at the observation layer.** The
+   round-16 review asked whether any admissibility flag reaches analytical
+   results. Answer: none existed — no aggregate of input classes was
+   computed anywhere above the observation. `weakestInputClass` now rides
+   on the concentration family (country/facility/operator/capacity), with
+   the operator indices including the attribution edges as inputs
+   (curated structural claims, representative-class by construction — so
+   the operator index cannot read stronger than the structure it stands
+   on, even after facility observations become reported). And the first
+   measurement bit harder than the review's own framing: **no index in
+   the system is reported-class end-to-end** — even the country index
+   reads `representative` (Mongolia's static entry, Panama's curated 0)
+   and would cap at `estimated` regardless, USGS's own label for
+   latest-year figures. The structural layer is pinned entirely
+   representative — a pin that breaks deliberately the day a reported
+   structural source lands.
+3. **The round-10 trade, priced.** Curating the two JV operating vehicles
+   bought control-attribution completeness 1.0 — and the attestation label
+   now shows what it cost: both vehicles are `structural_only`, the lowest
+   tier, existing on a curated relationship claim alone. The cleanest
+   index in the system (completeness 1.0, hhi = hhiWithRemainder) is
+   clean in completeness and weakest in attestation. Recorded because the
+   recommendation was made without pricing it; the label surfacing the
+   price is the system working.
+4. **The registry correction and the ranking fact.** The round-16 review
+   cited an EDGAR registry entry that did not exist (`company-filings` is
+   registered under the EVENT purpose; `artifact` is not a canonical
+   yield). The substantive point survives the correction — filings as
+   structure-source is a different purpose from filings as event-stream,
+   the same two-purposes split as ownership — so `sec-edgar` is now its
+   own entry (yields entity/observation/capacity; SourceYield gained
+   `capacity`): listed operators disclose production and capacity BY
+   FACILITY, attributed to the operator by construction — the source that
+   would move the structural layer, and every index standing on it, from
+   representative to reported (bound: filers only; Codelco sits outside).
+   The attestation measure now gives the backlog a self-consistent
+   ranking criterion — how much of the corpus does each item move from
+   curation-class to reported: OpenOwnership layers structural claims on
+   a structural layer; sec-edgar changes the class of the layer
+   everything else stands on. Recorded as a fact FOR the ranking
+   decision, per the review — the backlog order itself is unchanged.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -752,7 +806,7 @@ exposed the class.
 
 ## Verification
 
-Every subsystem above ships with executable tests (160+ economy tests; 529
+Every subsystem above ships with executable tests (160+ economy tests; 530
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,
