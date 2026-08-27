@@ -76,6 +76,7 @@ interface Analytics {
   coverage?: { result: { mineProduction: { result: CoverageRow[]; emptyBecause?: string }; refinedProduction: { result: CoverageRow[]; emptyBecause?: string } } };
   divergence?: { result: DivergenceRec[] };
   corpusHealth?: CorpusHealthRow[];
+  corpusHealthAccounting?: { judged: string[]; notYetKnowable: string[]; cadenceUnmeasurable: string[]; emptyBecause?: string };
   /** Whether the flow topology's period can describe the evaluation date. */
   topology?: { topologyPeriod: { start: string; end: string } | null; evaluatedAt: string; status: 'within' | 'extrapolated' | 'predates'; note?: string };
   events: EconEvent[];
@@ -568,12 +569,21 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                 </div>
               </Section>
 
-              {(analytics.corpusHealth?.length ?? 0) > 0 && (
-                <Section id="corpus-health" open={openSections['corpus-health'] ?? true} onToggle={toggle} title="CORPUS HEALTH" icon={<AlertTriangle className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.corpusHealth!.length}>
+              {((analytics.corpusHealth?.length ?? 0) > 0 || analytics.corpusHealthAccounting?.emptyBecause) && (
+                <Section id="corpus-health" open={openSections['corpus-health'] ?? true} onToggle={toggle} title="CORPUS HEALTH" icon={<AlertTriangle className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.corpusHealth?.length ?? 0}>
                   <div className="space-y-1">
                     <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
                       The instrument watching its own blindness: a source going stale or failing sanity checks degrades the best achievable warning, silently, unless reported here.
                     </div>
+                    {analytics.corpusHealth!.length === 0 && analytics.corpusHealthAccounting?.emptyBecause && (
+                      <div
+                        data-testid="corpus-health-empty-because"
+                        className="px-2 py-2 rounded bg-white/[0.03] border-l-2 text-[9px] font-mono leading-relaxed text-[var(--text-muted)]"
+                        style={{ borderLeftColor: analytics.corpusHealthAccounting.judged.length === 0 ? '#FF9500' : '#00E676' }}
+                      >
+                        {analytics.corpusHealthAccounting.emptyBecause}
+                      </div>
+                    )}
                     {analytics.corpusHealth!.map(s => (
                       <div key={`${s.kind}-${s.sourceId}`} className="px-2 py-1 rounded bg-[#FF3D3D]/5 border-l-2 border-[#FF3D3D]">
                         <div className="text-[9px] font-mono font-bold text-[#FF3D3D]">

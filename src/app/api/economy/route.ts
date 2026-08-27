@@ -4,7 +4,7 @@ import { getEconomyState } from '@/lib/economy/store';
 import { DISRUPTIVE_EVENT_TYPES, isEventActive, topologyValidity } from '@/lib/economy/propagation';
 import { selectTopology } from '@/lib/economy/graph';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
-import { corpusHealthSignals } from '@/lib/economy/horizon';
+import { corpusHealthSignals, corpusHealthAccounting } from '@/lib/economy/horizon';
 import { attribution } from '@/lib/economy/attribution';
 import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
 import { toKtPerYear } from '@/lib/economy/types';
@@ -105,6 +105,11 @@ export async function GET(request: Request) {
       // ceiling degrades or a plausibility gate rejected its live data.
       // Empty on a healthy corpus — the panel renders nothing then.
       corpusHealth: corpusHealthSignals(state, evalDate),
+      // "No signals" is the reading that matters most here and the one most
+      // easily wrong: a health instrument that cannot distinguish "nothing
+      // is wrong" from "nothing was checked" has lost the distinction that
+      // IS the product. The population judged travels with the verdict.
+      corpusHealthAccounting: corpusHealthAccounting(state, evalDate),
       // Ingest row accounting — filtering is never free (round 26).
       ingestAccounting: accounting,
       events: state.events,

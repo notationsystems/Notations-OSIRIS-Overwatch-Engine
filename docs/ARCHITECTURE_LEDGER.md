@@ -2722,6 +2722,64 @@ defect rather than a coverage fact if it ever fires).
 afternoon.
 
 
+## Phase 43 — the health instrument could not say whether it had checked anything
+
+Last surface in the sweep, and the one where the distinction matters
+most: corpus health.
+
+`corpusHealthSignals` excludes two kinds of source before it can judge
+anything — one with no observation knowable at the evaluation date
+("not degraded, just early") and one with too few arrivals to measure a
+cadence against. Both exclusions are correct, both are documented in the
+code, and both are **invisible in the empty array they produce**.
+
+Worse than invisible, at the surface: the panel section was rendered only
+when signals existed, so at a historical date a researcher did not see
+`CORPUS HEALTH (0)` — they saw **no corpus-health section at all**, which
+is a stronger clean bill of health than a zero. A health instrument that
+cannot distinguish *nothing is wrong* from *nothing was checked* has lost
+the distinction that IS its product.
+
+`corpusHealthAccounting` now travels with the verdict: which sources were
+judged, which were not yet knowable, which have no measurable cadence,
+and — when the signal list is empty — which silence this is. Verified at
+the screen: today `CORPUS HEALTH (1)` with the standing flow-snapshot
+signal and no note; at the earliest scrubbable date `CORPUS HEALTH (0)`
+with *"2 source(s) were judged at 2017-01-31 and none is past its own
+arrival cadence. 8 source(s) had nothing knowable by this date and were
+not judged. 1 carry too few arrivals to measure a cadence."*
+
+**Second correction to my own assertion this session.** I wrote the test
+claiming NOTHING is judged at 2017; it failed, because three sources are
+— the ones whose vintages carry an explicit `knownAt` at that date. The
+claim changed and the finding did not, and the measured number is the
+better one: an empty signal list covering three of eleven sources is a
+much weaker statement than the silence implied. (Checked while there:
+`knownAtOf` falls back to `retrievedAt`, so a 2024 factbook is judged at
+2017 only where the corpus curates a contemporaneous `knownAt` — the
+intended vintage design, not a hindsight leak.)
+
+683 tests green, typecheck clean.
+
+**The sweep, whole.** Five rounds from one question — *which kind of
+nothing is this?* — applied to every surface that can return little:
+
+| surface | the silence | now |
+|---|---|---|
+| evidence search | empty array for four distinct states | census + note + refusal by name |
+| graph view | today's network at every historical date | selected topology, three named states |
+| bottleneck list | `(0)` at every past date | `emptyBecause`, aggregates vs no-flow |
+| coverage table | the 0% rows dropped entirely | every country a row; both metrics rendered |
+| corpus health | the section vanished | the population judged, always |
+
+None of them failed. Every one was internally consistent, and every one
+answered a question the researcher had not asked with a confidence the
+corpus had not earned.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
