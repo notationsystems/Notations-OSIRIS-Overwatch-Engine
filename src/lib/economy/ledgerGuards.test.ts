@@ -1,29 +1,70 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFERRED_DECISIONS, EXTRAPOLATION_BOUND_DAYS, dailyPhysicalStreamCount,
-  evaluateDeferredDecisions, noEventAdapterBuilt,
+  evaluateDeferredDecisions, evaluateAllDeferredDecisions, guardEvaluationScope,
+  noEventAdapterBuilt,
 } from './ledgerGuards';
 import { SOURCE_REGISTRY } from './sourceRegistry';
-import { getEconomyState } from './store';
+import { registerAdapter, unregisterAdapter } from './adapters';
 import { syntheticState, FIXTURE_PROV } from './fixtures';
 import type { EntityKind } from './types';
 
 describe('validWhile guards on deferred ledger decisions', () => {
-  it('every deferred decision still stands on the ground it was taken on — checked on EVERY commodity', async () => {
-    // The round-25 lesson: the attribution-basis guard was breached the day
-    // aluminium landed (the Rusal sanction) and nothing noticed, because the
-    // guards only ever ran on the copper state — the condition was checked,
-    // but not everywhere it held. Guards now run per commodity.
+  it('every deferred decision still stands on the ground it was taken on — over the DERIVED scope', async () => {
+    // Work order 3.1: the runner's scope is derived from the adapter
+    // register, never hand-listed — a hand list is the copper-only blindness
+    // waiting to recur on the next axis value.
     const now = new Date().toISOString().slice(0, 10);
-    for (const commodity of ['copper', 'aluminium']) {
-      const { state } = await getEconomyState(commodity);
-      const failures = evaluateDeferredDecisions(state, now);
-      // A failure here is NOT a broken build: it says a recorded decision
-      // needs re-taking, and the message carries why it was taken.
-      expect(
-        failures,
-        `[${commodity}] ` + failures.map(f => `[${f.id}] (${f.ledgerRef}) condition no longer holds: ${f.condition}\n  decision was taken because: ${f.reason}`).join('\n'),
-      ).toEqual([]);
+    const { scope, failures } = await evaluateAllDeferredDecisions(now);
+    expect(scope).toContain('copper');
+    expect(scope).toContain('aluminium');
+    // A failure here is NOT a broken build: it says a recorded decision
+    // needs re-taking, and the message carries why — with the partition it
+    // failed in.
+    expect(
+      failures,
+      failures.map(f => `[${f.commodity}] [${f.id}] (${f.ledgerRef}) condition no longer holds: ${f.condition}\n  decision was taken because: ${f.reason}`).join('\n'),
+    ).toEqual([]);
+  });
+
+  it('certification: the runner covers the full cross-product of register partitions × predicates', async () => {
+    const now = new Date().toISOString().slice(0, 10);
+    const { scope, evaluatedCells } = await evaluateAllDeferredDecisions(now);
+    const uncovered: string[] = [];
+    for (const commodity of scope) {
+      const cell = evaluatedCells.find(c => c.commodity === commodity);
+      if (!cell) { uncovered.push(`${commodity}: NO predicates evaluated`); continue; }
+      for (const d of DEFERRED_DECISIONS) {
+        if (!cell.predicates.includes(d.id)) uncovered.push(`${commodity}: ${d.id} not evaluated`);
+      }
+    }
+    expect(uncovered, `uncovered cells:\n${uncovered.join('\n')}`).toEqual([]);
+  });
+
+  it('the scope is derived from the register: a planted commodity enters it with no guard-code change', async () => {
+    // The trap the pre-registration names: a literal partition list is
+    // subject to the defect it certifies. Plant a novel partition value in
+    // the register and assert the scope notices.
+    registerAdapter({
+      providerId: 'test-planted-commodity',
+      providerName: 'Planted partition (test)',
+      commodities: ['testium-planted'],
+      async load() {
+        return {
+          commodity: 'testium-planted', commodityName: 'Testium (planted)',
+          entities: [{ id: 'ent:commodity:testium-planted', kind: 'commodity', name: 'Testium (planted)' }],
+          observations: [], flows: [], capacities: [], dependencies: [], events: [], sources: [],
+        };
+      },
+    });
+    try {
+      expect(guardEvaluationScope()).toContain('testium-planted');
+      const { evaluatedCells } = await evaluateAllDeferredDecisions('2026-08-27');
+      const cell = evaluatedCells.find(c => c.commodity === 'testium-planted');
+      expect(cell).toBeDefined();
+      expect(cell!.predicates.length).toBe(DEFERRED_DECISIONS.length);
+    } finally {
+      unregisterAdapter('test-planted-commodity');
     }
   });
 

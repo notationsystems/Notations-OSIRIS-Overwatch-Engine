@@ -26,6 +26,8 @@
 import type { EconomyState, EntityKind } from './types';
 import { SOURCE_REGISTRY, type RegisteredSource } from './sourceRegistry';
 import { topologyValidity } from './propagation';
+import { listAdapters } from './adapters';
+import { getEconomyState } from './store';
 
 /* Registry-shaped conditions are factored out so the vacuity tests can show
  * each one failing against a mutated registry — a guard designed never to
@@ -142,6 +144,52 @@ export interface GuardFailure {
   ledgerRef: string;
   reason: string;
   condition: string;
+}
+
+/* ── Evaluation-scope certification (work order 3.1) ──
+ *
+ * Three instances of one blindness were each found by a human, one to
+ * twenty rounds late: a check evaluated correctly somewhere is silent about
+ * everywhere else its condition holds. The certification: the guard
+ * evaluation scope is DERIVED from the adapter register — never a literal,
+ * because a literal partition list is subject to the exact defect it
+ * certifies — and the standing runner reports the full cross-product of
+ * partitions × predicates it actually evaluated, so an uncovered cell is
+ * nameable, not invisible. */
+
+export interface ScopedGuardFailure extends GuardFailure {
+  /** The partition (commodity) the condition failed in — evaluation scope
+   *  travels with every failure. */
+  commodity: string;
+}
+
+export interface GuardEvaluation {
+  /** Partition values derived from the register at evaluation time. */
+  scope: string[];
+  /** Every (partition × predicate) cell actually evaluated. */
+  evaluatedCells: Array<{ commodity: string; predicates: string[] }>;
+  failures: ScopedGuardFailure[];
+}
+
+/** The evaluation scope, derived from the adapter register. A commodity
+ *  registered tomorrow enters this scope with no code change here. */
+export function guardEvaluationScope(): string[] {
+  return [...new Set(listAdapters().flatMap(a => a.commodities))].sort();
+}
+
+/** Evaluate every deferred decision over every partition the register
+ *  contains. This is THE runner — a hand-listed subset elsewhere is the
+ *  defect the certification test exists to name. */
+export async function evaluateAllDeferredDecisions(now: string): Promise<GuardEvaluation> {
+  const scope = guardEvaluationScope();
+  const evaluatedCells: GuardEvaluation['evaluatedCells'] = [];
+  const failures: ScopedGuardFailure[] = [];
+  for (const commodity of scope) {
+    const { state } = await getEconomyState(commodity);
+    evaluatedCells.push({ commodity, predicates: DEFERRED_DECISIONS.map(d => d.id) });
+    for (const f of evaluateDeferredDecisions(state, now)) failures.push({ ...f, commodity });
+  }
+  return { scope, evaluatedCells, failures };
 }
 
 /** Evaluate every deferred decision's condition; returns the entries whose
