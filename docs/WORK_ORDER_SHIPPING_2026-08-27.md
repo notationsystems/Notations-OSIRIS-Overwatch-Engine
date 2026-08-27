@@ -175,3 +175,71 @@ Current standing order, to be replaced: EDGAR, OpenOwnership (recorded structura
 The system is deployed, reachable, documented, owned, backed up, running its guards in CI, and has been used once by someone who did not build it — with the continue criterion written down before that use rather than after it.
 
 Everything after that is decided by evidence rather than by this order.
+
+---
+
+## Addendum A (operator, mid-execution) — corpus table and export surface
+
+Received while the order was executing; the operator placed it **before
+S-6**: "it makes the researcher afternoon substantially more likely to
+produce evidence, because browsing a corpus surfaces questions that
+entity-by-entity navigation does not."
+
+A projection over canonical state — no new acquisition, no new
+analytics, no new consumer of analytics. The two-axis form (period ×
+edition/knownAt) is the one only this system can produce: reading down a
+column is one publication's account of history; across a row, the
+revision history of one fact. Degenerate cases render, never collapse: a
+single-vintage row is a fact never revised; an empty cell is a period an
+edition did not cover — different from zero and must not look like one.
+Every row carries the axes or it does not export; an unknown axis
+exports null AND flagged. Header block with `baseline_fingerprint`,
+knowledge state, row accounting and caveats on every export. Refusals
+export as null-valued rows with their remedy. Markdown and JSON only —
+no CSV/XLSX (spreadsheet coercion destroys exactly what this system
+preserves). The export never round-trips back in. Export telemetry is
+the third demand signal — the only positive one — and feeds S-7.
+
+Acceptance criteria (pre-registered, operator's words):
+
+* Every exported row carries all mandatory columns; a row with an
+  unknown axis exports null and flagged, verified by a planted
+  incomplete record.
+* Markdown and JSON exports of the same query contain identical values
+  and identical headers.
+* An export under `as_known_then` contains no row whose `known_at`
+  postdates `as_of`, verified by a planted late-vintage record.
+* `baseline_fingerprint` on the export matches the state that produced
+  it, and a mutated state produces a different fingerprint.
+* The two-axis grid renders single-vintage rows and empty cells
+  distinguishably from zero.
+* Export telemetry writes in the running configuration, not only under
+  test.
+* No export path accepts input — verified structurally, not by
+  convention.
+
+Identifier reconciliation against this codebase, recorded at receipt:
+the spec's `mine_production` is this corpus's `production` (with
+`refined_production` / `intermediate_production` as the other physical
+metrics); the spec's `vintage` column is carried as `source_id`
+(editions are distinct sources here, e.g. `usgs-mcs2024`); `INV-6` has
+no referent in this ledger — the operative doctrine is "a projection of
+canonical state, never authoritative, never re-importable". The Zambia
+refined-revision example is real in kind (revision_lag records exist
+for `ent:country:zm`) but the −41.6% magnitude was not confirmed
+against the corpus and is not repeated as a figure.
+
+## Addendum B (operator, mid-execution) — external model clients, not an internal model
+
+Decision recorded, not built mid-order: language-model clients plug
+into the instrument from outside (e.g. an MCP tool surface over the
+existing API) rather than a model being built into the system. Slotted
+into the S-9 re-rank, to be judged against the S-6 evidence like every
+other backlog item. Two consequences taken immediately because they
+were cheap and belonged to the export item anyway: every export row
+carries a server-rendered `claim` sentence (the value with its axes
+attached — a client that copies the sentence carries the epistemics
+with it), and the exposure question is appended to the S-3 access
+decision in `docs/DEPLOYMENT.md` as an open item with its undecided
+parts named (authentication, telemetry segregation from the S-7
+readings, Westmetall posture for machine consumers).

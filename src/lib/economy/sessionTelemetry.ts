@@ -33,6 +33,9 @@ export interface SessionDigest {
   evidenceQueriesByKind: Record<string, number>;
   /** Refusal digests exported. */
   refusalDigestsServed: number;
+  /** Corpus-table/grid exports served — the one POSITIVE demand signal:
+   *  an export is someone carrying a number into their own work. */
+  exportsServed: number;
   /** Canonical entity ids inspected via the entity endpoint. */
   entitiesInspected: string[];
   note: string;
@@ -46,6 +49,7 @@ const state = {
   personShapedCounted: 0,
   evidenceQueriesByKind: {} as Record<string, number>,
   refusalDigestsServed: 0,
+  exportsServed: 0,
   entitiesInspected: new Set<string>(),
 };
 
@@ -64,6 +68,10 @@ export function recordRefusalDigest(): void {
   state.refusalDigestsServed += 1;
 }
 
+export function recordExport(): void {
+  state.exportsServed += 1;
+}
+
 export function recordEntityInspected(entityId: string): void {
   state.entitiesInspected.add(entityId);
 }
@@ -77,6 +85,7 @@ export function sessionDigest(): SessionDigest {
     personShapedCounted: state.personShapedCounted,
     evidenceQueriesByKind: { ...state.evidenceQueriesByKind },
     refusalDigestsServed: state.refusalDigestsServed,
+    exportsServed: state.exportsServed,
     entitiesInspected: [...state.entitiesInspected].sort(),
     note: 'Instrument telemetry: counters and canonical entity ids only. Query strings are never retained here; the miss log\'s vocabulary gate governs the one place query text persists.',
   };
@@ -91,5 +100,6 @@ export function resetSessionTelemetry(): void {
   state.personShapedCounted = 0;
   state.evidenceQueriesByKind = {};
   state.refusalDigestsServed = 0;
+  state.exportsServed = 0;
   state.entitiesInspected.clear();
 }

@@ -418,6 +418,28 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   start`, real HTTP): the miss log wrote both record shapes and the
   builder's own verification queries were then deleted — the researcher
   afternoon starts with an empty log, so what accumulates is demand.
+- `GET /api/economy/table?commodity=copper[&metric=…][&subject=ent:…][&format=json|md][&asOf=…&knowledge=…]`
+  — the corpus as a browsable, extractable table (shipping-order
+  addendum A): a projection over canonical state where every row
+  carries its axes (unit, basis, value kind, confidence, source,
+  period, known-at, attestation), refusal records export as null-valued
+  rows with their remedy (the table and the refusals digest are the
+  same object seen from two sides), and the header carries the
+  knowledge state, `baseline_fingerprint` of the producing state, row
+  count, withheld count and row accounting. Each row includes a
+  server-rendered `claim` sentence — the value with its axes attached,
+  ready to paste. `view=grid&subject=…&metric=…` returns the two-axis
+  period × edition grid (down a column: one edition's account of
+  history; across a row: the revision history of one fact; null cell =
+  not covered, never zero). Markdown and JSON only — CSV/XLSX refused
+  with the reason (spreadsheet coercion destroys the axes). GET-only by
+  design: no export path accepts input, so an export can never
+  round-trip back into state. Exports are counted in session telemetry
+  and appended to `data-archive/export-log.jsonl` (canonical
+  vocabulary only — the subject regex refuses free text at the
+  boundary) as the third demand signal: the miss log measures what the
+  corpus couldn't answer, the refusals digest what it declined, the
+  export log what someone carried into their own work.
 - `GET /api/economy/search?q=escondida[&asOf=…&knowledge=…]` — entity search
   over the canonical register (name, operator, country, kind — companies
   included) with a one-line evidence headline per hit (latest resolved

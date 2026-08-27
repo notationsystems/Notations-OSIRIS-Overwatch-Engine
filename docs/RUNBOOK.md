@@ -85,6 +85,21 @@ Your misses accumulate in `data-archive/search-misses.jsonl`: a query
 the corpus can't answer is a demand signal that re-ranks the roadmap,
 so ask what you actually want to know, not what you think it can answer.
 
+`GET /api/economy/table?commodity=copper[&metric=...][&subject=ent:...]
+[&format=md|json]` exports the corpus as a table — every row carries
+its axes (unit, basis, value kind, source, period, known-at,
+attestation), a header with the `baseline_fingerprint` of the state it
+came from, and a ready-to-paste claim sentence per row. Add
+`view=grid&subject=...&metric=...` for the period × edition grid: down
+a column is one edition's account of history, across a row the
+revision history of one fact; a dash is a period that edition did not
+cover — not a zero. Markdown and JSON only: if you need a spreadsheet,
+paste the markdown and own the conversion knowingly. Take the claim
+sentences, not bare numbers — a value separated from its basis is
+incommensurable in your own deck a month from now, and the fingerprint
+is how a number in that deck gets checked against the state that
+produced it.
+
 ---
 
 ## Operator section (not for the researcher's copy)

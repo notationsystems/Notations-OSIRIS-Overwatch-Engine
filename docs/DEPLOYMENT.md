@@ -64,6 +64,25 @@ Consequence: the corpus health surface, refusals digest and session
 telemetry are reachable to whoever can reach the instance — which is
 exactly the population whose use they are meant to measure.
 
+**Open item — external-client exposure (recorded 2026-08-27, decided at
+S-9):** the operator has directed that language-model clients plug into
+the instrument from outside (e.g. via an MCP tool surface) rather than a
+model being built into it. That surface would be a THIRD population with
+access — neither operator nor invited researcher — and it changes this
+decision's terms: reasons 2 and 3 above were argued against crawler
+noise and public re-serving, not against a small number of authenticated
+tool clients whose queries ARE legitimate demand signal (the export log
+records them like any other). What is already done ahead of that
+decision: every export row carries a server-rendered `claim` sentence so
+a client that copies the sentence carries the axes with it, and the
+export/table surface is GET-only with canonical-vocabulary boundaries,
+so a tool client cannot write or free-text anything into the corpus or
+its logs. What is NOT decided: authentication mechanism, whether tool
+traffic is segregated in telemetry (it should be distinguishable from
+the S-7 readings or it contaminates them), and the Westmetall posture
+for machine consumers. This item is to be resolved as part of the S-9
+re-rank, with the S-6 evidence in hand.
+
 ## Corpus health in the deployed instance
 
 `GET /api/economy?commodity=<c>&view=analytics` → `corpusHealth`:
