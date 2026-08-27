@@ -1,0 +1,268 @@
+import { describe, it, expect, beforeAll } from 'vitest';
+import { MCP_TOOLS, requireKnowledge, refusalCount, type McpContext, type McpToolResult } from './mcpTools';
+import { recordMcpCall, resetMcpSession, mcpSessionCalls, routeAroundEstimate, type McpCallRecord } from './mcpSession';
+import { resetSessionTelemetry, sessionDigest } from './sessionTelemetry';
+import { getEconomyState } from './store';
+import { stateFingerprint } from './corpusTable';
+import { GET as searchGet } from '@/app/api/economy/search/route';
+import { GET as entityGet } from '@/app/api/economy/entity/route';
+import { GET as tableGet } from '@/app/api/economy/table/route';
+import { GET as economyGet } from '@/app/api/economy/route';
+import { GET as refusalsGet } from '@/app/api/economy/refusals/route';
+import { GET as validateGet } from '@/app/api/economy/validate/route';
+import { POST as scenarioPost } from '@/app/api/economy/scenario/route';
+import { MACHINE_CLIENT_HEADER } from './machineClient';
+
+/**
+ * Final order F-2 (the MCP tool surface) and F-4 (route-around telemetry)
+ * — the pre-registered acceptance criteria, each against its planted or
+ * standing failing state. The in-process context routes MCP tool calls
+ * through the REAL route handlers, carrying the machine-client header
+ * exactly as the stdio server does — same logic path, nothing mocked but
+ * the transport.
+ */
+
+const inProcessCtx: McpContext = {
+  async fetchJson(path, init) {
+    const req = new Request(`http://localhost${path}`, {
+      method: init?.method ?? 'GET',
+      headers: { [MACHINE_CLIENT_HEADER]: 'machine', ...(init?.body ? { 'content-type': 'application/json' } : {}) },
+      body: init?.body,
+    });
+    const route = path.split('?')[0];
+    const handler =
+      route === '/api/economy/search' ? searchGet
+        : route === '/api/economy/entity' ? entityGet
+          : route === '/api/economy/table' ? tableGet
+            : route === '/api/economy/refusals' ? refusalsGet
+              : route === '/api/economy/validate' ? validateGet
+                : route === '/api/economy/scenario' ? scenarioPost
+                  : route === '/api/economy' ? economyGet
+                    : null;
+    if (!handler) throw new Error(`no in-process handler for ${route}`);
+    const res = await handler(req);
+    return { status: res.status, body: await res.json() };
+  },
+};
+
+const K = { asOf: '2026-08-27', mode: 'best_known' as const };
+const tool = (name: string) => MCP_TOOLS.find(t => t.name === name)!;
+
+/** Valid minimal args per tool, for the no-mutation sweep. */
+const VALID_ARGS: Record<string, Record<string, unknown>> = {
+  search_entities: { ...K, q: 'escondida' },
+  search_evidence: { ...K, kind: 'refused' },
+  get_entity: { ...K, id: 'ent:mine:escondida' },
+  get_observations: { ...K, metric: 'production' },
+  concentration: { ...K },
+  propagate: { ...K },
+  scenario: { ...K, label: 'pin', events: [{ entityId: 'ent:mine:escondida', type: 'strike', title: 'pin strike', start: '2026-08-01', severity: 'high' }] },
+  refusals_digest: { ...K },
+  corpus_health: { ...K },
+  source_registry: { ...K },
+  validate_claim: { ...K, claim: 'a claim of 42 units', record_ids: [] },
+};
+
+describe('F-2: the MCP tool surface (pre-registered criteria)', () => {
+  // ── Criterion 1: a tool call omitting knowledge state fails with the
+  //    missing parameter NAMED — on every tool, never defaulted. ──
+  it('every tool refuses a call without asOf/mode, naming the missing parameter', async () => {
+    expect(MCP_TOOLS.length).toBe(11);
+    for (const def of MCP_TOOLS) {
+      await expect(def.handler({}, inProcessCtx), def.name).rejects.toThrow(/missing required parameter: asOf/);
+      await expect(def.handler({ asOf: '2026-08-27' }, inProcessCtx), def.name).rejects.toThrow(/missing required parameter: mode/);
+      expect(def.params.asOf, `${def.name} must declare asOf`).toBeDefined();
+      expect(def.params.mode, `${def.name} must declare mode`).toBeDefined();
+    }
+    expect(() => requireKnowledge({ asOf: 'yesterday', mode: 'best_known' })).toThrow(/asOf/);
+  });
+
+  // ── Criterion 2: every quantitative return carries record ids, the five
+  //    axes and a rendered claim sentence — at the TOP level; a planted
+  //    incomplete record returns nulls FLAGGED rather than omitted. ──
+  it('quantitative returns carry record ids, axes and claim sentences at top level', async () => {
+    const obs = await tool('get_observations').handler(VALID_ARGS.get_observations, inProcessCtx);
+    expect(obs.record_ids.length).toBeGreaterThan(0);
+    expect(obs.claims.length).toBeGreaterThan(0);
+    const rows = (obs.data as { rows: Array<Record<string, unknown>> }).rows;
+    for (const r of rows) {
+      for (const axis of ['unit', 'basis', 'value_kind', 'source_id', 'period_start', 'known_at', 'attestation']) {
+        expect(axis in r, `row lacks ${axis}`).toBe(true);
+      }
+      expect(typeof r.claim).toBe('string');
+    }
+
+    const conc = await tool('concentration').handler(VALID_ARGS.concentration, inProcessCtx);
+    const indices = (conc.data as { indices: Array<Record<string, unknown>> }).indices;
+    expect(indices.length).toBeGreaterThan(0);
+    expect(conc.record_ids.length).toBeGreaterThan(0);
+    for (const idx of indices) {
+      const axes = idx.axes as Record<string, unknown>;
+      for (const axis of ['basis', 'population', 'universe', 'partition', 'completeness']) {
+        expect(axis in axes, `${idx.name} axes lack ${axis}`).toBe(true);
+      }
+      // The unknown axis is null AND FLAGGED, never omitted or defaulted.
+      expect(axes.basis).toBeNull();
+      expect(String(axes.basis_flag)).toContain('unstated');
+      expect(typeof idx.claim).toBe('string');
+    }
+  });
+
+  it('a planted incomplete record surfaces its gap in the claim, not as an omission', async () => {
+    // Planted at the transport seam: a table row with a missing basis, as
+    // the corpus table emits one (null + flagged + UNSTATED in the claim).
+    const planted: McpContext = {
+      async fetchJson() {
+        return {
+          status: 200,
+          body: {
+            header: { withheld: 0, caveats: [] },
+            rows: [{
+              record_id: 'obs:test-plant:incomplete', subject_id: 'ent:country:cl', subject_label: 'Chile',
+              metric: 'production', value: 999, unit: 'kt/y', basis: null, value_kind: 'reported',
+              confidence: 'medium', source_id: 'test-plant', source_name: 'test plant',
+              period_start: '2021-01-01', period_end: '2021-12-31', known_at: '2026-08-27',
+              supersedes: null, attestation: null,
+              flags: ['basis unspecified — flagged, not defaulted'],
+              claim: 'Chile production 2021: 999 kt/y [basis UNSTATED, reported, attestation unknown-attested subject, test-plant, knowable from 2026-08-27]',
+            }],
+          },
+        };
+      },
+    };
+    const res = await tool('get_observations').handler(VALID_ARGS.get_observations, planted);
+    expect(res.claims[0]).toContain('basis UNSTATED');
+    expect(res.record_ids).toContain('obs:test-plant:incomplete');
+    const row = (res.data as { rows: Array<Record<string, unknown>> }).rows[0];
+    expect(row.basis).toBeNull();
+    expect((row.flags as string[])[0]).toContain('flagged');
+  });
+
+  // ── Criterion 3: a refused query returns SUCCESS with refusalType and
+  //    remedy — per refusal mechanism, on the standing corpus. ──
+  it('refusals return successfully with type and remedy, across the standing mechanisms', async () => {
+    // Today's queue: resolution refusals stand in the real corpus.
+    const today = await tool('refusals_digest').handler(VALID_ARGS.refusals_digest, inProcessCtx);
+    expect(today.refusals.length).toBeGreaterThan(0);
+    // At the 2017 evaluation date the corpus's four standing refusal
+    // mechanisms are all live (ledger: resolution, topology, basis,
+    // attribution) — each must arrive as null-with-remedy, never an error.
+    const at2017 = await tool('refusals_digest').handler({ asOf: '2017-02-15', mode: 'best_known' }, inProcessCtx);
+    const types = new Set(at2017.refusals.map(r => r.refusalType));
+    for (const mechanism of ['resolution', 'topology', 'basis', 'attribution']) {
+      expect(types.has(mechanism), `mechanism ${mechanism} missing from the queue`).toBe(true);
+    }
+    for (const r of at2017.refusals) {
+      expect(r.value).toBeNull();
+      expect(r.remedy.length).toBeGreaterThan(0);
+    }
+    // Null-HHI indices arrive as refusals through concentration too.
+    const conc = await tool('concentration').handler(VALID_ARGS.concentration, inProcessCtx);
+    for (const r of conc.refusals) {
+      expect(r.value).toBeNull();
+      expect(r.refusalType.length).toBeGreaterThan(0);
+      expect(r.remedy.length).toBeGreaterThan(0);
+    }
+  });
+
+  // ── Criterion 4: no tool mutates state — verified structurally by
+  //    fingerprinting canonical state across a full sweep of every tool. ──
+  it('a full sweep of every tool leaves the canonical state fingerprint unchanged', async () => {
+    const { state: before } = await getEconomyState('copper');
+    const fpBefore = stateFingerprint(before);
+    for (const def of MCP_TOOLS) {
+      const res = await def.handler(VALID_ARGS[def.name], inProcessCtx);
+      expect(res.knowledge_state.mode).toBe('best_known');
+    }
+    const { state: after } = await getEconomyState('copper');
+    expect(stateFingerprint(after)).toBe(fpBefore);
+  });
+
+  // ── Criterion 5: a call under as_known_then returns no row whose knownAt
+  //    postdates asOf — and the withholding is COUNTED, not silent. ──
+  it('as_known_then returns nothing knowable only later, and counts what it withheld', async () => {
+    const asOf = '2024-06-30';
+    const res = await tool('get_observations').handler({ asOf, mode: 'as_known_then', metric: 'production' }, inProcessCtx);
+    const rows = (res.data as { rows: Array<Record<string, unknown>> }).rows;
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      if (r.known_at) expect(String(r.known_at) <= asOf, `${r.record_id} leaked`).toBe(true);
+    }
+    const header = (res.data as { header: Record<string, unknown> }).header;
+    expect(header.withheld as number).toBeGreaterThan(0);
+    expect(res.claims.some(c => c.includes('withheld'))).toBe(true);
+  });
+
+  // ── Contract: machine traffic never lands in the frozen S-7 counters. ──
+  it('MCP calls do not increment the human session telemetry', async () => {
+    resetSessionTelemetry();
+    await tool('search_entities').handler(VALID_ARGS.search_entities, inProcessCtx);
+    await tool('get_observations').handler(VALID_ARGS.get_observations, inProcessCtx);
+    await tool('refusals_digest').handler(VALID_ARGS.refusals_digest, inProcessCtx);
+    const digest = sessionDigest();
+    expect(digest.queries).toBe(0);
+    expect(digest.exportsServed).toBe(0);
+    expect(digest.refusalDigestsServed).toBe(0);
+  });
+});
+
+describe('F-4: route-around telemetry (a proxy that says so)', () => {
+  it('a simulated refuse-then-quiet session produces the signal, and the method is stated as a proxy', () => {
+    resetMcpSession('session-quiet');
+    recordMcpCall('search_entities', 0);
+    recordMcpCall('refusals_digest', 5); // hits refusals… and goes quiet
+    const quiet = mcpSessionCalls();
+
+    resetMcpSession('session-continued');
+    recordMcpCall('refusals_digest', 3); // hits refusals…
+    recordMcpCall('get_observations', 0); // …and keeps working
+    const continued = mcpSessionCalls();
+
+    resetMcpSession('session-no-refusals');
+    recordMcpCall('search_entities', 0);
+    const clean = mcpSessionCalls();
+
+    const all: McpCallRecord[] = [...quiet, ...continued, ...clean];
+    const est = routeAroundEstimate(all);
+    expect(est.sessionsWithRefusals).toBe(2); // the refusal-free session is out of the denominator
+    expect(est.quietAfterRefusal).toBe(1);
+    expect(est.estimate).toBe(0.5);
+    expect(est.method).toContain('PROXY');
+    expect(est.method).toContain('not a measurement');
+    // A rate over nothing is not a rate.
+    expect(routeAroundEstimate(clean).estimate).toBeNull();
+    resetMcpSession();
+  });
+
+  it('the session log holds tool names and counts only — no parameter value can reach it', async () => {
+    resetMcpSession('session-values');
+    const def = tool('search_entities');
+    await def.handler({ ...K, q: 'jane doe person-shaped text' }, inProcessCtx).catch(() => undefined);
+    recordMcpCall(def.name, 0);
+    const logged = JSON.stringify(mcpSessionCalls());
+    expect(logged).not.toContain('jane');
+    expect(logged).toContain('search_entities');
+    resetMcpSession();
+  });
+});
+
+describe('F-2 result envelope', () => {
+  let sample: McpToolResult;
+  beforeAll(async () => {
+    sample = await tool('concentration').handler(VALID_ARGS.concentration, inProcessCtx);
+  });
+  it('carries knowledge state, claims, record ids, refusals and caveats on every result', () => {
+    expect(sample.knowledge_state).toEqual({ as_of: '2026-08-27', mode: 'best_known' });
+    expect(Array.isArray(sample.claims)).toBe(true);
+    expect(Array.isArray(sample.record_ids)).toBe(true);
+    expect(Array.isArray(sample.refusals)).toBe(true);
+    expect(refusalCount(sample)).toBe(sample.refusals.length);
+  });
+  it('tool descriptions are contracts: refusal conduct, knowledge bounds and claim-pasting are stated on every tool', () => {
+    for (const def of MCP_TOOLS) {
+      expect(def.description).toContain('Do not substitute external knowledge');
+      expect(def.description).toContain('bounded by the asOf and mode you supplied');
+      expect(def.description).toContain('refusalType and remedy');
+    }
+  });
+});

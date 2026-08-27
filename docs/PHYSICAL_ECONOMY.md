@@ -440,6 +440,60 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   boundary) as the third demand signal: the miss log measures what the
   corpus couldn't answer, the refusals digest what it declined, the
   export log what someone carried into their own work.
+## The MCP tool surface (external models attach; final order F-2)
+
+`npm run mcp` starts a stdio MCP server (`src/mcp/server.ts`) exposing
+eleven read-only tools over the RUNNING terminal's own HTTP routes — one
+logic path, so the machine surface cannot drift from what the terminal
+serves. The operator's pivot: external models attach to the substrate
+rather than a reasoning layer being built inside it. That moves the
+enforcement point out of the codebase and into the interface, so the
+interface carries the discipline (`src/lib/economy/mcpTools.ts`):
+
+- **Knowledge state is required on every tool.** `asOf` and `mode`, never
+  defaulted, enforced twice (schema layer and `requireKnowledge`). A model
+  that must state the knowledge state cannot silently answer from the present.
+- **Every quantitative return carries record ids, the five axes and a
+  server-rendered `claim` sentence at the TOP LEVEL** — not in a metadata
+  blob a client will drop. A model handed a correct sentence pastes it,
+  because pasting is cheaper than reconstructing; that is the only
+  mechanism that reaches a model we do not control.
+- **Refusals return successfully**: `value: null` plus `refusalType` and
+  `remedy`. Never an error code — an error invites a retry or a
+  workaround, a null-with-remedy invites a report.
+- **Nothing mutates state**, pinned structurally: a sweep of all eleven
+  tools leaves the canonical state fingerprint unchanged.
+- **Machine traffic is segregated from the frozen S-7 demand instruments**
+  (`machineClient.ts`): served identically, never counted as researcher
+  demand, observed instead in `data-archive/mcp-sessions.jsonl`.
+
+Tools: `search_entities`, `search_evidence`, `get_entity`,
+`get_observations` (rows and the period × edition grid), `concentration`,
+`propagate`, `scenario`, `refusals_digest`, `corpus_health`,
+`source_registry`, `validate_claim`.
+
+**Route-around telemetry (F-4)** — `mcpSession.ts` logs per session which
+tools were called and how many refusals each surfaced, and computes a
+route-around estimate: sessions whose LAST call surfaced a refusal, over
+sessions that hit any refusal. It is reported as a **proxy and says so in
+its own payload** — "went quiet after a refusal" is equally consistent
+with the remedy having answered the question, or the session simply
+ending. A proxy reported as a measurement is the defect this project
+exists to refuse. No parameter value ever reaches the log.
+
+- `GET /api/economy/validate?claim=…&records=obs:a,obs:b[&asOf=…&knowledge=…]`
+  — the claim validator (final order F-3, the round-1 contract built in
+  phase 36): a claim arrives from whatever model the analyst is using,
+  the verdict comes from the substrate. Verdicts are `supported`,
+  `partially_supported`, `unsupported`, `overstated` (more precise than
+  its inputs) and `inadmissible` (rests on representative-attested
+  input — today that is EVERY facility-level record in this corpus, and
+  the service says so rather than softening it), each with supporting
+  and contradicting record ids and a reason. It judges only the SUPPORT
+  RELATION: it never recomputes the analytics (pinned structurally — the
+  module imports nothing but `./types`) and never supplies evidence the
+  claim did not cite. An empty evidence chain is `unsupported`, never an
+  error. GET-only; the claim text is never logged anywhere.
 - `GET /api/economy/search?q=escondida[&asOf=…&knowledge=…]` — entity search
   over the canonical register (name, operator, country, kind — companies
   included) with a one-line evidence headline per hit (latest resolved

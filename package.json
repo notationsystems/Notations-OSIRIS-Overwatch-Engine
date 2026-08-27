@@ -9,10 +9,12 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:live": "RUN_LIVE_TESTS=1 vitest run"
+    "test:live": "RUN_LIVE_TESTS=1 vitest run",
+    "mcp": "tsx src/mcp/server.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@vercel/analytics": "^2.0.1",
     "framer-motion": "^12.38.0",
     "google-libphonenumber": "^3.2.44",
@@ -28,7 +30,8 @@
     "rss-parser": "^3.13.0",
     "satellite.js": "^7.0.0",
     "sharp": "^0.34.5",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -41,6 +44,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^2.1.9"
   }

@@ -4,6 +4,7 @@ import { buildGraph } from '@/lib/economy/graph';
 import { searchEvidence, type EvidenceHit } from '@/lib/economy/evidenceSearch';
 import { asKnownThen } from '@/lib/economy/engine';
 import { recordRefusalDigest, sessionDigest } from '@/lib/economy/sessionTelemetry';
+import { isMachineClient } from '@/lib/economy/machineClient';
 import type { EconomyState } from '@/lib/economy/types';
 
 /**
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
     g.items.push({ title: h.title, entityId: h.entityId, entityName: h.entityName, evidenceIds: h.evidenceIds });
     byType.set(h.type, g);
   }
-  recordRefusalDigest();
+  if (!isMachineClient(request)) recordRefusalDigest(); // machine traffic is not researcher demand (machineClient.ts)
 
   return NextResponse.json({
     commodity,

@@ -4,6 +4,7 @@ import { strongestAttestingClass, knownAtOf, outranksObservation, type Attestati
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
 import { parseEvidenceQuery, searchEvidence } from '@/lib/economy/evidenceSearch';
 import { recordEvidenceQuery, recordQuery } from '@/lib/economy/sessionTelemetry';
+import { isMachineClient } from '@/lib/economy/machineClient';
 import { asKnownThen } from '@/lib/economy/engine';
 import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
@@ -170,9 +171,13 @@ export async function GET(request: Request) {
   // and honour the knowledge state the same way: under as_known_then the
   // evidence is computed from the knowledge-filtered state, so a refusal or
   // contradiction that entered the corpus later never surfaces early.
+  // Machine clients (MCP) are served identically but never counted in the
+  // human demand instruments — the frozen S-7 criterion reads those, and
+  // machine traffic in them would measure the wrong thing (machineClient.ts).
+  const machine = isMachineClient(request);
   const evidenceQuery = parseEvidenceQuery(q);
   if (evidenceQuery) {
-    recordEvidenceQuery(evidenceQuery.kind);
+    if (!machine) recordEvidenceQuery(evidenceQuery.kind);
     const evidenceState = restrictTo ? asKnownThen(state, restrictTo) : state;
     // The graph is built AT the evaluation date so the refusals reflect the
     // topology that actually serves it (a 2017 query runs over the 2017
@@ -248,9 +253,13 @@ export async function GET(request: Request) {
     const rec = missRecord({ q, commodity, asOf: asOf ?? null, knowledge, gapIds: gaps.map(g => g.sourceId), extraVocabulary });
     // Telemetry counts the person-shaped miss; the STRING lives only in
     // the vocabulary-gated record (and there only when the gate admits it).
-    recordQuery({ miss: true, withheld, personShaped: 'queryWithheld' in rec });
-    await archiveSearchMiss({ ts: new Date().toISOString(), ...rec });
-  } else {
+    // Machine misses are neither counted nor logged here — a model probing
+    // the corpus is not researcher demand (machineClient.ts).
+    if (!machine) {
+      recordQuery({ miss: true, withheld, personShaped: 'queryWithheld' in rec });
+      await archiveSearchMiss({ ts: new Date().toISOString(), ...rec });
+    }
+  } else if (!machine) {
     recordQuery({ miss: false, withheld, personShaped: false });
   }
 

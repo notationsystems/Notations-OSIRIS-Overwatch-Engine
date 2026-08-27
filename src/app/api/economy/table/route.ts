@@ -3,6 +3,7 @@ import { getEconomyState } from '@/lib/economy/store';
 import { asKnownThen } from '@/lib/economy/engine';
 import { buildCorpusTable, buildVintageGrid, renderGridMarkdown, renderTableMarkdown, stateFingerprint } from '@/lib/economy/corpusTable';
 import { recordExport } from '@/lib/economy/sessionTelemetry';
+import { isMachineClient } from '@/lib/economy/machineClient';
 import type { EconomyState } from '@/lib/economy/types';
 
 /**
@@ -67,18 +68,26 @@ export async function GET(request: Request) {
   // from the columns entirely).
   const served = knowledge === 'as_known_then' && asOf ? asKnownThen(state, asOf) : state;
 
+  // Machine clients: served identically, never counted as researcher demand
+  // — the export log is the S-7 positive signal (machineClient.ts).
+  const machine = isMachineClient(request);
+
   if (view === 'grid') {
     if (!subject || !metric) return NextResponse.json({ error: 'grid view requires subject and metric' }, { status: 400 });
     const grid = buildVintageGrid(served, subject, metric);
-    recordExport();
-    await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject, metric, asOf, knowledge, rows: grid.rows.length, fingerprint: stateFingerprint(state) });
+    if (!machine) {
+      recordExport();
+      await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject, metric, asOf, knowledge, rows: grid.rows.length, fingerprint: stateFingerprint(state) });
+    }
     if (format === 'md') return new NextResponse(renderGridMarkdown(grid), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
     return NextResponse.json({ fingerprint: stateFingerprint(state), grid });
   }
 
   const table = buildCorpusTable(state, { metric, subject }, { asOf, knowledge });
-  recordExport();
-  await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject: subject ?? null, metric: metric ?? null, asOf, knowledge, rows: table.header.row_count, fingerprint: table.header.baseline_fingerprint });
+  if (!machine) {
+    recordExport();
+    await archiveExportLog({ ts: new Date().toISOString(), view, format, commodity, subject: subject ?? null, metric: metric ?? null, asOf, knowledge, rows: table.header.row_count, fingerprint: table.header.baseline_fingerprint });
+  }
   if (format === 'md') return new NextResponse(renderTableMarkdown(table), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
   return NextResponse.json(table);
 }

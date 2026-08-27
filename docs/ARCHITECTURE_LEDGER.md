@@ -1888,6 +1888,168 @@ wanted on the record, kept verbatim in spirit: after the session runs,
 amending the continue criterion is not legitimate — the freeze is what
 makes the result mean anything either way.
 
+## Phase 36 — the final order: external models attach, and the interface carries the discipline
+
+One report per item against the criteria pre-registered in
+`docs/WORK_ORDER_FINAL_2026-08-27.md`. The order's INSPECT posture held
+and corrected one of its own numbers (below).
+
+**F-1 — the operator's steps, one command each.**
+`docs/OPERATOR_STEPS.md`: the tag (with the exact SHA to use and the
+statement that the proxy's `refs/tags` 403 is ENVIRONMENTAL, not the
+operator's error), the `ci-verify/guard-breach` deletion with its
+never-merge warning, the deployment as a single `docker run`, and the
+afternoon. **Criterion partially met, reported honestly:** "verify from a
+clean state" was executed for the fresh-clone path (install → build →
+serve, no undocumented step) but NOT for the published image — pulling
+and running a ghcr image is the one step this environment cannot perform,
+so the doc says the image path is verified only as far as CI publishing
+it. The runbook gained the three concrete moves the S-4 criterion names
+(reach a bottleneck candidate, switch knowledge modes, read a
+`refused:basis` hit): it never told a researcher how to reach a
+bottleneck at all, which would have failed the criterion on a gap the
+builder could fix but not discharge.
+
+**F-2 — the MCP server.** Eleven tools (`src/lib/economy/mcpTools.ts`)
+over a stdio server (`src/mcp/server.ts`), calling the terminal's OWN
+HTTP routes so the machine surface cannot drift from what the browser
+gets. All five pre-registered criteria discharged, and verified twice:
+in-process against the real route handlers, and in the RUNNING
+CONFIGURATION through a real MCP client over stdio against a real
+`next start`.
+
+- Knowledge state required, never defaulted: enforced at two layers, and
+  the live client's error names the parameter (`expected string, received
+  undefined at asOf`).
+- Every quantitative return carries record ids, the five axes and a
+  server-rendered claim sentence at top level. Live sample: *"Chile 26% of
+  production — HHI 1339 across 19 groups (effective 7.5, floor 526),
+  weakest input representative [20,240 kt/y total]. Not comparable raw
+  against a different partition; compare effectiveGroups."* The unknown
+  axis (index-level mass basis) exports null AND FLAGGED. A planted
+  incomplete record surfaces its gap in the claim rather than as an
+  omission.
+- Refusals return successfully with type and remedy, across all four
+  standing mechanisms (resolution, topology, basis, attribution — the
+  2017 evaluation date makes them all live), verified live: 84 refusals,
+  `isError: false`.
+- No tool mutates state: a sweep of all eleven leaves the canonical state
+  fingerprint unchanged.
+- `as_known_then` leaks nothing: 154 rows served at 2024-06-30, 57
+  withheld and COUNTED, zero rows with a later `knownAt`.
+
+Tool descriptions are written as contract, not label, and a test asserts
+every one of them carries the refusal conduct, the knowledge bound and
+the paste-the-claim instruction.
+
+**Corrected assumption (INSPECT, the tree wins):** the order states
+facility coverage as "22% to 73% by country". Measured today it is
+**21.8%–100%** across 9 countries — Panama is 100% because its single
+modeled facility accounts for its entire compiled figure. The 22–73%
+range is the interval EXCLUDING Panama. The claim sentences render the
+measured range, not the remembered one.
+
+**F-3 — the validator, as a service.** The round-1 contract, unbuilt for
+thirty-five phases, built here because the pivot makes cross-model
+validation the arrangement rather than a contrivance
+(`src/lib/economy/validator.ts`, `GET /api/economy/validate`). All four
+criteria discharged: a planted overstated claim returns `overstated` with
+the precision mismatch named; a planted facility-level claim returns
+`inadmissible` today with the reason stated unsoftened (admissibility is
+evaluated BEFORE numeric support, so an exact-match number does not
+rescue a representative-class chain); a claim its citations contradict
+returns `unsupported` with the contradicting ids; and the no-recompute
+rule is pinned STRUCTURALLY — the module's entire import list is
+`["./types"]`, asserted by test. An empty evidence chain is `unsupported`,
+never an error. The operator's two predictions are on record and will be
+judged against use: `overstated` as the most common real verdict, and
+`inadmissible` on every facility-level claim.
+
+**F-4 — route-around telemetry.** `mcpSession.ts` logs per session the
+tools called and refusals surfaced, and computes the refuse-then-quiet
+rate. The signal is a PROXY and carries that in its own payload text:
+going quiet after a refusal is equally consistent with routing around it,
+with the remedy having answered the question, and with the session simply
+ending. A simulated three-session set produces 0.5 with the refusal-free
+session correctly outside the denominator, and a rate over zero sessions
+is `null`, not 0. Verified in the running configuration: the live MCP
+smoke session wrote four records through the real path, carrying tool
+names and refusal counts only — no parameter value can reach the log
+because none is ever passed to it.
+
+**F-5 — visual refusal discipline.** `src/lib/economy/mapStyle.ts` is now
+the single place the econ layers compute treatment, and the tests run on
+that logic rather than on a designer's assurance. Both criteria
+discharged, and the first one found a REAL DEFECT: the map's radius ramp
+read `['coalesce', production, capacity, 100]` — an entity with no stated
+tonnage rendered at exactly the size of a 100 kt/y producer. Unknown was
+literally drawing as a small quantity. Now an unquantified node takes a
+non-scale treatment (fixed radius off the ramp, grey, heavy stroke) that
+cannot be read as a position on the size ramp, while ZERO stays on the
+ramp because zero is a value. Coverage rides in the ink (opacity), with
+unknown coverage rendered distinguishably from full coverage and zero
+coverage keeping a visible floor — invisible ink would be an omission.
+And a planted mixed-basis layer REFUSES to render, naming the conflict:
+one width-scaled layer cannot carry gross-weight and metal-content
+together, so callers split by basis and non-metal-content bases render
+dashed.
+
+**F-6 — exposure options prepared, not taken.**
+`docs/EXPOSURE_OPTIONS.md` lays out authentication, telemetry
+segregation and machine-consumer licensing with their consequences, and
+takes none of them. One default IS applied and is labelled as
+engineering rather than decision: machine traffic is segregated from the
+human demand instruments now, because the S-7 criterion is frozen and its
+thresholds describe researchers — a model can generate ten miss-log
+entries in a second, which would make a frozen threshold trivially
+satisfiable by a script, and the criterion cannot be amended afterwards
+to repair it. What remains the operator's is whether machine use should
+count at all, and toward what.
+
+**F-7 — holds observed.** No chat interface, no allocation model, no
+OpenOwnership re-attempt, no typed refusal emission, no new analytical
+dimensions, and the continue criterion untouched. This order did not
+supersede the afternoon and does not claim to: whether any of F-2 through
+F-5 was worth building is a question only the miss log answers.
+
+**Self-corrections and findings (this order's own).**
+
+1. **The MCP server would not have started.** `src/mcp/server.ts` used
+   top-level await; this repository declares no `"type": "module"`, so
+   tsx transpiles to CJS and top-level await is a hard transform error —
+   `npm run mcp` would have failed at the first line for anyone who tried
+   it. Found by running a real client against it, not by reading it.
+   Wrapped in an async `main()` with an explicit failure path.
+2. **The archive overwrote an unreconstructable capture, and it happened
+   during this order.** `archiveComtradeVintage` keyed by DAY and wrote
+   unconditionally, so the 18:17 live run replaced the 01:06 capture of
+   `152-2603-X-2023` — a 4-partner response overwritten by an 18-partner
+   superset for the identical query. Comtrade revises in place and keeps
+   no prior version: that is a knowledge state destroyed, by the archive's
+   own writer, in the store the archive exists to protect. Only git
+   history held the earlier bytes. Both captures are now placed where the
+   corrected scheme puts them (canonical name + sequenced sibling), the
+   writer never overwrites (identical bytes are a no-op; differing bytes
+   get the next free slot), and the vacuity guard is explicit — the test
+   demonstrates that the naive implementation loses the first capture.
+   The intra-day divergence is itself evidence now rather than a
+   casualty.
+3. **The manifest would have failed on any used instrument.** The running
+   instrument appends `search-misses.jsonl`, `export-log.jsonl` and
+   `mcp-sessions.jsonl` into `data-archive/`; an unruled path throws in
+   `buildManifest`, so the first production run to log a miss would have
+   broken the verifier — the archive check punishing the instrument for
+   being used. Excluded BY NAME (`LIVE_LOGS`, an accounted-for drop, not
+   a silent one) with a test that plants a live log and asserts the
+   manifest still builds.
+
+Manifest after this order: 34 files — 19 unreconstructable, 8
+refetchable-at-risk, 6 refetchable, 1 documentation. Suite: 619 passing.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon. Everything in this order was built to be judged by it, not
+instead of it.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

@@ -214,6 +214,17 @@ export async function GET(request: Request) {
     const eventsByEntity = new Map<string, number>();
     for (const ev of state.events) if (ev.entityId) eventsByEntity.set(ev.entityId, (eventsByEntity.get(ev.entityId) ?? 0) + 1);
 
+    // F-5: coverage belongs in the cell treatment, not only a caption — each
+    // facility dot carries its country's facility-model coverage ratio so the
+    // renderer can put it in the ink (opacity). A country not in the coverage
+    // result stays null: unknown coverage is not full coverage.
+    const coverageSuite = systems.coverage.result as { mineProduction?: { result?: Array<{ countryId: string; ratio: number }> } };
+    const ratioByCountryName = new Map<string, number>();
+    for (const r of coverageSuite.mineProduction?.result ?? []) {
+      const countryName = state.entities.find(e => e.id === r.countryId)?.name;
+      if (countryName) ratioByCountryName.set(countryName, r.ratio);
+    }
+
     const entities = state.entities
       .filter(e => e.lat !== undefined && e.lng !== undefined && e.kind !== 'country' && e.kind !== 'commodity')
       .map(e => ({
@@ -226,6 +237,7 @@ export async function GET(request: Request) {
         bottleneckScore: scoreByEntity.get(e.id) ?? null,
         eventCount: eventsByEntity.get(e.id) ?? 0,
         disrupted: disrupted.has(e.id),
+        coverageRatio: (e.country && ratioByCountryName.get(e.country)) ?? null,
       }));
 
     // Coordinates for ARC endpoints come from the full register (country

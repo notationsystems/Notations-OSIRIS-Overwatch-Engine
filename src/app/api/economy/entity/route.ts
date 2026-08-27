@@ -3,6 +3,7 @@ import { entityDetail, getEconomyState } from '@/lib/economy/store';
 import { strongestAttestingClass } from '@/lib/economy/analytics';
 import { buildGraph, downstream, upstream } from '@/lib/economy/graph';
 import { recordEntityInspected } from '@/lib/economy/sessionTelemetry';
+import { isMachineClient } from '@/lib/economy/machineClient';
 
 /**
  * OSIRIS — Entity inspector endpoint.
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
 
   const detail = entityDetail(state, id);
   if (!detail) return NextResponse.json({ error: `unknown entity "${id}"` }, { status: 404 });
-  recordEntityInspected(id); // canonical id only — session telemetry (3.7)
+  if (!isMachineClient(request)) recordEntityInspected(id); // canonical id only — session telemetry (3.7); machine traffic segregated (machineClient.ts)
 
   const graph = buildGraph(state);
   const name = (entityId: string) => {

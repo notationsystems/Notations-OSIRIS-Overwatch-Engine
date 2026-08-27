@@ -5,6 +5,28 @@ else is. Everything here is about reading the instrument correctly —
 the instrument's job is to tell you what it knows, how it knows it, and
 what it refuses to say.
 
+## Three moves, if you do nothing else
+
+1. **Find a constraint.** Open the research panel's **Bottlenecks** list
+   (the map ranks them too — the ringed nodes). Each candidate carries a
+   score and the reason it scored: how much material the graph routes
+   through it, what depends on it, and whether an alternative with spare
+   capacity exists. Click one to see the chain it sits on. That is the
+   instrument's answer to "where would this chain break".
+2. **Ask when you knew it.** Set a past date and switch to **AS KNOWN**
+   (below). The same question now answers from the evidence that existed
+   then — figures change, some disappear, and the count of what was
+   withheld is shown rather than hidden. If an answer looks the same in
+   both modes, it did not depend on hindsight.
+3. **Read one refusal properly.** Search `refused:basis`. Each hit is a
+   tonnage the system will not state because the number it has is a
+   *gross weight* and the question needs *contained metal* — different
+   quantities, and converting between them needs a corridor grade the
+   corpus does not have for that route. The hit names the entity, the
+   mechanism, and the remedy: acquire the grade, or accept the figure in
+   the basis it was measured in. That is what every refusal looks like —
+   a stated gap with a price on closing it, not a failure.
+
 ## The one rule that reframes everything else
 
 **`refused:` is a work queue, not an error.** This instrument declines

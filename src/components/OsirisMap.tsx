@@ -4,6 +4,7 @@ import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
+import { styleEconEntity, splitFlowsByBasis, buildEconFlowLayerStyles } from '@/lib/economy/mapStyle';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -303,19 +304,34 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
 
       // ── PHYSICAL ECONOMY (copper vertical slice) ──
       // Flows under entity dots; bottleneck rings under dots so the fill stays legible.
-      const econRadius: any = ['interpolate', ['linear'], ['sqrt', ['coalesce', ['get', 'production'], ['get', 'capacity'], 100]],
-        5, 3, 15, 5, 25, 7.5, 35, 10];
+      // Visual refusal discipline (F-5): radius/opacity/treatment are computed
+      // per feature by mapStyle.ts — an UNQUANTIFIED node is never a position
+      // on the size ramp, and coverage rides in the ink, not only a caption.
+      const econRadius: any = ['coalesce', ['get', 'styleRadius'], 3.5];
+      const econFlowColor: any = ['match', ['get', 'form'],
+        'concentrate', '#FFB300',
+        'blister', '#FF7043', 'anode', '#FF7043',
+        'cathode', '#4FC3F7', 'refined', '#4FC3F7',
+        '#90A4AE'];
+      const econFlowWidth: any = ['coalesce', ['get', 'lineWidth'], 1];
       map.addLayer({ id: 'econ-flow-lines', type: 'line', source: 'econ-flows',
-        filter: ['!=', ['get', 'disrupted'], true],
+        filter: ['all', ['!=', ['get', 'disrupted'], true], ['!=', ['get', 'dashed'], true]],
         layout: { 'line-cap': 'round' },
         paint: {
-          'line-color': ['match', ['get', 'form'],
-            'concentrate', '#FFB300',
-            'blister', '#FF7043', 'anode', '#FF7043',
-            'cathode', '#4FC3F7', 'refined', '#4FC3F7',
-            '#90A4AE'],
-          'line-width': ['interpolate', ['linear'], ['get', 'quantity'], 100, 0.8, 500, 2, 1000, 3.2, 1600, 4.5],
+          'line-color': econFlowColor,
+          'line-width': econFlowWidth,
           'line-opacity': 0.5,
+        } });
+      // Non-metal-content bases (gross weight, unspecified) render DASHED:
+      // their widths are stated on a different (or unstated) mass basis and
+      // must not read as commensurate with metal-content widths on sight.
+      map.addLayer({ id: 'econ-flow-lines-noncommensurate', type: 'line', source: 'econ-flows',
+        filter: ['all', ['!=', ['get', 'disrupted'], true], ['==', ['get', 'dashed'], true]],
+        paint: {
+          'line-color': econFlowColor,
+          'line-width': econFlowWidth,
+          'line-opacity': 0.5,
+          'line-dasharray': [2, 1.5],
         } });
       // Flows touched by a live disruptive event (temporal playback) render
       // dashed red — the interruption must be visible at a glance.
@@ -339,16 +355,27 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
       map.addLayer({ id: 'econ-dots', type: 'circle', source: 'econ-entities',
         paint: {
           'circle-radius': econRadius,
-          'circle-color': ['match', ['get', 'stage'],
-            'production', '#D4AF37',
-            'smelting', '#FF7043',
-            'refining', '#4FC3F7',
-            'logistics', '#78909C',
-            'manufacturing', '#AB47BC',
-            '#B0BEC5'],
-          'circle-opacity': 0.85,
-          'circle-stroke-color': ['case', ['==', ['get', 'disrupted'], true], '#FF3D3D', '#0A0A0A'],
-          'circle-stroke-width': ['case', ['==', ['get', 'disrupted'], true], 2, 1],
+          // An unquantified node takes the non-scale grey — never the stage
+          // ramp — so "no stated tonnage" cannot be misread as "small".
+          'circle-color': ['case', ['==', ['get', 'styleTreatment'], 'unquantified'], '#8A8A8A',
+            ['match', ['get', 'stage'],
+              'production', '#D4AF37',
+              'smelting', '#FF7043',
+              'refining', '#4FC3F7',
+              'logistics', '#78909C',
+              'manufacturing', '#AB47BC',
+              '#B0BEC5']],
+          // Coverage rides in the ink: 22%-modeled countries carry visibly
+          // less than 73% ones (coverageOpacity in mapStyle.ts).
+          'circle-opacity': ['coalesce', ['get', 'styleOpacity'], 0.85],
+          'circle-stroke-color': ['case',
+            ['==', ['get', 'disrupted'], true], '#FF3D3D',
+            ['==', ['get', 'styleTreatment'], 'unquantified'], '#FFFFFF',
+            '#0A0A0A'],
+          'circle-stroke-width': ['case',
+            ['==', ['get', 'disrupted'], true], 2,
+            ['==', ['get', 'styleTreatment'], 'unquantified'], 1.5,
+            1],
         } });
       map.addLayer({ id: 'econ-labels', type: 'symbol', source: 'econ-entities', minzoom: 3,
         layout: { 'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true },
@@ -1909,22 +1936,38 @@ function OsirisMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightCl
     // nodes visible — a constraint you have hidden is still a constraint.
     const features = ents
       .filter((e: any) => stageVisible(e.stage) || (al.econ_bottlenecks && (e.bottleneckScore ?? 0) >= 0.45))
-      .map((e: any) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
-        properties: {
-          id: e.id, name: e.name, kind: e.kind, stage: e.stage, country: e.country,
-          operator: e.operator, production: e.production, productionUnit: e.productionUnit,
-          capacity: e.capacity, bottleneckScore: al.econ_bottlenecks ? e.bottleneckScore : null,
-          eventCount: e.eventCount, geoPrecision: e.geoPrecision, disrupted: e.disrupted === true,
-        },
-      }));
+      .map((e: any) => {
+        // F-5: treatment computed by the tested style module — unquantified
+        // never lands on the size ramp; coverage rides in the opacity.
+        const style = styleEconEntity(
+          { production: e.production ?? null, capacity: e.capacity ?? null },
+          e.coverageRatio ?? null,
+        );
+        return {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [e.lng, e.lat] },
+          properties: {
+            id: e.id, name: e.name, kind: e.kind, stage: e.stage, country: e.country,
+            operator: e.operator, production: e.production, productionUnit: e.productionUnit,
+            capacity: e.capacity, bottleneckScore: al.econ_bottlenecks ? e.bottleneckScore : null,
+            eventCount: e.eventCount, geoPrecision: e.geoPrecision, disrupted: e.disrupted === true,
+            styleTreatment: style.treatment, styleRadius: style.radiusPx, styleOpacity: style.opacity,
+          },
+        };
+      });
     setGeo('econ-entities', features);
+    // F-5: one basis per width-scaled layer — split first, then each group
+    // builds through the refusing function (mixed input throws with the
+    // conflict named; the dashed flag marks non-metal-content bases).
     const flows = al.econ_flows && data.econ_flows
-      ? data.econ_flows.map((f: any) => ({
+      ? [...splitFlowsByBasis(data.econ_flows as Array<any>).values()].flatMap(group => buildEconFlowLayerStyles(group)).map((f: any) => ({
         type: 'Feature',
         geometry: { type: 'LineString', coordinates: greatCircleArc(f.fromCoord, f.toCoord) },
-        properties: { id: f.id, form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence, disrupted: f.disrupted === true },
+        properties: {
+          id: f.id, form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence,
+          disrupted: f.disrupted === true,
+          basis: f.style.basis, dashed: f.style.dashed, lineWidth: f.style.lineWidth,
+        },
       }))
       : [];
     setGeo('econ-flows', flows);
