@@ -42,6 +42,9 @@ threatfox.json
 
 # Dev scripts (one-time migration helpers)
 scripts/
+# ...except operational scripts the suite and CI depend on (S-2): the
+# archive manifest generator is imported by archiveManifest.test.ts.
+!scripts/archive-manifest.mjs
 
 # AI agent config files
 CLAUDE.md
