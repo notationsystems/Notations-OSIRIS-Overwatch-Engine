@@ -421,6 +421,55 @@ graph (firewalls and refusals), the analytics (partition context, coverage
 annotations) and the scorecard (population splits, floors), is the most
 valuable thing in the repository.
 
+## Phase 11 — the fourth axis, and the class-gated traversal
+
+Round-9 review found the fourth comparability axis inside round 10's own
+corrected numbers: **attribution completeness**. The country index covered
+100% of its universe; the control index covered 84.5% of the same universe,
+renormalized — inflating every share by 1/0.845 and the HHI by ~1.40. The
+reviewer's back-of-envelope said the enumerated correction would land near
+1391; the measured value, with the remainder restored, is **exactly 1391**.
+Shipped:
+
+1. **hhiWithRemainder** on operator indices: the renormalized `hhi` stays
+   (labeled as inflated by 1/completeness²), and only the remainder-
+   restored figure — unattributed facilities enumerated as their own
+   groups, per-facility minority residues lumped one group each with the
+   slight concentration bias said — is comparable against a full-universe
+   index. `attributionCompleteness` and `remainderTreatment` travel with
+   both. The synthetic pin: a fully-unattributed universe reads hhi 0 /
+   hhiWithRemainder 10000 — the renormalized figure has nothing to say,
+   the comparable one says "monopoly of the unmodeled".
+2. **The remainder was never anonymous**: Compañía Minera Antamina S.A. and
+   Compañía Minera Doña Inés de Collahuasi SCM are named legal entities of
+   public record — unmodeled, not unknown. Curated as company entities with
+   operator edges (strength 0: pass-through vehicles whose economic
+   interest sits with their shareholders), control completeness reached
+   1.0 by curation alone. The ownership-adapter ledger line splits into its
+   two very different costs: operator-of-record (CLOSED, curation) vs
+   parent chains — who stands behind each vehicle (still the adapter's
+   job).
+3. **Corrected conclusions**, measured and pinned: control 1391 vs economic
+   959 renormalized / 768 comparable — the basis reversal survives
+   comfortably; control vs the world-reported 1339 is retired in both
+   directions (different universe, and now effectively equal anyway); the
+   like-for-like facility pair WIDENS to 2135 vs 1391 — geography is
+   substantially, not somewhat, more concentrated than control on the
+   modeled set. Freeport at 26.3% control across three countries stands
+   through every correction.
+4. **Traversal gates on event class, not edge role alone.** The round-10
+   rule (shareholder edges inert) was correct for the event class that
+   motivated it and too strong globally: sanctions and insolvency attach to
+   owners, not managers. `eventClassOf` — operational → operator edges
+   only; financial (new `sanction`/`insolvency` types) → operator AND
+   shareholder; regulatory → neither (attaches to territory; jurisdiction
+   propagation via located_in is future work, noted). The Rio Tinto pin
+   gained its sibling: a strike at the holder still reaches nothing, and a
+   sanctions-class event DOES reach Escondida through the 30% — and the
+   Grasberg case is pinned end-to-end: a MIND ID operational event touches
+   nothing, a MIND ID sanction reaches Grasberg, Manyar and Amamapare
+   through the 51% no strike could use.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

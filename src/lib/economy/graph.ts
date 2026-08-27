@@ -92,11 +92,10 @@ export function buildGraph(state: EconomyState): EconomyGraph {
     // located_in is geography, not material structure — keep it out of the
     // traversal graph so "upstream of Escondida" never returns "Chile".
     if (d.type === 'located_in') continue;
-    // Shareholder operated_by edges are economic interest — a claim on
-    // output, not a lever over operations. Disruption does not propagate
-    // through a shareholding, so only operator-of-record edges traverse:
-    // a Rio Tinto event must not reach Escondida via its 30%.
-    if (d.type === 'operated_by' && d.role !== 'operator') continue;
+    // Shareholder operated_by edges stay IN the graph as structure, but
+    // whether they TRAVERSE depends on the event class (see the default
+    // edge filter below and propagation's traversableEdgeFilter): a strike
+    // propagates through the operator, a sanction through the owners.
     edges.push({ kind: 'dependency', id: d.id, from: d.fromEntityId, to: d.toEntityId, dependency: d });
   }
 
@@ -121,22 +120,35 @@ export interface TraversalStep {
 }
 
 /**
+ * Which edges a traversal may cross. The default is the OPERATIONAL view:
+ * shareholder operated_by edges are inert (a shareholding is a claim on
+ * output, not a lever over operations — a Rio Tinto strike must not reach
+ * Escondida through its 30%). Financial/legal event classes override this
+ * via propagation's class-derived filter, because sanctions and insolvency
+ * attach to owners, not managers.
+ */
+export type EdgeFilter = (edge: GraphEdge) => boolean;
+
+export const OPERATIONAL_EDGE_FILTER: EdgeFilter = e =>
+  !(e.kind === 'dependency' && e.dependency.type === 'operated_by' && e.dependency.role !== 'operator');
+
+/**
  * Upstream = walk flow edges backwards (who ships material toward `entityId`)
  * and dependency edges forwards (what `entityId` depends_on). Both answer
  * "what does this node's operation rest on".
  */
-export function upstream(graph: EconomyGraph, entityId: string, maxDepth = 6): TraversalStep[] {
+export function upstream(graph: EconomyGraph, entityId: string, maxDepth = 6, edgeFilter: EdgeFilter = OPERATIONAL_EDGE_FILTER): TraversalStep[] {
   return walk(graph, entityId, maxDepth, node => [
     ...(graph.in.get(node) ?? []).filter(e => e.kind === 'flow').map(e => ({ next: e.from, edge: e })),
-    ...(graph.out.get(node) ?? []).filter(e => e.kind === 'dependency').map(e => ({ next: e.to, edge: e })),
+    ...(graph.out.get(node) ?? []).filter(e => e.kind === 'dependency' && edgeFilter(e)).map(e => ({ next: e.to, edge: e })),
   ]);
 }
 
 /** Downstream = who receives material from here / who depends on this node. */
-export function downstream(graph: EconomyGraph, entityId: string, maxDepth = 6): TraversalStep[] {
+export function downstream(graph: EconomyGraph, entityId: string, maxDepth = 6, edgeFilter: EdgeFilter = OPERATIONAL_EDGE_FILTER): TraversalStep[] {
   return walk(graph, entityId, maxDepth, node => [
     ...(graph.out.get(node) ?? []).filter(e => e.kind === 'flow').map(e => ({ next: e.to, edge: e })),
-    ...(graph.in.get(node) ?? []).filter(e => e.kind === 'dependency').map(e => ({ next: e.from, edge: e })),
+    ...(graph.in.get(node) ?? []).filter(e => e.kind === 'dependency' && edgeFilter(e)).map(e => ({ next: e.from, edge: e })),
   ]);
 }
 

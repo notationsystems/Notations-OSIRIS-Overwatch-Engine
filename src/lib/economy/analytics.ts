@@ -369,12 +369,25 @@ export interface OperatorConcentration {
   /** The ALLOCATED total (the HHI base). The raw facility total is totalKt. */
   total: number;
   unit: string;
-  /** share = share of the allocated total (the HHI basis). */
+  /** share = share of the allocated total (the HHI basis of `hhi`). */
   shares: Array<{ entityId: string; name: string; value: number; share: number }>;
   /** Partition comparability — see Concentration. */
   groupCount: number;
   effectiveGroups: number;
   partitionFloor: number;
+  /**
+   * The FOURTH comparability axis: a renormalized index over c of the
+   * universe inflates every share by 1/c and the HHI by ~1/c². `hhi` is
+   * the renormalized (attributed-only) figure; `hhiWithRemainder` restores
+   * the unattributed tonnage — each unattributed facility enumerated as its
+   * own group, since distinct facilities have distinct (unmodeled, not
+   * unknown) operators; a facility's residual minority holders lump as one
+   * group per facility, which biases slightly toward concentration and is
+   * said so. ONLY hhiWithRemainder is comparable against an index computed
+   * over the full universe.
+   */
+  hhiWithRemainder: number;
+  remainderTreatment: 'none' | 'enumerated';
   totalKt: number;
   /** allocated / total: the share of facility output the operator model
    *  attributes. Partial attribution is reported, never hidden. */
@@ -410,6 +423,9 @@ export function operatorConcentration(
   const usedDeps: string[] = [];
 
   const allocated = new Map<string, number>();
+  /** Per-facility unattributed tonnage — enumerated groups for
+   *  hhiWithRemainder, never an anonymous pool. */
+  const facilityRemainders: number[] = [];
   let totalKt = 0;
   let allocatedKt = 0;
   let facilityCount = 0;
@@ -420,6 +436,7 @@ export function operatorConcentration(
       unit = o.unit;
       facilityCount += 1;
       usedObs.push(o.id);
+      let facilityAllocated = 0;
       if (basis === 'control') {
         // 100% of an asset to its operator of record. A JV-operated facility
         // with no modeled operator falls to the reported unattributed
@@ -427,18 +444,21 @@ export function operatorConcentration(
         const operator = opEdges.find(x => x.fromEntityId === o.entityId && x.role === 'operator');
         if (operator) {
           allocated.set(operator.toEntityId, (allocated.get(operator.toEntityId) ?? 0) + o.value);
-          allocatedKt += o.value;
+          facilityAllocated = o.value;
           usedDeps.push(operator.id);
         }
-        continue;
+      } else {
+        // economic_interest: ownership shares — who owns the loss.
+        for (const d of opEdges.filter(x => x.fromEntityId === o.entityId)) {
+          const share = Math.max(0, Math.min(1, d.strength ?? 1));
+          allocated.set(d.toEntityId, (allocated.get(d.toEntityId) ?? 0) + o.value * share);
+          facilityAllocated += o.value * share;
+          usedDeps.push(d.id);
+        }
       }
-      // economic_interest: ownership shares — who owns the loss.
-      for (const d of opEdges.filter(x => x.fromEntityId === o.entityId)) {
-        const share = Math.max(0, Math.min(1, d.strength ?? 1));
-        allocated.set(d.toEntityId, (allocated.get(d.toEntityId) ?? 0) + o.value * share);
-        allocatedKt += o.value * share;
-        usedDeps.push(d.id);
-      }
+      allocatedKt += facilityAllocated;
+      const remainder = o.value - facilityAllocated;
+      if (remainder > 0.5) facilityRemainders.push(remainder);
     }
   }
   const unattributedKt = Math.max(0, totalKt - allocatedKt);
@@ -455,6 +475,14 @@ export function operatorConcentration(
   const band: OperatorConcentration['band'] = shares.length === 0 ? 'no-data'
     : hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
 
+  // The comparable figure: shares of the FULL universe, unattributed
+  // facilities enumerated as their own groups.
+  const hhiWithRemainder = totalKt > 0
+    ? Math.round(
+      [...allocated.values(), ...facilityRemainders]
+        .reduce((s, v) => s + ((v / totalKt) * 100) ** 2, 0))
+    : 0;
+
   return wrap(
     'operatorConcentration',
     { metric, facilityKinds: facilityKinds.join(','), basis, asOf },
@@ -463,6 +491,8 @@ export function operatorConcentration(
       metric,
       attributionBasis: basis,
       hhi, band,
+      hhiWithRemainder,
+      remainderTreatment: facilityRemainders.length > 0 ? 'enumerated' as const : 'none' as const,
       total: Number(allocatedKt.toFixed(1)),
       unit,
       shares,
@@ -472,8 +502,8 @@ export function operatorConcentration(
       unattributedKt: Number(unattributedKt.toFixed(1)),
       facilityCount,
       note: basis === 'control'
-        ? 'CONTROL basis: 100% of each facility to its operator of record — who can stop it. JV-operated facilities without a modeled operator fall to the unattributed remainder. HHI over attributed shares; the coverage ratio and partition size travel with the number, which is not comparable raw against an index over a different partition.'
-        : 'ECONOMIC-INTEREST basis: ownership shares — who owns the loss. A different question from control; never pool the two. HHI over attributed shares; the coverage ratio and partition size travel with the number.',
+        ? 'CONTROL basis: 100% of each facility to its operator of record — who can stop it. JV-operated facilities without a modeled operator fall to the unattributed remainder. `hhi` is renormalized over attributed tonnage (inflated by 1/completeness²); ONLY hhiWithRemainder — unattributed facilities enumerated as their own groups — is comparable against a full-universe index.'
+        : 'ECONOMIC-INTEREST basis: ownership shares — who owns the loss. A different question from control; never pool the two. `hhi` is renormalized over attributed tonnage; ONLY hhiWithRemainder is comparable against a full-universe index (per-facility minority residues lump as one group each, biasing slightly toward concentration).',
     },
   );
 }

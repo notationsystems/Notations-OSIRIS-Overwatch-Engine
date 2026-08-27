@@ -18,8 +18,8 @@
  */
 
 import type { AnalyticalResult, EconEvent, EconomyState } from './types';
-import type { EconomyGraph } from './graph';
-import { downstream, nodeThroughput } from './graph';
+import type { EconomyGraph, EdgeFilter } from './graph';
+import { downstream, nodeThroughput, OPERATIONAL_EDGE_FILTER } from './graph';
 
 export interface EventImpact {
   eventId: string;
@@ -45,8 +45,46 @@ export interface EventImpact {
   explanation: string[];
 }
 
-export const DISRUPTIVE_EVENT_TYPES: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather'];
+export const DISRUPTIVE_EVENT_TYPES: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather', 'sanction', 'insolvency'];
 const DISRUPTIVE = DISRUPTIVE_EVENT_TYPES;
+
+/**
+ * What KIND of lever an event pulls — which decides the edges it may
+ * traverse. The role split (operator/shareholder) is the mechanism; the
+ * event class says which roles it travels along:
+ *
+ *   operational   strike, accident, outage, weather — control over the
+ *                 workforce and the plant: OPERATOR edges only.
+ *   financial     sanction, insolvency — attaches to OWNERS, not managers:
+ *                 operator AND shareholder edges. Grasberg is the case:
+ *                 Freeport-operated, majority state-held — a state-holding
+ *                 sanction reaches it through the 51% no operational event
+ *                 could use.
+ *   regulatory    policy — attaches to TERRITORY: neither attribution role
+ *                 carries it (jurisdiction propagation via located_in is
+ *                 not built; policy events remain entity-scoped context).
+ */
+export function eventClassOf(type: EconEvent['type']): 'operational' | 'financial' | 'regulatory' {
+  switch (type) {
+    case 'sanction':
+    case 'insolvency':
+      return 'financial';
+    case 'policy':
+      return 'regulatory';
+    default:
+      return 'operational';
+  }
+}
+
+/** The class-derived edge filter — the window is the event's own structure,
+ *  never a choice made at the call site. */
+export function traversableEdgeFilter(type: EconEvent['type']): EdgeFilter {
+  if (eventClassOf(type) === 'financial') {
+    // Owners and managers both: every operated_by edge traverses.
+    return () => true;
+  }
+  return OPERATIONAL_EDGE_FILTER;
+}
 
 /** Whether an event's window covers the evaluation date. */
 export function isEventActive(ev: EconEvent, asOf: string): boolean {
@@ -70,7 +108,7 @@ export function propagateEvents(
     const t = throughput.get(ev.entityId);
     const disrupted = t ? Math.max(t.inKt, t.outKt) : 0;
 
-    const affected = downstream(graph, ev.entityId, maxDepth).map(s => {
+    const affected = downstream(graph, ev.entityId, maxDepth, traversableEdgeFilter(ev.type)).map(s => {
       const e = graph.nodes.get(s.entityId);
       return { entityId: s.entityId, name: e?.name ?? s.entityId, kind: e?.kind ?? 'unknown', depth: s.depth };
     });

@@ -30,7 +30,7 @@ import type { AnalyticalResult, EconEventType, EconomyState } from '@/lib/econom
 
 export const dynamic = 'force-dynamic';
 
-const EVENT_TYPES: EconEventType[] = ['outage', 'strike', 'closure', 'expansion', 'disruption', 'weather', 'policy', 'demand_surge'];
+const EVENT_TYPES: EconEventType[] = ['outage', 'strike', 'closure', 'expansion', 'disruption', 'weather', 'policy', 'demand_surge', 'sanction', 'insolvency'];
 const SEVERITIES = ['low', 'medium', 'high'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_EVENTS = 8;

@@ -65,6 +65,35 @@ describe('scenario: counterfactual injection', () => {
     expect(affected).toContain('ent:port:amamapare');
   });
 
+  it('sanctions attach to owners: a MIND ID sanction reaches Grasberg through the 51% a strike cannot use', async () => {
+    // Grasberg is the sharp case: Freeport operates it, MIND ID holds 51%.
+    // An OPERATIONAL event at the state holding reaches nothing — a
+    // shareholding is not a lever over operations…
+    const strike = await runEngine('copper', {
+      asOf: '2024-06-15',
+      scenario: {
+        id: 'mind-op', label: 'MIND ID operational event',
+        events: [{ entityId: 'ent:company:mind-id', type: 'disruption', title: 'Operational event (hypothetical)', start: '2024-06-01', severity: 'high' }],
+      },
+    });
+    const strikeImpact = impacts(strike).find(i => i.eventId.startsWith('evt:scenario:mind-op'))!;
+    expect(strikeImpact.affected.map(a => a.entityId)).not.toContain('ent:mine:grasberg');
+    // …but a FINANCIAL/LEGAL event attaches to owners, and traverses the
+    // shareholder edge that operational events must not use.
+    const sanction = await runEngine('copper', {
+      asOf: '2024-06-15',
+      scenario: {
+        id: 'mind-sanction', label: 'Sanctions touching MIND ID',
+        events: [{ entityId: 'ent:company:mind-id', type: 'sanction', title: 'Sanctions (hypothetical)', start: '2024-06-01', severity: 'high' }],
+      },
+    });
+    const sancImpact = impacts(sanction).find(i => i.eventId.startsWith('evt:scenario:mind-sanction'))!;
+    const affected = sancImpact.affected.map(a => a.entityId);
+    expect(affected).toContain('ent:mine:grasberg');
+    expect(affected).toContain('ent:smelter:manyar');
+    expect(affected).toContain('ent:port:amamapare'); // and onward through the material graph
+  });
+
   it('rejects scenarios that reference unknown entities', async () => {
     await expect(runEngine('copper', {
       scenario: { id: 'x', label: 'x', events: [{ entityId: 'ent:mine:atlantis', type: 'outage', title: 'x', start: '2024-01-01', severity: 'high' }] },

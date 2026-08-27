@@ -298,7 +298,11 @@ export type EconEventType =
   | 'disruption'
   | 'weather'
   | 'policy'
-  | 'demand_surge';
+  | 'demand_surge'
+  /** Financial/legal events attach to OWNERS, not managers — they traverse
+   *  shareholder edges as well as operator edges (see propagation). */
+  | 'sanction'
+  | 'insolvency';
 
 export interface EconEvent {
   /** "evt:<slug>" */

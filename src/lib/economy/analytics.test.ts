@@ -4,6 +4,7 @@ import {
   bottleneckCandidates, detectAnomalies, extractSeries, observationsAt, operatorConcentration,
 } from './analytics';
 import { buildGraph, upstream, downstream } from './graph';
+import { traversableEdgeFilter } from './propagation';
 import { syntheticState, FIXTURE_PROV } from './fixtures';
 import { getEconomyState } from './store';
 
@@ -203,8 +204,20 @@ describe('operator concentration', () => {
     const control = operatorConcentration(s, 'production', ['mine'], 'control');
     expect(control.result.attributionCoverage).toBe(0);
     expect(control.result.unattributedKt).toBe(400);
+    // The renormalized hhi has nothing to say here (no attributed shares) —
+    // but the COMPARABLE figure does: one unattributed facility is the
+    // whole universe, a monopoly of the unmodeled. Excluding-and-
+    // renormalizing would have hidden exactly this.
+    expect(control.result.hhi).toBe(0);
+    expect(control.result.hhiWithRemainder).toBe(10000);
+    expect(control.result.remainderTreatment).toBe('enumerated');
     const economic = operatorConcentration(s, 'production', ['mine'], 'economic_interest');
     expect(economic.result.attributionCoverage).toBeCloseTo(0.44, 3);
+    // Renormalized: one holder of everything attributed → 10000. With the
+    // remainder restored, the same data reads far less concentrated —
+    // the 1/completeness² inflation made visible.
+    expect(economic.result.hhi).toBe(10000);
+    expect(economic.result.hhiWithRemainder).toBeCloseTo(5072, 0); // 44%² + 56%² of the full universe
   });
 
   it('reports partial attribution the way geographic coverage is reported — never hidden', () => {
@@ -224,7 +237,7 @@ describe('operator concentration', () => {
     expect(r.result.total).toBeCloseTo(180, 1); // 300 × 0.6 allocated
     expect(r.result.attributionCoverage).toBeCloseTo(0.45, 3);
     expect(r.result.unattributedKt).toBeCloseTo(220, 1);
-    expect(r.result.note).toContain('coverage ratio and partition size travel');
+    expect(r.result.note).toContain('hhiWithRemainder');
   });
 
   it('copper: the pair is only quotable with basis, universe and partition labeled', async () => {
@@ -249,21 +262,31 @@ describe('operator concentration', () => {
     }
     const geoHhi = Math.round([...byCountry.values()].reduce((s, v) => s + ((v / total) * 100) ** 2, 0));
 
-    // Control materially above economic: 100%-to-operator concentrates what
-    // JV share-splitting dilutes. (Grasberg alone: 800 kt to Freeport under
-    // control vs 390 under economic interest.)
-    expect(control.hhi).toBeGreaterThan(economic.hhi + 500);
+    // Control above economic: 100%-to-operator concentrates what JV
+    // share-splitting dilutes (Grasberg alone: 800 kt to Freeport under
+    // control vs 390 under economic interest). The margin NARROWED when the
+    // JV operating vehicles were curated — raising control completeness to
+    // ~100% removed the 1/completeness² inflation, which is the round-11
+    // correction working as intended.
+    expect(control.attributionCoverage).toBeGreaterThan(0.99); // JV vehicles curated: unmodeled was never unknown
+    expect(control.hhi).toBeGreaterThan(economic.hhi);
     // Freeport's control position is the index-free finding: largest
-    // operator, roughly 31% of modeled mine output, three countries.
+    // operator, roughly a quarter of modeled mine output, three countries.
     expect(control.shares[0].entityId).toBe('ent:company:freeport');
-    expect(control.shares[0].share).toBeGreaterThan(0.25);
-    // Same universe, same partition size — the one strictly comparable
-    // geographic figure. On current data the modeled facility set is more
-    // concentrated by geography than by control (Chile-heavy facility
-    // coverage — the coverage bias annotation explains why), while the
-    // world-reported country figure (different universe) sits below both.
-    expect(byCountry.size).toBe(control.groupCount);
-    expect(geoHhi).toBeGreaterThan(control.hhi);
+    expect(control.shares[0].share).toBeGreaterThan(0.2);
+    // Same universe, same partition — and with control completeness ~1,
+    // hhi and hhiWithRemainder coincide, so the comparison against the
+    // full-universe geographic figure is finally clean: the modeled
+    // facility set is substantially more concentrated by geography than by
+    // control (Chile-heavy facility coverage — the coverage bias annotation
+    // explains why). The world-reported country figure (different universe)
+    // is labeled, never compared raw.
+    expect(control.hhiWithRemainder).toBe(control.hhi);
+    expect(geoHhi).toBeGreaterThan(control.hhiWithRemainder);
+    // Economic completeness stays partial (minority residues) — its
+    // comparable figure deflates accordingly and says so.
+    expect(economic.attributionCoverage).toBeLessThan(1);
+    expect(economic.hhiWithRemainder).toBeLessThan(economic.hhi);
     // Every index carries its partition context, so no consumer has to
     // reconstruct comparability from the outside.
     for (const r of [control, economic]) {
@@ -290,14 +313,24 @@ describe('operator concentration', () => {
     const g = buildGraph(s);
     const up = upstream(g, 'ent:mine:alpha').map(x => x.entityId);
     expect(up).toContain('ent:company:omega-corp');
-    // A shareholding is a claim on output, not a lever over operations —
-    // disruption must not propagate through it in either direction.
+    // Operationally, a shareholding is a claim on output, not a lever —
+    // strikes and outages must not propagate through it in either direction.
     expect(up).not.toContain('ent:company:holder');
     expect(downstream(g, 'ent:company:holder')).toEqual([]);
     // The operator's reach covers the asset and everything downstream of it.
     const reach = downstream(g, 'ent:company:omega-corp').map(x => x.entityId);
     expect(reach).toContain('ent:mine:alpha');
     expect(reach).toContain('ent:port:gate');
+    // The sibling rule: FINANCIAL/LEGAL events attach to owners, not
+    // managers — a sanctions-class event DOES reach the asset through the
+    // 30%, because the edge that carries it is exactly the one operational
+    // events must not use.
+    const sanctionReach = downstream(g, 'ent:company:holder', 6, traversableEdgeFilter('sanction')).map(x => x.entityId);
+    expect(sanctionReach).toContain('ent:mine:alpha');
+    expect(sanctionReach).toContain('ent:port:gate');
+    // Regulatory events attach to territory: neither attribution role
+    // carries them.
+    expect(downstream(g, 'ent:company:holder', 6, traversableEdgeFilter('policy'))).toEqual([]);
   });
 });
 

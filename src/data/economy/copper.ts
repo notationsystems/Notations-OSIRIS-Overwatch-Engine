@@ -159,6 +159,12 @@ const companies: Entity[] = [
   { id: 'ent:company:aurubis', kind: 'company', name: 'Aurubis', commodity: 'copper' },
   { id: 'ent:company:kghm', kind: 'company', name: 'KGHM Polska Miedź', commodity: 'copper' },
   { id: 'ent:company:southern-copper', kind: 'company', name: 'Southern Copper', commodity: 'copper', notes: 'Operates Ilo. Majority-owned by Grupo México; operational attribution stops at the operating company.' },
+  /* JV operating vehicles — unmodeled was never unknown: these are named
+   * legal entities of public record. Modeling them closes control
+   * attribution by curation; who stands BEHIND each vehicle (parent
+   * chains) is the open-ownership adapter's separate job. */
+  { id: 'ent:company:antamina-jv', kind: 'company', name: 'Compañía Minera Antamina S.A.', commodity: 'copper', notes: 'Operator of record for Antamina. JV vehicle (BHP/Glencore/Teck/Mitsubishi); parent chains await the ownership adapter.' },
+  { id: 'ent:company:collahuasi-jv', kind: 'company', name: 'Compañía Minera Doña Inés de Collahuasi SCM', commodity: 'copper', notes: 'Operator of record for Collahuasi. JV vehicle (Anglo American/Glencore/JCR); parent chains await the ownership adapter.' },
 ];
 
 export const COPPER_ENTITIES: Entity[] = [
@@ -408,13 +414,18 @@ const op = (facility: string, company: string, share: number, role: 'operator' |
 const OPERATOR_ATTRIBUTIONS: Dependency[] = [
   op('ent:mine:escondida', 'ent:company:bhp', 0.575, 'operator'),
   op('ent:mine:escondida', 'ent:company:rio-tinto', 0.30, 'shareholder'),
-  op('ent:mine:collahuasi', 'ent:company:anglo-american', 0.44, 'shareholder', 'Operated by the Collahuasi JV vehicle — no modeled operator; control-basis unattributed.'),
+  // JV-vehicle operator edges carry strength 0: the vehicle is a
+  // pass-through with no economic interest of its own (its owners hold the
+  // shareholder edges), but it IS the lever operational disruption pulls.
+  op('ent:mine:collahuasi', 'ent:company:collahuasi-jv', 0, 'operator', 'Operator of record; economic interest sits with its shareholders.'),
+  op('ent:mine:collahuasi', 'ent:company:anglo-american', 0.44, 'shareholder'),
   op('ent:mine:collahuasi', 'ent:company:glencore', 0.44, 'shareholder'),
   op('ent:mine:el-teniente', 'ent:company:codelco', 1, 'operator'),
   op('ent:mine:chuquicamata', 'ent:company:codelco', 1, 'operator'),
   op('ent:mine:cerro-verde', 'ent:company:freeport', 0.535, 'operator'),
   op('ent:mine:cerro-verde', 'ent:company:sumitomo-mm', 0.21, 'shareholder'),
-  op('ent:mine:antamina', 'ent:company:bhp', 0.3375, 'shareholder', 'Operated by Compañía Minera Antamina (JV vehicle) — no modeled operator; control-basis unattributed.'),
+  op('ent:mine:antamina', 'ent:company:antamina-jv', 0, 'operator', 'Operator of record; economic interest sits with its shareholders.'),
+  op('ent:mine:antamina', 'ent:company:bhp', 0.3375, 'shareholder'),
   op('ent:mine:antamina', 'ent:company:glencore', 0.3375, 'shareholder'),
   op('ent:mine:antamina', 'ent:company:teck', 0.225, 'shareholder'),
   op('ent:mine:las-bambas', 'ent:company:mmg', 0.625, 'operator'),
