@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
 import { knownAtOf, outranksObservation } from '@/lib/economy/analytics';
-import { matchRegistryGaps } from '@/lib/economy/sourceRegistry';
+import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
 /**
@@ -80,13 +80,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * Best-effort miss log. A query the register cannot answer is the instrument
  * ranking its own registry: appended to data-archive/search-misses.jsonl so
- * dormant sources accumulate demand evidence instead of opinions. Suppressed
- * under test (synthetic queries are not demand); failure (read-only
- * filesystem) must never break search.
+ * dormant sources accumulate demand evidence instead of opinions. The record
+ * comes from missRecord(), which withholds the query string unless it
+ * contains register vocabulary — the person-name policy must hold at the log,
+ * not just at the index and the registry. Suppressed under test (synthetic
+ * queries are not demand); failure (read-only filesystem) must never break
+ * search.
  */
-async function archiveSearchMiss(rec: {
-  ts: string; q: string; commodity: string; asOf: string | null; knowledge: string; gapIds: string[];
-}): Promise<void> {
+async function archiveSearchMiss(rec: SearchMissRecord & { ts: string }): Promise<void> {
   if (process.env.VITEST) return;
   try {
     const fs = await import('node:fs/promises');
@@ -191,9 +192,16 @@ export async function GET(request: Request) {
       }));
       missNote = `No canonical entity answers "${q}". ${gaps.length} registered source${gaps.length === 1 ? '' : 's'} with no adapter declare${gaps.length === 1 ? 's' : ''} coverage that could — a miss is a demand signal, not a dead end.`;
     }
+    // State-derived register vocabulary: a miss mentioning any of these is a
+    // demand signal; free text mentioning none of them (a person's name, say)
+    // is counted but its string is never retained.
+    const extraVocabulary = [
+      state.commodity, state.commodityName,
+      ...state.entities.flatMap(e => [e.name, e.kind, e.stage ?? '', e.country ?? '', e.countryCode ?? '', e.operator ?? '']),
+    ];
     await archiveSearchMiss({
-      ts: new Date().toISOString(), q, commodity, asOf: asOf ?? null, knowledge,
-      gapIds: gaps.map(g => g.sourceId),
+      ts: new Date().toISOString(),
+      ...missRecord({ q, commodity, asOf: asOf ?? null, knowledge, gapIds: gaps.map(g => g.sourceId), extraVocabulary }),
     });
   }
 

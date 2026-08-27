@@ -203,7 +203,7 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 | `coverage` | Facility-model coverage per country: rolled-up facility observations ÷ the country's own observation. ≈1 complete, <1 the unmodelled share, >1 a contradiction. This is the standing integrity check that keeps facility- and country-level populations from ever being conflated — they meet only here, explicitly, as a ratio. The coverage range is also **attached to the facility-level HHI** (`coverageBias`), because differential coverage biases facility concentration toward better-modeled countries and the number must not travel without that caveat. |
 | `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. Classing definitional is **normalization, not dismissal**: the pair is converted at the fixed 25% reference grade and the residual recorded (`basisNormalization`) — Chile→China: 8,433 × 0.25 = 2,108 vs 2,125 declared, a **+0.8% residual: the basis explains the entire gap, no material suppression signal in this corridor**. The residual is the watched baseline — definitional pairs rank on it, never on raw spread — and reclassification keys on **drift** against the corridor's own history, never on level: the level is confounded by the corridor's unknown true grade (a genuine 30%-grade corridor shows +20% at the 25% reference with honest declarations — a stable offset is a grade), while grade moves slowly, so first-differencing removes it and a step beyond ±10 points reclasses the pair `unexplained`. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
 | `scenario` (via `POST /api/economy/scenario`) | Counterfactual event injection: hypothetical events run through the same engine on an explicit **EvaluationFrame** (`kind: counterfactual`, scenario id, asOf, knowledge) so a hypothetical can never be read as a reconstruction. Returns baseline + counterfactual frames and the structural delta (newly disrupted entities, newly affected downstream, disrupted kt/y). Combined with `as_known_then` it backtests the analytical layer itself: posing Grasberg's halt into the 2025-09-09 knowledge state recovers the same dependent-smelter conclusion the best-known reconstruction reaches — evidence the analytics' structural calls do not depend on hindsight. |
-| `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. Edge traversal is class-gated (`eventClassOf`): operational events walk operator edges, financial events walk shareholder edges too. **Regulatory events propagate by territory + scope, not graph adjacency**: a `RegulatoryScope { jurisdictionCountryCode, commodity?, stages?, direction }` on the event resolves membership through located_in edges and countryCode. `direction: 'all'` disrupts every in-scope entity and its downstream — Peru's 2020 COVID mining halt reaches Cerro Verde, Antamina, Las Bambas, Callao and Onsan, never Escondida (territory means territory). `direction: 'export'` halts only flows *crossing the border*, sparing domestic receivers — Grasberg's 2017 export halt stops outbound concentrate without stopping production (and honestly reports zero disrupted kt against the modeled 2024 domestic-processing topology, a recorded flow-vintage limitation, rather than inventing 2017 exports; a scenario-posed Chilean export ban shows the full mechanism: Saganoseki, Shanghai and Guixi affected, Caletones spared). A regulatory event **without a scope is refused, not guessed** — the impact says so instead of defaulting to a walk that would be wrong in both directions. |
+| `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. Edge traversal is class-gated (`eventClassOf`): operational events walk operator edges, financial events walk shareholder edges too. **Regulatory events propagate by territory + scope, not graph adjacency**: a `RegulatoryScope { jurisdictionCountryCode, commodity?, stages?, direction }` on the event resolves membership through located_in edges and countryCode. `direction: 'all'` disrupts every in-scope entity and its downstream — Peru's 2020 COVID mining halt reaches Cerro Verde, Antamina, Las Bambas, Callao and Onsan, never Escondida (territory means territory). `direction: 'export'` halts only flows *crossing the border*, sparing domestic receivers — Grasberg's 2017 export halt stops outbound concentrate without stopping production (a scenario-posed Chilean export ban shows the full mechanism: Saganoseki, Shanghai and Guixi affected, Caletones spared). A regulatory event **without a scope is refused, not guessed** — its tonnage is `null`, never a 0 a reader could take as "no effect". **Topology validity is checked on every pass**: `asOf` filters what was *known*, but flows are a single-vintage claim about what *was* — an evaluation date that **predates** the flow period gets `null` for every flow-derived tonnage with the mismatch named (a 2017 evaluation against 2024 flows describes a world that did not yet exist; "no entity in scope" is 0, "cannot answer at this date" is null, and the two never render alike), while a date **after** the period uses the snapshot as latest-known structure, labeled — the same latest-claim-at-asOf convention every other quantity follows. |
 
 ### Alerts (engine layer only — deliberately no UI yet)
 
@@ -347,9 +347,15 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   `data-archive/search-misses.jsonl` so dormant sources accumulate demand
   evidence instead of opinions. A withheld miss returns no gaps — the state
   CAN answer, the knowledge state withholds it, and offering sources there
-  would misdiagnose coherence as absence. Policy, pinned by test: registry
-  `yields` name canonical identity kinds only (no source may be registered
-  for natural-person data) and `SearchHit` projects register fields only.
+  would misdiagnose coherence as absence. Policy, pinned by test at all
+  three layers: registry `yields` name canonical identity kinds only (no
+  source may be registered for natural-person data); `SearchHit` projects
+  register fields only; and the miss log retains a query string only when
+  it contains register vocabulary (registry keywords + state-derived kinds,
+  countries, operators, commodity) — a person-directed query that misses is
+  counted (`queryWithheld`) but its string is never persisted, because the
+  policy's real property is that the system does not accumulate
+  person-directed queries, not merely that it declines to answer them.
 
 ## Spatial + research interface
 
@@ -437,11 +443,14 @@ supporting evidence.
   caveats, never silently interpolated.
 - Flow records are 2024 annual snapshots; playback re-evaluates events,
   propagation and observation selection over time, but flow tonnage itself is
-  not yet time-resolved. Regulatory propagation inherits this directly: an
-  export halt is evaluated against the modeled topology, so Grasberg's 2017
-  halt finds zero crossing flows to stop (Indonesian flows are modeled in
-  the post-2023 domestic-processing regime) and reports that honestly
-  rather than inventing 2017 exports.
+  not yet time-resolved. The topology-validity guard makes the mismatch an
+  enforced invariant rather than a silent error: evaluations predating the
+  flow period return null tonnage with the mismatch named (Grasberg's 2017
+  halt, the 2017 Escondida strike), later evaluations use the snapshot as
+  labeled latest-known structure, and the playback panel banners both. The
+  structural fix is **flow vintages** (several flow periods coexisting,
+  asOf selecting among them — the MCS-vintage shape), in the backlog ranked
+  below evidence-layer search kinds and the OpenOwnership adapter.
 - A sanctions-class event traverses both operator and shareholder edges,
   but its exposure number has no declared attribution basis yet — the
   sanctioned party's reach is operator-of-record ∪ material shareholding,

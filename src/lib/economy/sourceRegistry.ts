@@ -54,6 +54,49 @@ export const SOURCE_REGISTRY: RegisteredSource[] = [
   { sourceId: 'openownership', name: 'OpenOwnership beneficial-ownership register', category: 'ownership', yields: ['dependency'], cadence: 'irregular', accessClass: 'open', adapter: null, keywords: ['ownership', 'parent', 'beneficial', 'holding', 'shareholder'], note: 'Parent chains — who stands behind each JV vehicle (Southern Copper → Grupo México). The remaining ownership purpose after operator curation closed.' },
 ];
 
+const tokenize = (s: string): string[] => s.toLowerCase().split(/[^a-z0-9]+/).filter(t => t.length >= 2);
+
+/** Vocabulary the registry itself declares (categories + keyword tokens);
+ *  callers extend it with state-derived tokens via `extraVocabulary`. */
+const REGISTRY_VOCABULARY: ReadonlySet<string> = new Set(
+  SOURCE_REGISTRY.flatMap(s => [s.category as string, ...s.keywords.flatMap(tokenize)]),
+);
+
+/**
+ * Whether a missed query is admissible to the persistent miss log.
+ *
+ * The person-name policy is only real if it holds at every layer: the index
+ * refuses to MATCH person names, the registry refuses to YIELD person data —
+ * and the miss log must refuse to RETAIN person-directed queries, or the
+ * policy is "refused at the surface, persisted at the back". The gate: a
+ * query string is logged only when it contains register vocabulary (registry
+ * categories/keywords plus caller-supplied tokens — kinds, countries,
+ * operators, commodity). Free text with no register vocabulary is not a
+ * demand signal for any adapter, so discarding it costs nothing
+ * analytically; such misses are counted without their strings.
+ */
+export function missLoggable(query: string, extraVocabulary: Iterable<string> = []): boolean {
+  const vocab = new Set(REGISTRY_VOCABULARY);
+  for (const term of extraVocabulary) for (const t of tokenize(term)) vocab.add(t);
+  return tokenize(query).some(t => vocab.has(t));
+}
+
+export type SearchMissRecord = {
+  commodity: string; asOf: string | null; knowledge: string; gapIds: string[];
+} & ({ q: string } | { queryWithheld: true });
+
+/** The record a search miss persists — the query string only when the
+ *  vocabulary gate admits it (a gap match admits by construction). */
+export function missRecord(input: {
+  q: string; commodity: string; asOf: string | null; knowledge: string;
+  gapIds: string[]; extraVocabulary?: Iterable<string>;
+}): SearchMissRecord {
+  const base = { commodity: input.commodity, asOf: input.asOf, knowledge: input.knowledge, gapIds: input.gapIds };
+  return input.gapIds.length > 0 || missLoggable(input.q, input.extraVocabulary ?? [])
+    ? { ...base, q: input.q }
+    : { ...base, queryWithheld: true };
+}
+
 /** Registered sources with no adapter whose declared coverage matches the
  *  query — the demand signal a miss generates. */
 export function matchRegistryGaps(query: string): RegisteredSource[] {

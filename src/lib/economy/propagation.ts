@@ -30,8 +30,13 @@ export interface EventImpact {
   active: boolean;
   entityId: string;
   entityName: string;
-  /** kt/y of material the entity carries in the flow graph (max of in/out). */
-  disruptedKtPerYear: number;
+  /** kt/y of material the entity carries in the flow graph (max of in/out).
+   *  null when the figure cannot be stated: the evaluation date predates the
+   *  flow topology's period (a 2017 event against 2024 flows — the topology
+   *  describes a world that did not yet exist), or a regulatory event has no
+   *  scope. "No entity in scope" is 0; "cannot answer at this date" is null —
+   *  the two must never render alike. */
+  disruptedKtPerYear: number | null;
   /** Downstream entities within the propagation walk. */
   affected: Array<{ entityId: string; name: string; kind: string; depth: number }>;
   /** Same-kind, same-stage entities with stated spare capacity. */
@@ -61,8 +66,8 @@ const DISRUPTIVE = DISRUPTIVE_EVENT_TYPES;
  *                 sanction reaches it through the 51% no operational event
  *                 could use.
  *   regulatory    policy — attaches to TERRITORY: neither attribution role
- *                 carries it (jurisdiction propagation via located_in is
- *                 not built; policy events remain entity-scoped context).
+ *                 carries it; it propagates by jurisdiction + scope instead
+ *                 (regulatoryImpact below), and without a scope is refused.
  */
 export function eventClassOf(type: EconEvent['type']): 'operational' | 'financial' | 'regulatory' {
   switch (type) {
@@ -92,6 +97,59 @@ export function isEventActive(ev: EconEvent, asOf: string): boolean {
 }
 
 /**
+ * Whether the flow topology can describe the world at the evaluation date.
+ *
+ * asOf filters what was KNOWN; the flow records claim what WAS — and only one
+ * vintage of that claim exists. The statuses follow the same selection rule
+ * as every other quantity ("latest claim at or before asOf"):
+ *
+ *   within        asOf inside the union of flow periods.
+ *   extrapolated  asOf after the period: the snapshot is the latest-known
+ *                 structure and serves, labeled — the standard latest-
+ *                 observation-forward convention, not a silent guess.
+ *   predates      asOf BEFORE any flow period: no admissible vintage exists
+ *                 and the world demonstrably differed (2017 export routes
+ *                 are not 2024's). Flow-derived quantities are null, never
+ *                 zero — "no entity in scope" is an answer, "topology out of
+ *                 period" is not, and the two must not render alike.
+ *
+ * The structural fix is flow VINTAGES (several periods coexisting, asOf
+ * selecting among them — the MCS-vintage shape); until then this guard makes
+ * the mismatch an enforced invariant instead of a documented special case.
+ */
+export interface TopologyValidity {
+  /** Union of flow periods in the state; null when no flows are modeled. */
+  topologyPeriod: { start: string; end: string } | null;
+  evaluatedAt: string;
+  status: 'within' | 'extrapolated' | 'predates';
+  /** Human-readable statement of the mismatch; absent when within. */
+  note?: string;
+}
+
+export function topologyValidity(state: EconomyState, asOf: string): TopologyValidity {
+  if (state.flows.length === 0) {
+    return { topologyPeriod: null, evaluatedAt: asOf, status: 'within' };
+  }
+  let start = state.flows[0].period.start;
+  let end = state.flows[0].period.end;
+  for (const f of state.flows) {
+    if (f.period.start < start) start = f.period.start;
+    if (f.period.end > end) end = f.period.end;
+  }
+  const status = asOf < start ? 'predates' : asOf > end ? 'extrapolated' : 'within';
+  return {
+    topologyPeriod: { start, end },
+    evaluatedAt: asOf,
+    status,
+    ...(status === 'predates'
+      ? { note: `Flow topology describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only. Flow vintages are the recorded fix.` }
+      : status === 'extrapolated'
+        ? { note: `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure.` }
+        : {}),
+  };
+}
+
+/**
  * Regulatory propagation: territory + scope, not attribution edges.
  *
  *   direction 'export'  the sharp shape — CROSSING flows stop while
@@ -111,6 +169,7 @@ function regulatoryImpact(
   entityName: string,
   asOf: string,
   maxDepth: number,
+  validity: TopologyValidity,
 ): EventImpact {
   const active = isEventActive(ev, asOf);
   const scope = ev.regulatoryScope;
@@ -123,7 +182,8 @@ function regulatoryImpact(
     return {
       eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
       entityId: ev.entityId!, entityName,
-      disruptedKtPerYear: 0, affected: [], alternatives: [], dependents: [],
+      // Refused, not answered: null, never a zero a reader could take as "no effect".
+      disruptedKtPerYear: null, affected: [], alternatives: [], dependents: [],
       flowIds: [], capacityIds: [], dependencyIds: [], explanation,
     };
   }
@@ -146,6 +206,10 @@ function regulatoryImpact(
   };
   const flowIds: string[] = [];
   let disrupted = 0;
+  // Predating evaluation: the flow walk still yields structural reach, but
+  // its tonnage describes the topology's period, not asOf's world.
+  const predates = validity.status === 'predates';
+  const ktText = (n: number) => predates ? 'tonnage null — topology out of period' : `~${Math.round(n)} kt/y`;
 
   if (scope.direction === 'export') {
     // Crossing flows halt; production does not. Foreign receivers and their
@@ -163,7 +227,7 @@ function regulatoryImpact(
       addAffected(edge.to, 1);   // the foreign receiver
       for (const step of downstream(graph, edge.to, maxDepth - 1)) addAffected(step.entityId, step.depth + 1);
     }
-    explanation.push(`Export halt in ${scope.jurisdictionCountryCode}: ${flowIds.length} crossing flow(s) (~${Math.round(disrupted)} kt/y) stop while production continues — domestic receivers keep supply, foreign receivers and their downstream lose it.`);
+    explanation.push(`Export halt in ${scope.jurisdictionCountryCode}: ${flowIds.length} crossing flow(s) (${ktText(disrupted)}) stop while production continues — domestic receivers keep supply, foreign receivers and their downstream lose it.`);
   } else {
     // All in-scope activity halts: in-scope entities and their downstream.
     for (const [id] of graph.nodes) {
@@ -176,13 +240,14 @@ function regulatoryImpact(
       }
       for (const step of downstream(graph, id, maxDepth)) addAffected(step.entityId, step.depth);
     }
-    explanation.push(`Jurisdiction-wide halt in ${scope.jurisdictionCountryCode}${scope.stages ? ` (${scope.stages.join(', ')})` : ''}: ${affectedMap.size} entity(ies) in scope or downstream; ~${Math.round(disrupted)} kt/y of outbound flow interrupted.`);
+    explanation.push(`Jurisdiction-wide halt in ${scope.jurisdictionCountryCode}${scope.stages ? ` (${scope.stages.join(', ')})` : ''}: ${affectedMap.size} entity(ies) in scope or downstream; ${ktText(disrupted)} of outbound flow interrupted.`);
   }
+  if (validity.note) explanation.push(validity.note);
 
   return {
     eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
     entityId: ev.entityId!, entityName,
-    disruptedKtPerYear: Math.round(disrupted),
+    disruptedKtPerYear: predates ? null : Math.round(disrupted),
     affected: [...affectedMap.values()].sort((a, b) => a.depth - b.depth),
     alternatives: [], dependents: [],
     flowIds: [...new Set(flowIds)],
@@ -197,6 +262,10 @@ export function propagateEvents(
   { asOf = new Date().toISOString().slice(0, 10), maxDepth = 4 } = {},
 ): AnalyticalResult<EventImpact[]> {
   const throughput = nodeThroughput(graph);
+  // asOf filters what was KNOWN; the flow topology claims what WAS, and only
+  // one vintage of it exists. Evaluate the mismatch once for the whole pass.
+  const validity = topologyValidity(state, asOf);
+  const predates = validity.status === 'predates';
 
   const impacts: EventImpact[] = [];
   for (const ev of state.events) {
@@ -207,7 +276,7 @@ export function propagateEvents(
     // Regulatory events attach to territory: a distinct propagation shape,
     // scoped by what the regulation governs — never the entity walk.
     if (eventClassOf(ev.type) === 'regulatory') {
-      impacts.push(regulatoryImpact(state, graph, ev, entity.name, asOf, maxDepth));
+      impacts.push(regulatoryImpact(state, graph, ev, entity.name, asOf, maxDepth, validity));
       continue;
     }
 
@@ -249,16 +318,21 @@ export function propagateEvents(
     const unquantified = t?.unquantifiedFlowIds ?? [];
     const explanation: string[] = [];
     explanation.push(active ? 'Event window covers the evaluation date — treated as a live state change.' : 'Event window closed — shown as structural context.');
-    if (disrupted > 0) explanation.push(`~${Math.round(disrupted)} kt/y of material moves through ${entity.name} in the modeled graph.`);
+    if (predates) {
+      // The flow walk yields structural reach; its tonnage describes the
+      // topology's period, not asOf's world — the figure cannot be stated.
+      explanation.push(validity.note!);
+    } else if (disrupted > 0) explanation.push(`~${Math.round(disrupted)} kt/y of material moves through ${entity.name} in the modeled graph.`);
     else if (unquantified.length > 0) explanation.push(`${entity.name} carries ${unquantified.length} flow(s) whose tonnage is REFUSED (gross-weight basis with no corridor grade) — disrupted tonnage is unknown, not zero; impact below is structural reach only.`);
     else explanation.push(`${entity.name} carries no modeled flow — impact is structural (capacity/dependency), not flow interruption.`);
-    if (disrupted > 0 && unquantified.length > 0) explanation.push(`${unquantified.length} additional flow(s) at this node could not be quantified — the disrupted tonnage is a lower bound.`);
+    if (!predates && disrupted > 0 && unquantified.length > 0) explanation.push(`${unquantified.length} additional flow(s) at this node could not be quantified — the disrupted tonnage is a lower bound.`);
     explanation.push(affected.length > 0 ? `${affected.length} downstream entity(ies) within ${maxDepth} hops.` : 'No modeled downstream entities.');
-    if (disrupted > 0) {
+    if (!predates && disrupted > 0) {
       explanation.push(totalSpare >= disrupted
         ? `Stated spare capacity at peers (~${totalSpare} kt/y) could nominally absorb the loss.`
         : `Stated spare capacity at peers (~${totalSpare} kt/y) does NOT cover the disrupted volume — constraint candidate.`);
     }
+    if (!predates && validity.note) explanation.push(validity.note);
     for (const d of dependents) {
       explanation.push(`${d.name} declares dependency on this node${d.strength !== null ? ` (strength ${d.strength})` : ''}.`);
     }
@@ -266,7 +340,7 @@ export function propagateEvents(
     impacts.push({
       eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
       entityId: ev.entityId, entityName: entity.name,
-      disruptedKtPerYear: Math.round(disrupted),
+      disruptedKtPerYear: predates ? null : Math.round(disrupted),
       affected, alternatives, dependents,
       flowIds: [...(t?.flowIds ?? []), ...unquantified],
       capacityIds: altCapacityIds,
@@ -275,15 +349,23 @@ export function propagateEvents(
     });
   }
 
-  // Live, severe, large first.
+  // Live, severe, large first; a null figure ("cannot state") sorts below
+  // any stated figure, zero included — unknown never outranks known.
   const sevRank = { high: 2, medium: 1, low: 0 } as const;
   impacts.sort((a, b) =>
     Number(b.active) - Number(a.active) ||
     sevRank[b.severity] - sevRank[a.severity] ||
-    b.disruptedKtPerYear - a.disruptedKtPerYear);
+    (b.disruptedKtPerYear ?? -1) - (a.disruptedKtPerYear ?? -1));
 
   return {
-    operation: { name: 'propagateEvents', params: { asOf, maxDepth } },
+    operation: {
+      name: 'propagateEvents',
+      params: {
+        asOf, maxDepth,
+        topologyStatus: validity.status,
+        topologyPeriod: validity.topologyPeriod ? `${validity.topologyPeriod.start}..${validity.topologyPeriod.end}` : undefined,
+      },
+    },
     execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
     inputs: {
       flowIds: [...new Set(impacts.flatMap(i => i.flowIds))],

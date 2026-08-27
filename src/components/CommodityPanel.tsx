@@ -74,6 +74,8 @@ interface Analytics {
   coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
   divergence?: { result: DivergenceRec[] };
   corpusHealth?: CorpusHealthRow[];
+  /** Whether the flow topology's period can describe the evaluation date. */
+  topology?: { topologyPeriod: { start: string; end: string } | null; evaluatedAt: string; status: 'within' | 'extrapolated' | 'predates'; note?: string };
   events: EconEvent[];
   sources: Array<{ sourceId: string; sourceName: string; sourceUrl?: string }>;
 }
@@ -264,6 +266,20 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
           <button onClick={onClose} className="hover:bg-white/10 rounded p-0.5" aria-label="Close panel"><X className="w-3.5 h-3.5 text-[var(--text-muted)]" /></button>
         </div>
       </div>
+
+      {/* The scrubber is honest about observations via knownAt; this keeps it
+          equally honest about arcs — flow topology is a single-vintage claim,
+          and a scrub date outside its period says so (same shape as the
+          withheld-entity note in search). */}
+      {asOf && analytics?.topology && analytics.topology.status !== 'within' && analytics.topology.note && (
+        <div
+          className="px-3 py-1 text-[8px] font-mono leading-tight border-b border-white/10"
+          style={{ color: analytics.topology.status === 'predates' ? '#FF3D3D' : '#D4AF37', background: analytics.topology.status === 'predates' ? 'rgba(255,61,61,0.06)' : 'rgba(212,175,55,0.05)' }}
+        >
+          {analytics.topology.status === 'predates' ? 'TOPOLOGY OUT OF PERIOD — ' : 'TOPOLOGY EXTRAPOLATED — '}
+          {analytics.topology.note}
+        </div>
+      )}
 
       <div className="overflow-y-auto styled-scrollbar px-3 py-2 flex-1 min-h-0">
         {/* ── ENTITY INSPECTOR ── */}

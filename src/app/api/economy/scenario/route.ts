@@ -126,7 +126,11 @@ export async function POST(request: Request) {
       )]
         .filter(id => !baseAffected.has(id))
         .map(id => ({ id, name: entityName.get(id) ?? id })),
-      disruptedKtPerYear: scenarioImpacts.filter(i => i.active).reduce((s, i) => s + i.disruptedKtPerYear, 0),
+      // A null impact figure ("cannot state at this date") poisons the sum:
+      // adding it as 0 would launder unknown into a smaller known total.
+      disruptedKtPerYear: scenarioImpacts.filter(i => i.active).some(i => i.disruptedKtPerYear === null)
+        ? null
+        : scenarioImpacts.filter(i => i.active).reduce((s, i) => s + (i.disruptedKtPerYear ?? 0), 0),
     },
   });
 }

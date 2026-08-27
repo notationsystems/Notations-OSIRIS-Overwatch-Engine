@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SOURCE_REGISTRY, matchRegistryGaps } from './sourceRegistry';
+import { SOURCE_REGISTRY, matchRegistryGaps, missLoggable, missRecord } from './sourceRegistry';
 
 describe('source registry', () => {
   it('sourceIds are unique and every entry is a real, described source', () => {
@@ -35,5 +35,23 @@ describe('source registry', () => {
 
   it('a query outside every declared coverage matches nothing', () => {
     expect(matchRegistryGaps('xylophone quarterly')).toEqual([]);
+  });
+
+  it('policy: the miss log never retains a query without register vocabulary — refused at the surface must not mean persisted at the back', () => {
+    // A person-directed query: correctly missed by the index, and the string
+    // must not survive into the log either.
+    expect(missLoggable('maria fernanda gutierrez')).toBe(false);
+    const withheld = missRecord({ q: 'maria fernanda gutierrez', commodity: 'copper', asOf: null, knowledge: 'best_known', gapIds: [] });
+    expect(withheld).not.toHaveProperty('q');
+    expect(withheld).toMatchObject({ queryWithheld: true });
+    // Register vocabulary admits: registry keywords…
+    expect(missLoggable('vessel shipping movements')).toBe(true);
+    // …and caller-supplied state tokens (operators, countries, kinds):
+    // without them 'bhp' is unknown vocabulary, with them it admits.
+    expect(missLoggable('bhp workforce dispute')).toBe(false);
+    expect(missLoggable('bhp workforce dispute', ['BHP'])).toBe(true);
+    // A gap match admits by construction, whatever the vocabulary says.
+    const gapAdmitted = missRecord({ q: 'vessel movements', commodity: 'copper', asOf: null, knowledge: 'best_known', gapIds: ['maritime-ais'] });
+    expect(gapAdmitted).toMatchObject({ q: 'vessel movements' });
   });
 });

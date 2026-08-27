@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { runEngine, listSystems } from '@/lib/economy/engine';
-import { DISRUPTIVE_EVENT_TYPES, isEventActive } from '@/lib/economy/propagation';
+import { DISRUPTIVE_EVENT_TYPES, isEventActive, topologyValidity } from '@/lib/economy/propagation';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
 import { corpusHealthSignals } from '@/lib/economy/horizon';
 import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
@@ -62,6 +62,10 @@ export async function GET(request: Request) {
   }
   const { state, providers, systems } = run;
   const evalDate = asOf ?? new Date().toISOString().slice(0, 10);
+  // The scrubber is honest about observations (knownAt) — it must be equally
+  // honest about arcs: flow topology is a single-vintage claim about a
+  // period, and an evaluation date outside that period says so.
+  const topology = topologyValidity(state, evalDate);
 
   if (view === 'state') {
     return NextResponse.json({ providers, state });
@@ -75,6 +79,7 @@ export async function GET(request: Request) {
       providers,
       asOf: run.asOf ?? null,
       knowledge: run.knowledge,
+      topology,
       systems: listSystems(),
       concentration: concentrationSuite,
       centrality: systems.centrality,
@@ -230,6 +235,7 @@ export async function GET(request: Request) {
       providers,
       asOf: run.asOf ?? null,
       knowledge: run.knowledge,
+      topology,
       econ_entities: entities,
       econ_flows: flows,
       econ_events: state.events,

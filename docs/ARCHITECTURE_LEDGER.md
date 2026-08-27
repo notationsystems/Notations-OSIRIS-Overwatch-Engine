@@ -537,13 +537,67 @@ Shipped:
    kinds (no source registered for natural-person data), and `SearchHit`
    projects register fields only.
 
+## Phase 13 — what WAS vs what was KNOWN
+
+Round-12 review generalized the Grasberg pin: `asOf` filters what was
+*known* (observation knownAt, event firstReportedAt) — but the flow
+topology is a single-vintage claim about what *was*, presenting as valid at
+every tick. Scrub to 2017 under AS KNOWN and the map drew 2024 arcs under a
+2017 badge: the same coherence failure search closed in round 8, one layer
+down, and it reached further — every historical propagation ran against
+present topology; the regulatory class is merely where it surfaced, because
+export routes are what changed.
+
+1. **Topology validity is an enforced invariant, not a documented special
+   case.** `topologyValidity(state, asOf)` classifies the evaluation date
+   against the union of flow periods, following the same selection rule as
+   every other quantity ("latest claim at or before asOf") — which makes
+   the guard deliberately asymmetric. `predates` (asOf before any flow
+   period): no admissible vintage exists and the world demonstrably
+   differed — every flow-derived tonnage is **null, never zero**, with the
+   mismatch named in the explanation, because "no entity in scope" is an
+   answer and "topology out of period" is not, and the two must not render
+   alike. `extrapolated` (asOf after the period): the snapshot serves as
+   latest-known structure, labeled — nulling forward would null the live
+   instrument and contradict the latest-observation convention used
+   everywhere else. Round 12's honest zero (Grasberg 2017 "finds no
+   crossing flows") is retired: it was the middle row of the ambiguity
+   table wearing the right answer's clothes; the pin now asserts null. The
+   unscoped-regulatory refusal moved from 0 to null for the same reason,
+   and the scenario delta refuses to sum a null impact into a smaller
+   known total. Guard shown general in tests: the 2017 Escondida strike's
+   tonnage nulls alongside the 2017 export halt's.
+2. **The playback surface says so.** Both playback projections (map +
+   analytics) carry `topology`; the panel renders a banner beside the
+   AS OF / AS KNOWN badge when the scrub date falls outside the topology
+   period — red for predates ("out of period"), gold for extrapolated
+   ("latest-known structure") — the same shape as search's withheld-entity
+   note. The scrubber is now honest about arcs the way it has been about
+   observations.
+3. **The structural fix is flow vintages** — several flow periods
+   coexisting with asOf selecting among them, the MCS-vintage shape. Real
+   work; joins the instrument backlog RANKED BELOW evidence-layer search
+   kinds and the OpenOwnership parent-chain adapter (see backlog).
+4. **The person-name policy now holds at the miss log.** Round 12 pinned
+   it at the index (SearchHit fields) and the registry (yields), but a
+   person-directed query that truly missed was still written verbatim to
+   `search-misses.jsonl` — refused at the surface, persisted at the back.
+   `missRecord` gates the string on register vocabulary (registry
+   categories/keywords + state-derived tokens: kinds, countries,
+   operators, commodity, entity names); free text with no register
+   vocabulary is not a demand signal for any adapter, so it is counted
+   (`queryWithheld: true`) and its string discarded, at zero analytical
+   cost. The property the policy asserts is that the system does not
+   ACCUMULATE person-directed queries, not merely that it declines to
+   answer them; the third policy pin tests exactly that.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
 |---|---|---|---|---|
 | Canonical state + provenance | ✅ copper | more commodities | new curated/live adapters; state model needs no change | high |
 | Live acquisition | ✅ 4 providers | bilateral trade flows as graph edges; LME stocks | allocation model for country↔facility flow reconciliation; paid/licensed stock feeds | medium |
-| Time-series state | ✅ (decade series, asOf engine, playback UI) | time-resolved flow tonnage | quarterly/annual flow snapshots per period | medium |
+| Time-series state | ✅ (decade series, asOf engine, playback UI, topology-validity guard) | flow VINTAGES: several flow periods coexisting, asOf selecting among them (the MCS-vintage shape) — the structural fix behind phase 13's guard | per-period flow snapshots through the existing supersedes machinery | ranked below evidence-layer search kinds and the OpenOwnership adapter |
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
 | Search over entities | ✅ (canonical-register search, evidence headlines, knowledge coherence, miss→registry-gap demand signal) | evidence-layer kinds (refused/contested/stale, vintage ids); fuzzy matching; cross-commodity when a second commodity lands | ranked instrument backlog (phase 12 §4) | high |
@@ -551,7 +605,7 @@ Shipped:
 
 ## Verification
 
-Every subsystem above ships with executable tests (150+ economy tests; 512
+Every subsystem above ships with executable tests (150+ economy tests; 516
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

@@ -62,6 +62,22 @@ describe('GET /api/economy', () => {
     expect(grasbergBefore.disrupted).toBe(false);
   });
 
+  it('labels topology validity on playback projections — the scrubber must be as honest about arcs as about observations', async () => {
+    // Scrubbed before the flow period: 2024 arcs cannot describe a 2017
+    // world — the projection says so instead of drawing them under a clean
+    // badge.
+    const early = await (await economyGet(req('/api/economy?commodity=copper&view=map&asOf=2017-02-15'))).json();
+    expect(early.topology.status).toBe('predates');
+    expect(early.topology.note).toContain('predates');
+    // Inside the flow period: no caveat to carry.
+    const within = await (await economyGet(req('/api/economy?commodity=copper&view=analytics&asOf=2024-06-15'))).json();
+    expect(within.topology.status).toBe('within');
+    // After it: the snapshot serves as latest-known structure, labeled.
+    const later = await (await economyGet(req('/api/economy?commodity=copper&view=analytics&asOf=2026-08-01'))).json();
+    expect(later.topology.status).toBe('extrapolated');
+    expect(later.topology.note).toContain('latest-known structure');
+  });
+
   it('serves the timeline view with a playback range and dated events', async () => {
     const res = await economyGet(req('/api/economy?commodity=copper&view=timeline'));
     expect(res.status).toBe(200);
