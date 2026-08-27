@@ -392,6 +392,33 @@ export interface EconEvent {
   provenance: Provenance;
 }
 
+/* ── Entity resolution gate (work order 3.3) ── */
+
+/**
+ * A typed record of an identifier a source proposed and the register could
+ * not resolve. Row accounting (round 26) made these drops COUNTABLE; this
+ * makes them RECORDS — searchable (`refused:resolution`), each carrying the
+ * raw identifier verbatim, its source, how many rows rode on it, and the
+ * remedy that would resolve it. Near matches in the register surface as
+ * `candidates` and are NEVER merged: name similarity alone is never
+ * sufficient, and a proposal below certainty is unresolved, not assigned.
+ */
+export interface UnresolvedIdentifier {
+  /** The identifier vocabulary, e.g. 'comtrade-m49-partner', 'mcs-country-name'. */
+  scheme: string;
+  /** The raw identifier, verbatim as the source sent it. */
+  identifier: string;
+  sourceId: string;
+  /** Rows that carried this identifier and were dropped for it. */
+  occurrences: number;
+  /** Where it appeared, e.g. a reporter-year request key. */
+  context?: string;
+  /** Register entities whose NAME is similar — informational only; the gate
+   *  never merges on similarity, it names the collision for a curator. */
+  candidates?: Array<{ entityId: string; name: string; note: string }>;
+  remedy: string;
+}
+
 /* ── Canonical state ── */
 
 export interface EconomyState {
@@ -406,6 +433,11 @@ export interface EconomyState {
   events: EconEvent[];
   /** Sources referenced across the state, for the evidence panel. */
   sources: Array<{ sourceId: string; sourceName: string; sourceUrl?: string }>;
+  /** The resolution gate's residue: identifiers sources proposed that the
+   *  register could not resolve — typed records, not counts (work order
+   *  3.3). Deterministically ordered; reconciles against row accounting's
+   *  resolution-layer filtered counts. */
+  unresolved?: UnresolvedIdentifier[];
 }
 
 /* ── Evidence / Operation / Execution separation for analytics ── */

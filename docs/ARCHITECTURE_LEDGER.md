@@ -1336,6 +1336,67 @@ carry Chile's 2019 corridors — per-reporter selection would mix vintage
 periods inside one graph, and is deferred with that reason, not blended
 silently).
 
+## Phase 28 — work order 3.3: the resolution gate — counted drops become records
+
+**Built.** `resolution.ts`: `UnresolvedIdentifier` (scheme, raw identifier
+verbatim, source, occurrences, context, candidates, remedy) +
+`buildUnresolvedRecords` (deterministic: sorted by scheme then
+identifier, no clock, no randomness) + `nameCandidates` (case/diacritic
+fold + containment — CANDIDATE detection only, never resolution). Wired
+at all three resolution drop sites, built from the SAME tallies that
+feed row accounting so reconciliation is structural: the flow-vintage
+builder (partner M49), the Comtrade bilateral accounting (reporter +
+partner M49), and the MCS world-CSV parse (country names). Records ride
+`AdapterPayload.unresolved` → merged at assembly per (source, scheme,
+identifier) with occurrences summed and contexts joined → `state.unresolved`,
+deterministically ordered, with candidates enriched at assembly against
+the actual register (adapters do not hold it). Searchable as
+`refused:resolution` with identifier + source + row count + remedy in
+the hit.
+
+**The gate's two rules, held by construction.** Resolution happens ONLY
+through curated scheme maps. A near match in the register — the planted
+'Perú' against the register's 'Peru', or 'ANTAMINA' colliding with both
+the mine and its operating company — surfaces as candidates carrying a
+never-merge note and stays unresolved; both colliding entities survive,
+the register is untouched. Exact name equality is still a name match and
+still refuses (the 'Georgia' problem: a US-state string and a country
+share a spelling; only a curated mapping knows which).
+
+**Measured.** Copper: 30 records, 74 dropped rows — 25 distinct unmapped
+M49 partner codes + 5 MCS country strings; code 608 (the Philippines —
+Indonesia's largest 2017 receiver, 418 kt) merges from both drop sites
+into one record naming both contexts. Aluminium: 5 records, 12 rows —
+Germany, Ireland, Spain (the alumina reporters round 25 left as a
+countryMap comment) plus the two aggregates, now typed records. The MCS
+editions even disagree on capitalization ('Other countries' 2025 vs
+'Other Countries' 2024) — kept verbatim as distinct identifiers, which
+is what "raw" means.
+
+**Criteria.** All four pre-registered criteria passed: (1) an unmapped
+identifier produces a searchable `refused:resolution` hit carrying the
+raw identifier, source, and remedy — pinned against the real 608 record;
+(2) no code path merges on name similarity; the planted near-collision
+keeps both candidates — pinned; (3) deterministic — same proposals +
+same register produce identical records regardless of tally insertion
+order — pinned; (4) row accounting reconciles: at every drop site the
+filtered count equals the sum of unresolved occurrences, with a vacuity
+assert that each site is live — pinned.
+
+**Unanticipated.** Nothing that changed the design; two small findings.
+The two Comtrade ingest paths (bilateral observations, flow vintages)
+emit the same scheme under the same sourceId, so assembly-level merge
+was needed to avoid presenting one identifier as two records — the
+per-site reconciliation stays pinned at the sites, the merged record is
+the researcher's view. And an empty-string COUNTRY cell in the MCS CSV
+produces an `""` record (1 row) — kept: the gate records what the source
+sent, and an empty identifier is a source oddity worth seeing.
+
+**Guards moved.** None. The `person-name-policy-surface` guard's ground
+is unchanged: unresolved records carry source identifiers (M49 codes,
+country names), not person-shaped data, and the vocabulary gate on the
+miss log is untouched.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

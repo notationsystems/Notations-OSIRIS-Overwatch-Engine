@@ -11,6 +11,7 @@
 
 import type {
   EconomyState, Entity, Observation, Flow, Capacity, Dependency, EconEvent,
+  UnresolvedIdentifier,
 } from './types';
 import {
   COPPER_ENTITIES, COPPER_OBSERVATIONS, COPPER_FLOWS, COPPER_CAPACITIES,
@@ -58,6 +59,11 @@ export interface AdapterPayload {
   /** Row accounting per fetch scope — absent only for curated datasets,
    *  which fetch nothing. */
   accounting?: RowAccounting[];
+  /** The resolution gate's typed records (work order 3.3): identifiers this
+   *  adapter's source proposed that the register could not resolve. Built
+   *  from the same tallies that feed the accounting's resolution-layer
+   *  filtered counts, so the two reconcile by construction. */
+  unresolved?: UnresolvedIdentifier[];
 }
 
 export interface EconomyAdapter {

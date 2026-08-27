@@ -29,9 +29,10 @@
  *  allocation model named (propagation.ts).
  */
 
-import type { Flow } from './types';
+import type { Flow, UnresolvedIdentifier } from './types';
 import type { AdapterPayload, EconomyAdapter, RowAccounting } from './adapters';
 import { M49_TO_ENTITY } from './liveAdapters';
+import { buildUnresolvedRecords, type UnresolvedTally } from './resolution';
 import vintageSnapshot from '@/data/economy/snapshots/comtrade-flow-vintages.json';
 
 interface VintageRow { partnerCode?: number; netWgt?: number | null; period?: number | string }
@@ -52,10 +53,10 @@ const entitySlugV = (id: string) => id.split(':')[2];
 export function buildCountryFlowVintages(
   responses: Record<string, VintageResponse>,
   retrievedAt: string,
-): { flows: Flow[]; accounting: RowAccounting } {
+): { flows: Flow[]; accounting: RowAccounting; unresolved: UnresolvedIdentifier[] } {
   const flows: Flow[] = [];
   let fetched = 0, accepted = 0, world = 0, unmappedPartner = 0, belowFloor = 0, missingWgt = 0;
-  const unmappedCodes = new Set<string>();
+  const unmappedTally: UnresolvedTally = new Map();
   for (const [key, raw] of Object.entries(responses)) {
     const [m49Str, hs, flowCode, yearStr] = key.split('-');
     if (flowCode !== 'X') continue; // reporter-declared exports only (mirror choice)
@@ -67,7 +68,13 @@ export function buildCountryFlowVintages(
       if (row.netWgt === null || row.netWgt === undefined) { missingWgt += 1; continue; }
       if (!row.partnerCode || row.partnerCode === 0) { world += 1; continue; } // world aggregate — not a corridor
       const partnerId = M49_TO_ENTITY[row.partnerCode];
-      if (!partnerId) { unmappedPartner += 1; unmappedCodes.add(String(row.partnerCode)); continue; }
+      if (!partnerId) {
+        unmappedPartner += 1;
+        const code = String(row.partnerCode);
+        const prev = unmappedTally.get(code);
+        unmappedTally.set(code, { occurrences: (prev?.occurrences ?? 0) + 1, context: prev?.context ?? `reporter-year ${key}` });
+        continue;
+      }
       if (row.netWgt < MIN_KG) { belowFloor += 1; continue; }
       accepted += 1;
       flows.push({
@@ -100,11 +107,17 @@ export function buildCountryFlowVintages(
       accepted,
       filtered: [
         ...(world > 0 ? [{ predicate: 'world (partner 0) aggregate row — not a corridor', count: world }] : []),
-        ...(unmappedPartner > 0 ? [{ predicate: 'partner M49 not in M49_TO_ENTITY', count: unmappedPartner, examples: [...unmappedCodes].slice(0, 8) }] : []),
+        ...(unmappedPartner > 0 ? [{ predicate: 'partner M49 not in M49_TO_ENTITY', count: unmappedPartner, examples: [...unmappedTally.keys()].slice(0, 8) }] : []),
         ...(belowFloor > 0 ? [{ predicate: 'netWgt below noise floor (50 kt)', count: belowFloor }] : []),
       ],
       rejected: missingWgt > 0 ? [{ reason: 'netWgt missing on row', count: missingWgt }] : [],
     },
+    // The resolution gate's typed records — built from the SAME tally that
+    // feeds the accounting count above, so reconciliation is structural.
+    unresolved: buildUnresolvedRecords(
+      'comtrade-m49-partner', 'un-comtrade-preview', unmappedTally, [],
+      'Add the M49 code to M49_TO_ENTITY (register the country entity first if absent), or record the code as out of scope (aggregate/special area codes).',
+    ),
   };
 }
 
@@ -118,7 +131,7 @@ export const comtradeFlowVintagesAdapter: EconomyAdapter = {
   providerName: 'UN Comtrade country flow vintages (2017–2022, captured 2026-08-27)',
   commodities: ['copper'],
   async load(): Promise<AdapterPayload> {
-    const { flows, accounting } = buildCountryFlowVintages(SNAP.responses, `${SNAP.capturedAt}T00:00:00Z`);
+    const { flows, accounting, unresolved } = buildCountryFlowVintages(SNAP.responses, `${SNAP.capturedAt}T00:00:00Z`);
     return {
       commodity: 'copper', commodityName: 'Copper',
       entities: [], observations: [], capacities: [], dependencies: [], events: [],
@@ -129,6 +142,7 @@ export const comtradeFlowVintagesAdapter: EconomyAdapter = {
         sourceUrl: 'https://comtradeplus.un.org/',
       }],
       accounting: [accounting],
+      unresolved,
     };
   },
 };

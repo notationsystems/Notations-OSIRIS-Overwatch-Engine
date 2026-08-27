@@ -11,6 +11,7 @@
 import type { Dependency, EconomyState, Entity, ValidationIssue } from './types';
 import { validateState } from './types';
 import { adaptersFor, type RowAccounting } from './adapters';
+import { nameCandidates, sortUnresolved } from './resolution';
 
 export interface AssembledState {
   state: EconomyState;
@@ -126,6 +127,31 @@ async function assemble(commodity: string): Promise<AssembledState> {
     // A state that fails referential integrity must never reach analytics/UI.
     throw new Error(`Economy state for "${commodity}" failed validation:\n` + errors.map(e => `  - ${e.message}`).join('\n'));
   }
+
+  // The resolution gate's residue (work order 3.3): typed unresolved
+  // identifiers from every adapter, deterministically ordered, with
+  // near-match CANDIDATES computed here against the assembled register —
+  // adapters do not hold the register, and candidates are informational
+  // only (similarity never merges; the note on each candidate says so).
+  // Records from different drop sites that name the SAME (source, scheme,
+  // identifier) merge here — occurrences summed, contexts joined — so a
+  // researcher sees one record per unresolved identifier; the per-site
+  // reconciliation against row accounting is pinned at the drop sites.
+  const merged = new Map<string, NonNullable<EconomyState['unresolved']>[number]>();
+  for (const u of payloads.flatMap(p => p.unresolved ?? [])) {
+    const key = `${u.sourceId}|${u.scheme}|${u.identifier}`;
+    const prev = merged.get(key);
+    if (!prev) merged.set(key, { ...u });
+    else {
+      prev.occurrences += u.occurrences;
+      if (u.context && prev.context !== u.context) prev.context = [prev.context, u.context].filter(Boolean).join('; ');
+    }
+  }
+  state.unresolved = sortUnresolved([...merged.values()])
+    .map(u => {
+      const candidates = u.candidates ?? nameCandidates(u.identifier, state.entities);
+      return candidates ? { ...u, candidates } : u;
+    });
 
   const accounting = payloads.flatMap(p => p.accounting ?? []);
   return { state, issues: [...issues, ...validation], providers, accounting };

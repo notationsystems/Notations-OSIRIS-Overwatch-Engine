@@ -18,6 +18,10 @@
  *                        predates the flow topology.
  *   refused:scope        regulatory event with no jurisdiction scope.
  *   refused:attribution  operator index null — zero attributed tonnage.
+ *   refused:resolution   an identifier a source proposed that the register
+ *                        could not resolve (work order 3.3) — the raw
+ *                        identifier, its source, row count, near-match
+ *                        candidates (never merged), and the remedy.
  *
  * Staleness taxonomy (four conditions, four responses):
  *   stale:source         corpus health source_stale (arrival gap exceeded).
@@ -141,6 +145,17 @@ export function searchEvidence(
         title: `${i.eventTitle}: disrupted tonnage refused`,
         detail: text,
         evidenceIds: [i.eventId, ...i.flowIds],
+      });
+    }
+    // resolution — the gate's residue, typed records off the state.
+    for (const u of state.unresolved ?? []) {
+      const cand = (u.candidates ?? []).map(c => `${c.name} (${c.entityId}) — ${c.note}`);
+      push({
+        kind: 'refused', type: 'resolution',
+        title: `${u.scheme} "${u.identifier}": resolution refused`,
+        detail: `${u.occurrences} row(s) from ${u.sourceId} carried this identifier and were dropped at the resolution gate${u.context ? ` (${u.context})` : ''}.${cand.length > 0 ? ` Near matches, NEVER merged: ${cand.join('; ')}.` : ''}`,
+        remedy: u.remedy,
+        evidenceIds: [`${u.sourceId}:${u.scheme}:${u.identifier}`],
       });
     }
     // attribution — null operator indices.

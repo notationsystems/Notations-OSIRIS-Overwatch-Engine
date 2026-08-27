@@ -128,6 +128,25 @@ reporter/partner M49, netWgt noise floor); Yahoo/CFTC/Westmetall parses
 carry no filtering predicates (whole-series accept-or-fail) and adopt the
 doctrine when one appears.
 
+**The entity resolution gate (work order 3.3): counted drops became typed
+records.** Every resolution-layer drop is now an `UnresolvedIdentifier` on
+`state.unresolved` — the raw identifier verbatim, its scheme
+(`comtrade-m49-partner`, `mcs-country-name`, …), source, row count,
+context, and the remedy — built from the SAME tallies that feed row
+accounting, so the two reconcile by construction (pinned per drop site).
+Resolution happens only through curated scheme maps: a near match in the
+register (case, diacritics, containment) surfaces as a CANDIDATE with a
+never-merge note and still refuses — name similarity, exact equality
+included, is never sufficient to assign. Deterministic end to end (same
+proposals + same register → same records, same order), searchable as
+`refused:resolution`. Measured on the real corpus: copper carries 30
+records (25 distinct unmapped M49 partner codes + 5 MCS country strings,
+74 dropped rows total; code 608 — the Philippines, Indonesia's largest
+2017 receiver at 418 kt — appears at both drop sites and merges into
+one record naming them); aluminium carries the deliberately-unmapped
+Germany/Ireland/Spain alumina reporters plus the aggregates, now as
+records instead of a map comment.
+
 Adapters are registered, not hard-coded. Six serve copper (two more serve
 aluminium — the curated register and the same MCS world file under its
 commodity spec):
@@ -413,7 +432,13 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   earliest vintage, or a facility event under a country vintage needs the
   deferred allocation model), `refused:scope` (regulatory event with
   no jurisdiction → curate regulatoryScope), `refused:attribution` (null
-  operator index → curate operated_by edges); `stale:source` /
+  operator index → curate operated_by edges), `refused:resolution` (the
+  entity resolution gate's residue, work order 3.3 — an identifier a
+  source proposed that the register could not resolve, as a typed record:
+  raw identifier verbatim, source, row count, near-match candidates that
+  are NEVER merged, and the remedy — a mapping entry, a new entity, or an
+  out-of-scope decision; reconciles against row accounting's
+  resolution-layer counts); `stale:source` /
   `stale:ladder` / `stale:suspect` (the three corpus-health conditions) /
   `stale:topology` (extrapolation under structural contradiction);
   `contested` typed by divergence class; `vintage` inventories the source
