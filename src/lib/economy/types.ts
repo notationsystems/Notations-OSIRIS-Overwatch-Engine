@@ -331,6 +331,24 @@ export interface EconEvent {
    * announcement has no anticipation story and gets no window.
    */
   announcedAt?: string;
+  /**
+   * Regulatory events attach to TERRITORY, not to an attribution edge: a
+   * licence lapse, export ban or state decree reaches the entities inside a
+   * jurisdiction, scoped by what the regulation actually governs. An export
+   * halt is the sharp shape: it stops CROSSING flows without stopping
+   * production — foreign receivers lose supply while domestic ones keep it.
+   * A regulatory event without a scope propagates nowhere and says so
+   * (refused, not guessed).
+   */
+  regulatoryScope?: {
+    /** ISO 3166 alpha-2 of the governing jurisdiction. */
+    jurisdictionCountryCode: string;
+    commodity?: string;
+    /** Which stages the regulation governs; absent = all. */
+    stages?: SupplyStage[];
+    /** What it stops: exports (crossing flows only), or all activity. */
+    direction?: 'export' | 'all';
+  };
   severity: 'low' | 'medium' | 'high';
   /** Estimated physical magnitude of the impact, when curatable — the
    *  number a backtest match can be sized against. Estimates say so in

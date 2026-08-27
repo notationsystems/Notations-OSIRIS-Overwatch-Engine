@@ -482,8 +482,11 @@ export const COPPER_EVENTS: EconEvent[] = [
    * Every entry carries occurrence, first public report, and an estimated
    * magnitude with basis (marked estimate — never fabricated precision). */
   {
-    id: 'evt:grasberg-export-halt-2017', curation: 'independent', entityId: 'ent:mine:grasberg', type: 'disruption',
+    id: 'evt:grasberg-export-halt-2017', curation: 'independent', entityId: 'ent:mine:grasberg', type: 'policy',
     title: 'Grasberg concentrate export halt (permit lapse)', start: '2017-01-12', end: '2017-04-21', firstReportedAt: '2017-01-12', severity: 'high',
+    // Regulatory shape: exports stop, production does not — foreign
+    // receivers lose supply while domestic smelting keeps it.
+    regulatoryScope: { jurisdictionCountryCode: 'ID', commodity: 'copper', direction: 'export' },
     magnitude: { value: 100, unit: 'kt', basis: 'cu_content', note: 'Estimated deferred output over the ~3-month halt; representative.' },
     description: 'Indonesian mining-rule change lapsed PT Freeport Indonesia\'s concentrate export permit; exports halted mid-January, output was cut and force majeure declared in February, resuming after the IUPK framework agreement in April.',
     provenance: news('Freeport-McMoRan / Indonesian ministry reporting, Jan–Apr 2017. Representative dating.'),
@@ -503,8 +506,9 @@ export const COPPER_EVENTS: EconEvent[] = [
     provenance: news('Codelco / union statements, Jun 2019. Representative dating.'),
   },
   {
-    id: 'evt:peru-covid-shutdown-2020', curation: 'independent', entityId: 'ent:country:pe', type: 'disruption',
+    id: 'evt:peru-covid-shutdown-2020', curation: 'independent', entityId: 'ent:country:pe', type: 'policy',
     title: 'Peru COVID-19 national emergency mine curtailments', start: '2020-03-16', end: '2020-06-30', firstReportedAt: '2020-03-16', severity: 'high',
+    regulatoryScope: { jurisdictionCountryCode: 'PE', commodity: 'copper', stages: ['production'], direction: 'all' },
     magnitude: { value: 310, unit: 'kt', basis: 'cu_content', note: 'Full-year 2020 national output fell ~2,460 → ~2,150 kt vs 2019; Q2 was the trough.' },
     description: 'National state of emergency (2020-03-16) curtailed most Peruvian mining for roughly a quarter; phased restart under Phase 1 reactivation from May, normalizing by mid-year.',
     provenance: news('Peruvian government decrees / MINEM production data, 2020. Representative dating.'),

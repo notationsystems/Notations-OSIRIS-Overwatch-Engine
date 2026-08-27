@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
 import { knownAtOf, outranksObservation } from '@/lib/economy/analytics';
+import { matchRegistryGaps } from '@/lib/economy/sourceRegistry';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
 /**
@@ -77,6 +78,25 @@ function headlineFor(state: EconomyState, entityId: string, knowableBy?: string)
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * Best-effort miss log. A query the register cannot answer is the instrument
+ * ranking its own registry: appended to data-archive/search-misses.jsonl so
+ * dormant sources accumulate demand evidence instead of opinions. Suppressed
+ * under test (synthetic queries are not demand); failure (read-only
+ * filesystem) must never break search.
+ */
+async function archiveSearchMiss(rec: {
+  ts: string; q: string; commodity: string; asOf: string | null; knowledge: string; gapIds: string[];
+}): Promise<void> {
+  if (process.env.VITEST) return;
+  try {
+    const fs = await import('node:fs/promises');
+    const dir = `${process.cwd()}/data-archive`;
+    await fs.mkdir(dir, { recursive: true });
+    await fs.appendFile(`${dir}/search-misses.jsonl`, JSON.stringify(rec) + '\n');
+  } catch { /* best-effort by design */ }
+}
+
+/**
  * Under as_known_then, an entity is knowable at asOf iff at least one of its
  * records was: observations by knownAt, events by firstReportedAt. Curated
  * structural records (flows, capacities, dependencies) carry no revision
@@ -149,19 +169,44 @@ export async function GET(request: Request) {
     });
   }
   hits.sort((a, b) => a._score - b._score || a._rank - b._rank || a.name.localeCompare(b.name));
+  const results = hits.slice(0, 8).map((h): SearchHit => ({
+    id: h.id, name: h.name, kind: h.kind, stage: h.stage, country: h.country,
+    operator: h.operator, lat: h.lat, lng: h.lng, zoom: h.zoom, headline: h.headline,
+  }));
+
+  // A TRUE miss — no hits and nothing withheld — is a demand signal against
+  // the source registry: name the registered-but-unbuilt sources whose
+  // declared coverage could have answered, and log the miss so the registry
+  // is ranked by the instrument's own use. A withheld miss is different in
+  // kind: the state CAN answer, the knowledge state withholds it — surfacing
+  // registry gaps there would misdiagnose coherence as absence.
+  let registryGaps: Array<{ sourceId: string; name: string; category: string; cadence: string; accessClass: string; note: string }> | undefined;
+  let missNote: string | undefined;
+  if (results.length === 0 && withheld === 0) {
+    const gaps = matchRegistryGaps(q);
+    if (gaps.length > 0) {
+      registryGaps = gaps.map(g => ({
+        sourceId: g.sourceId, name: g.name, category: g.category,
+        cadence: g.cadence, accessClass: g.accessClass, note: g.note,
+      }));
+      missNote = `No canonical entity answers "${q}". ${gaps.length} registered source${gaps.length === 1 ? '' : 's'} with no adapter declare${gaps.length === 1 ? 's' : ''} coverage that could — a miss is a demand signal, not a dead end.`;
+    }
+    await archiveSearchMiss({
+      ts: new Date().toISOString(), q, commodity, asOf: asOf ?? null, knowledge,
+      gapIds: gaps.map(g => g.sourceId),
+    });
+  }
 
   return NextResponse.json({
     commodity,
     query: q,
     asOf: asOf ?? null,
     knowledge,
-    results: hits.slice(0, 8).map((h): SearchHit => ({
-      id: h.id, name: h.name, kind: h.kind, stage: h.stage, country: h.country,
-      operator: h.operator, lat: h.lat, lng: h.lng, zoom: h.zoom, headline: h.headline,
-    })),
+    results,
     withheld,
     ...(withheld > 0 && restrictTo
       ? { withheldNote: `${withheld} further entit${withheld === 1 ? 'y' : 'ies'} match but ${withheld === 1 ? 'was' : 'were'} not knowable on ${restrictTo}.` }
       : {}),
+    ...(registryGaps ? { registryGaps, missNote } : {}),
   });
 }

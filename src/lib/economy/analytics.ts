@@ -363,8 +363,12 @@ export interface OperatorConcentration {
   attributionBasis: AttributionBasis;
   /** HHI over ATTRIBUTED company shares (renormalized to the allocated
    *  total) — the attribution coverage travels with it, exactly as
-   *  geographic coverage travels with the facility HHI. */
-  hhi: number;
+   *  geographic coverage travels with the facility HHI. NULL when nothing
+   *  is attributed: an index over an empty set has nothing to say, and 0
+   *  would read as "perfectly unconcentrated" — the maximally wrong
+   *  reading, the same failure the precision scorecard's min-trials floor
+   *  removes. */
+  hhi: number | null;
   band: 'unconcentrated' | 'moderate' | 'high' | 'no-data';
   /** The ALLOCATED total (the HHI base). The raw facility total is totalKt. */
   total: number;
@@ -471,8 +475,12 @@ export function operatorConcentration(
       share: allocatedKt > 0 ? value / allocatedKt : 0,
     }))
     .sort((a, b) => b.value - a.value);
-  const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
-  const band: OperatorConcentration['band'] = shares.length === 0 ? 'no-data'
+  // An index over zero attributed tonnage is NULL, not 0 — zero is a value
+  // ("perfectly unconcentrated") that empty evidence cannot support.
+  const hhi = allocatedKt > 0
+    ? Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0))
+    : null;
+  const band: OperatorConcentration['band'] = hhi === null ? 'no-data'
     : hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
 
   // The comparable figure: shares of the FULL universe, unattributed
@@ -496,7 +504,7 @@ export function operatorConcentration(
       total: Number(allocatedKt.toFixed(1)),
       unit,
       shares,
-      ...partitionContext(hhi, shares.length),
+      ...partitionContext(hhi ?? 0, shares.length),
       totalKt: Number(totalKt.toFixed(1)),
       attributionCoverage: totalKt > 0 ? Number((allocatedKt / totalKt).toFixed(3)) : 0,
       unattributedKt: Number(unattributedKt.toFixed(1)),

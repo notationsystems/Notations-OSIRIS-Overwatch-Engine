@@ -31,7 +31,7 @@ interface ConcentrationBlock {
   operation: { name: string };
   inputs: { observationIds?: string[]; capacityIds?: string[] };
   result: {
-    hhi: number; band: string; total: number; unit: string; shares: Share[];
+    hhi: number | null; band: string; total: number; unit: string; shares: Share[];
     coverageBias?: { minRatio: number; maxRatio: number; countries: number; note: string };
     /** Operator concentration: share of facility output the operator model attributes. */
     attributionCoverage?: number;

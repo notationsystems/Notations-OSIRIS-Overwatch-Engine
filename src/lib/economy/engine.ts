@@ -53,7 +53,7 @@ export interface SystemContext {
 export interface ScenarioSpec {
   id: string;
   label: string;
-  events: Array<Pick<EconEvent, 'entityId' | 'type' | 'title' | 'start' | 'end' | 'severity' | 'description'>>;
+  events: Array<Pick<EconEvent, 'entityId' | 'type' | 'title' | 'start' | 'end' | 'severity' | 'description' | 'regulatoryScope'>>;
 }
 
 /**

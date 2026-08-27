@@ -45,7 +45,7 @@ export interface EventImpact {
   explanation: string[];
 }
 
-export const DISRUPTIVE_EVENT_TYPES: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather', 'sanction', 'insolvency'];
+export const DISRUPTIVE_EVENT_TYPES: EconEvent['type'][] = ['outage', 'strike', 'closure', 'disruption', 'weather', 'sanction', 'insolvency', 'policy'];
 const DISRUPTIVE = DISRUPTIVE_EVENT_TYPES;
 
 /**
@@ -91,6 +91,106 @@ export function isEventActive(ev: EconEvent, asOf: string): boolean {
   return ev.start <= asOf && (!ev.end || ev.end >= asOf);
 }
 
+/**
+ * Regulatory propagation: territory + scope, not attribution edges.
+ *
+ *   direction 'export'  the sharp shape — CROSSING flows stop while
+ *                       production continues: foreign receivers of
+ *                       in-jurisdiction flows lose supply (and their
+ *                       downstream with them); domestic receivers keep it.
+ *   direction 'all'     in-scope entities halt: they and everything
+ *                       downstream of them are affected.
+ *
+ * A regulatory event without a scope is REFUSED (no jurisdiction to reach
+ * through), never guessed from its entity.
+ */
+function regulatoryImpact(
+  state: EconomyState,
+  graph: EconomyGraph,
+  ev: EconEvent,
+  entityName: string,
+  asOf: string,
+  maxDepth: number,
+): EventImpact {
+  const active = isEventActive(ev, asOf);
+  const scope = ev.regulatoryScope;
+  const explanation: string[] = [
+    active ? 'Event window covers the evaluation date — treated as a live state change.' : 'Event window closed — shown as structural context.',
+  ];
+
+  if (!scope) {
+    explanation.push('REGULATORY EVENT WITHOUT A SCOPE: jurisdiction unknown — propagation refused rather than guessed. Curate regulatoryScope to give it reach.');
+    return {
+      eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
+      entityId: ev.entityId!, entityName,
+      disruptedKtPerYear: 0, affected: [], alternatives: [], dependents: [],
+      flowIds: [], capacityIds: [], dependencyIds: [], explanation,
+    };
+  }
+
+  const inScope = (id: string): boolean => {
+    const e = graph.nodes.get(id);
+    if (!e) return false;
+    if (e.countryCode !== scope.jurisdictionCountryCode) return false;
+    if (scope.stages && (!e.stage || !scope.stages.includes(e.stage))) return false;
+    if (scope.commodity && e.commodity && e.commodity !== scope.commodity) return false;
+    return true;
+  };
+
+  const affectedMap = new Map<string, { entityId: string; name: string; kind: string; depth: number }>();
+  const addAffected = (id: string, depth: number) => {
+    const e = graph.nodes.get(id);
+    if (!e) return;
+    const prev = affectedMap.get(id);
+    if (!prev || depth < prev.depth) affectedMap.set(id, { entityId: id, name: e.name, kind: e.kind, depth });
+  };
+  const flowIds: string[] = [];
+  let disrupted = 0;
+
+  if (scope.direction === 'export') {
+    // Crossing flows halt; production does not. Foreign receivers and their
+    // downstream feel it; domestic receivers are spared.
+    for (const edge of graph.edges) {
+      if (edge.kind !== 'flow') continue;
+      const from = graph.nodes.get(edge.from);
+      const to = graph.nodes.get(edge.to);
+      if (!from || !to || !inScope(edge.from)) continue;
+      if (to.countryCode === scope.jurisdictionCountryCode) continue; // domestic — spared
+      if (scope.commodity && edge.flow.commodity !== scope.commodity) continue;
+      flowIds.push(edge.id);
+      disrupted += edge.ktPerYear ?? 0;
+      addAffected(edge.from, 1); // the blocked exporter
+      addAffected(edge.to, 1);   // the foreign receiver
+      for (const step of downstream(graph, edge.to, maxDepth - 1)) addAffected(step.entityId, step.depth + 1);
+    }
+    explanation.push(`Export halt in ${scope.jurisdictionCountryCode}: ${flowIds.length} crossing flow(s) (~${Math.round(disrupted)} kt/y) stop while production continues — domestic receivers keep supply, foreign receivers and their downstream lose it.`);
+  } else {
+    // All in-scope activity halts: in-scope entities and their downstream.
+    for (const [id] of graph.nodes) {
+      if (!inScope(id)) continue;
+      addAffected(id, 0);
+      for (const edge of graph.out.get(id) ?? []) {
+        if (edge.kind !== 'flow') continue;
+        flowIds.push(edge.id);
+        disrupted += edge.ktPerYear ?? 0;
+      }
+      for (const step of downstream(graph, id, maxDepth)) addAffected(step.entityId, step.depth);
+    }
+    explanation.push(`Jurisdiction-wide halt in ${scope.jurisdictionCountryCode}${scope.stages ? ` (${scope.stages.join(', ')})` : ''}: ${affectedMap.size} entity(ies) in scope or downstream; ~${Math.round(disrupted)} kt/y of outbound flow interrupted.`);
+  }
+
+  return {
+    eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
+    entityId: ev.entityId!, entityName,
+    disruptedKtPerYear: Math.round(disrupted),
+    affected: [...affectedMap.values()].sort((a, b) => a.depth - b.depth),
+    alternatives: [], dependents: [],
+    flowIds: [...new Set(flowIds)],
+    capacityIds: [], dependencyIds: [],
+    explanation,
+  };
+}
+
 export function propagateEvents(
   state: EconomyState,
   graph: EconomyGraph,
@@ -103,6 +203,13 @@ export function propagateEvents(
     if (!ev.entityId || !DISRUPTIVE.includes(ev.type)) continue;
     const entity = graph.nodes.get(ev.entityId);
     if (!entity) continue;
+
+    // Regulatory events attach to territory: a distinct propagation shape,
+    // scoped by what the regulation governs — never the entity walk.
+    if (eventClassOf(ev.type) === 'regulatory') {
+      impacts.push(regulatoryImpact(state, graph, ev, entity.name, asOf, maxDepth));
+      continue;
+    }
 
     const active = isEventActive(ev, asOf);
     const t = throughput.get(ev.entityId);

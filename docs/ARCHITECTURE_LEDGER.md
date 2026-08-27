@@ -470,6 +470,73 @@ Shipped:
    nothing, a MIND ID sanction reaches Grasberg, Manyar and Amamapare
    through the 51% no strike could use.
 
+## Phase 12 — null over zero, regulatory territory, and the registry as code
+
+1. **An index over zero attributed tonnage is null, not 0.** The synthetic
+   pin in phase 11 read the renormalized figure of a fully-unattributed
+   universe as `hhi 0` — but 0 is a real value on the HHI scale ("perfectly
+   unconcentrated"), and an index computed over an empty attributed set has
+   no value at all. `OperatorConcentration.hhi` is now `number | null`,
+   null when allocated tonnage is zero, band `no-data`. The distinction is
+   the ledger's oldest rule resurfacing at the type level: absence of
+   evidence must be unrepresentable as evidence of absence.
+2. **Regulatory events propagate by territory + scope.** Phase 11 left
+   regulatory traversal at "neither edge role; jurisdiction propagation is
+   future work" — which made a third of the truth-set events typed but
+   inert. `RegulatoryScope { jurisdictionCountryCode, commodity?, stages?,
+   direction: 'export' | 'all' }` now rides on the event, and
+   `regulatoryImpact` resolves scope membership through the machinery that
+   already existed (located_in edges, countryCode): a `direction: 'all'`
+   halt disrupts in-scope entities and walks their downstream (Peru 2020
+   reaches Cerro Verde, Antamina, Las Bambas, Callao and Onsan — never
+   Escondida: territory means territory); a `direction: 'export'` halt
+   stops only flows crossing the border, sparing domestic receivers
+   (Grasberg 2017 halts outbound concentrate without stopping production).
+   The Grasberg pin is deliberately honest about a recorded limitation:
+   modeled flows are 2024 annual snapshots, so the post-2023 domestic-
+   processing topology (Amamapare → Gresik + Manyar, both ID) contains zero
+   crossing flows for a 2017 halt to stop — the test asserts the mechanism's
+   shape (production continues, domestic spared, explanation says what it
+   found) rather than inventing 2017 exports. A scenario-posed Chilean
+   export ban shows the full mechanism against present topology: Saganoseki,
+   Shanghai and Guixi feel it; Caletones does not. An unscoped regulatory
+   event is **refused, not guessed** — propagation says so in the
+   explanation instead of defaulting to a graph walk that would be wrong
+   in both directions.
+3. **Event-class attribution basis — recorded UNBUILT.** The class gate
+   decides which edges an event traverses; it does not yet decide which
+   *basis* the exposure number is quoted in. A sanctions-class event
+   reaches entities through operator AND shareholder edges, but the
+   exposure it creates is neither pure control nor pure economic interest:
+   the sanctioned party's reach is operator-of-record ∪ material
+   shareholding. The named test case is **Glencore**: operator of
+   Antapaccay (control), 44% shareholder of Collahuasi and 33.75% of
+   Antamina (economic interest via named JV vehicles) — a sanction on
+   Glencore touches all three, and today no single figure states that
+   combined exposure in a declared basis. This is the next analytical
+   dimension in the queue and it is deliberately not built: the instrument
+   backlog (this phase's §4) was three rounds old and analytics kept
+   jumping it. If another analytical dimension arrives before that backlog
+   clears, the right response is to point at this entry.
+4. **The source registry is code now, and a search miss is a demand
+   signal.** Every review round computed a gap list; the repository had no
+   code counterpart — the gap analysis lived in prose that nothing could
+   execute. `SOURCE_REGISTRY` reifies it: 17 real entries (5 built, 7
+   reconned-and-deferred with the recon findings preserved, 3 modality-
+   programme, 2 ownership with the two purposes split), each carrying
+   yields, cadence, access class and the adapter id or **null — the null
+   entries ARE the gap list**. The search route closes the loop: a TRUE
+   miss (no hits, nothing withheld) returns `registryGaps` — the
+   registered-but-unbuilt sources whose declared coverage could have
+   answered — and appends the miss to `data-archive/search-misses.jsonl`,
+   so dormant sources accumulate demand evidence instead of opinions. A
+   withheld miss under as_known_then returns no gaps: the state CAN
+   answer, the knowledge state withholds it, and offering sources there
+   would misdiagnose coherence as absence. The person-name policy is
+   pinned by test at both ends: `yields` may name only canonical identity
+   kinds (no source registered for natural-person data), and `SearchHit`
+   projects register fields only.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -479,12 +546,12 @@ Shipped:
 | Time-series state | ✅ (decade series, asOf engine, playback UI) | time-resolved flow tonnage | quarterly/annual flow snapshots per period | medium |
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
-| Search over entities | ✅ (canonical-register search, evidence headlines, map+panel selection) | fuzzy matching, cross-commodity when a second commodity lands | — | done |
+| Search over entities | ✅ (canonical-register search, evidence headlines, knowledge coherence, miss→registry-gap demand signal) | evidence-layer kinds (refused/contested/stale, vintage ids); fuzzy matching; cross-commodity when a second commodity lands | ranked instrument backlog (phase 12 §4) | high |
 | Alerting | numeric detector FROZEN by measurement (structural bound: can't beat price where it detects; can't detect where lead matters); corpus health SHIPPED | missing acquisition modality: event-from-language, AIS | separate funded programme — see Phase 8 | deliberate decision, not next increment |
 
 ## Verification
 
-Every subsystem above ships with executable tests (120+ economy tests; 476
+Every subsystem above ships with executable tests (150+ economy tests; 512
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

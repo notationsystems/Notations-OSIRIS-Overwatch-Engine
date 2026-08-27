@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GET } from './route';
+import { getEconomyState } from '@/lib/economy/store';
 
 const get = (qs: string) => GET(new Request(`http://localhost/api/economy/search?${qs}`));
 
@@ -64,5 +65,55 @@ describe('GET /api/economy/search', () => {
     const hit = then.results[0];
     expect(hit.id).toBe('ent:mine:escondida');
     expect(hit.headline ?? '').not.toContain('2024');
+  });
+});
+
+describe('search miss → registry gap', () => {
+  it('a true miss names the registered-but-unbuilt sources that could answer it', async () => {
+    const body = await (await get('q=vessel shipping movements')).json();
+    expect(body.results).toEqual([]);
+    const ids = body.registryGaps.map((g: { sourceId: string }) => g.sourceId);
+    expect(ids).toContain('maritime-ais');
+    // Built sources are never gaps.
+    expect(ids).not.toContain('westmetall-lme');
+    expect(body.missNote).toContain('demand signal');
+  });
+
+  it('an ownership miss surfaces the parent-chain register', async () => {
+    const body = await (await get('q=beneficial ownership parent')).json();
+    expect(body.results).toEqual([]);
+    const ids = body.registryGaps.map((g: { sourceId: string }) => g.sourceId);
+    expect(ids).toContain('openownership');
+  });
+
+  it('a hit carries no gaps; a withheld miss is a knowledge state, not a registry gap', async () => {
+    const hit = await (await get('q=escondida')).json();
+    expect(hit.registryGaps).toBeUndefined();
+    // Canada at 2019 AS KNOWN: the state CAN answer — the knowledge state
+    // withholds it. Offering registry gaps here would misdiagnose coherence
+    // as absence.
+    const withheldMiss = await (await get('q=canada&asOf=2019-06-01&knowledge=as_known_then')).json();
+    expect(withheldMiss.results).toEqual([]);
+    expect(withheldMiss.withheld).toBeGreaterThanOrEqual(1);
+    expect(withheldMiss.registryGaps).toBeUndefined();
+  });
+});
+
+describe('search policy: no natural persons', () => {
+  it('SearchHit projects register fields only — no person-shaped keys can leak', async () => {
+    const REGISTER_FIELDS = ['id', 'name', 'kind', 'stage', 'country', 'operator', 'lat', 'lng', 'zoom', 'headline'];
+    const body = await (await get('q=freeport')).json();
+    expect(body.results.length).toBeGreaterThan(0);
+    for (const hit of body.results) {
+      for (const key of Object.keys(hit)) expect(REGISTER_FIELDS).toContain(key);
+    }
+  });
+
+  it('the entity register holds no person-shaped kinds', async () => {
+    const { state } = await getEconomyState('copper');
+    const PERSON_SHAPED = ['person', 'individual', 'officer', 'director', 'beneficial_owner'];
+    for (const e of state.entities) {
+      expect(PERSON_SHAPED, `entity ${e.id}`).not.toContain(e.kind);
+    }
   });
 });

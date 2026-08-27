@@ -205,10 +205,11 @@ describe('operator concentration', () => {
     expect(control.result.attributionCoverage).toBe(0);
     expect(control.result.unattributedKt).toBe(400);
     // The renormalized hhi has nothing to say here (no attributed shares) —
-    // but the COMPARABLE figure does: one unattributed facility is the
-    // whole universe, a monopoly of the unmodeled. Excluding-and-
-    // renormalizing would have hidden exactly this.
-    expect(control.result.hhi).toBe(0);
+    // and NULL says so, where 0 would read "perfectly unconcentrated", the
+    // maximally wrong reading. The COMPARABLE figure still speaks: one
+    // unattributed facility is the whole universe, a monopoly of the
+    // unmodeled. Excluding-and-renormalizing would have hidden exactly this.
+    expect(control.result.hhi).toBeNull();
     expect(control.result.hhiWithRemainder).toBe(10000);
     expect(control.result.remainderTreatment).toBe('enumerated');
     const economic = operatorConcentration(s, 'production', ['mine'], 'economic_interest');
@@ -269,7 +270,7 @@ describe('operator concentration', () => {
     // ~100% removed the 1/completeness² inflation, which is the round-11
     // correction working as intended.
     expect(control.attributionCoverage).toBeGreaterThan(0.99); // JV vehicles curated: unmodeled was never unknown
-    expect(control.hhi).toBeGreaterThan(economic.hhi);
+    expect(control.hhi!).toBeGreaterThan(economic.hhi!);
     // Freeport's control position is the index-free finding: largest
     // operator, roughly a quarter of modeled mine output, three countries.
     expect(control.shares[0].entityId).toBe('ent:company:freeport');
@@ -286,12 +287,12 @@ describe('operator concentration', () => {
     // Economic completeness stays partial (minority residues) — its
     // comparable figure deflates accordingly and says so.
     expect(economic.attributionCoverage).toBeLessThan(1);
-    expect(economic.hhiWithRemainder).toBeLessThan(economic.hhi);
+    expect(economic.hhiWithRemainder).toBeLessThan(economic.hhi!);
     // Every index carries its partition context, so no consumer has to
     // reconstruct comparability from the outside.
     for (const r of [control, economic]) {
       expect(r.groupCount).toBeGreaterThan(0);
-      expect(r.effectiveGroups).toBeCloseTo(10000 / r.hhi, 0);
+      expect(r.effectiveGroups).toBeCloseTo(10000 / r.hhi!, 0);
       expect(r.partitionFloor).toBe(Math.round(10000 / r.groupCount));
     }
   });
