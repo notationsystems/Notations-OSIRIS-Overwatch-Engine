@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { getEconomyState, entityDetail } from './store';
-import { strongestAttestingClass } from './analytics';
+import { strongestAttestingClass, structuralClassProfile } from './analytics';
 import { registerAdapter, unregisterAdapter } from './adapters';
 
 describe('economy store (curated copper assembly)', () => {
@@ -66,18 +66,23 @@ describe('economy store (curated copper assembly)', () => {
     expect(att.get('ent:company:collahuasi-jv')).toBe('structural_only');
   });
 
-  it('the structural layer is entirely curation-class — pinned so the day it changes is visible', async () => {
-    // The split, stated plainly: the NUMBERS are increasingly reported
-    // (USGS, Comtrade, LME); the WORLD they are arranged in — every flow
-    // edge, every capacity, every operator attribution — is representative-
-    // class curation. Everything computed from structure (facility HHI,
-    // operator HHI, bottlenecks, propagation, scenarios) inherits that
-    // class, and weakestInputClass now says so on the indices. When a
-    // reported structural source lands (sec-edgar in the registry), this
-    // pin breaks deliberately.
+  it('the structural layer is 0% sourced — a proportion pinned so the first reported ingest moves a number, not a flag', async () => {
+    // The accurate statement (narrower than any numbers-vs-structure
+    // split): NO index in the system is reported-class end-to-end, and
+    // none CAN be until this layer's shares move — every index's
+    // weakestInputClass ultimately stands on it. A boolean pin here would
+    // break PARTIALLY when the first filings source lands (filers only;
+    // Codelco sits outside — a mixed layer, not a converted one), inviting
+    // an argument about the flag; the proportion survives the event it was
+    // written for. Update these measured values when they move.
     const { state } = await getEconomyState('copper');
-    for (const f of state.flows) expect(f.valueKind, f.id).toBe('representative');
-    for (const c of state.capacities) expect(c.valueKind, c.id).toBe('representative');
+    const p = structuralClassProfile(state);
+    expect(p.flows.records).toBeGreaterThan(20);
+    expect(p.capacities.records).toBeGreaterThan(10);
+    expect(p.attributionEdges.records).toBeGreaterThan(5);
+    expect(p.flows.sourcedShareByKt).toBe(0);
+    expect(p.capacities.sourcedShareByKt).toBe(0);
+    expect(p.attributionEdges.sourcedRecords).toBe(0);
   });
 
   it('keeps curated records representative; reported/estimated only from live providers', async () => {

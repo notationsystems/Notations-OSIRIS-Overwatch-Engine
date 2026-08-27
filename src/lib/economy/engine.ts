@@ -23,6 +23,7 @@ import { getEconomyState } from './store';
 import {
   bottleneckCandidates, capacityConcentration, concentration, concentrationTrajectory,
   detectAnomalies, facilityCoverage, flowCentrality, knownAtOf, operatorConcentration,
+  structuralClassProfile,
 } from './analytics';
 import { detectDivergences } from './divergence';
 import { propagateEvents } from './propagation';
@@ -150,6 +151,9 @@ const SYSTEMS: EconomySystem[] = [
       result: {
         mineProduction: facilityCoverage(state, 'production', ['mine'], ctx.asOf),
         refinedProduction: facilityCoverage(state, 'refined_production', ['refinery', 'smelter'], ctx.asOf),
+        // The structural layer's class mix, as a proportion — the figure
+        // every index's weakestInputClass ultimately stands on.
+        structuralClass: structuralClassProfile(state),
       },
     }),
   },

@@ -792,13 +792,57 @@ exposed the class.
    everything else stands on. Recorded as a fact FOR the ranking
    decision, per the review — the backlog order itself is unchanged.
 
+## Phase 18 — the proportion pin, the forced ordering, and the ranking decision
+
+1. **The split line is retired for the narrower true statement.** "The
+   numbers are reported, the structure is curated" was too clean — the
+   country index is representative too, and would cap at `estimated`
+   regardless (USGS's own label for latest-year figures). The docs now
+   carry only what measurement supports: **no index in the system is
+   reported-class end-to-end, and none can be until the structural layer
+   changes class.**
+2. **The structural pin is a proportion, not a flag.**
+   `structuralClassProfile` measures the sourced share of flows,
+   capacities and attribution edges by record and by tonnage (served in
+   the coverage projection; 0% across all three today, pinned as
+   numbers). A boolean pin would have broken PARTIALLY at the first
+   filings ingest — filers only, Codelco outside, a mixed layer — and
+   the pressure at that moment would be to relax the flag rather than
+   measure the mix. The proportion survives the event it was written
+   for: the first ingest moves a number from 0 to something. Same shape
+   as coverage annotation and attribution completeness.
+3. **The ordering EDGAR forces, written on its entry:** filings move
+   quantity and structure together from the same documents. Any path
+   that reports quantities while leaving structure curated leaves every
+   index representative regardless, because the operator indices count
+   their attribution edges as inputs. This is a property of the class
+   algebra, not a preference.
+4. **The ranking decision — taken here, once.** Two defensible criteria
+   were on the table: instrument value (the round-7/8 mission) and
+   attestation (how much of the corpus an item moves from curation-class
+   to reported). Decision: **evidence-layer search kinds stay first** —
+   the instrument mission was chosen deliberately, the item is small,
+   and it completes the search arc in flight. **sec-edgar takes the
+   second slot, ahead of OpenOwnership and flow vintages**, on
+   attestation dominance — and the dominance compounds rather than
+   competes: it is the only registered source that changes the class of
+   the layer BOTH remaining items stand on. OpenOwnership parent chains
+   layered on a wholly-curated layer are more curated structure; parent
+   chains over operators attested from filings are worth strictly more.
+   Flow vintages versioning curated flows stay representative; vintages
+   over a reported layer inherit its class. So the order is: 1)
+   evidence-layer search kinds, 2) sec-edgar structural ingest, 3)
+   OpenOwnership parent chains, 4) flow vintages (deferral guarded).
+   The two criteria disagree only about the top slot, and there the
+   mission decides; below it they agree.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
 |---|---|---|---|---|
 | Canonical state + provenance | ✅ copper | more commodities | new curated/live adapters; state model needs no change | high |
 | Live acquisition | ✅ 4 providers | bilateral trade flows as graph edges; LME stocks | allocation model for country↔facility flow reconciliation; paid/licensed stock feeds | medium |
-| Time-series state | ✅ (decade series, asOf engine, playback UI, topology-validity guard) | flow VINTAGES: several flow periods coexisting, asOf selecting among them (the MCS-vintage shape) — the structural fix behind phase 13's guard. The vintage material partially exists: Comtrade country-level annual trade by period is already archived and knownAt-stamped; the blocker is the deferred allocation model (country↔facility double-counting), not acquisition | per-period flow snapshots through the existing supersedes machinery + the allocation model | ranked below evidence-layer search kinds and the OpenOwnership adapter; deferral guarded by `flow-vintages-deferred` (phase 14) |
+| Time-series state | ✅ (decade series, asOf engine, playback UI, topology-validity guard) | flow VINTAGES: several flow periods coexisting, asOf selecting among them (the MCS-vintage shape) — the structural fix behind phase 13's guard. The vintage material partially exists: Comtrade country-level annual trade by period is already archived and knownAt-stamped; the blocker is the deferred allocation model (country↔facility double-counting), not acquisition | per-period flow snapshots through the existing supersedes machinery + the allocation model | backlog slot 4 (phase 18 ranking: search kinds → sec-edgar → OpenOwnership → flow vintages); deferral guarded by `flow-vintages-deferred` (phase 14) |
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
 | Search over entities | ✅ (canonical-register search, evidence headlines, knowledge coherence, miss→registry-gap demand signal) | evidence-layer kinds (refused/contested/stale, vintage ids); fuzzy matching; cross-commodity when a second commodity lands | ranked instrument backlog (phase 12 §4) | high |

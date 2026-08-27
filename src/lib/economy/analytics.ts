@@ -116,6 +116,54 @@ export function weakestInputClass(kinds: Iterable<Observation['valueKind']>): Ob
   return weakest;
 }
 
+/* ── Structural class profile ── */
+
+/**
+ * How much of the STRUCTURAL layer is source-labeled vs curation-class,
+ * as a proportion — by record count and by quantity (tonnage is what
+ * matters: one state operator outside a filings source outweighs many
+ * small filers). "Sourced" = reported|estimated (the source's own label);
+ * curation-class = representative|derived.
+ *
+ * This replaces a boolean pin that would have broken PARTIALLY the day the
+ * first reported structural source landed (a filings source covers filers;
+ * Codelco sits outside), inviting an argument about a flag instead of a
+ * measurement of the mix. A proportion survives the event it was written
+ * for: the first ingest moves a number from 0 to something.
+ */
+export interface StructuralClassProfile {
+  flows: { records: number; sourcedRecords: number; kt: number; sourcedKt: number; sourcedShareByKt: number };
+  capacities: { records: number; sourcedRecords: number; kt: number; sourcedKt: number; sourcedShareByKt: number };
+  /** operated_by edges carry no valueKind — curation-class by construction
+   *  until attribution comes from disclosures; counted so the layer's third
+   *  component is visible, not implied. */
+  attributionEdges: { records: number; sourcedRecords: 0 };
+  note: string;
+}
+
+export function structuralClassProfile(state: EconomyState): StructuralClassProfile {
+  const profile = (records: Array<{ valueKind: Observation['valueKind']; value?: number; quantity?: number }>) => {
+    let kt = 0, sourcedKt = 0, sourcedRecords = 0;
+    for (const r of records) {
+      const q = r.quantity ?? r.value ?? 0;
+      const sourced = r.valueKind === 'reported' || r.valueKind === 'estimated';
+      kt += q;
+      if (sourced) { sourcedKt += q; sourcedRecords += 1; }
+    }
+    return {
+      records: records.length, sourcedRecords,
+      kt: Number(kt.toFixed(1)), sourcedKt: Number(sourcedKt.toFixed(1)),
+      sourcedShareByKt: kt > 0 ? Number((sourcedKt / kt).toFixed(3)) : 0,
+    };
+  };
+  return {
+    flows: profile(state.flows),
+    capacities: profile(state.capacities),
+    attributionEdges: { records: state.dependencies.filter(d => d.type === 'operated_by').length, sourcedRecords: 0 },
+    note: 'Sourced = reported|estimated by the publisher\'s own label. Every index computed from structure inherits this layer\'s class (weakestInputClass); no index can be reported-class end-to-end until these shares move.',
+  };
+}
+
 /* ── Entity attestation ── */
 
 export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structural_only';
