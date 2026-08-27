@@ -542,6 +542,14 @@ function comtradeKnownAt(m49: string | number, year: string | number): { knownAt
  * acquisition.
  */
 async function archiveComtradeVintage(key: string, raw: unknown): Promise<void> {
+  // NEVER under test: the degradation-ladder tests exercise this path with
+  // STUBBED responses, and an unguarded write here put stub-served bytes
+  // into the real unreconstructable archive during every suite run — found
+  // by the S-2 manifest verifier the first time the two cohabited a suite
+  // (a fabricated byte in the vintage store is the exact loss class the
+  // archive exists to prevent, arriving through the instrument's own
+  // tests). Live-run archival is unaffected: VITEST is unset there.
+  if (process.env.VITEST) return;
   try {
     const fs = await import('node:fs/promises');
     const day = new Date().toISOString().slice(0, 10);
