@@ -9,16 +9,22 @@ import { syntheticState, FIXTURE_PROV } from './fixtures';
 import type { EntityKind } from './types';
 
 describe('validWhile guards on deferred ledger decisions', () => {
-  it('every deferred decision still stands on the ground it was taken on', async () => {
-    const { state } = await getEconomyState('copper');
+  it('every deferred decision still stands on the ground it was taken on — checked on EVERY commodity', async () => {
+    // The round-25 lesson: the attribution-basis guard was breached the day
+    // aluminium landed (the Rusal sanction) and nothing noticed, because the
+    // guards only ever ran on the copper state — the condition was checked,
+    // but not everywhere it held. Guards now run per commodity.
     const now = new Date().toISOString().slice(0, 10);
-    const failures = evaluateDeferredDecisions(state, now);
-    // A failure here is NOT a broken build: it says a recorded decision
-    // needs re-taking, and the message carries why it was taken.
-    expect(
-      failures,
-      failures.map(f => `[${f.id}] (${f.ledgerRef}) condition no longer holds: ${f.condition}\n  decision was taken because: ${f.reason}`).join('\n'),
-    ).toEqual([]);
+    for (const commodity of ['copper', 'aluminium']) {
+      const { state } = await getEconomyState(commodity);
+      const failures = evaluateDeferredDecisions(state, now);
+      // A failure here is NOT a broken build: it says a recorded decision
+      // needs re-taking, and the message carries why it was taken.
+      expect(
+        failures,
+        `[${commodity}] ` + failures.map(f => `[${f.id}] (${f.ledgerRef}) condition no longer holds: ${f.condition}\n  decision was taken because: ${f.reason}`).join('\n'),
+      ).toEqual([]);
+    }
   });
 
   it('every entry carries a ledger reference, a reason, and an executable condition', () => {
@@ -35,7 +41,7 @@ describe('validWhile guards on deferred ledger decisions', () => {
   // shown able to fire. Each predicate fails against the planted condition
   // it exists to catch. ──
 
-  it('curating a sanctions-class event trips the attribution-basis deferral', () => {
+  it('a sanctions-class event BEYOND the acknowledged counterexample trips the attribution-basis deferral', () => {
     const s = syntheticState();
     s.events.push({
       id: 'evt:test-sanction', entityId: 'ent:mine:alpha', type: 'sanction',
@@ -43,6 +49,19 @@ describe('validWhile guards on deferred ledger decisions', () => {
     });
     const failures = evaluateDeferredDecisions(s, '2024-07-01');
     expect(failures.map(f => f.id)).toContain('event-class-attribution-basis-unbuilt');
+  });
+
+  it('a second facility-scoped regulatory acknowledgment trips the scope-schema deferral', () => {
+    const s = syntheticState();
+    // The acknowledged Alunorte counterexample passes; a NEW event modeled
+    // around the same gap is accumulated demand, not another acknowledgment.
+    s.events.push({
+      id: 'evt:planted-facility-order', entityId: 'ent:port:gate', type: 'disruption',
+      title: 'Court-ordered curtailment (planted)', start: '2024-06-01', severity: 'high',
+      schemaLimitation: 'facility_scoped_regulation', provenance: FIXTURE_PROV,
+    });
+    const failures = evaluateDeferredDecisions(s, '2024-07-01');
+    expect(failures.map(f => f.id)).toContain('facility-scoped-regulation-unbuilt');
   });
 
   it('a second flow vintage trips the flow-vintages deferral', () => {

@@ -22,6 +22,28 @@ import { COPPER_SERIES_OBSERVATIONS, COPPER_SERIES_SOURCES } from '@/data/econom
 import { LIVE_ADAPTERS } from './liveAdapters';
 import { curatedAluminiumAdapter } from '@/data/economy/aluminium';
 
+/**
+ * Row accounting: every row an adapter fetched is accepted, rejected with a
+ * reason, or FILTERED with the predicate named and counted. Silent filtering
+ * is a defect class, not an incident (round 26): rejection was always
+ * reported (IngestReport, validation issues) but a filtered row never became
+ * a candidate record, so it was invisible — `!== 'Copper'` discarded
+ * aluminium's world data for twenty rounds, and unmapped M49/MCS identifiers
+ * vanished at resolution. Every refusal discipline in the system sits
+ * downstream of ingest; this is the same doctrine — a drop is a claim that
+ * the data doesn't matter, and claims get stated — applied at the one
+ * boundary it never reached.
+ */
+export interface RowAccounting {
+  sourceId: string;
+  /** What the accounting covers, e.g. 'MCS2025 world CSV' or 'Comtrade requests'. */
+  scope: string;
+  fetchedRows: number;
+  accepted: number;
+  filtered: Array<{ predicate: string; count: number; examples?: string[] }>;
+  rejected: Array<{ reason: string; count: number }>;
+}
+
 export interface AdapterPayload {
   commodity: string;
   commodityName: string;
@@ -32,6 +54,9 @@ export interface AdapterPayload {
   dependencies: Dependency[];
   events: EconEvent[];
   sources: EconomyState['sources'];
+  /** Row accounting per fetch scope — absent only for curated datasets,
+   *  which fetch nothing. */
+  accounting?: RowAccounting[];
 }
 
 export interface EconomyAdapter {

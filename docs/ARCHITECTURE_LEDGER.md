@@ -1129,6 +1129,66 @@ commodity-agnostic; countries attest reported/estimated while every
 facility attests representative — the copper split reproduces; the
 structural layer is 0% sourced here too.
 
+## Phase 25 — filtering is never free, and two guards were already breached
+
+1. **Silent filtering named as a defect class, and closed at its boundary.**
+   `!== 'Copper'` and unmapped-identifier drops were the same shape at two
+   layers: data arrives, a predicate excludes it, nothing reports the
+   exclusion. It survived twenty rounds structurally — every refusal
+   discipline in the system sits DOWNSTREAM of ingest, and a filtered row
+   never becomes a candidate record, so it is never rejected; rejection was
+   reported, filtering was free. `RowAccounting` closes it: every fetched
+   row is accepted, rejected with a reason, or filtered with the predicate
+   named and counted (with examples), attached to adapter payloads,
+   carried on `AssembledState`, served on the state and analytics views.
+   Wired for MCS (both commodities, both vintages) and Comtrade (unmapped
+   reporter/partner M49 — the round-25 resolution gap, now counted with
+   codes — plus the netWgt noise floor). The counterfactual is pinned as a
+   test: parsing the multi-commodity snapshot under the copper spec prints
+   `filtered: 56 (COMMODITY not in [Copper])` — the line that would have
+   raised the question on day two. Conservation asserted: every fetched
+   row lands in exactly one bucket. Standing adapter doctrine from here:
+   an adapter accounts for every row it fetched.
+2. **Two deferrals were breached by round 25's own register, and the
+   guards never noticed — because they only ran on copper.** A third
+   instance of the same blindness: the condition was checked, but not
+   everywhere it held. Guards now evaluate EVERY commodity. The breaches,
+   re-taken under the review's rule (acknowledge-and-hold or extend the
+   schema; silent failure is the one indefensible option):
+   - `event-class-attribution-basis-unbuilt`: the Rusal sanction is a
+     curated sanctions-class event — the original condition is gone. Held
+     against the acknowledged counterexample: the sanction propagates
+     reach, but no combined-basis exposure figure is quoted anywhere, so
+     the missing basis is still not load-bearing. The predicate now pins
+     the acknowledged list; the NEXT sanctions-class curation forces the
+     build, never a third acknowledgment.
+   - `facility-scoped-regulation-unbuilt` (new): RegulatoryScope cannot
+     express the Alunorte court embargo. The acknowledgment moved from
+     prose to a TYPED field (`EconEvent.schemaLimitation`) so the guard
+     can count counterexamples; a second one is accumulated demand and
+     forces the scope schema to gain an entity dimension.
+3. **Cross-commodity comparison is the fifth venue of the same
+   incommensurability species.** "Aluminium (>2500) is more concentrated
+   than copper (1339)" is a sentence someone will say, and it needs the
+   same four qualifiers as every within-commodity comparison — different
+   partitions (compare effectiveGroups, never raw HHI), different
+   universes (world-reported vs modeled sets), different bases per stage,
+   different completeness. The machinery already travels on every index;
+   what is new is the temptation, and it is now named where the numbers
+   are documented.
+4. **The next decisive step is not a build.** The usage finding stands:
+   twenty-five rounds, zero non-self-generated evidence. The cheapest
+   decisive experiment is one researcher, one real question, one
+   afternoon, no guidance — the miss log records what the corpus could
+   not answer, the refused:* queue records where it declined, and both
+   produce the one kind of evidence this project has never had. The
+   session's outcome re-ranks the backlog with data: aluminium-heavy
+   misses demote EDGAR; misses no registered source could answer convert
+   the modality programme from deferred-on-principle to deferred-against-
+   measured-demand; and a researcher who does not come back is the most
+   important finding twenty-five rounds could produce. Running that
+   session is the operator's move; the instrument is ready for it.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -1143,7 +1203,7 @@ structural layer is 0% sourced here too.
 
 ## Verification
 
-Every subsystem above ships with executable tests (180+ economy tests; 551
+Every subsystem above ships with executable tests (180+ economy tests; 555
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

@@ -26,7 +26,7 @@
  */
 
 import type { Observation, Provenance } from './types';
-import type { AdapterPayload, EconomyAdapter } from './adapters';
+import type { AdapterPayload, EconomyAdapter, RowAccounting } from './adapters';
 import { cachedSource } from '@/lib/sourceCache';
 import { MCS_SNAPSHOT_CSV, MCS_SNAPSHOT_CAPTURED_AT } from '@/data/economy/snapshots/mcs2025-world-copper';
 import { MCS2024_SNAPSHOT_CSV, MCS2024_SNAPSHOT_CAPTURED_AT, MCS2024_PUBLISHED_AT } from '@/data/economy/snapshots/mcs2024-world-copper';
@@ -220,12 +220,28 @@ export const MCS_ALUMINIUM_CSPEC: McsCommoditySpec = {
   countryMap: AL_COUNTRY_MAP,
 };
 
+/** Back-compat wrapper: observations only. Adapters use the accounted form —
+ *  filtering is never free (see RowAccounting). */
 export function parseMcsWorldCsv(
   csvText: string,
   prov: (ref: string, note?: string) => Provenance,
   spec: McsVintageSpec = MCS2025_SPEC,
   cspec?: McsCommoditySpec,
 ): Observation[] {
+  return parseMcsWorldCsvAccounted(csvText, prov, spec, cspec).observations;
+}
+
+/**
+ * The accounted parse: every CSV row is accepted, filtered with its
+ * predicate named, or rejected. The commodity filter that silently
+ * discarded aluminium for twenty rounds now counts what it excludes.
+ */
+export function parseMcsWorldCsvAccounted(
+  csvText: string,
+  prov: (ref: string, note?: string) => Provenance,
+  spec: McsVintageSpec = MCS2025_SPEC,
+  cspec?: McsCommoditySpec,
+): { observations: Observation[]; accounting: RowAccounting } {
   const lines = csvText.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
   const header = splitCsvRow(lines[0]).map(h => h.trim());
   const col = (name: string | null) => (name === null ? -1 : header.findIndex(h => h.replace(/\s+/g, ' ') === name.replace(/\s+/g, ' ')));
@@ -247,16 +263,34 @@ export function parseMcsWorldCsv(
 
   const cs: McsCommoditySpec = cspec ?? { ...MCS_COPPER_CSPEC, countryMap: MCS_COUNTRY_MAP };
   const obs: Observation[] = [];
+  let acceptedRows = 0;
+  const filteredCommodity = { count: 0 };
+  const filteredCountry = new Map<string, number>();
+  const filteredType = new Map<string, number>();
   for (const line of lines.slice(1)) {
     const row = splitCsvRow(line);
-    if (iCommodity >= 0 && !cs.commodities.includes((row[iCommodity] ?? '').trim())) continue;
-    const entityId = cs.countryMap[(row[iCountry] ?? '').trim()];
-    if (!entityId) continue; // "Other Countries", "World total", unmapped
+    if (iCommodity >= 0 && !cs.commodities.includes((row[iCommodity] ?? '').trim())) {
+      filteredCommodity.count += 1;
+      continue;
+    }
+    const countryName = (row[iCountry] ?? '').trim();
+    const entityId = cs.countryMap[countryName];
+    if (!entityId) {
+      // "Other Countries", "World total", and genuinely unmapped reporters —
+      // the resolution gap, now counted with names instead of vanished.
+      filteredCountry.set(countryName, (filteredCountry.get(countryName) ?? 0) + 1);
+      continue;
+    }
     const type = (row[iType] ?? '').trim();
     const mapped = cs.metricFor(type);
     const metric = mapped?.metric ?? null;
     const basis = mapped?.basis ?? 'metal_content';
     const slug = entityId.split(':')[2];
+    if (!metric) {
+      filteredType.set(type, (filteredType.get(type) ?? 0) + 1);
+      continue;
+    }
+    acceptedRows += 1;
     if (metric) {
       // USGS flags some "reported" figures as its own estimates in the notes
       // column (e.g. "estimated 2023") — those must not carry 'reported'.
@@ -299,10 +333,35 @@ export function parseMcsWorldCsv(
       }
     }
   }
-  return obs;
+  const accounting: RowAccounting = {
+    sourceId: `${spec.idPrefix}-live`.replace('usgs-mcs2024-live', 'usgs-mcs2024-vintage'),
+    scope: `${spec.idPrefix} world CSV (commodities: ${cs.commodities.join(', ')})`,
+    fetchedRows: lines.length - 1,
+    accepted: acceptedRows,
+    filtered: [
+      ...(iCommodity >= 0 ? [{ predicate: `COMMODITY not in [${cs.commodities.join(', ')}]`, count: filteredCommodity.count }] : []),
+      ...(filteredCountry.size > 0 ? [{
+        predicate: 'COUNTRY not in commodity country map (aggregates + unmapped reporters)',
+        count: [...filteredCountry.values()].reduce((s, n) => s + n, 0),
+        examples: [...filteredCountry.keys()].slice(0, 8),
+      }] : []),
+      ...(filteredType.size > 0 ? [{
+        predicate: 'TYPE not recognized by metricFor',
+        count: [...filteredType.values()].reduce((s, n) => s + n, 0),
+        examples: [...filteredType.keys()].slice(0, 4),
+      }] : []),
+    ],
+    rejected: [],
+  };
+  return { observations: obs, accounting };
 }
 
 interface ScienceBaseItem { files?: Array<{ name?: string; url?: string }> }
+
+/** Accounting from the most recent parse on each MCS path. Cached loader
+ *  hits reuse the last accounting (same data, same drops); the holder makes
+ *  filtering visible without threading a tuple through the ladder. */
+const mcsAccounting: { copper?: RowAccounting; copperVintage?: RowAccounting; aluminium?: RowAccounting } = {};
 
 async function fetchMcsLive(): Promise<Observation[]> {
   const item = await fetchJson<ScienceBaseItem>(MCS_ITEM_URL);
@@ -310,24 +369,28 @@ async function fetchMcsLive(): Promise<Observation[]> {
   if (!file?.url) throw new Error('MCS World Data CSV not found on ScienceBase item');
   const csv = await fetchText(file.url);
   const retrievedAt = new Date().toISOString();
-  return parseMcsWorldCsv(csv, (ref, note) => ({
+  const { observations, accounting } = parseMcsWorldCsvAccounted(csv, (ref, note) => ({
     sourceId: 'usgs-mcs2025-live',
     sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
     sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
     retrievedAt, sourceRef: ref, note,
   }), MCS2025_SPEC);
+  mcsAccounting.copper = accounting;
+  return observations;
 }
 
 /** The MCS2024 edition — static history, always served from the committed
  *  capture. Its estimates are what was knowable before MCS2025 published. */
 function mcs2024VintageObs(): Observation[] {
-  return parseMcsWorldCsv(MCS2024_SNAPSHOT_CSV, (ref, note) => ({
+  const { observations, accounting } = parseMcsWorldCsvAccounted(MCS2024_SNAPSHOT_CSV, (ref, note) => ({
     sourceId: 'usgs-mcs2024-vintage',
     sourceName: 'USGS Mineral Commodity Summaries 2024 — Copper (ScienceBase vintage)',
     sourceUrl: 'https://www.sciencebase.gov/catalog/item/65b7d77ed34e36a39045b4b2',
     retrievedAt: `${MCS2024_SNAPSHOT_CAPTURED_AT}T00:00:00Z`,
     sourceRef: ref, note,
   }), MCS2024_SPEC);
+  mcsAccounting.copperVintage = { ...accounting, sourceId: 'usgs-mcs2024-vintage' };
+  return observations;
 }
 
 /** Chain revisions: an MCS2025 figure supersedes the MCS2024 figure for the
@@ -341,7 +404,7 @@ function linkSupersedes(current: Observation[], vintage: Observation[]): Observa
 }
 
 function mcsSnapshot(reason: string): Observation[] {
-  return parseMcsWorldCsv(MCS_SNAPSHOT_CSV, (ref, note) => ({
+  const { observations, accounting } = parseMcsWorldCsvAccounted(MCS_SNAPSHOT_CSV, (ref, note) => ({
     sourceId: 'usgs-mcs2025-live',
     sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
     sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
@@ -349,6 +412,8 @@ function mcsSnapshot(reason: string): Observation[] {
     sourceRef: ref,
     note: [`bundled snapshot (${reason})`, note].filter(Boolean).join(' — '),
   }), MCS2025_SPEC);
+  mcsAccounting.copper = { ...accounting, scope: `${accounting.scope} [snapshot rung]` };
+  return observations;
 }
 
 /* ── Aluminium from the same world file ── */
@@ -367,15 +432,19 @@ async function fetchMcsAluminiumLive(): Promise<Observation[]> {
   const file = item.files?.find(f => /World_Data.*\.csv$/i.test(f.name ?? ''));
   if (!file?.url) throw new Error('MCS World Data CSV not found on ScienceBase item');
   const csv = await fetchText(file.url);
-  return parseMcsWorldCsv(csv, mcsAlProv(new Date().toISOString()), MCS2025_SPEC, MCS_ALUMINIUM_CSPEC);
+  const { observations, accounting } = parseMcsWorldCsvAccounted(csv, mcsAlProv(new Date().toISOString()), MCS2025_SPEC, MCS_ALUMINIUM_CSPEC);
+  mcsAccounting.aluminium = accounting;
+  return observations;
 }
 
 function mcsAluminiumSnapshot(reason: string): Observation[] {
-  return parseMcsWorldCsv(
+  const { observations, accounting } = parseMcsWorldCsvAccounted(
     MCS_AL_SNAPSHOT_CSV,
     mcsAlProv(`${MCS_AL_SNAPSHOT_CAPTURED_AT}T00:00:00Z`, `bundled snapshot (${reason})`),
     MCS2025_SPEC, MCS_ALUMINIUM_CSPEC,
   );
+  mcsAccounting.aluminium = { ...accounting, scope: `${accounting.scope} [snapshot rung]` };
+  return observations;
 }
 
 /* ══════════════ UN Comtrade preview ══════════════ */
@@ -561,6 +630,52 @@ export function parseComtradeBilateral(
   return obs;
 }
 
+/**
+ * Pure row accounting over Comtrade responses: recomputes the parse
+ * predicates' drops (unmapped reporter/partner M49 — the round-25
+ * resolution gap — the netWgt floor, missing world rows) so every fetched
+ * row is accepted, filtered with the predicate named, or rejected. Kept in
+ * lockstep with parseComtradeResponse/parseComtradeBilateral; the snapshot
+ * tests hold the two together.
+ */
+export function accountComtradeResponses(responses: Record<string, ComtradeResponse>): RowAccounting {
+  let fetched = 0, accepted = 0, unmappedReporter = 0, unmappedPartner = 0, belowFloor = 0, missingWgt = 0;
+  const unmappedReporterCodes = new Set<string>();
+  const unmappedPartnerCodes = new Set<string>();
+  for (const [key, raw] of Object.entries(responses)) {
+    const [m49Str, hs] = key.split('-');
+    const minKg = hs === '2603' ? 1e8 : 5e7;
+    const rows = (raw.data ?? []) as Array<ComtradeRow & { partnerCode?: number }>;
+    fetched += rows.length;
+    if (!M49_TO_ENTITY[Number(m49Str)]) {
+      unmappedReporter += rows.length;
+      unmappedReporterCodes.add(m49Str);
+      continue;
+    }
+    for (const row of rows) {
+      if (row.netWgt === null || row.netWgt === undefined) { missingWgt += 1; continue; }
+      if (!row.partnerCode || row.partnerCode === 0) { accepted += 1; continue; } // world row → aggregate obs
+      if (!M49_TO_ENTITY[row.partnerCode]) { unmappedPartner += 1; unmappedPartnerCodes.add(String(row.partnerCode)); continue; }
+      if (row.netWgt < minKg) { belowFloor += 1; continue; }
+      accepted += 1;
+    }
+  }
+  return {
+    sourceId: 'un-comtrade-preview',
+    scope: `Comtrade preview responses (${Object.keys(responses).length} request(s))`,
+    fetchedRows: fetched,
+    accepted,
+    filtered: [
+      ...(unmappedReporter > 0 ? [{ predicate: 'reporter M49 not in M49_TO_ENTITY', count: unmappedReporter, examples: [...unmappedReporterCodes].slice(0, 6) }] : []),
+      ...(unmappedPartner > 0 ? [{ predicate: 'partner M49 not in M49_TO_ENTITY', count: unmappedPartner, examples: [...unmappedPartnerCodes].slice(0, 8) }] : []),
+      ...(belowFloor > 0 ? [{ predicate: 'netWgt below noise floor (100 kt gross / 50 kt)', count: belowFloor }] : []),
+    ],
+    rejected: missingWgt > 0 ? [{ reason: 'netWgt missing on row', count: missingWgt }] : [],
+  };
+}
+
+const comtradeAccounting: { current?: RowAccounting } = {};
+
 async function fetchComtradeLive(): Promise<Observation[]> {
   const retrievedAt = new Date().toISOString();
   const prov = (ref: string, note?: string): Provenance => ({
@@ -571,6 +686,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
   });
   const snapshotResponses = (comtradeSnapshot as { capturedAt: string; responses: Record<string, ComtradeResponse> });
   const rawByKey = new Map<string, ComtradeResponse>();
+  const usedResponses: Record<string, ComtradeResponse> = {};
   const obs: Observation[] = [];
   let anyLive = false;
   let rateLimited = false;
@@ -602,6 +718,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
     if (one) {
       // Live parse succeeded — bilateral rows come from the same response at
       // zero extra request cost. (rawByKey holds the last successful raw.)
+      usedResponses[key] = rawByKey.get(key)!;
       bilateral = parseComtradeBilateral(key, rawByKey.get(key)!, prov);
     } else {
       // Per-request degradation: this key alone falls back to its snapshot slice.
@@ -612,6 +729,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
           retrievedAt: `${snapshotResponses.capturedAt}T00:00:00Z`,
           note: [`bundled snapshot (live request unavailable${rateLimited ? ': rate limited' : ''})`, note].filter(Boolean).join(' — '),
         });
+        usedResponses[key] = snap;
         one = parseComtradeResponse(key, snap, snapProv);
         bilateral = parseComtradeBilateral(key, snap, snapProv);
       }
@@ -622,6 +740,7 @@ async function fetchComtradeLive(): Promise<Observation[]> {
   // If nothing came back live, report failure so the ladder's snapshot rung
   // serves — an all-snapshot result must not be cached as a fresh success.
   if (!anyLive) throw new Error('no live Comtrade responses (rate limited or unreachable)');
+  comtradeAccounting.current = accountComtradeResponses(usedResponses);
   return obs;
 }
 
@@ -642,6 +761,7 @@ function comtradeSnapshotObs(reason: string): Observation[] {
     if (one) obs.push(one);
     obs.push(...parseComtradeBilateral(key, raw, prov));
   }
+  comtradeAccounting.current = { ...accountComtradeResponses(responses), scope: 'Comtrade snapshot rung' };
   return obs;
 }
 
@@ -963,6 +1083,7 @@ export const usgsMcsAdapter: EconomyAdapter = {
       sourceName: 'USGS Mineral Commodity Summaries 2024 — Copper (ScienceBase vintage)',
       sourceUrl: 'https://www.sciencebase.gov/catalog/item/65b7d77ed34e36a39045b4b2',
     });
+    payload.accounting = [mcsAccounting.copper, mcsAccounting.copperVintage].filter((a): a is RowAccounting => !!a);
     return payload;
   },
 };
@@ -976,11 +1097,13 @@ export const usgsMcsAluminiumAdapter: EconomyAdapter = {
     // production (gross dry tons), alumina refinery production (gross
     // calcined weight, intermediate_production) and primary aluminium
     // smelter production (metal content, refined_production).
-    return observationOnlyPayload(await loaders.usgsAluminium(), {
+    const payload = observationOnlyPayload(await loaders.usgsAluminium(), {
       sourceId: 'usgs-mcs2025-live',
       sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
       sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
     }, ['aluminium', 'Aluminium']);
+    payload.accounting = mcsAccounting.aluminium ? [mcsAccounting.aluminium] : [];
+    return payload;
   },
 };
 
@@ -989,11 +1112,13 @@ export const comtradeAdapter: EconomyAdapter = {
   providerName: 'UN Comtrade public preview — copper trade weights',
   commodities: ['copper'],
   async load() {
-    return observationOnlyPayload(await loaders.comtrade(), {
+    const payload = observationOnlyPayload(await loaders.comtrade(), {
       sourceId: 'un-comtrade-preview',
       sourceName: 'UN Comtrade (public preview API)',
       sourceUrl: 'https://comtradeplus.un.org/',
     });
+    payload.accounting = comtradeAccounting.current ? [comtradeAccounting.current] : [];
+    return payload;
   },
 };
 

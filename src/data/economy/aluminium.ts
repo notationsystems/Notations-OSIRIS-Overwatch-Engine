@@ -262,6 +262,7 @@ export const ALUMINIUM_EVENTS: EconEvent[] = [
   },
   {
     id: 'evt:alunorte-embargo-2018', curation: 'independent', entityId: 'ent:refinery:alunorte', type: 'disruption',
+    schemaLimitation: 'facility_scoped_regulation',
     title: 'Alunorte production embargo (court-ordered 50% curtailment)', start: '2018-03-01', end: '2019-05-21',
     firstReportedAt: '2018-03-01', severity: 'high',
     description: 'Brazilian court ordered Alunorte to half production after the Barcarena rain event; lifted May 2019. MODELING NOTE (recorded limitation): this was a REGULATORY act scoped to one facility, but RegulatoryScope is jurisdiction-shaped (country + commodity + direction) and cannot express a facility-scoped order — so the event is modeled as an operational disruption. The scope schema is copper-shaped in this respect; ledger phase 24.',

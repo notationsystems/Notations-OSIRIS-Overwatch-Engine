@@ -67,11 +67,24 @@ export const EXTRAPOLATION_BOUND_DAYS = 2 * 365;
 export const DEFERRED_DECISIONS: DeferredDecision[] = [
   {
     id: 'event-class-attribution-basis-unbuilt',
-    ledgerRef: 'Phase 12 §3',
-    reason: 'A sanction\'s exposure is operator-of-record ∪ material shareholding — neither pure control nor pure economic interest (Glencore the named test case). Deferred behind the instrument backlog because no sanctions-class analysis is being run, so the combined basis has no consumer.',
+    ledgerRef: 'Phase 12 §3 / Phase 25',
+    reason: 'A sanction\'s exposure is operator-of-record ∪ material shareholding — neither pure control nor pure economic interest (Glencore the named test case). Originally deferred while no sanctions-class event existed; the aluminium register BROKE that condition (evt:rusal-sanctions-2018 is a curated sanction) and the breach went unnoticed for a round because the guards only ever ran on the copper state. Re-taken (phase 25): the deferral is KNOWINGLY held against the acknowledged counterexample — the Rusal sanction propagates reach through owner edges but no combined-basis exposure figure is quoted anywhere, so the missing basis is still not load-bearing. The NEXT sanctions-class curation forces the build, not another acknowledgment.',
     validWhile: {
-      description: 'no sanction or insolvency event exists in the curated register — the moment one is curated, the missing attribution basis becomes load-bearing',
-      predicate: (state) => state.events.every(ev => ev.type !== 'sanction' && ev.type !== 'insolvency'),
+      description: 'every sanction/insolvency event in the register is in the acknowledged-counterexample list [evt:rusal-sanctions-2018] — a second one forces the build, never a third acknowledgment',
+      predicate: (state) => state.events
+        .filter(ev => ev.type === 'sanction' || ev.type === 'insolvency')
+        .every(ev => ev.id === 'evt:rusal-sanctions-2018'),
+    },
+  },
+  {
+    id: 'facility-scoped-regulation-unbuilt',
+    ledgerRef: 'Phase 24 / Phase 25',
+    reason: 'RegulatoryScope is jurisdiction-shaped (country + commodity + direction) and cannot express a regulatory act scoped to ONE FACILITY — the real Alunorte court embargo (2018–19) is modeled as an operational disruption, with the acknowledgment TYPED on the event (schemaLimitation) rather than remembered in prose. The deferral is knowingly held against that one live counterexample.',
+    validWhile: {
+      description: 'every event modeled around the facility-scoped-regulation gap is in the acknowledged list [evt:alunorte-embargo-2018] — a second one is accumulated demand and forces the scope schema to gain an entity dimension',
+      predicate: (state) => state.events
+        .filter(ev => ev.schemaLimitation === 'facility_scoped_regulation')
+        .every(ev => ev.id === 'evt:alunorte-embargo-2018'),
     },
   },
   {

@@ -377,6 +377,17 @@ export interface EconEvent {
    * must be claimed, never presumed).
    */
   curation?: 'independent' | 'post_hoc';
+  /**
+   * A TYPED acknowledgment that this event is modeled AROUND a schema gap
+   * rather than within the schema (round 26). The acknowledgment lives on
+   * the record, not in prose, so the ledger guard can count acknowledged
+   * counterexamples and force the re-take when a new one arrives:
+   *   facility_scoped_regulation — a regulatory act scoped to one facility
+   *     (the Alunorte court embargo), inexpressible in the
+   *     jurisdiction-shaped RegulatoryScope and modeled as an operational
+   *     disruption instead.
+   */
+  schemaLimitation?: 'facility_scoped_regulation';
   description?: string;
   provenance: Provenance;
 }

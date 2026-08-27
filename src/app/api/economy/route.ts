@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { runEngine, listSystems } from '@/lib/economy/engine';
+import { getEconomyState } from '@/lib/economy/store';
 import { DISRUPTIVE_EVENT_TYPES, isEventActive, topologyValidity } from '@/lib/economy/propagation';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
 import { corpusHealthSignals } from '@/lib/economy/horizon';
@@ -67,8 +68,13 @@ export async function GET(request: Request) {
   // period, and an evaluation date outside that period says so.
   const topology = topologyValidity(state, evalDate, knowledge);
 
+  // Row accounting from the assembly (memoized — no second fetch): every
+  // fetched row accepted, rejected with a reason, or filtered with the
+  // predicate named. Filtering is never free.
+  const { accounting } = await getEconomyState(commodity);
+
   if (view === 'state') {
-    return NextResponse.json({ providers, state });
+    return NextResponse.json({ providers, state, accounting });
   }
 
   if (view === 'analytics') {
@@ -92,6 +98,8 @@ export async function GET(request: Request) {
       // ceiling degrades or a plausibility gate rejected its live data.
       // Empty on a healthy corpus — the panel renders nothing then.
       corpusHealth: corpusHealthSignals(state, evalDate),
+      // Ingest row accounting — filtering is never free (round 26).
+      ingestAccounting: accounting,
       events: state.events,
       sources: state.sources,
     });

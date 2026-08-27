@@ -2,12 +2,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import type { Provenance } from './types';
 import { validateState } from './types';
 import {
-  parseMcsWorldCsv, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
-  parseWestmetallTable, westmetallObs, checkWestmetallPlausibility,
+  parseMcsWorldCsv, parseMcsWorldCsvAccounted, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
+  parseWestmetallTable, westmetallObs, checkWestmetallPlausibility, accountComtradeResponses,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
+  MCS2025_SPEC, MCS_COPPER_CSPEC, MCS_ALUMINIUM_CSPEC,
 } from './liveAdapters';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
 import { MCS_SNAPSHOT_CSV } from '@/data/economy/snapshots/mcs2025-world-copper';
+import { MCS_AL_SNAPSHOT_CSV } from '@/data/economy/snapshots/mcs2025-world-aluminium';
 import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
@@ -16,6 +18,53 @@ import { observationsAt, concentration } from './analytics';
 
 const prov = (ref: string, note?: string): Provenance =>
   ({ sourceId: 'test', sourceName: 'test', retrievedAt: '2026-08-26T00:00:00Z', sourceRef: ref, note });
+
+describe('row accounting: filtering is never free (round 26)', () => {
+  it('the commodity filter now counts what it excludes — the twenty-round counterfactual, printed', () => {
+    // Parse the aluminium snapshot (multi-commodity rows) with the COPPER
+    // spec: exactly what the live world-file parse did for twenty rounds.
+    // Had this accounting existed, every copper ingest would have printed
+    // this line, and someone would have asked on day two.
+    const { observations, accounting } = parseMcsWorldCsvAccounted(
+      MCS_AL_SNAPSHOT_CSV, prov, MCS2025_SPEC, { ...MCS_COPPER_CSPEC, countryMap: {} },
+    );
+    expect(observations).toEqual([]);
+    const commodityFilter = accounting.filtered.find(f => f.predicate.includes('COMMODITY not in [Copper]'))!;
+    expect(commodityFilter.count).toBe(56); // every aluminium/bauxite row, named and counted
+    expect(accounting.fetchedRows).toBe(56);
+    expect(accounting.accepted).toBe(0);
+  });
+
+  it('unmapped reporters are counted with names — the resolution gap made visible', () => {
+    const { accounting } = parseMcsWorldCsvAccounted(MCS_AL_SNAPSHOT_CSV, prov, MCS2025_SPEC, MCS_ALUMINIUM_CSPEC);
+    const unmapped = accounting.filtered.find(f => f.predicate.includes('COUNTRY not in'))!;
+    expect(unmapped.count).toBeGreaterThan(0);
+    // Germany/Ireland/Spain report alumina but are outside the aluminium
+    // country map — dropped rows, now dropped WITH NAMES.
+    expect(unmapped.examples!.join(' ')).toMatch(/Germany|Ireland|Spain|Other Countries|World total/);
+    expect(accounting.accepted).toBeGreaterThan(30);
+    expect(accounting.fetchedRows).toBe(accounting.accepted
+      + accounting.filtered.reduce((s, f) => s + f.count, 0)
+      + accounting.rejected.reduce((s, r) => s + r.count, 0)); // every row accounted for
+  });
+
+  it('Comtrade accounting names the unmapped-M49 and noise-floor drops', () => {
+    const responses = (comtradeSnapshot as { responses: Parameters<typeof accountComtradeResponses>[0] }).responses;
+    const acct = accountComtradeResponses(responses);
+    expect(acct.fetchedRows).toBeGreaterThan(0);
+    expect(acct.accepted).toBeGreaterThan(0);
+    // The bilateral partner rows outside M49_TO_ENTITY were silently dropped
+    // since round 1 — now counted with the codes named.
+    const partnerDrop = acct.filtered.find(f => f.predicate.includes('partner M49'));
+    expect(partnerDrop).toBeDefined();
+    expect(partnerDrop!.count).toBeGreaterThan(0);
+    expect(partnerDrop!.examples!.length).toBeGreaterThan(0);
+    // Conservation: every fetched row lands in exactly one bucket.
+    expect(acct.fetchedRows).toBe(acct.accepted
+      + acct.filtered.reduce((s, f) => s + f.count, 0)
+      + acct.rejected.reduce((s, r) => s + r.count, 0));
+  });
+});
 
 describe('parseMcsWorldCsv (against the committed real capture)', () => {
   const obs = parseMcsWorldCsv(MCS_SNAPSHOT_CSV, prov);

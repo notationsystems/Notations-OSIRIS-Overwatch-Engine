@@ -10,12 +10,15 @@
 
 import type { Dependency, EconomyState, Entity, ValidationIssue } from './types';
 import { validateState } from './types';
-import { adaptersFor } from './adapters';
+import { adaptersFor, type RowAccounting } from './adapters';
 
 export interface AssembledState {
   state: EconomyState;
   issues: ValidationIssue[];
   providers: string[];
+  /** Row accounting from every adapter that fetched anything — filtering is
+   *  never free; see RowAccounting. */
+  accounting: RowAccounting[];
 }
 
 /** Derive located_in country dependencies from entity.countryCode. */
@@ -124,7 +127,8 @@ async function assemble(commodity: string): Promise<AssembledState> {
     throw new Error(`Economy state for "${commodity}" failed validation:\n` + errors.map(e => `  - ${e.message}`).join('\n'));
   }
 
-  return { state, issues: [...issues, ...validation], providers };
+  const accounting = payloads.flatMap(p => p.accounting ?? []);
+  return { state, issues: [...issues, ...validation], providers, accounting };
 }
 
 /* ── Lookup helpers ── */
