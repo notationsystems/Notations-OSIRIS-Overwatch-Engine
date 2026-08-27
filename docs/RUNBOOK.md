@@ -73,6 +73,8 @@ a work list instead of a shrug.
 | `STRUCTURE HAS MOVED` | Curated events contradict that extrapolation at named entities — figures continue only because nothing better is modeled |
 | `TOPOLOGY OUT OF PERIOD` | No flow map can describe your date; flow-derived tonnage is null (unknown), never zero |
 | `COUNTRY-granularity vintage YYYY` | Historical dates are served by country-level trade corridors; facility detail refuses at these dates (the allocation model is the recorded remedy) |
+| `TOPOLOGY NOT REPRESENTABLE IN THIS VIEW` | The flow-graph explorer draws sited facility structure; at a country-granularity date its corridors are stated between countries, which it excludes as aggregates. The count withheld is stated. **The map draws these corridors** — scrub there instead |
+| `NO FLOW TOPOLOGY DESCRIBES <date>` | Reachable through the API and MCP rather than the time bar (the bar starts at the earliest vintage): no vintage covers the date, so no network is drawn rather than today's wearing a historical label |
 
 ## The search box speaks two languages
 

@@ -2522,6 +2522,82 @@ split-verdict hazard behaving exactly as recorded.
 the researcher afternoon.
 
 
+## Phase 40 — the graph view answered every date the same way
+
+The phase-39 corollary — *an instrument that declines has to say which
+kind of nothing it is returning* — was applied to the other surfaces by
+probing what each serves when it serves little. That found a ninth
+instance of context severance, and a bigger one than the eighth.
+
+**The finding.** `selectTopology` / `topologyValidity` is phase 13's
+machinery: a date outside every flow vintage yields null rather than
+today's structure wearing a historical label, with the banner vocabulary
+(`TOPOLOGY OUT OF PERIOD`, `COUNTRY-granularity vintage`) built for it.
+Its APPARENT scope is the instrument's flow topology. Its EFFECTIVE scope
+was the map view. The graph branch read `state.flows` — every vintage at
+once, unaffected by `asOf`.
+
+Measured across five dates:
+
+| date | map flows | map status | graph flow links |
+|---|---|---|---|
+| 1990-01-01 | 0 | `predates` | **39** |
+| 2010-01-01 | 0 | `predates` | **39** |
+| 2017-06-30 | 9 | `within` (country) | **39** |
+| 2022-06-30 | 6 | `within` (country) | **39** |
+| today | 39 | `extrapolated` (facility) | 39 |
+
+The graph is the surface that renders an `AS OF <date>` chip over what it
+draws. The projection asserting the knowledge state was the one ignoring
+it. Nothing failed — every link was a real flow, every node a real
+entity, the force layout worked.
+
+And it was reachable by a researcher, not only through the API: the time
+bar's leftmost position is **2017-01**, inside the country-vintage era,
+which is exactly where the runbook's move #2 ("set a past date") sends
+them. Verified at the screen before and after.
+
+**Closing it exposed what the old behaviour was hiding.** With the
+topology selected, the 2017 vintage yields ZERO drawable links — because
+this view excludes countries as AGGREGATES by design, and the corpus's
+historical corridors are stated country↔country. So the honest render at
+2017 is empty, which is a third kind of zero: not "no topology covers
+this date" (`predates`), not "the network is empty", but *the topology
+exists and this view cannot represent it*. Filling that hole with today's
+facility network was the stronger failure — an empty picture at least
+asserts nothing — but an unexplained empty picture is the phase-39 defect
+again. So the drop is counted:
+`representable: {flowsInSelectedTopology, flowLinks, withheld, reason}`,
+with the reason naming the recorded deferral (the country↔facility
+allocation model) rather than proposing to widen this view.
+
+Three states, three distinct screens, all verified live: today —
+`TOPOLOGY EXTRAPOLATED` in the header, network drawn; earliest scrubbable
+date — `TOPOLOGY NOT REPRESENTABLE IN THIS VIEW`, "9 of 9 flow(s) …
+withheld", pointing at the map, which does draw those corridors;
+pre-vintage (API/MCP-reachable, not on the time bar) —
+`NO FLOW TOPOLOGY DESCRIBES <date>`.
+
+**The pin that would have caught it.** Three route-level tests, the third
+being the property whose absence was the defect: the graph and the map
+must AGREE about which topology serves a date, at every date — same
+status, same granularity, same selected flow count — and the graph's own
+accounting must balance (`flowLinks + withheld = flowsInSelectedTopology`).
+Two projections of one state are free to draw different amounts of it;
+they are not free to disagree about what the date can carry.
+
+**A correction of my own, mid-round.** I first asserted that the graph
+should serve flow links at 2017 and wrote the test that way; it failed,
+and the measurement was right — the country corridors are not
+representable here at all. The assertion changed, not the finding, and
+the third zero exists because of that failure.
+
+672 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

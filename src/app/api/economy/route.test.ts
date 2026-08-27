@@ -161,3 +161,94 @@ describe('GET /api/economy/entity', () => {
     expect((await entityGet(req('/api/economy/entity?commodity=copper&id=ent:mine:nope'))).status).toBe(404);
   });
 });
+
+/**
+ * The ninth instance of context severance, at the graph projection.
+ *
+ * `topologyValidity` / `selectTopology` — the phase-13 machinery whose whole
+ * purpose is that a date outside any flow vintage produces null rather than
+ * today's structure wearing a historical label — had the map view as its
+ * EFFECTIVE scope and the instrument as its APPARENT one. The graph branch
+ * read `state.flows`: every vintage at once, identical at every date.
+ *
+ * MEASURED before it was believed: at 1990-01-01 the map served 0 flows with
+ * topology.status `predates`; the graph served the same 39 flow links it
+ * serves today. And the graph view is the surface that displays an
+ * "AS OF 1990-01-01" chip over what it draws — the projection asserting the
+ * knowledge state was the one ignoring it. Nothing failed.
+ */
+describe('the graph view answers at the date it is asked about', () => {
+  const graph = async (q = '') => {
+    const res = await economyGet(req(`/api/economy?commodity=copper&view=graph${q}`));
+    return await res.json() as {
+      links: Array<{ kind: string }>;
+      nodes: Array<{ id: string; throughputKt: number }>;
+      topology?: { status: string; granularity?: string };
+      representable?: { flowsInSelectedTopology: number; flowLinks: number; withheld: number; reason: string | null };
+    };
+  };
+  const flowLinks = (b: { links: Array<{ kind: string }> }) => b.links.filter(l => l.kind === 'flow').length;
+
+  it('a date no vintage covers refuses the network instead of serving today\'s', async () => {
+    const past = await graph('&asOf=1990-01-01');
+    expect(past.topology?.status, 'the graph must carry the topology block the map has').toBe('predates');
+    expect(flowLinks(past), 'a network drawn at 1990 is today\'s structure wearing a historical date').toBe(0);
+    // Throughput is a flow-derived magnitude: it must go with the flows.
+    expect(past.nodes.every(n => n.throughputKt === 0)).toBe(true);
+  });
+
+  it('DISCRIMINATING: the selected topology actually changes with the date', async () => {
+    // Without this the assertion above would pass on a graph that is empty
+    // everywhere. Three dates, three different selections.
+    const [today, v2017, past] = await Promise.all([graph(), graph('&asOf=2017-06-30'), graph('&asOf=1990-01-01')]);
+    expect(flowLinks(today)).toBeGreaterThan(0);
+    expect(today.topology?.granularity).toBe('facility');
+    expect(v2017.topology?.granularity).toBe('country');
+    expect(v2017.representable!.flowsInSelectedTopology).toBeGreaterThan(0);
+    expect(past.representable!.flowsInSelectedTopology).toBe(0);
+  });
+
+  it('THE THIRD ZERO: a country-granularity topology is not representable here, and says so', async () => {
+    // Corrected against the measurement rather than the other way round.
+    // Selecting the topology exposed a structural fact the old behaviour was
+    // hiding: this view excludes countries as AGGREGATES, and the corpus's
+    // historical vintages are country↔country corridors — so at 2017 the
+    // topology is `within`, holds flows, and none of them can be drawn here.
+    // The previous behaviour filled that hole with today's facility network,
+    // which is the stronger failure: an empty picture asserts nothing.
+    const v2017 = await graph('&asOf=2017-06-30');
+    expect(v2017.topology?.status).toBe('within');
+    expect(flowLinks(v2017)).toBe(0);
+    const r = v2017.representable!;
+    expect(r.flowsInSelectedTopology).toBeGreaterThan(0);
+    expect(r.withheld).toBe(r.flowsInSelectedTopology);   // every drop counted
+    expect(r.reason).toMatch(/not representable in this view/);
+    expect(r.reason).toMatch(/allocation model/);          // the recorded deferral, named
+    // And today's facility topology withholds NOTHING — otherwise the
+    // accounting above would be a constant rather than a measurement.
+    const today = await graph();
+    expect(today.representable!.withheld).toBe(0);
+    expect(today.representable!.reason).toBeNull();
+    expect(today.representable!.flowLinks).toBe(today.representable!.flowsInSelectedTopology);
+  });
+
+  it('the graph and the map agree about what the date can carry', async () => {
+    // Two projections of one state. Disagreeing about whether a date is
+    // describable is the defect; agreeing is the property.
+    for (const q of ['', '&asOf=2017-06-30', '&asOf=2022-06-30', '&asOf=1990-01-01']) {
+      const g = await graph(q);
+      const m = await (await economyGet(req(`/api/economy?commodity=copper&view=map${q}`))).json() as {
+        econ_flows: unknown[]; topology: { status: string; granularity?: string };
+      };
+      expect(g.topology?.status, `status disagrees at ${q || 'today'}`).toBe(m.topology.status);
+      expect(g.topology?.granularity, `granularity disagrees at ${q || 'today'}`).toBe(m.topology.granularity);
+      // The two views must agree on WHICH TOPOLOGY serves the date. They may
+      // draw different amounts of it — the map sites country corridors on
+      // coordinates, this view cannot — but that difference is accounted
+      // for, never silent.
+      expect(g.representable!.flowsInSelectedTopology, `selected flow count disagrees at ${q || 'today'}`).toBe(m.econ_flows.length);
+      expect(g.representable!.flowLinks + g.representable!.withheld).toBe(g.representable!.flowsInSelectedTopology);
+      if (g.representable!.withheld > 0) expect(g.representable!.reason).toBeTruthy();
+    }
+  });
+});

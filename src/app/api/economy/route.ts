@@ -161,14 +161,26 @@ export async function GET(request: Request) {
     // Nodes: everything that participates in material structure (flows or
     // non-geographic dependencies). Countries/commodity stay out — they are
     // aggregates, and located_in is geography, not structure.
+    // THE SELECTED TOPOLOGY, exactly as the map uses. This branch read
+    // `state.flows` — the whole corpus, every vintage at once, unaffected
+    // by asOf — while the map served `selectTopology(state, evalDate)`.
+    // Measured: at 1990-01-01 the map served 0 flows and reported
+    // topology.status `predates`; the graph served the same 39 links it
+    // serves today, with no topology block and an "AS OF 1990-01-01" chip
+    // over them. Two projections of one state disagreeing about whether a
+    // date can be described at all — and the one asserting the knowledge
+    // state in its own header was the one ignoring it. The phase-13
+    // topology-validity machinery's APPARENT scope is the instrument's flow
+    // topology; its EFFECTIVE scope was the map view. Nothing failed.
+    const selected = selectTopology(state, evalDate);
     const linked = new Set<string>();
-    for (const f of state.flows) { linked.add(f.fromEntityId); linked.add(f.toEntityId); }
+    for (const f of selected.flows) { linked.add(f.fromEntityId); linked.add(f.toEntityId); }
     for (const d of state.dependencies) {
       if (d.type === 'located_in') continue;
       linked.add(d.fromEntityId); linked.add(d.toEntityId);
     }
     const throughput = new Map<string, number>();
-    for (const f of state.flows) {
+    for (const f of selected.flows) {
       const kt = toKtPerYear(f.quantity, f.unit) ?? 0;
       throughput.set(f.fromEntityId, (throughput.get(f.fromEntityId) ?? 0) + kt);
       throughput.set(f.toEntityId, (throughput.get(f.toEntityId) ?? 0) + kt);
@@ -185,7 +197,7 @@ export async function GET(request: Request) {
       }));
     const nodeIds = new Set(nodes.map(n => n.id));
     const links = [
-      ...state.flows
+      ...selected.flows
         .filter(f => nodeIds.has(f.fromEntityId) && nodeIds.has(f.toEntityId))
         .map(f => ({
           id: f.id, source: f.fromEntityId, target: f.toEntityId,
@@ -211,7 +223,41 @@ export async function GET(request: Request) {
           kind: 'dependency' as const, strength: d.strength ?? null, basis: d.basis ?? null,
         })),
     ];
-    return NextResponse.json({ commodity: state.commodity, commodityName: state.commodityName, asOf: run.asOf ?? null, nodes, links });
+    // ACCOUNTING FOR THE DROP — the standing rule, applied to a view.
+    //
+    // Selecting the topology exposed a structural fact the old behaviour was
+    // hiding: this view's node set excludes countries as aggregates, and the
+    // corpus's historical vintages are country-granularity corridors. So at
+    // 2017 the topology is `within` and holds 9 flows, and NONE of them are
+    // representable here — every endpoint is a country. Previously the view
+    // filled that hole with today's facility network, which is the stronger
+    // failure: an empty picture at least does not assert anything.
+    //
+    // Zero links now comes with the reason, and the three zeroes are
+    // distinguished: no topology covers the date (`predates`), the topology
+    // is at a granularity this view cannot draw (below), or the network is
+    // genuinely empty. The remedy for the middle one is the recorded
+    // deferral — the country↔facility allocation model — not a widening of
+    // this view.
+    const flowLinkCount = links.filter(l => l.kind === 'flow').length;
+    const withheldFlows = selected.flows.length - flowLinkCount;
+    const representable = {
+      flowsInSelectedTopology: selected.flows.length,
+      flowLinks: flowLinkCount,
+      withheld: withheldFlows,
+      reason: withheldFlows > 0
+        ? `${withheldFlows} of ${selected.flows.length} flow(s) in the ${selected.granularity}-granularity topology are not representable in this view: it excludes countries and the commodity as AGGREGATES rather than sited structure, and these corridors are stated between them. Resolving them to facilities needs the country↔facility allocation model (deferred — it would have to invent an attribution the corpus does not carry).`
+        : null,
+    };
+    // The topology block travels with the payload, as it does on the map:
+    // a view that draws a network at a date must be able to say the date is
+    // outside what any vintage can describe. Zero links under `predates` is
+    // a refusal; zero links with no block is an empty picture.
+    return NextResponse.json({
+      commodity: state.commodity, commodityName: state.commodityName,
+      asOf: run.asOf ?? null, knowledge: run.knowledge,
+      topology, representable, nodes, links,
+    });
   }
 
   if (view === 'map') {

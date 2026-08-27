@@ -164,6 +164,31 @@ anything).**
 context from route handlers, so module-level state is not shared — and,
 for the seventh instance, a projection that quietly omitted a field.
 
+**Ninth instance (phase 40): the graph view answered every date the
+same way.** `selectTopology` / `topologyValidity` — phase 13's machinery,
+whose entire purpose is that a date outside every flow vintage yields
+null rather than today's structure wearing a historical label — had the
+MAP VIEW as its effective scope and "the instrument's flow topology" as
+its apparent one. The graph branch read `state.flows`: every vintage at
+once, identical at 1990 and today. Measured: at 1990-01-01 the map served
+0 flows with status `predates` while the graph served the same 39 links
+it serves now; at 2017 the map served 9 country corridors and the graph
+served today's 39 facility links. And the graph view is the one that
+displays an `AS OF <date>` chip over what it draws — the projection
+asserting the knowledge state was the one ignoring it. Nothing failed.
+Reachable by a researcher, not only by API: the time bar's leftmost
+position is 2017-01, inside the country-vintage era, and the runbook's
+move #2 sends them there.
+
+Closing it surfaced a structural fact the old behaviour had been hiding:
+this view excludes countries as AGGREGATES, and the historical vintages
+are country↔country corridors, so at those dates it can draw none of the
+topology. That is a third kind of zero — not "no topology covers this
+date" and not "the network is empty" — and it is now counted and named
+(`representable: {flowsInSelectedTopology, flowLinks, withheld, reason}`),
+with the recorded deferral as its remedy rather than a widening of the
+view.
+
 **Closed by.** `processSingleton` anchors process-wide state on
 `globalThis`; the map projection carries `basis` and the pin sits at the
 route's own payload, against a measured discriminating topology (2017,
@@ -172,7 +197,12 @@ would be vacuous; `contextSeverance.test.ts` requires every mutable
 module-level container to be either shared by construction or listed with
 the argument for why severance is harmless. Vacuity proven at fixture
 level and at file level (a planted severable module in the real tree
-fails the check by name and line).
+fails the check by name and line). For the ninth, the graph branch
+selects its topology exactly as the map does, carries the topology block
+in its payload, and accounts for what it cannot draw; three route-level
+tests pin it, including one asserting the two projections AGREE about
+which topology serves a date — the property whose absence was the
+defect.
 
 **Does not generalise — and this is the whole point.** The fix closes the
 MODULE door. Each earlier class was also closed at its own door, and the
