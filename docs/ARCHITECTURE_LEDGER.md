@@ -326,6 +326,55 @@ drifted into. Decisions taken, per the review:
   panel. Verified end-to-end in the running app: "escondida" → mine →
   strike event, resolved observations, flows, dependency tree.
 
+## Phase 9 — symmetric honesty, observable windows, and the operator dimension
+
+Round-7 review, in its order:
+
+1. **The 0 suppressed for the same reason as the 1.0.** The min-trials
+   argument has no direction: "precision 0" over one unmatched alert reads
+   as "wrong every time it fires", which one trial supports no better than
+   sixteen matched alerts supported 1.0 — and publishing unflattering
+   artifacts while suppressing flattering ones is its own bias, subtler
+   because it looks like rigour. Below MIN_TRIALS (5) the headline is null
+   with `insufficientTrials` alongside.
+2. **Anticipation windows became data.** `announcedAt` on events: where
+   announcement structurally precedes occurrence (Escondida's strike notice,
+   the 2025 tariff probe order), the pre-window is announcedAt → start —
+   observable, never chosen; events without an announcement have no
+   anticipation story and keep zero. Honest re-run of the January-2026
+   signal: no announced antecedent exists in the curated record for the
+   2026 drawdown, so it remains quiet-period volume — if curation later
+   surfaces a policy announcement behind that drawdown, the match (and the
+   "detector saw forward-buying" reading) follows from the event's own
+   structure, not from tuning.
+3. **Search honours the knowledge state.** Under as_known_then, entities
+   with no knowable record at asOf are withheld and counted, headlines
+   resolve from knowable evidence only, and the playback state threads from
+   the scrubber through the search bar — search is not the way around the
+   AS KNOWN badge. (Pinned: Canada, carried only for live sources, is
+   withheld at 2019.)
+4. **The operator dimension.** Company entities + `operated_by` edges with
+   attribution shares (public JV disclosures, representative; minorities
+   <~20% and multi-operator aggregates fall to a REPORTED unattributed
+   remainder). Operator-HHI ships beside country-HHI; measured on the
+   current facility model the pair is country 1339 / operator 959 at 88.5%
+   attribution — operator concentration is currently the lower number, and
+   the dimension's value is the correlation structure it makes computable:
+   Freeport's 944 kt spans three countries, BHP's 749 kt spans two, and a
+   company-level scenario now propagates to every operated asset across
+   borders (pinned by test: Freeport distress reaches Grasberg, Cerro Verde
+   and Morenci simultaneously). "What does BHP operate?" is now a traversal.
+   This is also the stated purpose the round-2 ownership sources
+   (opencorporates / openownership, yields: entity+dependency) have been
+   waiting for: parent chains (Southern Copper → Grupo México) are their
+   job, and attribution stops at the operating company until they land.
+
+Remaining search increments, recorded as next: query misses mapped to the
+source-registry gap list (the highest-quality demand signal the system can
+generate), evidence-layer search kinds (`refused`, `contested`, vintage
+ids), and the policy test that no indexed field can hold a natural-person
+name.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

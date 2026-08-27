@@ -317,6 +317,107 @@ export function facilityCoverage(
   );
 }
 
+/* ── Operator concentration ── */
+
+/** Shape-compatible with Concentration so every projection that renders an
+ *  HHI block renders this one — plus the attribution fields that must
+ *  travel with the number. */
+export interface OperatorConcentration {
+  metric: Metric;
+  /** HHI over ATTRIBUTED company shares (renormalized to the allocated
+   *  total) — the attribution coverage travels with it, exactly as
+   *  geographic coverage travels with the facility HHI. */
+  hhi: number;
+  band: 'unconcentrated' | 'moderate' | 'high' | 'no-data';
+  /** The ALLOCATED total (the HHI base). The raw facility total is totalKt. */
+  total: number;
+  unit: string;
+  /** share = share of the allocated total (the HHI basis). */
+  shares: Array<{ entityId: string; name: string; value: number; share: number }>;
+  totalKt: number;
+  /** allocated / total: the share of facility output the operator model
+   *  attributes. Partial attribution is reported, never hidden. */
+  attributionCoverage: number;
+  unattributedKt: number;
+  facilityCount: number;
+  note: string;
+}
+
+/**
+ * Concentration by OPERATOR: facility output allocated to companies via
+ * operated_by edges (strength = attribution share). A commodity can be
+ * geographically diversified and operationally concentrated at once — a
+ * single operator's labour dispute, financial distress or sanctions
+ * exposure hits assets in several countries simultaneously, which is
+ * correlated risk that country-HHI scores as diversified. The divergence
+ * between operator-HHI and country-HHI is the finding.
+ */
+export function operatorConcentration(
+  state: EconomyState,
+  metric: Metric,
+  facilityKinds: Array<'mine' | 'smelter' | 'refinery'>,
+  asOf?: string,
+): AnalyticalResult<OperatorConcentration> {
+  const cls = measurementClassOf(metric);
+  if (cls === 'market_price' || cls === 'financial_positioning') {
+    throw new Error(`operatorConcentration() rejects ${cls} metric "${metric}" — physical measurements only`);
+  }
+  const companyName = new Map(state.entities.filter(e => e.kind === 'company').map(e => [e.id, e.name]));
+  const opEdges = state.dependencies.filter(d => d.type === 'operated_by');
+  const usedObs: string[] = [];
+  const usedDeps: string[] = [];
+
+  const allocated = new Map<string, number>();
+  let totalKt = 0;
+  let allocatedKt = 0;
+  let facilityCount = 0;
+  let unit = 'kt/y';
+  for (const kind of facilityKinds) {
+    for (const o of observationsAt(state, metric, kind, asOf)) {
+      totalKt += o.value;
+      unit = o.unit;
+      facilityCount += 1;
+      usedObs.push(o.id);
+      for (const d of opEdges.filter(x => x.fromEntityId === o.entityId)) {
+        const share = Math.max(0, Math.min(1, d.strength ?? 1));
+        allocated.set(d.toEntityId, (allocated.get(d.toEntityId) ?? 0) + o.value * share);
+        allocatedKt += o.value * share;
+        usedDeps.push(d.id);
+      }
+    }
+  }
+  const unattributedKt = Math.max(0, totalKt - allocatedKt);
+
+  const shares = [...allocated.entries()]
+    .map(([companyId, value]) => ({
+      entityId: companyId,
+      name: companyName.get(companyId) ?? companyId,
+      value: Number(value.toFixed(1)),
+      share: allocatedKt > 0 ? value / allocatedKt : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+  const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
+  const band: OperatorConcentration['band'] = shares.length === 0 ? 'no-data'
+    : hhi > 2500 ? 'high' : hhi >= 1500 ? 'moderate' : 'unconcentrated';
+
+  return wrap(
+    'operatorConcentration',
+    { metric, facilityKinds: facilityKinds.join(','), asOf },
+    { observationIds: usedObs },
+    {
+      metric, hhi, band,
+      total: Number(allocatedKt.toFixed(1)),
+      unit,
+      shares,
+      totalKt: Number(totalKt.toFixed(1)),
+      attributionCoverage: totalKt > 0 ? Number((allocatedKt / totalKt).toFixed(3)) : 0,
+      unattributedKt: Number(unattributedKt.toFixed(1)),
+      facilityCount,
+      note: 'HHI over attributed company shares (renormalized to the allocated total). Attribution is partial by construction — JV minorities below ~20% and multi-operator aggregates fall to the unattributed remainder — and the coverage ratio must travel with the number.',
+    },
+  );
+}
+
 /* ── Flow centrality ── */
 
 export interface CentralityRow {

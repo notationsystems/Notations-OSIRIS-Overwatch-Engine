@@ -196,7 +196,7 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 
 | System | What it derives |
 |---|---|
-| `concentration` | HHI of mine production (country/mine), refined production, consumption, smelting/refining capacity — each from the latest observation per entity at `asOf`. DOJ bands (<1500 / 1500–2500 / >2500). Never mixes entity kinds in one calculation. Includes the **concentration trajectory**: HHI recomputed per year from that year's own observations (years with too few reporters are dropped, not fabricated). |
+| `concentration` | HHI of mine production (country/mine/**operator**), refined production, consumption, smelting/refining capacity — each from the latest observation per entity at `asOf`. DOJ bands (<1500 / 1500–2500 / >2500). Never mixes entity kinds in one calculation. Includes the **concentration trajectory** (HHI per year from that year's own observations) and **operator concentration**: a commodity can be geographically diversified and operationally concentrated at once, so `operated_by` edges (attribution shares from public JV disclosures, representative) allocate facility output to company entities and operator-HHI ships beside country-HHI — the pair is the finding. Measured on the current facility model: country 1339 vs operator 959 at 88.5% attribution coverage (reported like geographic coverage, never hidden) — operator concentration is currently the LOWER number, and what the dimension adds is the correlation structure: Freeport's 944 kt spans Indonesia, Peru and the US, a single-operator exposure the country lens scores as three unrelated events, now expressible as a company-level scenario reaching every operated asset across borders. |
 | `centrality` | Material throughput per node (in + out, kt/y) and network share. |
 | `bottlenecks` | **Candidate** bottleneck score: 0.35·throughput share + 0.25·utilization (flow vs stated capacity) + 0.25·redundancy (alternatives at same stage) + 0.15·dependency load. Explicitly a triage signal, not validated risk; every score exposes its components, explanation and evidence ids. Countries/regions are excluded (aggregates are not chokepoints). |
 | `anomalies` | Rolling z-score vs trailing window + period-over-period rate of change on every (entity, metric) series with enough points. Series resolve one observation per period by evidence rank before detection (provider disagreement is never a time step). The continuous front-month price series is excluded (roll discontinuities are contract artifacts, not moves); positioning signals are tagged `financial_positioning` and rendered as reflexive market context, never physical evidence. |
@@ -329,11 +329,16 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 - `GET /api/economy?commodity=copper&view=state` — the full canonical state (research/debug).
 - `GET /api/economy/entity?commodity=copper&id=…` — entity detail: observations,
   capacities, flows in/out, events, and resolved upstream/downstream chains.
-- `GET /api/economy/search?q=escondida` — entity search over the canonical
-  register (name, operator, country, kind) with a one-line evidence headline
-  per hit (latest resolved observation, labeled with its valueKind — a search
-  result never presents a number without its epistemic status). The search
-  index IS the entity register; there is no parallel list to drift.
+- `GET /api/economy/search?q=escondida[&asOf=…&knowledge=…]` — entity search
+  over the canonical register (name, operator, country, kind — companies
+  included) with a one-line evidence headline per hit (latest resolved
+  observation, labeled with its valueKind — a search result never presents a
+  number without its epistemic status). The search index IS the entity
+  register; there is no parallel list to drift. Search honours the knowledge
+  state like every other surface: under `as_known_then`, entities with no
+  knowable record at `asOf` are withheld and counted ("N further entities
+  match but were not knowable then"), and headlines resolve from knowable
+  evidence only — search must never be the way around the AS KNOWN badge.
 
 ## Spatial + research interface
 

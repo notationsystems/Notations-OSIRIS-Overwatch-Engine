@@ -1471,6 +1471,8 @@ export default function Dashboard() {
                     setShowEconomy(true);
                     setShowDesktopSearch(false);
                   }}
+                  econAsOf={econAsOf}
+                  econKnowledge={econKnowledge}
                 />
               </motion.div>
             )}
@@ -1730,6 +1732,8 @@ export default function Dashboard() {
                       <SearchBar
                         onLocate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, zoom, ts: Date.now() }); setMobilePanel(null); }}
                         onSelectEconEntity={(hit) => { setEconSelected(hit.id); setShowEconomy(true); setMobilePanel(null); }}
+                        econAsOf={econAsOf}
+                        econKnowledge={econKnowledge}
                       />
                       <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
                     </div>

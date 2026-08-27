@@ -37,8 +37,32 @@ describe('GET /api/economy/search', () => {
     expect(port.results.every((r: { kind: string }) => r.kind === 'port')).toBe(true);
   });
 
-  it('rejects unknown commodities and short queries', async () => {
+  it('rejects unknown commodities, short queries, and malformed dates', async () => {
     expect((await get('q=escondida&commodity=unobtainium')).status).toBe(404);
     expect((await get('q=')).status).toBe(400);
+    expect((await get('q=escondida&asOf=not-a-date')).status).toBe(400);
+    expect((await get('q=escondida&asOf=2019-06-01&knowledge=psychic')).status).toBe(400);
+  });
+
+  it('honours the knowledge state: entities not knowable at asOf are withheld and counted', async () => {
+    // Canada exists in the register only for live observations whose knownAt
+    // is 2025+. Under AS KNOWN at 2019 it must be withheld — search must not
+    // be the way around the badge.
+    const then = await (await get('q=canada&asOf=2019-06-01&knowledge=as_known_then')).json();
+    expect(then.results).toEqual([]);
+    expect(then.withheld).toBeGreaterThanOrEqual(1);
+    expect(then.withheldNote).toContain('not knowable on 2019-06-01');
+    const now = await (await get('q=canada')).json();
+    expect(now.results.map((r: { id: string }) => r.id)).toContain('ent:country:ca');
+  });
+
+  it('headlines never leak hindsight under as_known_then', async () => {
+    // Escondida is knowable in 2019 via curated structure, but its
+    // observation evidence carries knownAt 2025 — the headline must not
+    // surface a 2024 figure under a 2019 AS KNOWN state.
+    const then = await (await get('q=escondida&asOf=2019-06-01&knowledge=as_known_then')).json();
+    const hit = then.results[0];
+    expect(hit.id).toBe('ent:mine:escondida');
+    expect(hit.headline ?? '').not.toContain('2024');
   });
 });

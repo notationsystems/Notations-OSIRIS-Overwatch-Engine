@@ -41,6 +41,30 @@ describe('scenario: counterfactual injection', () => {
     expect(base.state.events.some(e => e.id.startsWith('evt:scenario:'))).toBe(false);
   });
 
+  it('perturbs a COMPANY and reaches every asset it operates, across borders', async () => {
+    // The payoff of operator modeling: a scenario at the company node — a
+    // labour dispute, financial distress, sanctions — propagates to all
+    // operated facilities simultaneously, in three countries, which the
+    // per-site event model could not express.
+    const run = await runEngine('copper', {
+      asOf: '2024-06-15',
+      scenario: {
+        id: 'fcx-distress', label: 'Freeport-McMoRan operational distress',
+        events: [{ entityId: 'ent:company:freeport', type: 'disruption', title: 'Operator-level distress (hypothetical)', start: '2024-06-01', severity: 'high' }],
+      },
+    });
+    const impact = impacts(run).find(i => i.eventId.startsWith('evt:scenario:fcx-distress'))!;
+    expect(impact.active).toBe(true);
+    const affected = impact.affected.map(a => a.entityId);
+    // Operated assets in Indonesia, Peru and the US — correlated exposure
+    // the country lens scores as diversified.
+    expect(affected).toContain('ent:mine:grasberg');
+    expect(affected).toContain('ent:mine:cerro-verde');
+    expect(affected).toContain('ent:mine:morenci');
+    // And the reach continues downstream through the material graph.
+    expect(affected).toContain('ent:port:amamapare');
+  });
+
   it('rejects scenarios that reference unknown entities', async () => {
     await expect(runEngine('copper', {
       scenario: { id: 'x', label: 'x', events: [{ entityId: 'ent:mine:atlantis', type: 'outage', title: 'x', start: '2024-01-01', severity: 'high' }] },

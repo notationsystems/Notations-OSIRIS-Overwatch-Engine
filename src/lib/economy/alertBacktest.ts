@@ -75,11 +75,17 @@ export interface AlertScorecard {
   /**
    * THE headline number: precision over the pre-registered truth set only,
    * with post-hoc-matched alerts excluded from the denominator entirely.
-   * Null when no measurement is possible (no pre-registered event is
-   * detectable and no alert went unmatched) — and null IS the honest current
-   * answer, not a defect of the scorecard.
+   * Null below MIN_TRIALS in EITHER direction — "0 over one unmatched
+   * alert" reads as "wrong every time it fires", which one trial supports
+   * no better than sixteen matched alerts supported 1.0. Publishing
+   * unflattering artifacts while suppressing flattering ones is its own
+   * bias, and a subtler one, because it looks like rigour. When null,
+   * insufficientTrials carries the trial count.
    */
   precisionPreRegisteredOnly: number | null;
+  /** Present when the clean-set trial count is below the minimum for the
+   *  ratio to be a measurement. */
+  insufficientTrials?: number;
   /** Precision over the full truth set — reported, never quoted alone. */
   precisionAll: number | null;
   /** An episode is a contiguous run of alerts on one subject (gap ≤ 45
@@ -168,6 +174,19 @@ export function monthEnds(from: string, to: string): string[] {
  * becoming public) should raise it WITH the argument stated here.
  */
 export const DEFAULT_PRE_WINDOW_DAYS = 0;
+
+/**
+ * The one legitimate pre-window is the event's own announcement gap: where
+ * an announcement structurally precedes occurrence (strike notice, policy
+ * order), anticipatory behaviour between the two is a known mechanism whose
+ * duration is a fact about the world — announcedAt → start is DATA, never a
+ * knob. Events without an announcement have no anticipation story and get
+ * the zero default.
+ */
+export function anticipationWindow(ev: EconEvent): number {
+  if (!ev.announcedAt) return DEFAULT_PRE_WINDOW_DAYS;
+  return Math.max(0, daysBetween(ev.announcedAt, ev.start));
+}
 
 function withinEventWindow(signalMonth: string, ev: EconEvent, horizon: string, preWindowDays: number): boolean {
   const lo = new Date(Date.parse(ev.start) - preWindowDays * DAY_MS).toISOString().slice(0, 7);
@@ -264,15 +283,19 @@ export async function backtestAlerts(
   const curationOf = (ev: EconEvent): 'independent' | 'post_hoc' => ev.curation ?? 'post_hoc';
   // Match preferring pre-registered events, so an alert explicable by an
   // independent event is never attributed to a post-hoc one by accident.
-  const matchFor = (alert: Alert, preWindowDays: number): EconEvent | undefined => {
+  // Default windows are PER-EVENT, derived from each event's own
+  // announcement structure; a uniform override exists only for the
+  // sensitivity table, which is the knob-exposure artifact.
+  const matchFor = (alert: Alert, uniformWindowDays?: number): EconEvent | undefined => {
     const candidates = truth.filter(ev =>
-      adjacent(alert.entityId, ev.entityId!) && withinEventWindow(alert.signalPeriod, ev, to, preWindowDays));
+      adjacent(alert.entityId, ev.entityId!)
+      && withinEventWindow(alert.signalPeriod, ev, to, uniformWindowDays ?? anticipationWindow(ev)));
     return candidates.find(ev => curationOf(ev) === 'independent') ?? candidates[0];
   };
 
-  const buildRecords = (preWindowDays: number): BacktestAlertRecord[] => firedAnomalies.map(alert => {
+  const buildRecords = (uniformWindowDays?: number): BacktestAlertRecord[] => firedAnomalies.map(alert => {
     const firedAt = firedAtByKey.get(alert.signalKey)!;
-    const match = matchFor(alert, preWindowDays);
+    const match = matchFor(alert, uniformWindowDays);
     if (!match) return { alert, firedAt, disposition: 'false_positive' as const };
     return {
       alert,
@@ -282,7 +305,7 @@ export async function backtestAlerts(
       disposition: 'true_positive' as const,
     };
   });
-  const records = buildRecords(DEFAULT_PRE_WINDOW_DAYS);
+  const records = buildRecords(); // per-event announcement-derived windows
   const tp = records.filter(r => r.disposition === 'true_positive');
 
   const truthRows: BacktestTruthRow[] = truth.map(ev => {
@@ -318,6 +341,8 @@ export async function backtestAlerts(
   const tpPre = tp.filter(r => !isPostHocMatch(r));
   const fp = records.filter(r => r.disposition === 'false_positive');
   const preDenominator = tpPre.length + fp.length;
+  /** Below this, a ratio is not a measurement — in either direction. */
+  const MIN_TRIALS = 5;
 
   const episodesOf = (recs: BacktestAlertRecord[]) => {
     const byEntity = new Map<string, BacktestAlertRecord[]>();
@@ -358,18 +383,19 @@ export async function backtestAlerts(
     };
   });
 
-  // Quiet months: no truth-event window (start − default pre-window .. end +
-  // 60d) touches them. Firing rate there is the operational axis precision
-  // cannot see.
+  // Quiet months: no truth-event window (using each event's own
+  // announcement-derived pre-window) touches them. Firing rate there is the
+  // operational axis precision cannot see.
   const allMonths = monthEnds(from, to).map(d => d.slice(0, 7));
   const quietMonthList = allMonths.filter(m =>
-    !truth.some(ev => withinEventWindow(m, ev, to, DEFAULT_PRE_WINDOW_DAYS)));
+    !truth.some(ev => withinEventWindow(m, ev, to, anticipationWindow(ev))));
   const quietFirings = records.filter(r => quietMonthList.includes(r.firedAt.slice(0, 7)));
 
   const scorecard: AlertScorecard = {
     preRegisteredEvents,
     postHocEvents,
-    precisionPreRegisteredOnly: preDenominator > 0 ? Number((tpPre.length / preDenominator).toFixed(3)) : null,
+    precisionPreRegisteredOnly: preDenominator >= MIN_TRIALS ? Number((tpPre.length / preDenominator).toFixed(3)) : null,
+    ...(preDenominator < MIN_TRIALS ? { insufficientTrials: preDenominator } : {}),
     precisionAll: records.length > 0 ? Number((tp.length / records.length).toFixed(3)) : null,
     episodes: { total: episodes.length, matched: matchedEpisodes.length, unmatched: episodes.length - matchedEpisodes.length },
     attributionSensitivity,
@@ -399,7 +425,7 @@ export async function backtestAlerts(
       `Ground truth is the curated event record: ${truthRows.length} event(s) in window (${preRegisteredEvents.length} pre-registered, ${postHocEvents.length} post-hoc) — treat the percentages as small-n measurements, not general performance claims.`,
       'precisionAll pools post-hoc events (curated after observing detector output) with independent ones; only precisionPreRegisteredOnly may be quoted as detector quality, and null there means "no measurement possible on the clean truth set", which is itself the finding.',
       'Annual production series can only be detected at publication (the following year): production-derived detections structurally lag occurrence.',
-      `Matching allows one structural hop and a −${DEFAULT_PRE_WINDOW_DAYS}d/+60d window. The pre-window default is set by causal mechanism, not outcome: no anticipation mechanism has been argued for the current signal classes, so it is zero; the knob's effect is published in scorecard.attributionSensitivity.`,
+      'Matching allows one structural hop; the pre-window is PER-EVENT and derived from announcement structure (announcedAt → start — data, not a knob), zero for events without an announcement. Uniform-window effects are published in scorecard.attributionSensitivity as the knob-exposure artifact.',
       'leadVsPrice uses monthly COMEX closes as a benchmark (never an input): its resolution is one month, and a reaction "at" a month-end may have occurred any day inside that month.',
       'Evaluation grid is hybrid: month-ends everywhere plus daily dates where daily evidence exists.',
       'Comtrade is a single-version source revised in place: as_known_then is blind before the release date of the held version, and pre-revision vintages that predate OSIRIS\'s archive (begun 2026-08) are permanently unrecoverable.',

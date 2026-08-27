@@ -61,7 +61,11 @@ export type EntityKind =
   | 'region'
   | 'country'
   | 'commodity'
-  | 'infrastructure';
+  | 'infrastructure'
+  /** Operating/owning company. A commodity can be geographically diversified
+   *  and operationally concentrated at once — companies as entities (with
+   *  operated_by edges) are what makes the second dimension computable. */
+  | 'company';
 
 /** Where the entity sits in the material chain. */
 export type SupplyStage =
@@ -252,7 +256,15 @@ export interface Capacity {
 
 /* ── Dependency ── */
 
-export type DependencyType = 'depends_on' | 'feeds' | 'located_in' | 'produces' | 'processes' | 'consumes';
+/**
+ * `operated_by` links a facility to the company that operates/owns it, with
+ * `strength` = attribution share (JV shares from public disclosures). It is
+ * OPERATIONAL structure, so unlike located_in it stays in the traversal
+ * graph: a company's labour dispute or financial distress reaches every
+ * asset it operates, across borders — correlated risk that geographic
+ * grouping scores as diversified.
+ */
+export type DependencyType = 'depends_on' | 'feeds' | 'located_in' | 'produces' | 'processes' | 'consumes' | 'operated_by';
 
 export interface Dependency {
   /** "dep:<slug>" */
@@ -295,6 +307,16 @@ export interface EconEvent {
    * knowability; curated events should set it explicitly.
    */
   firstReportedAt?: string;
+  /**
+   * When the event was ANNOUNCED, where announcement structurally precedes
+   * occurrence: a strike notice before the stoppage, a policy order before
+   * implementation, a licence challenge before the halt. Anticipatory
+   * behaviour (forward-buying, inventory draws) between announcedAt and
+   * start is a real mechanism with an observable duration — so attribution
+   * windows are DERIVED from this field, never chosen: an event without an
+   * announcement has no anticipation story and gets no window.
+   */
+  announcedAt?: string;
   severity: 'low' | 'medium' | 'high';
   /** Estimated physical magnitude of the impact, when curatable — the
    *  number a backtest match can be sized against. Estimates say so in
@@ -475,7 +497,12 @@ export function validateState(state: EconomyState): ValidationIssue[] {
   }
   for (const c of state.capacities) checkRecord(c.id, 'capacity', [c.entityId], c.value);
   for (const d of state.dependencies) checkRecord(d.id, 'dependency', [d.fromEntityId, d.toEntityId]);
-  for (const ev of state.events) checkRecord(ev.id, 'event', ev.entityId ? [ev.entityId] : []);
+  for (const ev of state.events) {
+    checkRecord(ev.id, 'event', ev.entityId ? [ev.entityId] : []);
+    if (ev.announcedAt && ev.announcedAt > ev.start) {
+      issues.push({ severity: 'error', message: `Event ${ev.id} has announcedAt after start — an announcement cannot postdate the occurrence it announces` });
+    }
+  }
 
   const withProvenance: Array<{ id: string; provenance?: Provenance }> = [
     ...state.observations, ...state.flows, ...state.capacities, ...state.dependencies, ...state.events,

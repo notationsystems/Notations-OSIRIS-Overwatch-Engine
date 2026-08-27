@@ -22,7 +22,7 @@ import { buildGraph } from './graph';
 import { getEconomyState } from './store';
 import {
   bottleneckCandidates, capacityConcentration, concentration, concentrationTrajectory,
-  detectAnomalies, facilityCoverage, flowCentrality, knownAtOf,
+  detectAnomalies, facilityCoverage, flowCentrality, knownAtOf, operatorConcentration,
 } from './analytics';
 import { detectDivergences } from './divergence';
 import { propagateEvents } from './propagation';
@@ -108,6 +108,9 @@ const SYSTEMS: EconomySystem[] = [
       result: {
         mineProductionByCountry: concentration(state, 'production', 'country', ctx.asOf),
         mineProductionByMine: byMine,
+        // The pair is the finding: a commodity can be geographically
+        // diversified and operationally concentrated at the same time.
+        mineProductionByOperator: operatorConcentration(state, 'production', ['mine'], ctx.asOf),
         refinedProductionByCountry: concentration(state, 'refined_production', 'country', ctx.asOf),
         consumptionByRegion: concentration(state, 'consumption', 'region', ctx.asOf),
         smeltingCapacityByCountry: capacityConcentration(state, 'smelting'),

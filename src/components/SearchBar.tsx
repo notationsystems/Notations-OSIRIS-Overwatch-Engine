@@ -38,6 +38,11 @@ interface SearchBarProps {
    *  appear above geographic results and selecting one opens it in the
    *  research panel as well as flying the map. */
   onSelectEconEntity?: (hit: EconSearchHit) => void;
+  /** Playback state, threaded through so search honours the knowledge state
+   *  like every other surface — under AS KNOWN, entities not knowable at
+   *  the evaluation date are withheld and counted, never surfaced. */
+  econAsOf?: string | null;
+  econKnowledge?: 'best_known' | 'as_known_then';
   alwaysExpanded?: boolean;
 }
 
@@ -103,11 +108,12 @@ function formatLabel(displayName: string): { primary: string; secondary: string 
   };
 }
 
-export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded = false }: SearchBarProps) {
+export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econKnowledge, alwaysExpanded = false }: SearchBarProps) {
   const [open, setOpen] = useState(alwaysExpanded);
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [econResults, setEconResults] = useState<EconSearchHit[]>([]);
+  const [econWithheldNote, setEconWithheldNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -189,12 +195,14 @@ export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded
       // mine's state, not the Chilean locality of the same name.
       if (onSelectEconEntity) {
         try {
-          const res = await fetch(`/api/economy/search?q=${encodeURIComponent(q)}`);
+          const temporal = econAsOf ? `&asOf=${econAsOf}&knowledge=${econKnowledge ?? 'best_known'}` : '';
+          const res = await fetch(`/api/economy/search?q=${encodeURIComponent(q)}${temporal}`);
           if (res.ok) {
             const data = await res.json();
             setEconResults((data.results ?? []).slice(0, 4));
-          } else setEconResults([]);
-        } catch { setEconResults([]); }
+            setEconWithheldNote(data.withheldNote ?? null);
+          } else { setEconResults([]); setEconWithheldNote(null); }
+        } catch { setEconResults([]); setEconWithheldNote(null); }
       }
       try {
         // Use addressdetails=1 for better type detection and limit=8 for more results
@@ -219,12 +227,13 @@ export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded
       } catch { setResults([]); }
       setLoading(false);
     }, 300);
-  }, [onSelectEconEntity]);
+  }, [onSelectEconEntity, econAsOf, econKnowledge]);
 
   const clearAll = () => {
     setValue('');
     setResults([]);
     setEconResults([]);
+    setEconWithheldNote(null);
     setSelectedIdx(-1);
   };
 
@@ -313,7 +322,7 @@ export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded
         )}
       </div>
 
-      {(results.length > 0 || econResults.length > 0) && (
+      {(results.length > 0 || econResults.length > 0 || econWithheldNote) && (
         <div
           className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden max-h-[320px] overflow-y-auto styled-scrollbar z-[9999]"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.6), 0 0 1px rgba(212,175,55,0.2)' }}
@@ -348,6 +357,11 @@ export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded
               </button>
             );
           })}
+          {econWithheldNote && (
+            <div className="px-3 py-1.5 text-[9px] font-mono text-[var(--text-muted)] border-b border-[var(--border-secondary)] bg-white/[0.02]">
+              {econWithheldNote}
+            </div>
+          )}
           {results.map((r, i) => {
             const { primary, secondary } = formatLabel(r.label);
             const isSelected = i + econResults.length === selectedIdx;

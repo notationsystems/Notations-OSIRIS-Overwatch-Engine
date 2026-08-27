@@ -130,9 +130,40 @@ const infrastructure: Entity[] = [
   { id: 'ent:infrastructure:panama-canal', kind: 'infrastructure', name: 'Panama Canal', countryCode: 'PA', country: 'Panama', lat: 9.08, lng: -79.68, geoPrecision: 'site', stage: 'logistics' },
 ];
 
+/* Operating/owning companies. A commodity can be geographically diversified
+ * and operationally concentrated at once; these entities (with operated_by
+ * edges below) make the second dimension computable. No coordinates — a
+ * company is not a place. */
+const companies: Entity[] = [
+  { id: 'ent:company:bhp', kind: 'company', name: 'BHP', commodity: 'copper', notes: 'Operates Escondida; major JV partner at Antamina.' },
+  { id: 'ent:company:rio-tinto', kind: 'company', name: 'Rio Tinto', commodity: 'copper', notes: 'Operates Oyu Tolgoi and Kennecott; minority partner at Escondida.' },
+  { id: 'ent:company:codelco', kind: 'company', name: 'Codelco', commodity: 'copper', notes: 'Chilean state producer: El Teniente, Chuquicamata, Caletones.' },
+  { id: 'ent:company:anglo-american', kind: 'company', name: 'Anglo American', commodity: 'copper' },
+  { id: 'ent:company:glencore', kind: 'company', name: 'Glencore', commodity: 'copper' },
+  { id: 'ent:company:teck', kind: 'company', name: 'Teck Resources', commodity: 'copper' },
+  { id: 'ent:company:freeport', kind: 'company', name: 'Freeport-McMoRan', commodity: 'copper', notes: 'Operates Grasberg (PT-FI), Cerro Verde, Morenci; partner at Gresik/Manyar.' },
+  { id: 'ent:company:mind-id', kind: 'company', name: 'MIND ID', commodity: 'copper', notes: 'Indonesian state mining holding; majority owner of PT Freeport Indonesia.' },
+  { id: 'ent:company:sumitomo-mm', kind: 'company', name: 'Sumitomo Metal Mining', commodity: 'copper', notes: 'Operates Toyo; minority interests at Cerro Verde and Morenci (group interest, representative).' },
+  { id: 'ent:company:mmg', kind: 'company', name: 'MMG', commodity: 'copper' },
+  { id: 'ent:company:ivanhoe', kind: 'company', name: 'Ivanhoe Mines', commodity: 'copper' },
+  { id: 'ent:company:zijin', kind: 'company', name: 'Zijin Mining', commodity: 'copper' },
+  { id: 'ent:company:cmoc', kind: 'company', name: 'CMOC Group', commodity: 'copper' },
+  { id: 'ent:company:grupo-mexico', kind: 'company', name: 'Grupo México', commodity: 'copper', notes: 'Also majority owner of Southern Copper — the parent chain is the open-ownership adapter\'s future work.' },
+  { id: 'ent:company:first-quantum', kind: 'company', name: 'First Quantum Minerals', commodity: 'copper' },
+  { id: 'ent:company:jiangxi-copper', kind: 'company', name: 'Jiangxi Copper', commodity: 'copper' },
+  { id: 'ent:company:daye-nonferrous', kind: 'company', name: 'Daye Nonferrous Metals', commodity: 'copper' },
+  { id: 'ent:company:chinalco', kind: 'company', name: 'Chinalco (Yunnan Copper)', commodity: 'copper' },
+  { id: 'ent:company:ls-mnm', kind: 'company', name: 'LS MnM', commodity: 'copper' },
+  { id: 'ent:company:jx-metals', kind: 'company', name: 'JX Advanced Metals', commodity: 'copper' },
+  { id: 'ent:company:mitsubishi-materials', kind: 'company', name: 'Mitsubishi Materials', commodity: 'copper' },
+  { id: 'ent:company:aurubis', kind: 'company', name: 'Aurubis', commodity: 'copper' },
+  { id: 'ent:company:kghm', kind: 'company', name: 'KGHM Polska Miedź', commodity: 'copper' },
+  { id: 'ent:company:southern-copper', kind: 'company', name: 'Southern Copper', commodity: 'copper', notes: 'Operates Ilo. Majority-owned by Grupo México; operational attribution stops at the operating company.' },
+];
+
 export const COPPER_ENTITIES: Entity[] = [
   { id: 'ent:commodity:copper', kind: 'commodity', name: 'Copper' },
-  ...countries, ...mines, ...smelters, ...refineries, ...ports, ...demandRegions, ...infrastructure,
+  ...countries, ...mines, ...smelters, ...refineries, ...ports, ...demandRegions, ...infrastructure, ...companies,
 ];
 
 /* ── Observations ── */
@@ -350,7 +381,67 @@ export const COPPER_FLOWS: Flow[] = flowRows.map(([id, fromEntityId, toEntityId,
 
 /* ── Explicit dependencies (structural facts not derivable from single flows) ── */
 
+/* ── Operator attribution (facility → company, strength = share) ──
+ * JV shares from public disclosures, REPRESENTATIVE. Minority holders below
+ * ~20% are not modeled and fall to the unattributed remainder, which
+ * operator concentration reports the way geographic coverage is reported —
+ * partial attribution travels with the number, never silently. */
+const op = (facility: string, company: string, share: number, note?: string): Dependency => ({
+  id: `dep:op:${facility.split(':')[2]}:${company.split(':')[2]}`,
+  fromEntityId: facility, type: 'operated_by', toEntityId: company, strength: share,
+  basis: 'Operating/ownership attribution, representative; public JV disclosures.',
+  provenance: curated(note),
+});
+
+const OPERATOR_ATTRIBUTIONS: Dependency[] = [
+  op('ent:mine:escondida', 'ent:company:bhp', 0.575, 'Operator.'),
+  op('ent:mine:escondida', 'ent:company:rio-tinto', 0.30),
+  op('ent:mine:collahuasi', 'ent:company:anglo-american', 0.44),
+  op('ent:mine:collahuasi', 'ent:company:glencore', 0.44),
+  op('ent:mine:el-teniente', 'ent:company:codelco', 1),
+  op('ent:mine:chuquicamata', 'ent:company:codelco', 1),
+  op('ent:mine:cerro-verde', 'ent:company:freeport', 0.535, 'Operator.'),
+  op('ent:mine:cerro-verde', 'ent:company:sumitomo-mm', 0.21),
+  op('ent:mine:antamina', 'ent:company:bhp', 0.3375),
+  op('ent:mine:antamina', 'ent:company:glencore', 0.3375),
+  op('ent:mine:antamina', 'ent:company:teck', 0.225),
+  op('ent:mine:las-bambas', 'ent:company:mmg', 0.625, 'Operator.'),
+  op('ent:mine:grasberg', 'ent:company:freeport', 0.488, 'Operator (PT Freeport Indonesia).'),
+  op('ent:mine:grasberg', 'ent:company:mind-id', 0.51),
+  op('ent:mine:kamoa-kakula', 'ent:company:ivanhoe', 0.395, 'Co-operator.'),
+  op('ent:mine:kamoa-kakula', 'ent:company:zijin', 0.395),
+  op('ent:mine:tenke-fungurume', 'ent:company:cmoc', 0.80, 'Operator.'),
+  op('ent:mine:morenci', 'ent:company:freeport', 0.72, 'Operator.'),
+  op('ent:mine:morenci', 'ent:company:sumitomo-mm', 0.28, 'Sumitomo group interest, representative.'),
+  op('ent:mine:buenavista', 'ent:company:grupo-mexico', 1),
+  op('ent:mine:oyu-tolgoi', 'ent:company:rio-tinto', 0.66, 'Operator; state share unattributed.'),
+  op('ent:mine:kansanshi', 'ent:company:first-quantum', 0.80, 'Operator.'),
+  op('ent:mine:cobre-panama', 'ent:company:first-quantum', 0.90, 'Operator; site in preservation.'),
+  op('ent:smelter:guixi', 'ent:company:jiangxi-copper', 1),
+  op('ent:refinery:guixi-refinery', 'ent:company:jiangxi-copper', 1),
+  op('ent:smelter:daye', 'ent:company:daye-nonferrous', 1),
+  op('ent:smelter:yunnan-kunming', 'ent:company:chinalco', 1),
+  op('ent:smelter:onsan', 'ent:company:ls-mnm', 1),
+  op('ent:refinery:onsan-refinery', 'ent:company:ls-mnm', 1),
+  op('ent:smelter:saganoseki', 'ent:company:jx-metals', 1),
+  op('ent:smelter:toyo', 'ent:company:sumitomo-mm', 1),
+  op('ent:smelter:gresik', 'ent:company:mitsubishi-materials', 0.605, 'Operator (PT Smelting).'),
+  op('ent:smelter:gresik', 'ent:company:freeport', 0.395),
+  op('ent:smelter:manyar', 'ent:company:freeport', 0.488, 'Operator (PT Freeport Indonesia).'),
+  op('ent:smelter:manyar', 'ent:company:mind-id', 0.51),
+  op('ent:smelter:aurubis-hamburg', 'ent:company:aurubis', 1),
+  op('ent:smelter:glogow', 'ent:company:kghm', 1),
+  op('ent:refinery:glogow-refinery', 'ent:company:kghm', 1),
+  op('ent:smelter:caletones', 'ent:company:codelco', 1),
+  op('ent:smelter:chuquicamata-smelter', 'ent:company:codelco', 1),
+  op('ent:smelter:ilo', 'ent:company:southern-copper', 1),
+  op('ent:refinery:kennecott', 'ent:company:rio-tinto', 1),
+  // chile-sxew and drc-sxew are multi-operator aggregates: deliberately
+  // unattributed — the remainder is reported, not hidden.
+];
+
 export const COPPER_DEPENDENCIES: Dependency[] = [
+  ...OPERATOR_ATTRIBUTIONS,
   { id: 'dep:kamoa-dar-corridor', fromEntityId: 'ent:mine:kamoa-kakula', type: 'depends_on', toEntityId: 'ent:port:dar-es-salaam', strength: 0.6, basis: 'Primary export corridor; alternative (Durban/Lobito) has lower throughput.', provenance: curated() },
   { id: 'dep:gresik-grasberg', fromEntityId: 'ent:smelter:gresik', type: 'depends_on', toEntityId: 'ent:mine:grasberg', strength: 0.9, basis: 'Near-sole concentrate source.', provenance: curated() },
   { id: 'dep:manyar-grasberg', fromEntityId: 'ent:smelter:manyar', type: 'depends_on', toEntityId: 'ent:mine:grasberg', strength: 0.95, basis: 'Built to process Grasberg concentrate.', provenance: curated() },
@@ -376,7 +467,7 @@ export const COPPER_EVENTS: EconEvent[] = [
   },
   {
     id: 'evt:escondida-strike-2017', curation: 'independent', entityId: 'ent:mine:escondida', type: 'strike',
-    title: 'Escondida 44-day strike', start: '2017-02-09', end: '2017-03-24', firstReportedAt: '2017-02-07', severity: 'high',
+    title: 'Escondida 44-day strike', start: '2017-02-09', end: '2017-03-24', announcedAt: '2017-02-07', firstReportedAt: '2017-02-07', severity: 'high',
     magnitude: { value: 120, unit: 'kt', basis: 'cu_content', note: 'Estimated lost output across the stoppage at a ~1.1 Mt/y mine; representative.' },
     description: 'Union rejected the final wage offer and gave strike notice (2017-02-07); the stoppage at the world\'s largest copper mine began 2017-02-09 and ran 44 days. A strike is knowable before it starts — first report precedes occurrence.',
     provenance: news('BHP / union statements, Feb–Mar 2017. Representative dating.'),
@@ -397,16 +488,16 @@ export const COPPER_EVENTS: EconEvent[] = [
   },
   {
     id: 'evt:las-bambas-blockade-2022', curation: 'independent', entityId: 'ent:mine:las-bambas', type: 'disruption',
-    title: 'Las Bambas community occupation halts production', start: '2022-04-20', end: '2022-06-11', firstReportedAt: '2022-04-14', severity: 'medium',
+    title: 'Las Bambas community occupation halts production', start: '2022-04-20', end: '2022-06-11', announcedAt: '2022-04-14', firstReportedAt: '2022-04-14', severity: 'medium',
     magnitude: { value: 50, unit: 'kt', basis: 'cu_content', note: 'Estimated lost output over ~7 weeks at a ~400 kt/y mine; representative.' },
     description: 'Community members entered the mine site (reported from 2022-04-14); MMG suspended operations 2022-04-20 and resumed in mid-June after agreement. One of a series of blockades on the Las Bambas corridor 2019–2022.',
     provenance: news('MMG disclosures / Peruvian press, Apr–Jun 2022. Representative dating.'),
   },
   {
     id: 'evt:lme-tariff-drawdown-2025', curation: 'post_hoc', entityId: 'ent:infrastructure:lme-warehouses', type: 'demand_surge',
-    title: 'US tariff-anticipation drawdown of LME stocks', start: '2025-02-25', end: '2025-07-31', firstReportedAt: '2025-02-25', severity: 'high',
+    title: 'US tariff-anticipation drawdown of LME stocks', start: '2025-03-01', end: '2025-07-31', announcedAt: '2025-02-25', firstReportedAt: '2025-02-25', severity: 'high',
     magnitude: { value: 165, unit: 'kt', basis: 'cu_content', note: 'Series decline ~260 → 95 kt Feb–Jun 2025; representative of the reported LME drawdown.' },
-    description: 'US Section 232 copper import probe (ordered 2025-02-25) opened a COMEX premium; metal was pulled from LME warehouses toward US delivery points through H1 2025. The pull unwound after the July 2025 tariff decision left refined cathode exempt.',
+    description: 'US Section 232 copper import probe ANNOUNCED 2025-02-25; the physical LME drawdown established itself from March as a COMEX premium pulled metal toward US delivery points through H1 2025. A tariff has structure ordinary disruptions lack — announcement precedes implementation, and forward-buying between the two is the mechanism — so the anticipation window here is data (announcedAt → start), not a tuning choice. The pull unwound after the July 2025 tariff decision left refined cathode exempt.',
     provenance: news('Executive order 2025-02-25; exchange stock reporting H1 2025. Representative dating.'),
   },
   {

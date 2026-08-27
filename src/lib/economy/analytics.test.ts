@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   concentration, capacityConcentration, concentrationTrajectory, flowCentrality,
-  bottleneckCandidates, detectAnomalies, extractSeries, observationsAt,
+  bottleneckCandidates, detectAnomalies, extractSeries, observationsAt, operatorConcentration,
 } from './analytics';
-import { buildGraph } from './graph';
+import { buildGraph, upstream, downstream } from './graph';
 import { syntheticState, FIXTURE_PROV } from './fixtures';
 import { getEconomyState } from './store';
 
@@ -122,6 +122,74 @@ describe('capacity concentration', () => {
     expect(r.result.shares[0].name).toBe('Borland');
     expect(r.result.hhi).toBe(10000);
     expect(r.inputs.capacityIds).toEqual(['cap:omega']);
+  });
+});
+
+describe('operator concentration', () => {
+  it('sees operational concentration that geographic grouping scores as diversified', () => {
+    // THE demonstration: two mines in two countries, one operator. By
+    // country the production is a 50/50 split (HHI 5000); by operator it is
+    // a monopoly (HHI 10000). A commodity can be geographically diversified
+    // and operationally concentrated at the same time — a single operator's
+    // labour dispute or financial distress hits both assets simultaneously,
+    // correlated risk the country lens cannot represent.
+    const s = syntheticState();
+    s.entities.push(
+      { id: 'ent:mine:gamma', kind: 'mine', name: 'Gamma Mine', countryCode: 'BB', lat: 23, lng: 23, geoPrecision: 'site', stage: 'production' },
+      { id: 'ent:company:omega-corp', kind: 'company', name: 'Omega Corp' },
+    );
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:mp:alpha', entityId: 'ent:mine:alpha', metric: 'production', value: 500, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+      { id: 'obs:mp:gamma', entityId: 'ent:mine:gamma', metric: 'production', value: 500, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+    );
+    s.dependencies.push(
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
+      { id: 'dep:op:gamma', fromEntityId: 'ent:mine:gamma', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
+    );
+    const r = operatorConcentration(s, 'production', ['mine']);
+    expect(r.result.hhi).toBe(10000);
+    expect(r.result.band).toBe('high');
+    expect(r.result.shares[0]).toMatchObject({ entityId: 'ent:company:omega-corp', share: 1 });
+    expect(r.result.attributionCoverage).toBe(1);
+  });
+
+  it('reports partial attribution the way geographic coverage is reported — never hidden', () => {
+    const s = syntheticState();
+    s.entities.push({ id: 'ent:company:omega-corp', kind: 'company', name: 'Omega Corp' });
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:mp:alpha', entityId: 'ent:mine:alpha', metric: 'production', value: 300, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+      { id: 'obs:mp:beta', entityId: 'ent:mine:beta', metric: 'production', value: 100, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+    );
+    // JV attribution: 60% of alpha attributed, beta not attributed at all.
+    s.dependencies.push(
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 0.6, provenance: FIXTURE_PROV },
+    );
+    const r = operatorConcentration(s, 'production', ['mine']);
+    expect(r.result.totalKt).toBe(400);
+    expect(r.result.total).toBeCloseTo(180, 1); // 300 × 0.6 allocated
+    expect(r.result.attributionCoverage).toBeCloseTo(0.45, 3);
+    expect(r.result.unattributedKt).toBeCloseTo(220, 1);
+    expect(r.result.note).toContain('coverage ratio must travel');
+  });
+
+  it('refuses market metrics like every other concentration', () => {
+    expect(() => operatorConcentration(syntheticState(), 'price', ['mine'])).toThrow(/physical measurements only/);
+  });
+
+  it('operated_by is operational structure: the operator appears upstream of its asset', () => {
+    const s = syntheticState();
+    s.entities.push({ id: 'ent:company:omega-corp', kind: 'company', name: 'Omega Corp' });
+    s.dependencies.push(
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
+    );
+    const g = buildGraph(s);
+    expect(upstream(g, 'ent:mine:alpha').map(x => x.entityId)).toContain('ent:company:omega-corp');
+    // And the company's reach covers the asset and everything downstream of it.
+    const reach = downstream(g, 'ent:company:omega-corp').map(x => x.entityId);
+    expect(reach).toContain('ent:mine:alpha');
+    expect(reach).toContain('ent:port:gate');
   });
 });
 

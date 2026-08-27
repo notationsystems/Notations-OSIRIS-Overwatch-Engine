@@ -269,15 +269,20 @@ describe('alert backtest (decade of monthly knowledge states)', () => {
     // event is independent public record.
     expect(sc.postHocEvents.sort()).toEqual(['evt:lme-stock-drawdown', 'evt:lme-tariff-drawdown-2025']);
     expect(sc.preRegisteredEvents.length).toBeGreaterThanOrEqual(9);
-    // THE headline: no pre-registered event is detected, so the clean-set
-    // precision can only be null (no trials) or 0 (unmatched alerts and no
-    // independent detections) — never a positive number. A positive value
-    // here must come from detecting an independent event, not from curation
-    // or window choice. Under the zero pre-window the January early signal
-    // goes unmatched, so the current measurement is 0 over a denominator of
-    // 1 — a small-n zero, not a capability claim in either direction.
+    // THE headline: below MIN_TRIALS the ratio is not a measurement in
+    // EITHER direction — an earlier revision reported "0 over a denominator
+    // of 1", which reads as "wrong every time it fires" on the strength of
+    // one unmatched alert, the mirror image of the suppressed 1.0. The
+    // symmetric floor returns null and names the trial count instead.
     expect(r.truthEvents.filter(t => t.curation === 'independent' && t.detected)).toEqual([]);
-    expect(sc.precisionPreRegisteredOnly === null || sc.precisionPreRegisteredOnly === 0).toBe(true);
+    if (sc.precisionPreRegisteredOnly !== null) {
+      // A published number requires enough trials AND an independent detection.
+      expect(sc.insufficientTrials).toBeUndefined();
+      expect(r.truthEvents.some(t => t.curation === 'independent' && t.detected)).toBe(true);
+    } else {
+      expect(sc.insufficientTrials).toBeDefined();
+      expect(sc.insufficientTrials!).toBeLessThan(5);
+    }
     // precisionAll exists for context and is never the headline.
     expect(sc.precisionAll).not.toBeNull();
     // Episodes, not alerts: many firings on one drawdown are one success.

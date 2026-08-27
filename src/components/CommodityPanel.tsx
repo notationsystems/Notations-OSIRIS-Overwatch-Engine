@@ -33,6 +33,9 @@ interface ConcentrationBlock {
   result: {
     hhi: number; band: string; total: number; unit: string; shares: Share[];
     coverageBias?: { minRatio: number; maxRatio: number; countries: number; note: string };
+    /** Operator concentration: share of facility output the operator model attributes. */
+    attributionCoverage?: number;
+    unattributedKt?: number;
   };
 }
 interface Bottleneck {
@@ -95,6 +98,7 @@ interface EntityDetail {
 const CONCENTRATION_LABELS: Record<string, string> = {
   mineProductionByCountry: 'MINE PRODUCTION / COUNTRY',
   mineProductionByMine: 'MINE PRODUCTION / MINE',
+  mineProductionByOperator: 'MINE PRODUCTION / OPERATOR',
   refinedProductionByCountry: 'REFINED PRODUCTION / COUNTRY',
   consumptionByRegion: 'CONSUMPTION / REGION',
   smeltingCapacityByCountry: 'SMELTING CAPACITY / COUNTRY',
@@ -455,6 +459,11 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                         {block.result.coverageBias && (
                           <div className="text-[8px] font-mono text-[#FF9500] mt-0.5">
                             ⚠ modeled coverage {(block.result.coverageBias.minRatio * 100).toFixed(0)}–{(block.result.coverageBias.maxRatio * 100).toFixed(0)}% by country — biased toward better-modeled countries
+                          </div>
+                        )}
+                        {block.result.attributionCoverage !== undefined && (
+                          <div className="text-[8px] font-mono text-[#FF9500] mt-0.5">
+                            ⚠ operator attribution covers {(block.result.attributionCoverage * 100).toFixed(0)}% of facility output ({(block.result.unattributedKt ?? 0).toLocaleString()} kt unattributed) — HHI is over the attributed share
                           </div>
                         )}
                       </button>
