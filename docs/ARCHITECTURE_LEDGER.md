@@ -1868,6 +1868,26 @@ runs the protocol in its operator section. Every other open item is a
 recorded condition (tag + branch deletion one-liners, hosting, S-8's
 identity, S-9's evidence), not work anyone can do today.
 
+**Operator response, ratified as standing rules.** Three items from
+the response round carry forward permanently rather than staying
+phase-local. (1) The split-commit hazard is the project's own defect
+species one level up — a check correct about the thing it examined and
+silent about the thing that shipped: local green and CI green were
+verdicts on DIFFERENT ARTIFACTS. Standing rule: CI's verdict on the
+pushed commit is the only one that counts; a local green is a
+hypothesis until the pushed tree agrees. (2) The off-repository copy
+is GitHub-to-GitHub: a provider-level incident takes the archive and
+its backup together. The caveat stays open until a provider-diverse
+copy exists — an operator decision, on record here so pruning either
+repository is never mistaken for redundancy. (3) The S-4 ten-minute
+criterion, structurally undischargeable by a builder, discharges
+itself during the afternoon if watched for: the time from handover to
+the researcher's first self-directed query is the measurement (now in
+the runbook's operator section). And the sentence the operator most
+wanted on the record, kept verbatim in spirit: after the session runs,
+amending the continue criterion is not legitimate — the freeze is what
+makes the result mean anything either way.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

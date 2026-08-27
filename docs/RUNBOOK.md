@@ -113,5 +113,10 @@ guidance mid-session; a miss log shaped by coaching measures the
 coaching. Whether they return the next day unprompted is a finding only
 you can record — one dated line suffices.
 
+**The S-4 criterion discharges itself here if you watch for it**: note
+the time from handing over this document to the researcher's first
+self-directed query — how long before they stop reading and start
+clicking IS the ten-minute measurement. One timestamped line.
+
 **Do not** tune the instrument mid-session or curate a source overnight
 to make a miss go away. The miss is the finding.
