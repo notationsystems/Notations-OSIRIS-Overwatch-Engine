@@ -5,7 +5,8 @@ import { join } from 'node:path';
 // The generator module is the single source of the walk and the rules —
 // the test verifies the COMMITTED manifest against the tree using the
 // same walk, so the two cannot drift apart.
-import { ARCHIVE_ROOTS, MANIFEST_PATH, buildManifest, durabilityClassOf } from '../../../scripts/archive-manifest.mjs';
+import { ARCHIVE_ROOTS, LIVE_LOGS, MANIFEST_PATH, buildManifest, durabilityClassOf } from '../../../scripts/archive-manifest.mjs';
+import { writeFileSync, rmSync, existsSync } from 'node:fs';
 
 /**
  * Shipping order S-2: the archive verifies against itself, in CI.
@@ -58,5 +59,21 @@ describe('archive manifest (S-2)', () => {
     // unclassified archive file is an unlabelled risk, refused loudly.
     expect(durabilityClassOf('data-archive/new-source/capture.json')).toBeNull();
     expect(ARCHIVE_ROOTS.length).toBeGreaterThan(1); // both roots covered
+  });
+
+  it('live demand logs are excluded BY NAME — a used instrument still verifies (F-4 finding)', () => {
+    // Before this exclusion, the first production run to log a search miss
+    // or an MCP call would fail buildManifest (unruled path) on the next
+    // suite run — the verifier punishing the instrument for being used.
+    expect(LIVE_LOGS).toContain('data-archive/mcp-sessions.jsonl');
+    const plant = join(process.cwd(), 'data-archive/mcp-sessions.jsonl');
+    const existed = existsSync(plant);
+    if (!existed) writeFileSync(plant, '{"ts":"2026-08-27T00:00:00Z","session":"plant","tool":"search_entities","refusals":0}\n');
+    try {
+      const fresh = buildManifest(process.cwd()); // must NOT throw with the live log on disk
+      expect(fresh.files.some(f => f.path === 'data-archive/mcp-sessions.jsonl')).toBe(false);
+    } finally {
+      if (!existed) rmSync(plant);
+    }
   });
 });

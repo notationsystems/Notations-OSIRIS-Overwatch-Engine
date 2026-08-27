@@ -30,6 +30,23 @@ import { join, relative, sep } from 'node:path';
 export const ARCHIVE_ROOTS = ['data-archive', 'src/data/economy/snapshots'];
 export const MANIFEST_PATH = 'data-archive/MANIFEST.json';
 
+/**
+ * LIVE demand logs (final order, F-4 finding): the running instrument
+ * appends search-misses.jsonl, export-log.jsonl and mcp-sessions.jsonl
+ * into data-archive/ — so on any machine where the instrument has been
+ * USED, an unruled path would fail buildManifest and a growing file can
+ * never hash-match a static manifest. They are excluded from the
+ * manifest contract BY NAME (an accounted-for drop, not a silent one):
+ * append-only demand evidence, unreconstructable in kind, protected by
+ * the mirror refresh rather than by a hash that would be stale the next
+ * time someone uses the instrument.
+ */
+export const LIVE_LOGS = [
+  'data-archive/search-misses.jsonl',
+  'data-archive/export-log.jsonl',
+  'data-archive/mcp-sessions.jsonl',
+];
+
 /** First matching rule wins. Paths are repo-relative with forward slashes. */
 export const DURABILITY_RULES = [
   { prefix: 'data-archive/comtrade/', cls: 'unreconstructable' },
@@ -63,6 +80,7 @@ export function buildManifest(cwd = process.cwd()) {
     for (const full of walk(join(cwd, root))) {
       const rel = relative(cwd, full).split(sep).join('/');
       if (rel === MANIFEST_PATH) continue;
+      if (LIVE_LOGS.includes(rel)) continue; // named exclusion — see LIVE_LOGS
       const bytes = readFileSync(full);
       const cls = durabilityClassOf(rel);
       if (!cls) throw new Error(`No durability rule covers ${rel} — add one; an unclassified archive file is an unlabelled risk.`);

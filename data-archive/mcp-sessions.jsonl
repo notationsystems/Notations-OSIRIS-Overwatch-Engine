@@ -1,0 +1,4 @@
+{"ts":"2026-08-27T18:17:38.241Z","session":"mcp-dm0ufy6z","tool":"concentration","refusals":1}
+{"ts":"2026-08-27T18:17:38.259Z","session":"mcp-dm0ufy6z","tool":"refusals_digest","refusals":84}
+{"ts":"2026-08-27T18:17:38.276Z","session":"mcp-dm0ufy6z","tool":"get_observations","refusals":0}
+{"ts":"2026-08-27T18:17:38.292Z","session":"mcp-dm0ufy6z","tool":"validate_claim","refusals":0}

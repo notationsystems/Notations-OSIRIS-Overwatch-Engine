@@ -5,6 +5,7 @@ import {
   parseMcsWorldCsv, parseMcsWorldCsvAccounted, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
   parseWestmetallTable, westmetallObs, checkWestmetallPlausibility, accountComtradeResponses,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
+  writeVintageWithoutOverwrite,
   MCS2025_SPEC, MCS_COPPER_CSPEC, MCS_ALUMINIUM_CSPEC,
 } from './liveAdapters';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
@@ -327,5 +328,57 @@ describe('live adapters in the assembled state (snapshot rung, network off)', ()
     // Concentration therefore runs on the hardest available evidence.
     const conc = concentration(state, 'production', 'country');
     expect(conc.inputs.observationIds).toContain('obs:usgs-mcs2025:production:cl:2024');
+  });
+});
+
+describe('the archive never overwrites a capture (final order finding)', () => {
+  /** In-memory stand-in for node:fs/promises with the two methods used. */
+  function memFs(seed: Record<string, string> = {}) {
+    const files = { ...seed };
+    return {
+      files,
+      async readFile(p: string) {
+        if (!(p in files)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        return files[p];
+      },
+      async writeFile(p: string, data: string) { files[p] = data; },
+    };
+  }
+
+  it('a differing same-day re-capture lands beside the first, never on top of it', async () => {
+    // The real sequence, reproduced: a 4-row capture, then an 18-row
+    // superset for the identical query on the same date.
+    const first = JSON.stringify({ count: 4, data: [1, 2, 3, 4] });
+    const second = JSON.stringify({ count: 18, data: Array.from({ length: 18 }, (_, i) => i) });
+    const fs = memFs();
+    const a = await writeVintageWithoutOverwrite(fs, '/arch/2026-08-27', '152-2603-X-2023', first);
+    const b = await writeVintageWithoutOverwrite(fs, '/arch/2026-08-27', '152-2603-X-2023', second);
+    expect(a).toBe('/arch/2026-08-27/152-2603-X-2023.json');
+    expect(b).toBe('/arch/2026-08-27/152-2603-X-2023-2.json');
+    // BOTH knowledge states survive — the first is not a casualty of the second.
+    expect(fs.files['/arch/2026-08-27/152-2603-X-2023.json']).toBe(first);
+    expect(fs.files['/arch/2026-08-27/152-2603-X-2023-2.json']).toBe(second);
+    // A third, differing again, keeps sequencing.
+    const third = JSON.stringify({ count: 19, data: [] });
+    expect(await writeVintageWithoutOverwrite(fs, '/arch/2026-08-27', '152-2603-X-2023', third))
+      .toBe('/arch/2026-08-27/152-2603-X-2023-3.json');
+  });
+
+  it('a byte-identical re-fetch is a no-op — re-running the instrument does not litter the archive', async () => {
+    const bytes = JSON.stringify({ count: 4, data: [1] });
+    const fs = memFs({ '/arch/2026-08-27/k.json': bytes });
+    expect(await writeVintageWithoutOverwrite(fs, '/arch/2026-08-27', 'k', bytes)).toBeNull();
+    expect(Object.keys(fs.files)).toEqual(['/arch/2026-08-27/k.json']);
+  });
+
+  it('the discriminating case: the OLD unconditional write would have destroyed the first capture', async () => {
+    // Vacuity guard — the property above is only meaningful because the
+    // naive implementation fails it. This is that implementation.
+    const fs = memFs();
+    const naiveWrite = async (key: string, bytes: string) => { await fs.writeFile(`/arch/${key}.json`, bytes); };
+    await naiveWrite('k', 'FIRST');
+    await naiveWrite('k', 'SECOND');
+    expect(fs.files['/arch/k.json']).toBe('SECOND');
+    expect(Object.values(fs.files)).not.toContain('FIRST'); // gone, unrecoverably
   });
 });

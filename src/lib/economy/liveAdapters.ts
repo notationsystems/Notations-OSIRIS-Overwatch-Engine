@@ -555,8 +555,44 @@ async function archiveComtradeVintage(key: string, raw: unknown): Promise<void> 
     const day = new Date().toISOString().slice(0, 10);
     const dir = `${process.cwd()}/data-archive/comtrade/${day}`;
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(`${dir}/${key}.json`, JSON.stringify(raw));
+    await writeVintageWithoutOverwrite(fs, dir, key, JSON.stringify(raw));
   } catch { /* best-effort by design */ }
+}
+
+/**
+ * NEVER OVERWRITE A CAPTURE (final order finding, verified in the running
+ * configuration). The archive path is keyed by DAY, and the write was
+ * unconditional — so a second live run on the same date silently replaced
+ * the first capture of an UNRECONSTRUCTABLE vintage. It happened: the
+ * 01:06 capture of 152-2603-X-2023 (4 partner rows) was overwritten at
+ * 18:17 by a superset (18 rows) for the identical query; only git history
+ * held the earlier bytes. Comtrade revises in place and keeps no prior
+ * version, so an overwritten capture is a knowledge state gone — the exact
+ * loss class the archive exists to prevent, this time arriving through the
+ * archive's own writer.
+ *
+ * Identical bytes are a no-op (a re-fetch that changed nothing adds no
+ * file). DIFFERING bytes get the next free sequenced sibling, so both
+ * captures survive and the intra-day revision is itself visible evidence.
+ */
+export async function writeVintageWithoutOverwrite(
+  fs: { readFile(p: string, enc: 'utf8'): Promise<string>; writeFile(p: string, data: string): Promise<void> },
+  dir: string,
+  key: string,
+  bytes: string,
+): Promise<string | null> {
+  for (let n = 1; n < 100; n++) {
+    const path = `${dir}/${key}${n === 1 ? '' : `-${n}`}.json`;
+    let existing: string | null = null;
+    try {
+      existing = await fs.readFile(path, 'utf8');
+    } catch {
+      await fs.writeFile(path, bytes); // free slot
+      return path;
+    }
+    if (existing === bytes) return null; // already archived, byte-identical
+  }
+  return null; // 99 differing same-day captures: something else is wrong
 }
 
 export function parseComtradeResponse(
