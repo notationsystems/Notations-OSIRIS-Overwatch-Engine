@@ -38,6 +38,7 @@ import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
 import comtradeDa from '@/data/economy/snapshots/comtrade-da.json';
 import { withHostRateLimit } from './outboundRate';
+import { processSingleton } from './processSingleton';
 
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
@@ -524,7 +525,11 @@ interface ComtradeResponse { data?: ComtradeRow[] }
  *      snapshots are the only Comtrade vintage archive there will ever be.
  */
 interface ComtradeDaRow { reporterCode: number; period: number; firstReleased: string; lastReleased: string }
-const COMTRADE_DA = new Map<string, ComtradeDaRow>();
+// On globalThis: a severed copy means boot and request contexts each
+// re-fetch the publication-date index, which is both wasted outbound
+// load against a courtesy-limited source and a knownAt that could differ
+// between contexts for the same record. See processSingleton.ts.
+const COMTRADE_DA = processSingleton('comtrade-da', () => new Map<string, ComtradeDaRow>());
 for (const r of (comtradeDa as { rows: ComtradeDaRow[] }).rows) {
   const key = `${r.reporterCode}-${r.period}`;
   const prev = COMTRADE_DA.get(key);

@@ -20,6 +20,8 @@
  * text cannot leak into a log that never stores it.
  */
 
+import { processSingleton } from './processSingleton';
+
 export interface McpCallRecord {
   ts: string;
   /** Opaque per-process session id — one MCP server process is one session. */
@@ -30,25 +32,32 @@ export interface McpCallRecord {
   refusals: number;
 }
 
-/* In-memory record for the running process (one MCP session). */
-const calls: McpCallRecord[] = [];
-let sessionId = `mcp-${Math.random().toString(36).slice(2, 10)}`;
+/* In-memory record for the running process (one MCP session), on
+ * globalThis: module-level state is severable by module duplication, and
+ * a severed route-around log would compute its estimate over half the
+ * calls while looking correct. See processSingleton.ts. */
+const store = () => processSingleton('mcp-session', () => ({
+  calls: [] as McpCallRecord[],
+  sessionId: `mcp-${Math.random().toString(36).slice(2, 10)}`,
+}));
 
 export function recordMcpCall(tool: string, refusals: number): McpCallRecord {
-  const rec: McpCallRecord = { ts: new Date().toISOString(), session: sessionId, tool, refusals };
-  calls.push(rec);
+  const s = store();
+  const rec: McpCallRecord = { ts: new Date().toISOString(), session: s.sessionId, tool, refusals };
+  s.calls.push(rec);
   void appendMcpLog(rec);
   return rec;
 }
 
 export function mcpSessionCalls(): McpCallRecord[] {
-  return [...calls];
+  return [...store().calls];
 }
 
 /** Test seam: a simulated session must start from zero. */
 export function resetMcpSession(id?: string): void {
-  calls.length = 0;
-  sessionId = id ?? `mcp-${Math.random().toString(36).slice(2, 10)}`;
+  const s = store();
+  s.calls.length = 0;
+  s.sessionId = id ?? `mcp-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** Same env seams as the miss log / export log; suppressed under test

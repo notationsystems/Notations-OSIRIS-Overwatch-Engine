@@ -17,6 +17,8 @@
  * the digest is read at the end and the counters die with the process.
  */
 
+import { processSingleton } from './processSingleton';
+
 export interface SessionDigest {
   startedAt: string;
   /** Entity-register searches served. */
@@ -41,7 +43,16 @@ export interface SessionDigest {
   note: string;
 }
 
-const state = {
+/**
+ * ON globalThis (processSingleton). These counters ARE the S-7 demand
+ * evidence the frozen continue criterion reads, and module-level state
+ * is severable by Next's module duplication — a severed copy would
+ * under-report an afternoon while every individual write looked correct.
+ * A demand instrument that silently counts half the session is worse
+ * than one that is absent, because the reading still looks like a
+ * reading. See processSingleton.ts for the class.
+ */
+const state = processSingleton('session-telemetry', () => ({
   startedAt: new Date().toISOString(),
   queries: 0,
   misses: 0,
@@ -51,7 +62,7 @@ const state = {
   refusalDigestsServed: 0,
   exportsServed: 0,
   entitiesInspected: new Set<string>(),
-};
+}));
 
 export function recordQuery(outcome: { miss: boolean; withheld: number; personShaped: boolean }): void {
   state.queries += 1;

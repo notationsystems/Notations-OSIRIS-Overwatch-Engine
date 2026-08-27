@@ -2213,6 +2213,102 @@ refetchable-at-risk, 6 refetchable, 1 documentation. Suite: 641 passing.
 **Exactly one next executable frontier:** still the researcher afternoon.
 Tier 1 is complete, which was the only prerequisite the order set for it.
 
+## Phase 38 — the class named: a mechanism narrower than it appears, with nothing failing
+
+The operator's reading of phase 37's `globalThis` finding, taken as the
+directive it was: it is **larger than its fix**, and it belongs here as
+an instance of a CLASS rather than as an infrastructure bug — because the
+next instance will not be about modules either.
+
+**The class.** *A mechanism whose EFFECTIVE SCOPE is narrower than its
+APPARENT SCOPE, with nothing failing.* Its signature is that every part
+reports success truthfully. No exception is thrown, no test goes red, and
+the mechanism's own self-description is accurate — about an artifact that
+is not the one in use. It is only ever found by someone asking "and does
+that reach the thing I think it reaches?"
+
+Three confirmed instances, arriving through three different doors:
+
+| Instance | The door | What it looked like |
+|---|---|---|
+| The world-file commodity filter (round 26) | a PREDICATE | Ingest ran, accounted correctly, and silently dropped aluminium for twenty rounds |
+| Guards evaluated on one partition (work order 3.1) | a SCOPE | Checks passed on copper and were silent about everywhere else their condition held |
+| Module-context severance (phase 37) | a MODULE CONTEXT | Boot logged `ready` while health logged `booting` forever; the outbound limiter kept two per-host chains; state warming warmed a cache no request would read |
+
+The third is the sharpest illustration because of the limiter: **a
+throttle that exists to prevent compounding, defeated by a door it could
+not see.** It spaced its requests perfectly — within each of the two
+chains it did not know were two.
+
+**Why the fix is not the finding.** Anchoring the state on `globalThis`
+closes the module door. It says nothing about the next door. Every prior
+instance was also closed at its own door — the filter now counts what it
+drops, the guards now derive their scope from the register — and the
+class still produced a new instance, through a mechanism none of those
+fixes could have anticipated. What generalises is not the remedy but the
+QUESTION: for any mechanism that reports success, does the thing it
+affects and the thing in use have the same identity?
+
+**What was built for it, at the door that is now visible.** Every
+mutable module-level container in the economy instrument is now either
+reached through `processSingleton` (shared across every module context by
+construction) or listed in `CONTEXT_LOCAL_BY_DESIGN` with the argument
+for why severance is harmless — accounting for every drop, applied to
+state instead of rows. `contextSeverance.test.ts` enforces it, and
+carries its own vacuity proof twice over: fixture-level (it must flag
+severable state, must not flag an immutable lookup, must not flag state
+already shared), and file-level (a planted severable module in the real
+tree makes it fail, naming file and line; removing it makes it pass).
+
+Three further instances were found and closed by that sweep, none of
+which had failed anything: **`sessionTelemetry`** — the counters that ARE
+the S-7 demand evidence, where a severed copy would have under-reported
+an afternoon while every individual write looked correct, and the frozen
+criterion cannot be amended afterwards to repair a reading taken through
+half a session; **`mcpSession`** — the route-around log, which would have
+computed its estimate over half its calls; and **`COMTRADE_DA`** — the
+publication-date cache, where severance means duplicate outbound load
+against a courtesy-limited source and a `knownAt` that could differ
+between contexts for the same record.
+
+**The check found a defect in itself, immediately.** Its by-name
+assertion failed on `boot.ts`, which reaches the registry as
+`processSingleton<T>(` — a literal `processSingleton(` match missed the
+type parameter. A checker blind to one calling form is the class again,
+one level up: a check correct about the files it examined and silent
+about the file that mattered. Both patterns are now generic-tolerant, and
+the generic form is in the vacuity fixture.
+
+**The miscount, and how it moved.** Recorded because the propagation is
+the point: "seven guards" was not a typo but a LEDGER SENTENCE (phase
+34), and the operator's two subsequent work orders inherited it by
+reading these documents rather than the register — which they had no way
+to see. So an error in my own account of the system propagated outward
+into instructions written on the basis of that account. It is the same
+class stated in prose instead of code: **a literal that agreed with
+itself and not with the world.** The count is now pinned against
+`DEFERRED_DECISIONS.length`, and the general lesson is the one this
+project already applies to scope — derive from the register, never
+restate it.
+
+Suite: 644 passing.
+
+**The classes, collected.** The five named defect classes plus this one
+were scattered across phases 26, 3.1, 33/34 and 37, recoverable only by
+reading the narrative — and a doctrine you have to reconstruct from a
+narrative gets restated slightly wrong, which is class 6 itself.
+`docs/DEFECT_CLASSES.md` is now the register: signature, instances with
+what each cost, the door each arrived through, what closed that door,
+and — the part that matters — what does NOT generalise from each fix.
+All six reduce to one question no test asks on its own: *does the thing
+this mechanism affects, and the thing actually in use, have the same
+identity?*
+
+**Exactly one next executable frontier:** unchanged, and now unchanged
+for three phases running — the researcher afternoon. That is not
+avoidance; it is what "everything buildable is built" looks like when it
+is true.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
