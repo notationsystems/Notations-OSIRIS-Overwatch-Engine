@@ -2841,7 +2841,20 @@ two operator-facing documents say eleven — which is precisely how class
 the tree already knows. Corrected, and pinned against `MCP_TOOLS.length`
 with a vacuity guard for when a document stops stating a count at all.
 
-689 tests green, typecheck clean.
+**And the class was already in the deployment check, as an assertion.**
+`scripts/smoke.mjs` — the one command the operator runs after every
+deploy — printed *"corpus health reachable — 1 signal(s) (empty is the
+healthy state)"*. That parenthesis is the claim class 7 exists to reject,
+written into the check itself: an empty signal list is healthy only if
+something was judged, and otherwise it is a corpus nobody examined. The
+check now asserts the accounting is present and that zero signals over
+zero judged sources with no warrant is a FAILURE. Proven to bite against
+a stub serving the pre-phase-43 shape (signals present, accounting
+absent): `FAIL corpus health reachable — corpusHealth has no accounting:
+an empty signal list would be unreadable`. All nine pass against the
+running instrument.
+
+690 tests green, typecheck clean, 9/9 smoke.
 
 **Exactly one next executable frontier:** unchanged — the researcher
 afternoon, and now the only thing left that this kind of work cannot

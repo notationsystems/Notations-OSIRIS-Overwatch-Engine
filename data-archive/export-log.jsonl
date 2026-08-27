@@ -2,3 +2,7 @@
 {"ts":"2026-08-27T19:01:03.789Z","view":"rows","format":"md","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"7e592687d4a58a93"}
 {"ts":"2026-08-27T19:01:22.093Z","view":"rows","format":"json","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"7e592687d4a58a93"}
 {"ts":"2026-08-27T19:01:22.102Z","view":"rows","format":"md","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"7e592687d4a58a93"}
+{"ts":"2026-08-27T21:40:29.117Z","view":"rows","format":"json","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"d613cf12e4c6659c"}
+{"ts":"2026-08-27T21:40:29.124Z","view":"rows","format":"md","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"d613cf12e4c6659c"}
+{"ts":"2026-08-27T21:40:45.051Z","view":"rows","format":"json","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"d613cf12e4c6659c"}
+{"ts":"2026-08-27T21:40:45.059Z","view":"rows","format":"md","commodity":"copper","subject":null,"metric":"production","asOf":null,"knowledge":"best_known","rows":5,"truncated":206,"fingerprint":"d613cf12e4c6659c"}

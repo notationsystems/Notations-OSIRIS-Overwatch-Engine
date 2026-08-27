@@ -65,11 +65,19 @@ await check('guards evaluated at runtime', async () => {
     (d.failures.length ? ` — ${d.failures.map(f => `${f.commodity}/${f.id}`).join(', ')}` : '');
 });
 
-// 3. Corpus health reachable (empty is healthy — reachable is the assertion).
+// 3. Corpus health reachable AND accounted for. This line used to read
+// "empty is the healthy state" — which is the claim class 7 exists to
+// reject, written into the deployment check itself. An empty signal list is
+// healthy only if something was judged; otherwise it is a corpus nobody
+// examined, and the two must never smoke-test alike.
 await check('corpus health reachable', async () => {
   const d = await json('/api/economy?commodity=copper&view=analytics');
   assert(Array.isArray(d.corpusHealth), 'corpusHealth is not an array');
-  return `${d.corpusHealth.length} signal(s) (empty is the healthy state)`;
+  const acc = d.corpusHealthAccounting;
+  assert(acc && Array.isArray(acc.judged), 'corpusHealth has no accounting: an empty signal list would be unreadable');
+  assert(d.corpusHealth.length > 0 || acc.judged.length > 0 || acc.emptyBecause,
+    'zero signals over zero judged sources, with no warrant — nothing was checked and nothing said so');
+  return `${d.corpusHealth.length} signal(s) over ${acc.judged.length} judged source(s)${d.corpusHealth.length === 0 ? ' — empty, warranted' : ''}`;
 });
 
 // 4. Export renders, in both formats, with the bound stated (D-5).
