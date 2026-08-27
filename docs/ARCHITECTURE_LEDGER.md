@@ -1714,6 +1714,160 @@ Vacuity shown both coarse (a classifier that types everything
 **Guards moved.** One added: `typed-refusal-emission-unbuilt` — the
 seventh deferred decision under validWhile.
 
+## Phase 35 — the shipping order: from a green branch to an instrument that is deployed, owned, backed up and measured
+
+One report per item against the criteria pre-registered in
+`docs/WORK_ORDER_SHIPPING_2026-08-27.md` (committed verbatim before
+execution). Failed criteria are reported, not adjusted. The order's
+INSPECT posture held: every infrastructure assumption was measured
+first, and two were corrected.
+
+**S-1 — Release.** Inspection corrected the order's premise: the
+repository had never had a `main` or `master` — the working branch was
+its only ref. `main` was created from the branch head; CI (typecheck,
+full suite, build) runs on every push to `main` and `claude/**`, and
+green was verified by log CONTENT (the pass count visible in the CI
+output), not by the badge. The planted guard breach fails the pipeline
+at the test step with the guard's own message (`[copper]
+[allocation-model-deferred] condition no longer holds`) plus the
+structural-profile pin honestly noticing the planted tonnage — per-
+failure attribution, exactly what the criterion asked. A fresh clone
+at the released revision installs, builds and serves with no
+undocumented step. **FAILED criterion, reported:** "at a named tag" —
+the execution environment's git proxy refuses `refs/tags` pushes
+(HTTP 403, four retries) and branch deletions likewise, so the named
+version ships as branch `release/v0.1.0` plus a local annotated tag;
+creating `v0.1.0` on the remote and deleting `ci-verify/guard-breach`
+(never merge it) are recorded operator one-liners.
+
+**S-2 — Archive durability.** The unreconstructable set is labelled
+and counted: 29 archive files — 14 unreconstructable (the Comtrade
+vintages), 8 refetchable-at-risk, 6 refetchable, 1 documentation —
+indexed in `data-archive/MANIFEST.json` with sha256, verified in both
+directions by a suite test that also refuses unclassified files, green
+in CI. The off-repository copy lives in the Information-Systems-Archive
+repository under `sea-dog-terminal/` with its own verifier, and the
+restore drill was EXECUTED, not assumed — and earned its place on day
+one: its verify step caught the MANIFEST missing from the mirrored
+tree (see self-corrections). One genuine defect found and fixed by
+this item's own verifier: the degradation-ladder tests were writing
+stub-served bytes into the real unreconstructable archive on every
+suite run — fabricated bytes in the exact store the item exists to
+protect, arriving through the instrument's own tests.
+`archiveComtradeVintage` now refuses under VITEST; the pre-seal CI run
+is red with the interference, the sealed run green — the fix confirmed
+where it matters. **Caveat, reported:** the off-repository copy is
+same-provider (GitHub to GitHub) — it survives repository loss, not
+provider loss; provider-diverse backup is an operator decision.
+Archive-before-parse confirmed in program order and empirically (the
+session's own live retrievals archived).
+
+**S-3 — Deployment and access.** Inspection: nothing was deployed; the
+path is the ghcr image (docker-publish now succeeds on mainline pushes
+— the image exists) plus one documented docker command. Configuration
+seams fail loudly at startup with every missing key NAMED, verified in
+the running configuration, with a measured nuance recorded rather than
+papered over: Next 16 holds the refused process serving 500s instead
+of exiting, so the refusal is loud in the log and on every request but
+invisible to an exit-code supervisor. The access decision is recorded
+in `docs/DEPLOYMENT.md`: internal, operator-controlled — an evidence
+hazard (demand instruments assume researcher users) and a licensing
+posture (Westmetall), not a privacy one. Addendum B appended the open
+external-client exposure question to that decision with its undecided
+parts named (authentication, telemetry segregation, machine-consumer
+licensing), to be resolved at S-9. **Criterion honestly scoped:** "a
+running instance a researcher can reach" is operator-shaped from this
+environment — image, command, seams and decision are delivered; the
+hosting itself is the operator's hand.
+
+**S-4 — Runbook.** Written (`docs/RUNBOOK.md`): the refusal queue as a
+work queue, the two knowledge modes, the banner vocabulary, the search
+grammar, limitations unsoftened, the export surface, and an operator
+section with session mechanics. **Criterion pending by construction:**
+"a non-builder reaches a documented conclusion in ten minutes" can
+only be discharged by a non-builder; the builder cannot self-certify
+it and does not.
+
+**S-5 — Ownership and cadence.** Every built-adapter source carries
+`owner` + `maintenance`, enforced by a property test over the registry
+(not a list that can drift); 'operator' is a role because the program
+has exactly one human. The facility flow snapshot is now a registered,
+maintained, AGING source: past its annual cadence it emits a
+corpus-health signal, and the signal is real today (~604 days) — a
+standing signal, not a simulation, with the discriminating absent
+cases pinned (fresh snapshot; country-vintage-only state). The digest
+a human receives is delivered end to end: the weekly workflow's
+dispatch run succeeded and filed issue #1 ("Corpus health digest:
+1 signal(s)") through the real path on the real signal. Silence on a
+healthy corpus is the workflow's design and was not simulated away.
+
+**Addendum A — the corpus as a table (operator, mid-execution, placed
+before S-6).** `GET /api/economy/table`: rows carry every axis or the
+row flags what it cannot state; refusals export as null-valued rows
+with remedies; the header carries knowledge state, fingerprint,
+withheld count and row accounting; `view=grid` is the period × edition
+form. All seven pre-registered criteria discharged in
+`src/app/api/economy/table/route.test.ts`, each against its planted
+failing state: the basis-less record exports null AND flagged; md and
+JSON render the same objects verbatim (and CSV is refused with its
+reason); the planted late vintage is withheld under `as_known_then`
+and COUNTED (+1 in the header, present under best-known); the
+fingerprint matches the producing state and moves when a value moves;
+the uncovered grid cell is a typed null rendered as a dash, never a
+zero, with the legend shipped; the export log writes through the real
+env-seam path and `exportsServed` counts in the session digest; the
+route module structurally exports GET and only GET, and a free-text
+subject is refused at the boundary BEFORE any log write. Identifier
+reconciliation with the operator's spec is recorded in the order doc's
+Addendum A (metric names; `vintage`≡`source_id`; the unverified Zambia
+magnitude not repeated).
+
+**S-7 — the continue criterion**, pre-registered and committed
+(`docs/CONTINUE_CRITERION.md`) before any researcher session: a
+90-day window from S-6; CONTINUE on any of three unprompted return
+days, one finding in someone's own work product, or ten distinct
+non-builder miss queries with named gaps; FREEZE (keep, don't
+maintain) below that; a no-show retires the question early without
+starting the window. The operator decides at day 90 against the
+document as written; the builder computes the readings without
+recommendation.
+
+**S-6 is the operator's; S-8 and S-9 are conditions.** S-6 (the
+researcher afternoon) is not builder-executable and everything it
+needs is armed. S-8 (EDGAR) unblocks on the SEC identity and its
+phase-22 pre-registration is to be RE-TAKEN then, not obeyed as
+archaeology. S-9 (the evidence-led re-rank, now carrying the MCP
+exposure item) waits on S-6's evidence and supersedes every prior
+ordering when it runs.
+
+**Self-corrections (this order's own defects, named).** (1) The first
+two planted breaches were MALFORMED — a syntax error, then a missing
+gitignored module — and failed CI at typecheck, not at the guard; a
+mutation that does not reach executable semantics has not survived
+anything. The third plant was asserted-applied locally (tsc clean,
+exactly one failing test, the guard's own message) before pushing.
+(2) A `git add -A` on the breach branch swept then-untracked S-2
+artifacts into the plant commit, so commit cd17729's message claimed
+content it did not carry — corrected in a follow-up commit that says
+so. (3) Worse: a later checkout left HEAD on the breach branch and an
+S-2 commit was pushed to MAIN carrying the plant; repaired minutes
+later by cherry-pick onto the clean parent and a force-with-lease of
+my own refs. Plants now get isolated worktrees — applied for the final
+verification. (4) The S-3 commit was red in CI at typecheck for four
+minutes: its test file used `{}` literals against a parameter typed
+`NodeJS.ProcessEnv`, and the retype that fixed it lived in the working
+tree, landing with the NEXT commit — local validation ran against the
+working tree, not the committed tree. Split commits get per-commit
+validation or no split. (5) The archive test-write defect above —
+found by this order's own verifier, which is the argument for the
+verifier.
+
+**Exactly one next executable frontier:** the researcher afternoon
+(S-6) — the operator schedules it, hands over `docs/RUNBOOK.md`, and
+runs the protocol in its operator section. Every other open item is a
+recorded condition (tag + branch deletion one-liners, hosting, S-8's
+identity, S-9's evidence), not work anyone can do today.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
