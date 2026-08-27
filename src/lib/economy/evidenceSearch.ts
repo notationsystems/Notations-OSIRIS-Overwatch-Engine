@@ -77,7 +77,7 @@ export function parseEvidenceQuery(q: string): EvidenceQuery | null {
 }
 
 const REMEDY: Record<string, string> = {
-  'refused:basis': 'Curate a corridor grade (mirror-implied or documented assay) for the gross-weight flow; it converts with the band as uncertainty.',
+  'refused:basis': 'Curate a corridor grade (mirror-implied or documented assay) for the gross-weight flow, or — where the FORM pins the conversion (bauxite, alumina) — a documented form-level stage constant; either converts with its band as uncertainty.',
   'refused:component': 'Resolve the refused flow basis feeding this node — the score computes when its components do.',
   'refused:topology': 'Country flow vintages serve 2017+ at country granularity; before the earliest vintage no topology exists. Facility tonnage under a country vintage needs the country↔facility allocation model (deferred — work order scope).',
   'refused:scope': 'Curate regulatoryScope (jurisdiction + commodity/stages/direction) on the event.',
@@ -111,7 +111,7 @@ export function searchEvidence(
         kind: 'refused', type: 'basis',
         entityId: edge.from, entityName: entityName(state, edge.from),
         title: `${entityName(state, edge.from)} → ${entityName(state, edge.to)}: tonnage refused`,
-        detail: 'Gross-weight basis with no corridor grade — the flow enters as structure, never as tonnage; zero would claim it carries nothing.',
+        detail: 'Gross-weight basis with no corridor grade and no form-level stage constant — the flow enters as structure, never as tonnage; zero would claim it carries nothing.',
         evidenceIds: [edge.id],
       });
     }

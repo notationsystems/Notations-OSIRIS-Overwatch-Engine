@@ -1601,6 +1601,78 @@ as the order left them: the EDGAR contact identity (procurement-shaped;
 UA now specified under the Sea Dog Terminal name) and the researcher
 afternoon — which this item leaves armed.
 
+## Phase 33 — the response round: wrong-attribution audit, and phases 18/20 reconciled
+
+Three items from the operator's reading of the order report, each
+executed rather than acknowledged.
+
+**1. The wrong-attribution audit — the 'kt gross/y' species, hunted.**
+The operator's observation: a refusal correct in outcome and wrong in
+attribution is invisible to any test asserting only that a refusal
+occurred, and every refusal here carries a remedy — a wrong attribution
+sends work to the wrong place. Audited the refusal machinery for the
+shape. Found twice:
+- **The regulatory basis-honesty notes fired regardless of `predates`.**
+  In the mixed-call shape (a graph built for a later world evaluated at
+  a predating date), an unquantified gross crossing corridor pushed the
+  corridor-grade remedy — and the partial case pushed "LOWER BOUND"
+  while the returned figure was null. Compounding it, the evidence
+  search's refusal classifier keys on that text, so the predates refusal
+  would be TYPED `basis`: wrong remedy on the explanation, wrong type on
+  the queue. Fixed by guarding both notes on `!predates` (at a
+  predating date the mechanism is the topology, and the topology note
+  with its rebuild remedy is what remains). The discriminating case is
+  named and mutation-verified: a planted gross crossing corridor under a
+  facility graph at a 2015 evaluation — green under the guard, red under
+  the un-guarded mutation exactly on the `corridor grade` assertion,
+  mutation asserted-applied.
+- **`refused:basis` remedy text predated item 3.5.** It named only
+  corridor grades; a form-level stage constant is now the remedy for an
+  aluminium gross flow. Both the type remedy and the edge detail now
+  name both conversion paths.
+Plus the property pin the finding deserved: every flow unit in every
+assembled state parses through `toKtPerYear` (vacuity-asserted
+non-empty, both commodities) — so no tonnage refusal can ever again fire
+on unit parse while claiming basis. The property, not the enumeration:
+the pin holds for units that do not exist yet.
+
+**2. The OpenOwnership registry entry now states the CLASS.** The entry
+already carried the structural cause (inbound direction; a Peruvian S.A.
+can never be a subject); it now also says explicitly that this is a
+property of the source class — a fresher export cannot change it, and a
+re-attempt should target a register in the vehicle's own jurisdiction.
+Written so the person who rediscovers the entry in a year reads the
+boundary, not just the category.
+
+**3. Phases 18 and 20, reconciled — additively, as the rename rule
+requires.** Phase 18's forced-ordering claim ("filings move quantity and
+structure together; the first reported structural source is EDGAR") and
+phase 20's flow-boundary prediction ("filings yield facility/production/
+operator/capacity but never flows — flow edges stay at 0% under EDGAR,
+structural to the source") were both written before any structural
+source landed. The measurement (phase 27): flows moved FIRST, from trade
+data — metal_content 0 → 0.202, gross_weight 1.0 — while attribution
+and capacity stayed at 0% awaiting the blocked EDGAR ingest. The
+reconciliation: phase 18's ordering claim holds for the components it
+scoped — quantity-and-attribution move together, from filings, and have
+not moved — and did not extend to flows, which is exactly the boundary
+phase 20 drew. Phase 18 was not wrong within its scope; it was silent on
+the component that moved first, and phase 20 had already named the
+source class (trade declarations) that would have to move it. Both
+entries stand as written; this entry is the join. The residual
+prediction now on record: when EDGAR unblocks, attribution edges and
+capacities move together and flows stay where Comtrade put them.
+
+**Also recorded, per the operator's framing.** The 3.2 criteria
+conflict ("≥3 of 5 propagate" vs "facility events refuse") is a defect
+in the ORDER's pre-registration, not a shortfall of the build — two
+jointly unsatisfiable criteria over this register, surfaced only by
+executing both. The round-6 rule (report the disagreement, never adjust
+the number) applied symmetrically to the operator's own artifact — which
+is what the rule was always for.
+
+**Guards moved.** None. Suite green after the audit fixes.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

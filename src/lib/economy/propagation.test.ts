@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { propagateEvents, topologyValidity } from './propagation';
 import { buildGraph } from './graph';
+import { searchEvidence } from './evidenceSearch';
 import { syntheticState, FIXTURE_PROV } from './fixtures';
 import { getEconomyState } from './store';
 import { runEngine, listSystems } from './engine';
@@ -202,6 +203,47 @@ describe('regulatory propagation (territory + scope)', () => {
     // …while production and DOMESTIC processing continue.
     expect(affected).not.toContain('ent:smelter:caletones');
     expect(ban.disruptedKtPerYear).toBeGreaterThan(2000);
+  });
+
+  it('a predating refusal never carries the basis remedy — attribution, not just outcome', () => {
+    // The wrong-attribution species (the 'kt gross/y' finding, audited
+    // for): a refusal correct in outcome and wrong in attribution sends
+    // work to the wrong place, and is invisible to any test that only
+    // asserts a refusal occurred. The discriminating state: a facility
+    // graph with an unquantifiable gross crossing corridor, evaluated at
+    // a PREDATING date. The pre-fix behavior pushed the corridor-grade
+    // remedy (and the evidence search then typed the hit 'basis'); the
+    // correct attribution is topology, with the rebuild/serving remedy.
+    const s = syntheticState();
+    s.flows.push({
+      // A CROSSING corridor (AA → BB) — the export branch counts it; the
+      // fixture's alpha→gate flows are domestic and would be spared.
+      id: 'flow:planted-gross-export', fromEntityId: 'ent:port:gate', toEntityId: 'ent:smelter:omega',
+      commodity: 'testium', form: 'concentrate', quantity: 500, unit: 'kt gross/y',
+      basis: 'gross_weight', period: { start: '2024-01-01', end: '2024-12-31' },
+      mode: 'sea', valueKind: 'representative', confidence: 'medium', provenance: FIXTURE_PROV,
+    });
+    s.events.push({
+      id: 'evt:planted-export-ban', entityId: 'ent:port:gate', type: 'policy',
+      title: 'Export ban (planted)', start: '2015-01-01', end: '2015-06-01', severity: 'high',
+      regulatoryScope: { jurisdictionCountryCode: 'AA', direction: 'export' },
+      provenance: FIXTURE_PROV,
+    });
+    const graph = buildGraph(s); // facility topology (2024)
+    const r = propagateEvents(s, graph, { asOf: '2015-03-01' });
+    const ban = r.result.find(i => i.eventId === 'evt:planted-export-ban')!;
+    expect(ban.disruptedKtPerYear).toBeNull();
+    const text = ban.explanation.join(' ');
+    expect(text).toContain('predates');
+    // The discriminating assertions — these FAIL under the pre-fix
+    // behavior, where the basis notes pushed regardless of predates:
+    expect(text).not.toContain('corridor grade');
+    expect(text).not.toContain('LOWER BOUND');
+    // And the typed-refusal surface attributes it to topology, not basis.
+    const hits = searchEvidence(s, graph, { kind: 'refused', type: 'topology', terms: ['planted'] }, { asOf: '2015-03-01' });
+    expect(hits.some(h => h.title.includes('Export ban (planted)'))).toBe(true);
+    const basisHits = searchEvidence(s, graph, { kind: 'refused', type: 'basis', terms: ['planted'] }, { asOf: '2015-03-01' });
+    expect(basisHits.some(h => h.title.includes('Export ban (planted)'))).toBe(false);
   });
 
   it('a regulatory event without a scope is refused, not guessed', () => {

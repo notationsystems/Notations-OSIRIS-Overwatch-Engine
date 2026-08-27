@@ -404,10 +404,15 @@ function regulatoryImpact(
   // Basis honesty over vintage topologies: an unconvertible gross flow is
   // REFUSED tonnage, never zero. All-refused → the figure is null with the
   // remedy named; partially refused → the stated sum is a lower bound.
-  if (unquantifiedEdges > 0 && disrupted === 0) {
-    explanation.push(`${unquantifiedEdges} in-scope flow(s) carry gross-weight tonnage with no mirror-implied corridor grade — disrupted tonnage is REFUSED (unknown, not zero); reach is real. Remedy: a corridor grade (mirror-implied or documented assay).`);
-  } else if (unquantifiedEdges > 0) {
-    explanation.push(`${unquantifiedEdges} further in-scope flow(s) refused conversion (gross weight, no corridor grade) — the stated tonnage is a LOWER BOUND.`);
+  // GUARDED on !predates: at a predating date the refusal's mechanism is
+  // the topology, and pushing the corridor-grade remedy here would be a
+  // refusal correct in outcome and WRONG IN ATTRIBUTION — it sends the
+  // reader to curate a grade when the actual remedy is a served topology
+  // (the 'kt gross/y' unit finding's species, caught by auditing for it).
+  if (!predates && unquantifiedEdges > 0 && disrupted === 0) {
+    explanation.push(`${unquantifiedEdges} in-scope flow(s) carry gross-weight tonnage with no mirror-implied corridor grade or form-level stage constant — disrupted tonnage is REFUSED (unknown, not zero); reach is real. Remedy: a corridor grade (mirror-implied or documented assay) or a documented stage-conversion constant for the form.`);
+  } else if (!predates && unquantifiedEdges > 0) {
+    explanation.push(`${unquantifiedEdges} further in-scope flow(s) refused conversion (gross weight, no corridor grade or stage constant) — the stated tonnage is a LOWER BOUND.`);
   }
   // Completeness honesty: the captured vintages are a SUBSET of the world's
   // reporters. A jurisdiction with zero corridors in the serving vintage is

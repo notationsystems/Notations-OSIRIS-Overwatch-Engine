@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildGraph, upstream, downstream, nodeThroughput } from './graph';
 import { syntheticState } from './fixtures';
 import { getEconomyState } from './store';
+import { toKtPerYear } from './types';
 
 describe('economy graph (synthetic)', () => {
   const graph = buildGraph(syntheticState());
@@ -140,5 +141,22 @@ describe('economy graph (copper)', () => {
     const ids = upstream(graph, 'ent:smelter:manyar').map(s => s.entityId);
     expect(ids).toContain('ent:port:amamapare');
     expect(ids).toContain('ent:mine:grasberg');
+  });
+
+  it('every flow unit in every state parses — a refusal can never fire on unit while claiming basis', async () => {
+    // The wrong-attribution audit's property pin (the 'kt gross/y'
+    // finding): an unparseable unit made gross corridors refuse BEFORE the
+    // grade lookup ran — right outcome, wrong mechanism, wrong remedy.
+    // The property, not the enumeration: every flow unit the assembled
+    // states actually carry converts, so the only reachable tonnage
+    // refusal mechanisms are the basis firewall's own (no grade, no
+    // constant), which carry the right remedies.
+    for (const commodity of ['copper', 'aluminium']) {
+      const { state } = await getEconomyState(commodity);
+      expect(state.flows.length).toBeGreaterThan(0); // vacuity
+      for (const f of state.flows) {
+        expect(toKtPerYear(f.quantity, f.unit), `${commodity} ${f.id} unit "${f.unit}"`).not.toBeNull();
+      }
+    }
   });
 });
