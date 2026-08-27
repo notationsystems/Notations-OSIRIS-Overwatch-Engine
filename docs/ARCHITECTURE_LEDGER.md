@@ -2058,6 +2058,161 @@ refetchable-at-risk, 6 refetchable, 1 documentation. Suite: 619 passing.
 afternoon. Everything in this order was built to be judged by it, not
 instead of it.
 
+## Phase 37 — deployment hardening: the gap between an image exists and an instrument runs
+
+One report per item against `docs/WORK_ORDER_DEPLOY_2026-08-27.md`. The
+order's INSPECT posture earned its place four times over: the most
+valuable findings in this phase came from RUNNING the thing, and none of
+them were visible by reading it.
+
+**D-1 — guards evaluate against deployed state.** `/api/economy/guards`
+runs all eight `validWhile` guards against the state the instance is
+actually serving, per commodity, and reports the state fingerprint it
+judged against. It declares itself the RUNTIME verdict and never infers
+CI's: two greens about two different artifacts is the hazard, and it is
+the same species as phase 35's split-commit rule one layer over. A
+firing guard returns 200 — a lapsed condition on a live instance is a
+condition to act on, not a test failure. Summary on `/api/health`,
+detail at the endpoint. Vacuity discharged: evaluated at 2032 the
+topology condition lapses and the failures carry commodity, ledger ref
+and lapsed condition; evaluated today they hold, so the passing case is
+not vacuously true of every date.
+
+**Correction, and it is mine.** There are **EIGHT** guards, not the seven
+this ledger, the docs, and both operator orders said. Phase 34 added
+`typed-refusal-emission-unbuilt` and its entry called it "the seventh
+deferred decision under validWhile" — the register already held seven,
+so it was the eighth. The miscount originated in my own ledger line and
+propagated outward into two orders written by the operator on the basis
+of it. Corrected at the source in phase 34's entry, and the count is now
+pinned against `DEFERRED_DECISIONS.length` in a test so a literal can
+never drift from the register again — the same reason
+`guardEvaluationScope()` is derived rather than listed.
+
+**D-2 — boot behaviour.** Two of the order's assumptions were wrong and
+inspection corrected both. (1) A cold start built NO state: `register()`
+asserted configuration and stopped, and the canonical state assembled
+lazily on the first request — so the researcher's first click paid the
+entire assembly, live fetches included, with nothing on screen. Worse
+than a slow boot: a boot that deferred its work into the first user's
+lap. (2) "A missing archive path fails at startup" has no referent —
+snapshots are ES-module imports bundled into the build, so the snapshot
+rungs cannot go missing at runtime. What an unwritable archive actually
+breaks is the WRITE path (miss log, export log, MCP session log, Comtrade
+vintages), and every writer there is deliberately best-effort, so the
+loss would be silent. The check is therefore WRITABILITY, reported with
+its path. Boot now warms state, bounded, never fatal, degradations named.
+
+**D-3 / D-4 — attribution and degradation.** Every response carries the
+build, the state fingerprint (the same function the export stamps, so a
+screen number and an exported number are comparable) and the knowledge
+mode. Build identity is never fabricated: an unstamped image reports
+`commit: null, commit_source: unstamped-build` rather than a guess. D-4
+found a real gap: adapter failures were recorded as assembly `issues`
+and reached NO response, so a state served from snapshot rungs because a
+provider was unreachable looked identical to a fully live one — the
+fresh-but-wrong failure wearing a healthy face. Every response now names
+its degradation and lists the providers that answered.
+
+**D-5 — bounded returns.** The corpus table takes a limit (default 500,
+`limit=0` for unbounded, asked for explicitly) and the header carries
+`limit`, `total_rows` and `truncated`, with the truncation stated in the
+caveats. Row accounting conservation still holds:
+`row_count + truncated = total_rows`.
+
+**D-6 — post-deploy smoke check.** `npm run smoke` runs nine checks
+against a running instance. Verified in BOTH directions live: 9/9 and
+exit 0 against the real instance; exit 1 against nothing listening, and
+exit 1 with every check named against a server that answers HTTP 200 but
+is not the instrument — the discriminating case, because "something
+responds" is what a liveness probe already tells you.
+
+**D-7 / D-8 / D-10 — Tier 2.** Process observability (counters, bounded
+event ring, per-host outbound stats) sits beside corpus health and says
+plainly that it does NOT survive a restart. Restart semantics are
+documented and verified in `docs/OPERATIONS.md`, including the one that
+matters in a container: an unmounted `data-archive` discards the
+unreconstructable captures on every restart, and boot can report the
+path but cannot know the volume is ephemeral. D-10 found that the only
+throttle in the codebase was a single in-loop sleep — a one-shot-script
+discipline — and that **this order's own D-2 warming made it worse**, by
+starting both commodities' Comtrade runs at the same instant. The
+throttle is now a process-wide per-host gate: concurrent callers cannot
+compound because they cannot run concurrently against one host.
+
+**D-12 — the exposure decisions, TAKEN** (in `docs/OPERATIONS.md`).
+Telemetry segregation: permanent, and the consequence is stated rather
+than softened — a corpus used heavily by models and by no humans reads
+as UNUSED against the frozen S-7 criterion, which is the intended
+reading, because that criterion asks whether a researcher returns.
+Authentication: stdio only, no port, nothing to authenticate. Inbound
+rate limiting: not needed at a surface with no inbound, with the
+condition named — if an HTTP surface is ever added, inbound limiting is
+decided WITH it, not after.
+
+**D-13 — machine-consumer licensing.** Every source carries a
+`redistribution` posture with its reasoning, enforced at the MCP
+boundary: `internal_only` (Westmetall, Yahoo) and `unresolved` (anything
+unrecorded) are WITHHELD from machine clients and returned as typed
+refusals with remedies, never omitted and never served on the assumption
+that silence means permission. A source added tomorrow is refused until
+someone decides — deliberate friction in the correct direction.
+
+**FAILED / NOT DONE, reported not adjusted.** D-9: the off-provider
+backup is **not done**. Moving the copy off GitHub needs a credential to
+a second provider that this environment does not have and must not
+invent, and the restore drill has the same blocker. The honest statement
+stands: **the archive is replicated, not backed up** — one provider
+incident still takes both copies, and the Comtrade vintages are the
+unreconstructable set. D-11: the staging mechanism and the promotion
+rule are documented; the target itself is the operator's.
+
+**Four defects found by running it, none visible by reading it.**
+
+1. **A health check that hangs.** Cold `/api/health` took **14.8s**,
+   because the guard summary triggered the assembly it needed — a health
+   endpoint that blocks for the one reason a health endpoint exists to
+   survive, and long enough for an orchestrator to kill the instance
+   mid-warm. It now reports `warming` without waiting; the blocking
+   answer stays at `/api/economy/guards`, where waiting is correct.
+2. **Next runs instrumentation in a different module context.** Module
+   state is therefore NOT shared with route handlers, and this broke
+   three things at once, silently: boot wrote a report no route could
+   read (the log said `boot ready in 2805ms` while `/api/health`
+   answered `booting` forever); the D-10 limiter kept TWO per-host
+   chains, so a boot-time fetch and a request-time fetch to the same host
+   never queued behind each other — the compounding it exists to prevent,
+   reappearing through a door it could not see; and boot warmed a state
+   cache no request would ever read, which silently voided all of D-2.
+   Every process-wide singleton is now anchored on `globalThis`
+   (`processSingleton.ts`) and the property is pinned by test. Measured
+   after: first economy request **49ms**, guards `all_holding`, boot
+   `ready` visible to the routes.
+3. **The no-overwrite archive writer proliferated near-duplicates.** The
+   fix shipped one phase earlier compared raw bytes — and Comtrade stamps
+   every response with its own `elapsedTime`, so byte-identical NEVER
+   matched and each re-fetch of unchanged data wrote another sibling.
+   Seven copies of one knowledge state accumulated in an afternoon
+   (`-2` through `-8`, identical payloads, seven timings). An archive
+   that grows without bound on unchanged data loses the real revision in
+   copies of itself — a second way to lose a vintage, created by the fix
+   for the first. Comparison now ignores volatile response metadata; the
+   STORED file is always the full unmodified response, because we never
+   edit an archived capture, only ask a better question about whether it
+   is new. The 18 timing-duplicates were removed after verifying their
+   payloads were identical; both genuinely distinct captures survive.
+4. **A shell that killed itself.** Twice, a `pkill -f "next start"` in the
+   same command as the work matched the running shell and killed the
+   edit mid-write, leaving files unchanged while the command reported
+   nothing. Caught because the next `grep` found zero matches. Process
+   management and file edits do not share a command.
+
+Manifest after this phase: 36 files — 21 unreconstructable, 8
+refetchable-at-risk, 6 refetchable, 1 documentation. Suite: 641 passing.
+
+**Exactly one next executable frontier:** still the researcher afternoon.
+Tier 1 is complete, which was the only prerequisite the order set for it.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
