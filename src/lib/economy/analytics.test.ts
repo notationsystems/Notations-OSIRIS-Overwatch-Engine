@@ -3,7 +3,7 @@ import {
   concentration, capacityConcentration, concentrationTrajectory, flowCentrality,
   bottleneckCandidates, detectAnomalies, extractSeries, observationsAt, operatorConcentration,
 } from './analytics';
-import { buildGraph, upstream, downstream } from './graph';
+import { buildGraph, upstream, downstream, nodeThroughput } from './graph';
 import { traversableEdgeFilter } from './propagation';
 import { syntheticState, FIXTURE_PROV } from './fixtures';
 import { getEconomyState } from './store';
@@ -469,5 +469,59 @@ describe('anomaly detection', () => {
   it('extractSeries orders points chronologically', () => {
     const series = extractSeries(syntheticState(), 'ent:port:gate', 'inventory');
     expect(series.map(p => p.period)).toEqual(['2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06', '2024-07', '2024-08']);
+  });
+});
+
+describe('the bottleneck sentence states the basis it is on (the researcher\'s first move)', () => {
+  it('throughput is labelled CONTAINED METAL, because that is what it is by construction', async () => {
+    // The runbook's move #1 sends a researcher to the Bottlenecks list,
+    // where the sentence read "N kt/y passes through". Graph throughput
+    // is contained metal BY CONSTRUCTION — buildGraph multiplies a
+    // gross-weight edge by a corridor grade or a form-conversion
+    // constant, and refuses (ktPerYear null) where neither exists — but
+    // the sentence stated the unit and not the basis, which is the one
+    // axis that makes the figure comparable to anything else.
+    const { state } = await getEconomyState('copper');
+    const graph = buildGraph(state);
+    const result = bottleneckCandidates(state, graph);
+    const scored = result.result.filter(c => c.score !== null);
+    expect(scored.length).toBeGreaterThan(0);
+    for (const c of scored) {
+      const through = c.explanation.find(e => e.includes('passes through'));
+      expect(through, `${c.name} has no throughput sentence`).toBeDefined();
+      expect(through, `${c.name} states a tonnage without its basis`).toContain('CONTAINED METAL');
+    }
+  });
+
+  it('a converted contribution is COUNTED in the sentence — and a node with none says nothing', async () => {
+    // Discriminating: the conversion note must appear only where a
+    // conversion actually happened. A note on every node would be as
+    // uninformative as a note on none.
+    const { state } = await getEconomyState('copper');
+    const graph = buildGraph(state);
+    const t = nodeThroughput(graph);
+
+    const converted = [...t.values()].filter(v => v.convertedFlowIds.length > 0);
+    const clean = [...t.values()].filter(v => v.flowIds.length > 0 && v.convertedFlowIds.length === 0);
+    // The corpus must contain both kinds or this pin proves nothing.
+    expect(clean.length, 'no unconverted node — the note would be universal').toBeGreaterThan(0);
+
+    const result = bottleneckCandidates(state, graph);
+    for (const c of result.result) {
+      if (c.score === null) continue;
+      const th = t.get(c.entityId);
+      const note = c.explanation.find(e => e.includes('converted at a corridor grade'));
+      if ((th?.convertedFlowIds.length ?? 0) > 0) {
+        expect(note, `${c.name} converted inputs but the sentence is silent`).toBeDefined();
+        expect(note).toContain('uncertainty band');
+      } else {
+        expect(note, `${c.name} has no converted inputs but claims one`).toBeUndefined();
+      }
+    }
+    // Whatever the corpus holds today, the accounting is consistent:
+    // a converted id is always also a contributing id.
+    for (const v of converted) {
+      for (const id of v.convertedFlowIds) expect(v.flowIds).toContain(id);
+    }
   });
 });

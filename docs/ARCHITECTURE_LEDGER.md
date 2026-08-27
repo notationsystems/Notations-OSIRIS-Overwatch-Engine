@@ -2369,6 +2369,39 @@ itself pinned as a TRIPWIRE — when that assertion fails, the latent case
 has become live, which is precisely what building the deferred allocation
 model (facility-level flows on a non-metal basis) would do.
 
+**The third surface, and the door the operator named: TEST PLACEMENT.**
+The operator's reading of the seventh instance — "class 6 arriving
+through test placement" — is a door in its own right: a test that
+exercises a mechanism at the wrong ALTITUDE verifies the mechanism and
+is silent about the wiring. F-5 was correct, unit-tested at the function
+level, and fed inputs directly rather than through the path production
+uses; the refusal it existed to fire therefore never could.
+
+So the panel was rendered too — the other surface the afternoon runs
+through, and one this programme had only ever tested through its API.
+It works: the bottleneck list, the concentration indices with their
+partitions, and the real 604-day corpus-health signal all reach the
+screen, no JS errors.
+
+But the runbook's FIRST move sends a researcher to that bottleneck list,
+where the sentence read `2200 kt/y passes through`. Graph throughput is
+contained metal BY CONSTRUCTION — `buildGraph` multiplies a gross-weight
+edge by a corridor grade or a form-conversion constant and refuses where
+neither exists — so the number was right and the sentence stated the
+unit while omitting the one axis that makes it comparable to anything
+else. On the surface a researcher is pointed at first, and in a system
+whose export rows and MCP claims all carry the basis. Verified before
+labelling rather than assumed: the conversion was read in the graph
+builder, not inferred from the field name.
+
+It now reads `2200 kt/y CONTAINED METAL passes through`. And a second
+distinction the total was hiding: a CONVERTED tonne is not the same
+epistemic object as a declared one — it carries the corridor grade's
+band — so `nodeThroughput` counts converted contributions and the
+sentence names them when they exist. Discriminating by test: the note
+must be absent on a node with no converted input, or it would be as
+uninformative as no note at all.
+
 **Exactly one next executable frontier:** unchanged, and now unchanged
 for three phases running — the researcher afternoon. That is not
 avoidance; it is what "everything buildable is built" looks like when it

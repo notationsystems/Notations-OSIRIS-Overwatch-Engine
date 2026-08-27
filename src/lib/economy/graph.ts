@@ -274,13 +274,25 @@ export interface NodeThroughput {
    * them is unsafe — consumers must refuse shares for this node, visibly.
    */
   unquantifiedFlowIds: string[];
+  /**
+   * Flow edges whose tonnage reached contained metal through a BASIS
+   * CONVERSION (a mirror-implied corridor grade, or a documented
+   * form-conversion constant) rather than being declared on that basis.
+   * inKt/outKt are contained metal either way — but a converted tonne
+   * carries the grade's uncertainty band, and a surface that shows the
+   * total without saying which inputs were converted presents two
+   * different epistemic objects as one number. Accounted for the same
+   * way every other drop and conversion in this system is: named and
+   * counted, never folded in silently.
+   */
+  convertedFlowIds: string[];
 }
 
 /** Total material throughput (in + out, kt/y) per node — flow edges only. */
 export function nodeThroughput(graph: EconomyGraph): Map<string, NodeThroughput> {
   const acc = new Map<string, NodeThroughput>();
   const get = (id: string) => {
-    if (!acc.has(id)) acc.set(id, { inKt: 0, outKt: 0, flowIds: [], unquantifiedFlowIds: [] });
+    if (!acc.has(id)) acc.set(id, { inKt: 0, outKt: 0, flowIds: [], unquantifiedFlowIds: [], convertedFlowIds: [] });
     return acc.get(id)!;
   };
   for (const edge of graph.edges) {
@@ -294,6 +306,7 @@ export function nodeThroughput(graph: EconomyGraph): Map<string, NodeThroughput>
     }
     const from = get(edge.from); from.outKt += edge.ktPerYear; from.flowIds.push(edge.id);
     const to = get(edge.to); to.inKt += edge.ktPerYear; to.flowIds.push(edge.id);
+    if (edge.basisConversion) { from.convertedFlowIds.push(edge.id); to.convertedFlowIds.push(edge.id); }
   }
   return acc;
 }

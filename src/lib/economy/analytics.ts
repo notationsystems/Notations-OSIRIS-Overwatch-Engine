@@ -817,7 +817,18 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
       explanation.push(`SCORE REFUSED: ${t.unquantifiedFlowIds.length} flow(s) at this node (${t.unquantifiedFlowIds.join(', ')}) declare gross weight with no corridor grade (or an unconvertible unit) — shares and redundancy would be computed against a total known to be wrong. Supply a mirror-implied corridor grade or a metal_content declaration.`);
       explanation.push(`Quantified lower bound: ${Math.round(through)} kt/y.`);
     } else {
-      explanation.push(`${Math.round(through)} kt/y passes through (${Math.round(throughputShare * 100)}% of network max)`);
+      // The BASIS travels with the number, on the surface the runbook
+      // points a researcher at first. Graph throughput is contained metal
+      // BY CONSTRUCTION (gross-weight edges are multiplied by a corridor
+      // grade or a form-conversion constant, and refuse where neither
+      // exists) — but the sentence said only "kt/y", so the one axis that
+      // makes the figure comparable was the one thing it did not state.
+      explanation.push(`${Math.round(through)} kt/y CONTAINED METAL passes through (${Math.round(throughputShare * 100)}% of network max)`);
+      // A converted tonne is not the same epistemic object as a declared
+      // one: it carries the corridor grade's band. Counted, never folded in.
+      if (t.convertedFlowIds.length > 0) {
+        explanation.push(`${t.convertedFlowIds.length} of ${t.flowIds.length} contributing flow(s) were declared GROSS WEIGHT and converted at a corridor grade — that share of the total carries the grade's uncertainty band, not the flow's own precision`);
+      }
       if (utilization !== null) explanation.push(`utilization ≈ ${Math.round(utilization * 100)}% of stated capacity`);
       else explanation.push('no stated capacity — flow pressure used as proxy');
       explanation.push(alternatives === 0 ? 'no modeled alternative at this stage' : `${alternatives} modeled alternative(s) at this stage`);
