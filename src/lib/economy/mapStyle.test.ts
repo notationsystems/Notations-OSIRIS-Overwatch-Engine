@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   styleEconEntity, rampRadius, coverageOpacity, UNQUANTIFIED_COLOR, UNQUANTIFIED_RADIUS,
-  splitFlowsByBasis, buildEconFlowLayerStyles, flowWidth,
+  splitFlowsByBasis, buildEconFlowLayerStyles, flowWidth, graphLinkTreatment,
 } from './mapStyle';
 
 /**
@@ -132,5 +132,66 @@ describe('F-5 at the SEAM: the basis axis survives the map projection', () => {
     const groups = splitFlowsByBasis(flows);
     expect([...groups.keys()]).toEqual(['metal_content']);
     expect(buildEconFlowLayerStyles(flows).every(f => f.style.dashed === false)).toBe(true);
+  });
+});
+
+describe('the graph view is a magnitude surface too', () => {
+  it('graph links carry the basis axis out of the route', async () => {
+    // toKtPerYear normalises the UNIT and not the BASIS, so a
+    // gross-weight and a contained-metal flow would both arrive as
+    // `ktPerYear` — ~4x apart for concentrate — under a field name that
+    // asserts a commensurability the numbers do not have. The graph
+    // scales link WIDTH and PARTICLE COUNT on that number: two magnitude
+    // channels on one ramp. The axis now travels with the magnitude.
+    const { GET } = await import('@/app/api/economy/route');
+    const res = await GET(new Request('http://localhost/api/economy?commodity=copper&view=graph'));
+    const body = await res.json() as { links: Array<{ kind: string; basis?: string | null }> };
+    const flows = body.links.filter(l => l.kind === 'flow');
+    expect(flows.length).toBeGreaterThan(0);
+    for (const l of flows) expect('basis' in l, 'graph flow link lost its basis axis').toBe(true);
+  });
+
+  it('MEASURED: the graph is single-basis today, so this treatment is LATENT, not active', async () => {
+    // Stated exactly rather than overclaimed. Unlike the map layer —
+    // which WAS actively mixing at the 2017 vintage, 5 metal_content
+    // beside 4 gross_weight on one ramp — the graph's node set excludes
+    // countries as aggregates, and the corpus's gross-weight corridors
+    // are country-level. So every graph link today is metal_content: the
+    // code would have mixed, the data does not currently ask it to.
+    // This assertion is the tripwire. When it fails, the latent case has
+    // become real — which is what building the deferred allocation model
+    // (facility-level flows on a non-metal basis) would do.
+    const { GET } = await import('@/app/api/economy/route');
+    const res = await GET(new Request('http://localhost/api/economy?commodity=copper&view=graph'));
+    const body = await res.json() as { links: Array<{ kind: string; basis?: string | null }> };
+    const bases = new Set(body.links.filter(l => l.kind === 'flow').map(l => l.basis ?? 'unspecified'));
+    expect([...bases], 'graph now serves a second basis: the latent case is live, and the treatment below is load-bearing').toEqual(['metal_content']);
+  });
+
+  it('the rule itself: a non-metal-content magnitude is off the ramp on EVERY channel', () => {
+    // Tested on planted links, because the corpus cannot currently
+    // produce the case — a rule that only works on data you happen to
+    // have is the vacuity problem this project refuses.
+    const metalSmall = graphLinkTreatment({ kind: 'flow', basis: 'metal_content', ktPerYear: 100 });
+    const metalLarge = graphLinkTreatment({ kind: 'flow', basis: 'metal_content', ktPerYear: 1750 });
+    expect(metalLarge.width).toBeGreaterThan(metalSmall.width);      // the ramp works
+    expect(metalLarge.particles).toBeGreaterThan(metalSmall.particles);
+    expect(metalLarge.onRamp).toBe(true);
+    expect(metalLarge.dash).toBeNull();
+
+    // A gross-weight link of the SAME magnitude must not read as the same
+    // size — that comparison is the incommensurability.
+    const grossLarge = graphLinkTreatment({ kind: 'flow', basis: 'gross_weight', ktPerYear: 1750 });
+    expect(grossLarge.onRamp).toBe(false);
+    expect(grossLarge.width).not.toBe(metalLarge.width);
+    expect(grossLarge.dash).toEqual([4, 3]);
+    // BOTH magnitude channels obey it — width alone would leak the
+    // comparison back in through the particles.
+    expect(grossLarge.particles).toBe(1);
+    expect(grossLarge.particles).not.toBe(metalLarge.particles);
+    // Unstated basis is treated as not-commensurate, never as metal.
+    expect(graphLinkTreatment({ kind: 'flow', ktPerYear: 1750 }).onRamp).toBe(false);
+    // Dependencies are structural, not magnitudes.
+    expect(graphLinkTreatment({ kind: 'dependency' }).particles).toBe(0);
   });
 });

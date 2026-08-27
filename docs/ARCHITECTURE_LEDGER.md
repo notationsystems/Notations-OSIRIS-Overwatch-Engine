@@ -2338,6 +2338,37 @@ route's own payload) against that measured discriminating case, with
 today's single-basis topology asserted separately so nothing is falsely
 marked non-commensurate.
 
+**An eighth, at the same seam class, in the OTHER magnitude surface —
+and here the honest report is that it is LATENT.** Having found the map
+projection stripping `basis`, the same question was put to every other
+projection. The force-graph view builds its links directly from
+`state.flows` and computes `ktPerYear: toKtPerYear(quantity, unit)` —
+which normalises the UNIT and not the BASIS. The graph then scales link
+WIDTH and PARTICLE COUNT on that number: two magnitude channels on one
+ramp, under a field name asserting a commensurability the numbers would
+not have.
+
+But measured rather than assumed, and the measurement changes the claim:
+the graph serves 39 flow links, **all `metal_content`**, because its node
+set excludes countries as aggregates and this corpus's gross-weight
+corridors are country-level. So unlike the map — which was ACTIVELY
+mixing at the 2017 vintage — the graph's defect is latent: the code would
+mix, the data does not currently ask it to. Reported that way rather than
+as a second live defect, because the difference is the whole distinction
+between a finding and an anecdote.
+
+Closed anyway, while closing is cheap: the axis travels on the link, and
+the treatment rule moved into `mapStyle.ts` — the ONE place treatment is
+computed — so the graph cannot drift from the map's rule and the rule is
+testable without a renderer. A non-metal-content magnitude sits off the
+ramp on BOTH channels (width alone would leak the comparison back through
+the particles), and unstated basis is treated as not-commensurate rather
+than as metal. The corpus cannot produce the mixed case today, so the
+rule is pinned on planted links; the "all metal_content" measurement is
+itself pinned as a TRIPWIRE — when that assertion fails, the latent case
+has become live, which is precisely what building the deferred allocation
+model (facility-level flows on a non-metal basis) would do.
+
 **Exactly one next executable frontier:** unchanged, and now unchanged
 for three phases running — the researcher afternoon. That is not
 avoidance; it is what "everything buildable is built" looks like when it

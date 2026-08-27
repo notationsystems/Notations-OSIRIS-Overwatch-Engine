@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import ForceGraph2D from 'react-force-graph-2d';
+import { graphLinkTreatment } from '@/lib/economy/mapStyle';
 import { X, Network } from 'lucide-react';
 
 /**
@@ -34,6 +35,9 @@ interface GraphLink {
   target: string | GraphNode;
   kind: 'flow' | 'dependency';
   ktPerYear?: number | null;
+  /** Mass basis of ktPerYear. Non-metal-content magnitudes are NOT
+   *  commensurate with contained-metal ones and never share the ramp. */
+  basis?: string | null;
   form?: string;
   confidence?: string;
   disrupted?: boolean;
@@ -202,15 +206,12 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
                 const c = FORM_COLOR[l.form ?? ''] ?? '#90A4AE';
                 return c + '66';
               }}
-              linkLineDash={link => ((link as GraphLink).kind === 'dependency' ? [2, 2] : null)}
-              linkWidth={link => {
-                const l = link as GraphLink;
-                return l.kind === 'dependency' ? 0.6 : 0.6 + Math.min(3.5, (l.ktPerYear ?? 0) / 500);
-              }}
-              linkDirectionalParticles={link => {
-                const l = link as GraphLink;
-                return l.kind === 'flow' ? Math.max(1, Math.min(4, Math.round((l.ktPerYear ?? 0) / 350))) : 0;
-              }}
+              // Treatment comes from the ONE place it is computed
+              // (mapStyle.ts), so the graph cannot drift from the map's
+              // rule — and so the rule is testable without a renderer.
+              linkLineDash={link => graphLinkTreatment(link as GraphLink).dash}
+              linkWidth={link => graphLinkTreatment(link as GraphLink).width}
+              linkDirectionalParticles={link => graphLinkTreatment(link as GraphLink).particles}
               linkDirectionalParticleWidth={2}
               linkDirectionalParticleSpeed={0.0045}
               linkDirectionalParticleColor={link => FORM_COLOR[(link as GraphLink).form ?? ''] ?? '#90A4AE'}

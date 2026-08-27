@@ -190,6 +190,17 @@ export async function GET(request: Request) {
         .map(f => ({
           id: f.id, source: f.fromEntityId, target: f.toEntityId,
           kind: 'flow' as const, ktPerYear: toKtPerYear(f.quantity, f.unit),
+          // The MASS BASIS travels with the magnitude. toKtPerYear
+          // normalises the UNIT and not the BASIS, so a gross-weight
+          // flow and a contained-metal flow both arrive as "ktPerYear"
+          // — ~4x apart for concentrate — under a field name that
+          // asserts a commensurability the numbers do not have. The
+          // graph view scales link width and particle count on this
+          // number, so mixing the bases on one ramp is the same
+          // incommensurability F-5 refuses on the map layer. Carried,
+          // never silently converted: the corridor-grade machinery is
+          // the only thing allowed to convert, and it can refuse.
+          basis: f.basis ?? null,
           form: f.form, mode: f.mode, confidence: f.confidence,
           disrupted: disrupted.has(f.fromEntityId) || disrupted.has(f.toEntityId),
         })),

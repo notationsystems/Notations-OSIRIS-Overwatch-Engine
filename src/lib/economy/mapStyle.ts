@@ -156,3 +156,49 @@ export function buildEconFlowLayerStyles<T extends { basis?: string | null; quan
     style: { lineWidth: flowWidth(f.quantity), dashed: basis !== 'metal_content', basis },
   }));
 }
+
+/* ── The graph view is a magnitude surface too ──
+ *
+ * `toKtPerYear` normalises the UNIT and not the BASIS, so a gross-weight
+ * flow and a contained-metal flow both reach the force graph as
+ * `ktPerYear` — ~4x apart for concentrate — under a field name that
+ * asserts a commensurability the numbers do not have. The graph scales
+ * link WIDTH and PARTICLE COUNT on that number, i.e. two magnitude
+ * channels on one ramp.
+ *
+ * MEASURED, and stated exactly: today the graph serves 39 flow links,
+ * ALL metal_content, because its node set excludes countries as
+ * aggregates and the corpus's gross-weight corridors are country-level.
+ * So unlike the map layer — which WAS actively mixing at the 2017
+ * vintage — this defect is LATENT here: the code would mix, the data
+ * does not currently ask it to. It stops being latent exactly when
+ * facility-level flows arrive on a non-metal basis, which is what the
+ * deferred allocation model (`allocation-model-deferred`) would produce.
+ * Closed now, while the closing is cheap and the condition is legible.
+ */
+export interface GraphLinkTreatment {
+  /** Fixed width OFF the ramp when the basis is not contained metal. */
+  width: number;
+  /** Particle count — a second magnitude channel, same rule. */
+  particles: number;
+  dash: [number, number] | null;
+  onRamp: boolean;
+}
+
+export function graphLinkTreatment(link: { kind?: string; basis?: string | null; ktPerYear?: number | null }): GraphLinkTreatment {
+  if (link.kind === 'dependency') {
+    return { width: 0.6, particles: 0, dash: [2, 2], onRamp: false };
+  }
+  if (link.basis !== 'metal_content') {
+    // Not commensurate with the contained-metal ramp: fixed width, dashed,
+    // and a single particle — no channel carries the comparison.
+    return { width: 1.2, particles: 1, dash: [4, 3], onRamp: false };
+  }
+  const kt = link.ktPerYear ?? 0;
+  return {
+    width: 0.6 + Math.min(3.5, kt / 500),
+    particles: Math.max(1, Math.min(4, Math.round(kt / 350))),
+    dash: null,
+    onRamp: true,
+  };
+}
