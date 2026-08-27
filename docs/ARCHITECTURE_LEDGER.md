@@ -1004,6 +1004,16 @@ build will be judged against, the phase-20 move applied to the parse.
    plausibility gate generalizes to this adapter on day one (anchor
    available by construction: a facility figure cannot exceed its
    country's compiled figure), not retrofitted after a bad parse ships.
+   The ceiling's soft edge is diagnosed, never collapsed (round-22
+   refinement): a SINGLE parsed figure breaching the country ceiling is
+   a unit/parse error — the gate rejects it, and it catches the Mlb/kt
+   error specifically, since a 2.2×-high district figure breaches its
+   ceiling wherever the district is a material share of national output
+   (Grasberg against Indonesia's compiled total is exactly that case).
+   MULTIPLE filers legitimately summing past the compiled figure is the
+   coverage system's ratio>1 contradiction — a finding, routed to the
+   existing path. Same numbers, two diagnoses; only one means the
+   parser is wrong.
 
 When the operator supplies the identity: first document fetch answers
 consolidated-vs-attributable, attribution scope rides ON the
