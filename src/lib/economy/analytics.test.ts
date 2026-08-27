@@ -144,14 +144,67 @@ describe('operator concentration', () => {
       { id: 'obs:mp:gamma', entityId: 'ent:mine:gamma', metric: 'production', value: 500, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
     );
     s.dependencies.push(
-      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
-      { id: 'dep:op:gamma', fromEntityId: 'ent:mine:gamma', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, role: 'operator', provenance: FIXTURE_PROV },
+      { id: 'dep:op:gamma', fromEntityId: 'ent:mine:gamma', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, role: 'operator', provenance: FIXTURE_PROV },
     );
-    const r = operatorConcentration(s, 'production', ['mine']);
+    const r = operatorConcentration(s, 'production', ['mine'], 'control');
     expect(r.result.hhi).toBe(10000);
     expect(r.result.band).toBe('high');
+    expect(r.result.attributionBasis).toBe('control');
     expect(r.result.shares[0]).toMatchObject({ entityId: 'ent:company:omega-corp', share: 1 });
     expect(r.result.attributionCoverage).toBe(1);
+    // The comparability fields travel with the number: one group, one
+    // effective group, floor 10000 — this index is only comparable within
+    // its own partition.
+    expect(r.result.groupCount).toBe(1);
+    expect(r.result.effectiveGroups).toBe(1);
+    expect(r.result.partitionFloor).toBe(10000);
+  });
+
+  it('states the basis on the number, and the two bases answer different questions', () => {
+    // One mine: operator holds 48.8%, a state shareholder holds 51% — the
+    // Grasberg shape. Control says the operator can stop 100% of it;
+    // economic says the state owns most of the loss. Never pool the two.
+    const s = syntheticState();
+    s.entities.push(
+      { id: 'ent:company:op-co', kind: 'company', name: 'Operator Co' },
+      { id: 'ent:company:state-co', kind: 'company', name: 'State Holding' },
+    );
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:mp:alpha', entityId: 'ent:mine:alpha', metric: 'production', value: 800, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+    );
+    s.dependencies.push(
+      { id: 'dep:op:alpha:op', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:op-co', strength: 0.488, role: 'operator', provenance: FIXTURE_PROV },
+      { id: 'dep:op:alpha:state', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:state-co', strength: 0.51, role: 'shareholder', provenance: FIXTURE_PROV },
+    );
+    const control = operatorConcentration(s, 'production', ['mine'], 'control');
+    expect(control.result.shares[0]).toMatchObject({ entityId: 'ent:company:op-co', value: 800 });
+    expect(control.result.attributionCoverage).toBe(1);
+    const economic = operatorConcentration(s, 'production', ['mine'], 'economic_interest');
+    expect(economic.result.shares[0].entityId).toBe('ent:company:state-co'); // 51% > 48.8%
+    expect(economic.result.attributionCoverage).toBeCloseTo(0.998, 3);
+    expect(control.result.note).toContain('who can stop it');
+    expect(economic.result.note).toContain('who owns the loss');
+  });
+
+  it('control basis never force-assigns a JV-operated asset to a shareholder', () => {
+    const s = syntheticState();
+    s.entities.push({ id: 'ent:company:holder', kind: 'company', name: 'Holder' });
+    const period = { start: '2024-01-01', end: '2024-12-31' };
+    s.observations.push(
+      { id: 'obs:mp:alpha', entityId: 'ent:mine:alpha', metric: 'production', value: 400, unit: 'kt/y', period, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
+    );
+    // Only shareholder edges (the Antamina/Collahuasi shape: the operator of
+    // record is an unmodeled JV vehicle).
+    s.dependencies.push(
+      { id: 'dep:op:alpha:h', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:holder', strength: 0.44, role: 'shareholder', provenance: FIXTURE_PROV },
+    );
+    const control = operatorConcentration(s, 'production', ['mine'], 'control');
+    expect(control.result.attributionCoverage).toBe(0);
+    expect(control.result.unattributedKt).toBe(400);
+    const economic = operatorConcentration(s, 'production', ['mine'], 'economic_interest');
+    expect(economic.result.attributionCoverage).toBeCloseTo(0.44, 3);
   });
 
   it('reports partial attribution the way geographic coverage is reported — never hidden', () => {
@@ -164,29 +217,84 @@ describe('operator concentration', () => {
     );
     // JV attribution: 60% of alpha attributed, beta not attributed at all.
     s.dependencies.push(
-      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 0.6, provenance: FIXTURE_PROV },
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 0.6, role: 'shareholder', provenance: FIXTURE_PROV },
     );
-    const r = operatorConcentration(s, 'production', ['mine']);
+    const r = operatorConcentration(s, 'production', ['mine'], 'economic_interest');
     expect(r.result.totalKt).toBe(400);
     expect(r.result.total).toBeCloseTo(180, 1); // 300 × 0.6 allocated
     expect(r.result.attributionCoverage).toBeCloseTo(0.45, 3);
     expect(r.result.unattributedKt).toBeCloseTo(220, 1);
-    expect(r.result.note).toContain('coverage ratio must travel');
+    expect(r.result.note).toContain('coverage ratio and partition size travel');
+  });
+
+  it('copper: the pair is only quotable with basis, universe and partition labeled', async () => {
+    // Round 9 compared country-HHI 1339 against operator-HHI 959 raw. That
+    // comparison was triply incommensurable: different partitions (HHI
+    // floors 10000/n), different attribution bases (economic shares vs
+    // control), and different universes (reported country totals vs the
+    // modeled facility subset). This test pins the corrected, fully
+    // labeled measurement.
+    const { state } = await getEconomyState('copper');
+    const control = operatorConcentration(state, 'production', ['mine'], 'control').result;
+    const economic = operatorConcentration(state, 'production', ['mine'], 'economic_interest').result;
+    // Like-for-like geographic figure: the SAME facility universe grouped
+    // by country — same total, same floor as the control index.
+    const facObs = observationsAt(state, 'production', 'mine');
+    const byCountry = new Map<string, number>();
+    let total = 0;
+    for (const o of facObs) {
+      const ent = state.entities.find(e => e.id === o.entityId)!;
+      byCountry.set(ent.countryCode ?? '?', (byCountry.get(ent.countryCode ?? '?') ?? 0) + o.value);
+      total += o.value;
+    }
+    const geoHhi = Math.round([...byCountry.values()].reduce((s, v) => s + ((v / total) * 100) ** 2, 0));
+
+    // Control materially above economic: 100%-to-operator concentrates what
+    // JV share-splitting dilutes. (Grasberg alone: 800 kt to Freeport under
+    // control vs 390 under economic interest.)
+    expect(control.hhi).toBeGreaterThan(economic.hhi + 500);
+    // Freeport's control position is the index-free finding: largest
+    // operator, roughly 31% of modeled mine output, three countries.
+    expect(control.shares[0].entityId).toBe('ent:company:freeport');
+    expect(control.shares[0].share).toBeGreaterThan(0.25);
+    // Same universe, same partition size — the one strictly comparable
+    // geographic figure. On current data the modeled facility set is more
+    // concentrated by geography than by control (Chile-heavy facility
+    // coverage — the coverage bias annotation explains why), while the
+    // world-reported country figure (different universe) sits below both.
+    expect(byCountry.size).toBe(control.groupCount);
+    expect(geoHhi).toBeGreaterThan(control.hhi);
+    // Every index carries its partition context, so no consumer has to
+    // reconstruct comparability from the outside.
+    for (const r of [control, economic]) {
+      expect(r.groupCount).toBeGreaterThan(0);
+      expect(r.effectiveGroups).toBeCloseTo(10000 / r.hhi, 0);
+      expect(r.partitionFloor).toBe(Math.round(10000 / r.groupCount));
+    }
   });
 
   it('refuses market metrics like every other concentration', () => {
-    expect(() => operatorConcentration(syntheticState(), 'price', ['mine'])).toThrow(/physical measurements only/);
+    expect(() => operatorConcentration(syntheticState(), 'price', ['mine'], 'control')).toThrow(/physical measurements only/);
   });
 
-  it('operated_by is operational structure: the operator appears upstream of its asset', () => {
+  it('only CONTROL traverses: the operator appears upstream, a shareholder never does', () => {
     const s = syntheticState();
-    s.entities.push({ id: 'ent:company:omega-corp', kind: 'company', name: 'Omega Corp' });
+    s.entities.push(
+      { id: 'ent:company:omega-corp', kind: 'company', name: 'Omega Corp' },
+      { id: 'ent:company:holder', kind: 'company', name: 'Holder' },
+    );
     s.dependencies.push(
-      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, provenance: FIXTURE_PROV },
+      { id: 'dep:op:alpha', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:omega-corp', strength: 1, role: 'operator', provenance: FIXTURE_PROV },
+      { id: 'dep:op:alpha:h', fromEntityId: 'ent:mine:alpha', type: 'operated_by', toEntityId: 'ent:company:holder', strength: 0.3, role: 'shareholder', provenance: FIXTURE_PROV },
     );
     const g = buildGraph(s);
-    expect(upstream(g, 'ent:mine:alpha').map(x => x.entityId)).toContain('ent:company:omega-corp');
-    // And the company's reach covers the asset and everything downstream of it.
+    const up = upstream(g, 'ent:mine:alpha').map(x => x.entityId);
+    expect(up).toContain('ent:company:omega-corp');
+    // A shareholding is a claim on output, not a lever over operations —
+    // disruption must not propagate through it in either direction.
+    expect(up).not.toContain('ent:company:holder');
+    expect(downstream(g, 'ent:company:holder')).toEqual([]);
+    // The operator's reach covers the asset and everything downstream of it.
     const reach = downstream(g, 'ent:company:omega-corp').map(x => x.entityId);
     expect(reach).toContain('ent:mine:alpha');
     expect(reach).toContain('ent:port:gate');

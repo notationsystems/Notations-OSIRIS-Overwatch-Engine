@@ -49,6 +49,18 @@ export interface Concentration {
   unit: string;
   shares: ConcentrationShare[];
   /**
+   * HHI has a floor of 10000/n: a finer partition yields a lower index
+   * whatever the underlying structure, so raw HHIs over unequal partitions
+   * are NOT comparable. These travel with every index so the comparison is
+   * done against the partition, never across partitions raw:
+   *   groupCount       n — the partition size
+   *   effectiveGroups  10000/HHI — the equivalent number of equal groups
+   *   partitionFloor   10000/n — the minimum HHI this partition permits
+   */
+  groupCount: number;
+  effectiveGroups: number;
+  partitionFloor: number;
+  /**
    * Facility-level concentrations only: how much of each country the facility
    * model covers. Differential coverage biases facility HHI systematically —
    * a country that is 73% modeled looks more concentrated than one 22%
@@ -145,8 +157,17 @@ export function concentration(
     'concentration',
     { metric, kind, asOf },
     { observationIds: obs.map(o => o.id) },
-    { metric, hhi, band, total, unit: obs[0]?.unit ?? '', shares },
+    { metric, hhi, band, total, unit: obs[0]?.unit ?? '', shares, ...partitionContext(hhi, shares.length) },
   );
+}
+
+/** The comparability fields every HHI must carry — see Concentration. */
+export function partitionContext(hhi: number, groupCount: number): { groupCount: number; effectiveGroups: number; partitionFloor: number } {
+  return {
+    groupCount,
+    effectiveGroups: hhi > 0 ? Number((10000 / hhi).toFixed(1)) : 0,
+    partitionFloor: groupCount > 0 ? Math.round(10000 / groupCount) : 0,
+  };
 }
 
 export interface TrajectoryPoint {
@@ -235,7 +256,7 @@ export function capacityConcentration(
     'capacityConcentration',
     { stage },
     { capacityIds: caps.map(c => c.id) },
-    { metric: 'throughput', hhi, band, total, unit: caps[0]?.unit ?? '', shares },
+    { metric: 'throughput', hhi, band, total, unit: caps[0]?.unit ?? '', shares, ...partitionContext(hhi, shares.length) },
   );
 }
 
@@ -319,11 +340,27 @@ export function facilityCoverage(
 
 /* ── Operator concentration ── */
 
+/**
+ * What an operator attribution MEANS — the same shape as QuantityBasis, one
+ * level up, and never defaulted:
+ *   control            100% of an asset to its operator of record — the
+ *                      lever a strike, distress or sanction pulls. This is
+ *                      what propagation and correlated-disruption analysis
+ *                      answer: "who can stop it".
+ *   economic_interest  ownership shares — "who owns the loss". A legitimate
+ *                      second view, and a different question.
+ * Grasberg is the sharp case: majority state-held, Freeport-operated — the
+ * two bases disagree hardest on one of the largest nodes.
+ */
+export type AttributionBasis = 'control' | 'economic_interest';
+
 /** Shape-compatible with Concentration so every projection that renders an
  *  HHI block renders this one — plus the attribution fields that must
  *  travel with the number. */
 export interface OperatorConcentration {
   metric: Metric;
+  /** The attribution basis is stated ON the number, always. */
+  attributionBasis: AttributionBasis;
   /** HHI over ATTRIBUTED company shares (renormalized to the allocated
    *  total) — the attribution coverage travels with it, exactly as
    *  geographic coverage travels with the facility HHI. */
@@ -334,6 +371,10 @@ export interface OperatorConcentration {
   unit: string;
   /** share = share of the allocated total (the HHI basis). */
   shares: Array<{ entityId: string; name: string; value: number; share: number }>;
+  /** Partition comparability — see Concentration. */
+  groupCount: number;
+  effectiveGroups: number;
+  partitionFloor: number;
   totalKt: number;
   /** allocated / total: the share of facility output the operator model
    *  attributes. Partial attribution is reported, never hidden. */
@@ -356,6 +397,7 @@ export function operatorConcentration(
   state: EconomyState,
   metric: Metric,
   facilityKinds: Array<'mine' | 'smelter' | 'refinery'>,
+  basis: AttributionBasis,
   asOf?: string,
 ): AnalyticalResult<OperatorConcentration> {
   const cls = measurementClassOf(metric);
@@ -378,6 +420,19 @@ export function operatorConcentration(
       unit = o.unit;
       facilityCount += 1;
       usedObs.push(o.id);
+      if (basis === 'control') {
+        // 100% of an asset to its operator of record. A JV-operated facility
+        // with no modeled operator falls to the reported unattributed
+        // remainder — never force-assigned to a shareholder.
+        const operator = opEdges.find(x => x.fromEntityId === o.entityId && x.role === 'operator');
+        if (operator) {
+          allocated.set(operator.toEntityId, (allocated.get(operator.toEntityId) ?? 0) + o.value);
+          allocatedKt += o.value;
+          usedDeps.push(operator.id);
+        }
+        continue;
+      }
+      // economic_interest: ownership shares — who owns the loss.
       for (const d of opEdges.filter(x => x.fromEntityId === o.entityId)) {
         const share = Math.max(0, Math.min(1, d.strength ?? 1));
         allocated.set(d.toEntityId, (allocated.get(d.toEntityId) ?? 0) + o.value * share);
@@ -402,18 +457,23 @@ export function operatorConcentration(
 
   return wrap(
     'operatorConcentration',
-    { metric, facilityKinds: facilityKinds.join(','), asOf },
+    { metric, facilityKinds: facilityKinds.join(','), basis, asOf },
     { observationIds: usedObs },
     {
-      metric, hhi, band,
+      metric,
+      attributionBasis: basis,
+      hhi, band,
       total: Number(allocatedKt.toFixed(1)),
       unit,
       shares,
+      ...partitionContext(hhi, shares.length),
       totalKt: Number(totalKt.toFixed(1)),
       attributionCoverage: totalKt > 0 ? Number((allocatedKt / totalKt).toFixed(3)) : 0,
       unattributedKt: Number(unattributedKt.toFixed(1)),
       facilityCount,
-      note: 'HHI over attributed company shares (renormalized to the allocated total). Attribution is partial by construction — JV minorities below ~20% and multi-operator aggregates fall to the unattributed remainder — and the coverage ratio must travel with the number.',
+      note: basis === 'control'
+        ? 'CONTROL basis: 100% of each facility to its operator of record — who can stop it. JV-operated facilities without a modeled operator fall to the unattributed remainder. HHI over attributed shares; the coverage ratio and partition size travel with the number, which is not comparable raw against an index over a different partition.'
+        : 'ECONOMIC-INTEREST basis: ownership shares — who owns the loss. A different question from control; never pool the two. HHI over attributed shares; the coverage ratio and partition size travel with the number.',
     },
   );
 }

@@ -375,6 +375,52 @@ generate), evidence-layer search kinds (`refused`, `contested`, vintage
 ids), and the policy test that no indexed field can hold a natural-person
 name.
 
+## Phase 10 — commensurability, applied to our own headline
+
+Round-8 review caught round 9's headline comparing two incommensurable
+indices — the same defect species the system exists to refuse, in our own
+reporting. Country-HHI 1339 vs operator-HHI 959 differed in **partition**
+(HHI floors at 10000/n: a finer partition reads lower regardless of
+structure), in **attribution basis** (JV ownership shares are economic
+interest; disruption propagates through operational control — Escondida
+stops when BHP's workforce strikes, not 57.5% of Escondida), and — found
+while correcting — in **universe** (reported country totals vs the modeled
+facility subset). Shipped:
+
+- `Dependency.role: operator | shareholder` on every operated_by edge;
+  **only operator edges traverse** (a shareholding is a claim on output,
+  not a lever over operations — pinned: a Rio Tinto event cannot reach
+  Escondida through its 30%). JV-operated facilities whose operator of
+  record is an unmodeled JV vehicle (Antamina, Collahuasi) are control-
+  unattributed rather than force-assigned to a shareholder.
+- `AttributionBasis` on operatorConcentration, never defaulted; both bases
+  ship in the engine and the panel ("who can stop it" / "who owns the
+  loss"). Grasberg is the pinned sharp case: majority state-held,
+  Freeport-operated — 800 kt to Freeport under control, 390 under economic.
+- `groupCount` / `effectiveGroups` / `partitionFloor` on **every** HHI
+  (country, capacity, operator), so no consumer reconstructs comparability
+  from outside.
+- The corrected measurement, fully labeled and pinned as an executable
+  test: control **1778** (9 groups, effective 5.6, 84.5% attribution) vs
+  economic 959 (15 groups, effective 10.4); same-universe country 2135
+  (9 groups, effective 4.7 — the only strictly comparable geographic
+  figure, itself carrying the Chile-heavy facility coverage bias); the
+  world-reported 1339 sits in a different universe and is labeled as such.
+  The review's expectation held: control came out materially above 959 and
+  above the reported country figure. The index-free finding survives every
+  correction: Freeport controls 31.2% of modeled mine output across three
+  countries.
+
+The through-line the round-8 status named is adopted as doctrine: every
+serious defect across ten rounds has been a quantity compared against
+something it was not commensurable with, and the defence is always the
+same — make the basis explicit, carry it with the number, refuse rather
+than default when it is unknown. That discipline, now in the types
+(QuantityBasis, AttributionBasis, MeasurementClass, curation, roles), the
+graph (firewalls and refusals), the analytics (partition context, coverage
+annotations) and the scorecard (population splits, floors), is the most
+valuable thing in the repository.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

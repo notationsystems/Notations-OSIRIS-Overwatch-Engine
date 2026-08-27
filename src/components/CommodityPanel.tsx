@@ -98,7 +98,8 @@ interface EntityDetail {
 const CONCENTRATION_LABELS: Record<string, string> = {
   mineProductionByCountry: 'MINE PRODUCTION / COUNTRY',
   mineProductionByMine: 'MINE PRODUCTION / MINE',
-  mineProductionByOperator: 'MINE PRODUCTION / OPERATOR',
+  mineProductionByOperator: 'MINE PRODUCTION / OPERATOR (CONTROL)',
+  mineProductionByOperatorEconomic: 'MINE PRODUCTION / OPERATOR (ECONOMIC)',
   refinedProductionByCountry: 'REFINED PRODUCTION / COUNTRY',
   consumptionByRegion: 'CONSUMPTION / REGION',
   smeltingCapacityByCountry: 'SMELTING CAPACITY / COUNTRY',

@@ -386,56 +386,68 @@ export const COPPER_FLOWS: Flow[] = flowRows.map(([id, fromEntityId, toEntityId,
  * ~20% are not modeled and fall to the unattributed remainder, which
  * operator concentration reports the way geographic coverage is reported —
  * partial attribution travels with the number, never silently. */
-const op = (facility: string, company: string, share: number, note?: string): Dependency => ({
+/* Two attribution BASES live on these edges, and they are different claims:
+ *   role 'operator'     operational control — the lever a strike, distress
+ *                       or sanction pulls. The CONTROL basis attributes
+ *                       100% of an asset here; the graph traverses only
+ *                       these edges (Escondida stops when BHP's workforce
+ *                       strikes, not 57.5% of Escondida).
+ *   role 'shareholder'  economic interest — a claim on output, not a lever.
+ *                       Feeds the ECONOMIC basis; never enters traversal.
+ * JV-operated facilities whose operating company is itself an unmodeled JV
+ * vehicle (Antamina, Collahuasi) have NO modeled operator: under the control
+ * basis they fall to the reported unattributed remainder rather than being
+ * force-assigned to a shareholder. */
+const op = (facility: string, company: string, share: number, role: 'operator' | 'shareholder', note?: string): Dependency => ({
   id: `dep:op:${facility.split(':')[2]}:${company.split(':')[2]}`,
-  fromEntityId: facility, type: 'operated_by', toEntityId: company, strength: share,
+  fromEntityId: facility, type: 'operated_by', toEntityId: company, strength: share, role,
   basis: 'Operating/ownership attribution, representative; public JV disclosures.',
   provenance: curated(note),
 });
 
 const OPERATOR_ATTRIBUTIONS: Dependency[] = [
-  op('ent:mine:escondida', 'ent:company:bhp', 0.575, 'Operator.'),
-  op('ent:mine:escondida', 'ent:company:rio-tinto', 0.30),
-  op('ent:mine:collahuasi', 'ent:company:anglo-american', 0.44),
-  op('ent:mine:collahuasi', 'ent:company:glencore', 0.44),
-  op('ent:mine:el-teniente', 'ent:company:codelco', 1),
-  op('ent:mine:chuquicamata', 'ent:company:codelco', 1),
-  op('ent:mine:cerro-verde', 'ent:company:freeport', 0.535, 'Operator.'),
-  op('ent:mine:cerro-verde', 'ent:company:sumitomo-mm', 0.21),
-  op('ent:mine:antamina', 'ent:company:bhp', 0.3375),
-  op('ent:mine:antamina', 'ent:company:glencore', 0.3375),
-  op('ent:mine:antamina', 'ent:company:teck', 0.225),
-  op('ent:mine:las-bambas', 'ent:company:mmg', 0.625, 'Operator.'),
-  op('ent:mine:grasberg', 'ent:company:freeport', 0.488, 'Operator (PT Freeport Indonesia).'),
-  op('ent:mine:grasberg', 'ent:company:mind-id', 0.51),
-  op('ent:mine:kamoa-kakula', 'ent:company:ivanhoe', 0.395, 'Co-operator.'),
-  op('ent:mine:kamoa-kakula', 'ent:company:zijin', 0.395),
-  op('ent:mine:tenke-fungurume', 'ent:company:cmoc', 0.80, 'Operator.'),
-  op('ent:mine:morenci', 'ent:company:freeport', 0.72, 'Operator.'),
-  op('ent:mine:morenci', 'ent:company:sumitomo-mm', 0.28, 'Sumitomo group interest, representative.'),
-  op('ent:mine:buenavista', 'ent:company:grupo-mexico', 1),
-  op('ent:mine:oyu-tolgoi', 'ent:company:rio-tinto', 0.66, 'Operator; state share unattributed.'),
-  op('ent:mine:kansanshi', 'ent:company:first-quantum', 0.80, 'Operator.'),
-  op('ent:mine:cobre-panama', 'ent:company:first-quantum', 0.90, 'Operator; site in preservation.'),
-  op('ent:smelter:guixi', 'ent:company:jiangxi-copper', 1),
-  op('ent:refinery:guixi-refinery', 'ent:company:jiangxi-copper', 1),
-  op('ent:smelter:daye', 'ent:company:daye-nonferrous', 1),
-  op('ent:smelter:yunnan-kunming', 'ent:company:chinalco', 1),
-  op('ent:smelter:onsan', 'ent:company:ls-mnm', 1),
-  op('ent:refinery:onsan-refinery', 'ent:company:ls-mnm', 1),
-  op('ent:smelter:saganoseki', 'ent:company:jx-metals', 1),
-  op('ent:smelter:toyo', 'ent:company:sumitomo-mm', 1),
-  op('ent:smelter:gresik', 'ent:company:mitsubishi-materials', 0.605, 'Operator (PT Smelting).'),
-  op('ent:smelter:gresik', 'ent:company:freeport', 0.395),
-  op('ent:smelter:manyar', 'ent:company:freeport', 0.488, 'Operator (PT Freeport Indonesia).'),
-  op('ent:smelter:manyar', 'ent:company:mind-id', 0.51),
-  op('ent:smelter:aurubis-hamburg', 'ent:company:aurubis', 1),
-  op('ent:smelter:glogow', 'ent:company:kghm', 1),
-  op('ent:refinery:glogow-refinery', 'ent:company:kghm', 1),
-  op('ent:smelter:caletones', 'ent:company:codelco', 1),
-  op('ent:smelter:chuquicamata-smelter', 'ent:company:codelco', 1),
-  op('ent:smelter:ilo', 'ent:company:southern-copper', 1),
-  op('ent:refinery:kennecott', 'ent:company:rio-tinto', 1),
+  op('ent:mine:escondida', 'ent:company:bhp', 0.575, 'operator'),
+  op('ent:mine:escondida', 'ent:company:rio-tinto', 0.30, 'shareholder'),
+  op('ent:mine:collahuasi', 'ent:company:anglo-american', 0.44, 'shareholder', 'Operated by the Collahuasi JV vehicle — no modeled operator; control-basis unattributed.'),
+  op('ent:mine:collahuasi', 'ent:company:glencore', 0.44, 'shareholder'),
+  op('ent:mine:el-teniente', 'ent:company:codelco', 1, 'operator'),
+  op('ent:mine:chuquicamata', 'ent:company:codelco', 1, 'operator'),
+  op('ent:mine:cerro-verde', 'ent:company:freeport', 0.535, 'operator'),
+  op('ent:mine:cerro-verde', 'ent:company:sumitomo-mm', 0.21, 'shareholder'),
+  op('ent:mine:antamina', 'ent:company:bhp', 0.3375, 'shareholder', 'Operated by Compañía Minera Antamina (JV vehicle) — no modeled operator; control-basis unattributed.'),
+  op('ent:mine:antamina', 'ent:company:glencore', 0.3375, 'shareholder'),
+  op('ent:mine:antamina', 'ent:company:teck', 0.225, 'shareholder'),
+  op('ent:mine:las-bambas', 'ent:company:mmg', 0.625, 'operator'),
+  op('ent:mine:grasberg', 'ent:company:freeport', 0.488, 'operator', 'Operator (PT Freeport Indonesia); majority state-held — the sharp case where control and economic bases disagree.'),
+  op('ent:mine:grasberg', 'ent:company:mind-id', 0.51, 'shareholder'),
+  op('ent:mine:kamoa-kakula', 'ent:company:ivanhoe', 0.395, 'operator', 'Co-operator of record, representative.'),
+  op('ent:mine:kamoa-kakula', 'ent:company:zijin', 0.395, 'shareholder'),
+  op('ent:mine:tenke-fungurume', 'ent:company:cmoc', 0.80, 'operator'),
+  op('ent:mine:morenci', 'ent:company:freeport', 0.72, 'operator'),
+  op('ent:mine:morenci', 'ent:company:sumitomo-mm', 0.28, 'shareholder', 'Sumitomo group interest, representative.'),
+  op('ent:mine:buenavista', 'ent:company:grupo-mexico', 1, 'operator'),
+  op('ent:mine:oyu-tolgoi', 'ent:company:rio-tinto', 0.66, 'operator', 'State share unattributed.'),
+  op('ent:mine:kansanshi', 'ent:company:first-quantum', 0.80, 'operator'),
+  op('ent:mine:cobre-panama', 'ent:company:first-quantum', 0.90, 'operator', 'Site in preservation.'),
+  op('ent:smelter:guixi', 'ent:company:jiangxi-copper', 1, 'operator'),
+  op('ent:refinery:guixi-refinery', 'ent:company:jiangxi-copper', 1, 'operator'),
+  op('ent:smelter:daye', 'ent:company:daye-nonferrous', 1, 'operator'),
+  op('ent:smelter:yunnan-kunming', 'ent:company:chinalco', 1, 'operator'),
+  op('ent:smelter:onsan', 'ent:company:ls-mnm', 1, 'operator'),
+  op('ent:refinery:onsan-refinery', 'ent:company:ls-mnm', 1, 'operator'),
+  op('ent:smelter:saganoseki', 'ent:company:jx-metals', 1, 'operator'),
+  op('ent:smelter:toyo', 'ent:company:sumitomo-mm', 1, 'operator'),
+  op('ent:smelter:gresik', 'ent:company:mitsubishi-materials', 0.605, 'operator', 'Operator (PT Smelting).'),
+  op('ent:smelter:gresik', 'ent:company:freeport', 0.395, 'shareholder'),
+  op('ent:smelter:manyar', 'ent:company:freeport', 0.488, 'operator', 'Operator (PT Freeport Indonesia).'),
+  op('ent:smelter:manyar', 'ent:company:mind-id', 0.51, 'shareholder'),
+  op('ent:smelter:aurubis-hamburg', 'ent:company:aurubis', 1, 'operator'),
+  op('ent:smelter:glogow', 'ent:company:kghm', 1, 'operator'),
+  op('ent:refinery:glogow-refinery', 'ent:company:kghm', 1, 'operator'),
+  op('ent:smelter:caletones', 'ent:company:codelco', 1, 'operator'),
+  op('ent:smelter:chuquicamata-smelter', 'ent:company:codelco', 1, 'operator'),
+  op('ent:smelter:ilo', 'ent:company:southern-copper', 1, 'operator'),
+  op('ent:refinery:kennecott', 'ent:company:rio-tinto', 1, 'operator'),
   // chile-sxew and drc-sxew are multi-operator aggregates: deliberately
   // unattributed — the remainder is reported, not hidden.
 ];

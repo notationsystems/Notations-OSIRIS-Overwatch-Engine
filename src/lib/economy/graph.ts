@@ -92,6 +92,11 @@ export function buildGraph(state: EconomyState): EconomyGraph {
     // located_in is geography, not material structure — keep it out of the
     // traversal graph so "upstream of Escondida" never returns "Chile".
     if (d.type === 'located_in') continue;
+    // Shareholder operated_by edges are economic interest — a claim on
+    // output, not a lever over operations. Disruption does not propagate
+    // through a shareholding, so only operator-of-record edges traverse:
+    // a Rio Tinto event must not reach Escondida via its 30%.
+    if (d.type === 'operated_by' && d.role !== 'operator') continue;
     edges.push({ kind: 'dependency', id: d.id, from: d.fromEntityId, to: d.toEntityId, dependency: d });
   }
 

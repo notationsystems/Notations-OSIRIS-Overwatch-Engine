@@ -110,7 +110,12 @@ const SYSTEMS: EconomySystem[] = [
         mineProductionByMine: byMine,
         // The pair is the finding: a commodity can be geographically
         // diversified and operationally concentrated at the same time.
-        mineProductionByOperator: operatorConcentration(state, 'production', ['mine'], ctx.asOf),
+        // Both attribution bases ship — control answers "who can stop it",
+        // economic answers "who owns the loss" — and neither is comparable
+        // raw against the country index (different partitions; use
+        // effectiveGroups).
+        mineProductionByOperator: operatorConcentration(state, 'production', ['mine'], 'control', ctx.asOf),
+        mineProductionByOperatorEconomic: operatorConcentration(state, 'production', ['mine'], 'economic_interest', ctx.asOf),
         refinedProductionByCountry: concentration(state, 'refined_production', 'country', ctx.asOf),
         consumptionByRegion: concentration(state, 'consumption', 'region', ctx.asOf),
         smeltingCapacityByCountry: capacityConcentration(state, 'smelting'),

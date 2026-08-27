@@ -275,6 +275,16 @@ export interface Dependency {
   /** Share of the from-entity's requirement met by the to-entity (0..1), when known. */
   strength?: number;
   basis?: string;
+  /**
+   * operated_by edges only: what the relationship IS. 'operator' = the
+   * company of record with operational control — the lever a strike or
+   * distress pulls, so the edge propagation traverses and the CONTROL
+   * attribution basis uses (100% of the asset). 'shareholder' = economic
+   * interest — a claim on output, not a lever over operations: it feeds the
+   * ECONOMIC attribution basis and never enters the traversal graph.
+   * Escondida stops when BHP's workforce strikes, not 57.5% of Escondida.
+   */
+  role?: 'operator' | 'shareholder';
   provenance: Provenance;
 }
 
