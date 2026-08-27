@@ -28,12 +28,26 @@ represented it.
 - Unmapped M49 and MCS identifiers vanished at the resolution gate — the
   rows never became candidate records, so they were not "rejected", they
   simply were not.
+- **The evidence layer's own display caps** (phase 39). The standing
+  refusal queue held 30 records; `searchEvidence` served 20; the search
+  bar rendered 6 of those. None of the three surfaces said so. The
+  function that truncates carries a comment explaining that the DIGEST
+  passes `Infinity` "because a work queue that silently truncated would
+  read as covered" — and then the interactive queue truncated silently.
+  Worse than the count: the slice runs over a list built type-by-type, so
+  a refusal TYPE can vanish entirely behind a fuller one, and the
+  researcher reads "these are the refusals" with a mechanism absent.
 
-**Door.** A predicate that returned fewer rows than it received.
+**Door.** A predicate that returned fewer rows than it received — and,
+in the phase-39 instance, a `.slice()`, which is the same predicate
+written as presentation.
 
 **Closed by.** Row accounting (round 26): every fetched row is accepted,
 rejected with a reason, or filtered with the predicate NAMED and COUNTED.
-A conservation test asserts every row lands in exactly one bucket.
+A conservation test asserts every row lands in exactly one bucket. For
+the display caps, `EvidenceCensus` (phase 39): the page carries
+`total`/`shown`/`truncated` and a per-type census taken BEFORE the cut,
+so no type can hide behind the cap; both surfaces state their own depth.
 
 **Does not generalise.** Row accounting covers rows. The same shape
 recurs wherever a population is narrowed without a counter — which is
@@ -182,15 +196,39 @@ documents rather than the register, which they could not see. Errors in
 the system's account of itself become errors in the instructions given
 to it.
 
+**Second instance (phase 39): the runbook.** Move #3 of the operator
+runbook — the only document in front of the researcher — instructed
+"Search `refused:basis`". That type has no instances under today's
+facility topology (the corpus's gross-weight corridors are
+country-level), so the query returned an empty array, the dropdown never
+opened, and a first contact with the refusal system was a blank screen
+indistinguishable from a typo or a dead fetch. The prose was true when
+written and the corpus moved underneath it. The same document printed
+`refused:` as the name of the queue while the parser required at least
+one type character after the colon, so the token the doc taught fell
+through to the entity register and answered with a source-registry miss
+note about copper. Found by EXECUTING the runbook against the running
+instrument rather than reading it.
+
 **Door.** A hand-maintained restatement of something the tree already
 knows.
 
 **Closed by.** The count is pinned against `DEFERRED_DECISIONS.length` in
 a test. Generally: derive from the register, never restate it — the same
-rule that closed class 2, applied to documentation instead of scope.
+rule that closed class 2, applied to documentation instead of scope. For
+the runbook, `runbookClaims.test.ts` (phase 39) EXTRACTS every evidence
+query the document prints and runs each one: a printed query must return
+records or come back with a note explaining the emptiness, and the one
+deliberately invalid example must be refused by name. The runbook can no
+longer send a researcher somewhere the instrument goes quiet.
 
 **Does not generalise.** Only the counts someone thought to pin are
-pinned. Every other number in these documents is still a restatement.
+pinned, and only the runbook's *executable* claims are checked — its
+prose about what a figure MEANS is still a restatement. The declared
+evidence taxonomy is itself a literal, so it is not trusted either: a
+tripwire runs every mechanism across five vintages and fails if any
+emits a type the list does not declare, since a real refusal rejected as
+a typo is the worse half of that failure.
 
 ---
 
@@ -202,5 +240,14 @@ All six reduce to one question, which no test asks on its own:
 > use, have the same identity?**
 
 Row accounting, derived scopes, vacuity plants, refusal-type coupling,
-the severance sweep and the pinned count are six places that question has
-been answered permanently. There will be a seventh door.
+the severance sweep, the pinned count, the evidence census and the
+extracted runbook claims are eight places that question has been answered
+permanently. There will be a ninth door.
+
+Phase 39 added a corollary worth stating on its own, because it is where
+two of these classes meet: **an instrument that declines has to say which
+kind of nothing it is returning.** "None of that type here", "not at this
+date", "you named something that does not exist" and "the page was cut"
+were one empty array, on three surfaces — the search bar, the route, and
+the MCP tool an external model attaches to. Refuse-don't-default was
+built into every mechanism and then discarded at the display.

@@ -281,7 +281,7 @@ export const MCP_TOOLS: McpToolDef[] = [
   },
   {
     name: 'search_evidence',
-    description: 'Search the EPISTEMIC STATE instead of the register: kind=refused (what the system declines to quantify, optionally typed basis|scope|topology|resolution), stale (sources past their measured cadence), contested (observer disagreement), vintage (edition history). This is the instrument\'s account of its own limits — treat a result here as a finding about the evidence, not about the world.' + CONTRACT_FOOTER,
+    description: 'Search the EPISTEMIC STATE instead of the register: kind=refused (what the system declines to quantify, optionally typed basis|component|topology|scope|attribution|resolution), stale (source|ladder|suspect|topology), contested (observer disagreement, typed by class), vintage (edition history). This is the instrument\'s account of its own limits — treat a result here as a finding about the evidence, not about the world. ZERO ITEMS IS AN ANSWER, NOT AN ABSENCE OF ONE: the returned `note` says which zero it is — none of that type in the topology at your asOf (with the condition that produces one, and often a date where it is live), or a type that does not exist, which is refused by name rather than answered empty. Report the note; do not conclude from an empty list that a mechanism is missing.' + CONTRACT_FOOTER,
     params: { kind: 'refused | stale | contested | vintage', type: 'Optional refusal/staleness type filter, e.g. basis.', commodity: 'copper (default) or aluminium.', ...KNOWLEDGE_PARAMS },
     async handler(args, ctx) {
       const k = requireKnowledge(args);
@@ -290,15 +290,38 @@ export const MCP_TOOLS: McpToolDef[] = [
       const q = args.type ? `${kind}:${args.type}` : kind;
       const data = await fetchOk(ctx, `/api/economy/search?commodity=${args.commodity ?? 'copper'}&q=${encodeURIComponent(q)}&${ks(k)}`);
       const ev = (get(data, 'evidenceResults') as Array<Record<string, unknown>>) ?? [];
+      // An undeclared type is refused AT THE BOUNDARY, like free text on an
+      // entity id: an attached model handed an empty array cannot tell a
+      // typo from a corpus that holds none of that type, and the wrong one
+      // of those becomes "the instrument has no basis refusals" in prose.
+      const undeclared = get(data, 'evidenceRefused') as { type?: string; declared?: string[] } | undefined;
+      if (undeclared) {
+        throw new Error(`"${kind}:${undeclared.type}" is not a declared ${kind} type. Declared: ${(undeclared.declared ?? []).join(', ')}.`);
+      }
+      const total = Number(get(data, 'evidenceTotal') ?? ev.length);
+      const truncated = Boolean(get(data, 'evidenceTruncated'));
+      const note = get(data, 'evidenceNote') as string | null | undefined;
+      const byType = (get(data, 'evidenceByType') as Array<{ type: string; count: number }>) ?? [];
       const refusals: ToolRefusal[] = kind === 'refused'
         ? ev.map(e => ({ subject: String(e.subject ?? e.entityId ?? e.id ?? 'unknown'), value: null, refusalType: String(e.type ?? kind), remedy: String(e.remedy ?? e.explanation ?? 'see item') }))
         : [];
       return result(k, {
-        claims: [`${ev.length} ${kind} item(s) at ${k.asOf} under ${k.mode}.`],
+        // The count sentence states BOTH numbers, because "20 items" beside
+        // a 30-deep queue is the same overstatement the validator exists to
+        // catch, made by the substrate itself.
+        claims: [
+          `${ev.length} of ${total} ${kind} item(s) served at ${k.asOf} under ${k.mode}${truncated ? ' — the page is capped, the queue is not' : ''}.`,
+          ...(byType.length > 0 ? [`By type: ${byType.map(t => `${kind}:${t.type} (${t.count})`).join(', ')}.`] : []),
+          ...(note ? [note] : []),
+        ],
         record_ids: ev.map(e => String(e.id ?? e.subject ?? '')).filter(Boolean),
         refusals,
         data,
-        caveats: ['Evidence-layer results are computed from the knowledge-filtered state: a refusal that entered the corpus later never surfaces early.'],
+        caveats: [
+          'Evidence-layer results are computed from the knowledge-filtered state: a refusal that entered the corpus later never surfaces early.',
+          ...(total === 0 ? ['Zero items is a statement about this corpus at this asOf, NOT evidence that the mechanism is absent — see the note for the condition that produces one.'] : []),
+          ...(truncated ? [`Only ${ev.length} of ${total} served; GET /api/economy/refusals returns the full queue uncapped.`] : []),
+        ],
       });
     },
   },

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
 import { strongestAttestingClass, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
-import { parseEvidenceQuery, searchEvidence } from '@/lib/economy/evidenceSearch';
+import { parseEvidenceQuery, searchEvidenceCensus, evidenceNote } from '@/lib/economy/evidenceSearch';
 import { recordEvidenceQuery, recordQuery } from '@/lib/economy/sessionTelemetry';
 import { isMachineClient } from '@/lib/economy/machineClient';
 import { asKnownThen } from '@/lib/economy/engine';
@@ -182,15 +182,27 @@ export async function GET(request: Request) {
     // The graph is built AT the evaluation date so the refusals reflect the
     // topology that actually serves it (a 2017 query runs over the 2017
     // country vintage, not today's facility snapshot mislabeled).
-    const evidenceResults = searchEvidence(evidenceState, buildGraph(evidenceState, asOf), evidenceQuery, {
+    const census = searchEvidenceCensus(evidenceState, buildGraph(evidenceState, asOf), evidenceQuery, {
       asOf, knowledge: knowledge as 'best_known' | 'as_known_then',
     });
+    // The page is served WITH its accounting. An evidence query that returns
+    // nothing is a common and honest state (`refused:basis` has no instances
+    // in today's facility topology — the gross-weight corridors are
+    // country-level, so the type is live at the 2017 vintage), and a bare
+    // empty array cannot be told apart from a typo, a dead fetch, or a
+    // mechanism that was never built. The note says which.
     return NextResponse.json({
       commodity, query: q, asOf: asOf ?? null, knowledge,
       evidenceKind: evidenceQuery.kind,
       ...(evidenceQuery.type ? { evidenceType: evidenceQuery.type } : {}),
       results: [], withheld: 0,
-      evidenceResults,
+      evidenceResults: census.hits,
+      evidenceTotal: census.total,
+      evidenceShown: census.shown,
+      evidenceTruncated: census.truncated,
+      evidenceByType: census.byType,
+      ...(census.unknownType ? { evidenceRefused: census.unknownType } : {}),
+      evidenceNote: evidenceNote(evidenceQuery, census, asOf),
     });
   }
 

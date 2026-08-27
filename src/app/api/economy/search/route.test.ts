@@ -196,3 +196,54 @@ describe('search policy: no natural persons', () => {
     }
   });
 });
+
+/**
+ * AT THE SEAM. The census exists in evidenceSearch.ts and is unit-tested
+ * there; what the researcher meets is this route and the bar above it. The
+ * lesson that produced these assertions is the one from the map's basis
+ * axis: a mechanism can be correct, unit-tested, and operating on data whose
+ * accounting was discarded one layer up, and nothing fails.
+ */
+describe('the evidence layer states its own accounting at the route', () => {
+  it('the empty type the RUNBOOK sends a reader to comes back with a note, not a blank', async () => {
+    const body = await (await get('q=refused:basis')).json();
+    expect(body.evidenceResults).toEqual([]);
+    expect(body.evidenceTotal).toBe(0);
+    expect(body.evidenceNote).toMatch(/No refused:basis/);
+    expect(body.evidenceNote).toMatch(/2017-06-30/);          // where the type is live
+    expect(body.evidenceNote).toMatch(/refused:resolution \(\d+\)/); // what the kind DOES hold
+    expect(body.evidenceRefused).toBeUndefined();             // valid type, genuinely empty
+  });
+
+  it('an undeclared type is refused by name and never answered with an empty list', async () => {
+    const body = await (await get('q=refused:bassis')).json();
+    expect(body.evidenceRefused?.type).toBe('bassis');
+    expect(body.evidenceRefused?.declared).toContain('basis');
+    expect(body.evidenceNote).toMatch(/not a declared refused type/);
+  });
+
+  it('`refused:` reaches the evidence layer instead of falling through to the entity register', async () => {
+    // The exact token docs/RUNBOOK.md prints. Before the fix this returned
+    // entity results and a source-registry miss note about copper.
+    const body = await (await get('q=refused%3A')).json();
+    expect(body.evidenceKind).toBe('refused');
+    expect(body.evidenceType).toBeUndefined();
+    expect(body.missNote).toBeUndefined();
+    expect(body.evidenceTotal).toBeGreaterThan(0);
+  });
+
+  it('the served page states the cap and the full queue depth', async () => {
+    const body = await (await get('q=refused')).json();
+    // The interactive cap is 20 and the standing queue is deeper — the
+    // condition this pins. If the queue ever drains below the cap the
+    // assertion below goes vacuous, so the depth is asserted first.
+    expect(body.evidenceTotal).toBeGreaterThan(body.evidenceResults.length);
+    expect(body.evidenceTruncated).toBe(true);
+    expect(body.evidenceShown).toBe(body.evidenceResults.length);
+    expect(body.evidenceNote).toMatch(new RegExp(`Showing ${body.evidenceShown} of ${body.evidenceTotal}`));
+    // The census sums to the total over the whole kind, so nothing is
+    // invisible behind the cut.
+    const summed = body.evidenceByType.reduce((s: number, t: { count: number }) => s + t.count, 0);
+    expect(summed).toBe(body.evidenceTotal);
+  });
+});

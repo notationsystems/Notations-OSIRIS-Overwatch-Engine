@@ -325,3 +325,53 @@ describe('D-13: the machine-consumer redistribution gate', () => {
     }
   });
 });
+
+/**
+ * The same defect at the machine surface.
+ *
+ * `search_evidence(kind=refused, type=basis)` returned an empty array and the
+ * sentence "0 refused item(s)". True today — and indistinguishable, to an
+ * attached model, from a type that does not exist or a page that was capped.
+ * A model with no way to tell those apart writes "the instrument holds no
+ * basis refusals", which is a claim about the world made from a rendering
+ * artefact. The pivot was that external models attach; this is the part of
+ * that pivot that has to be right.
+ */
+describe('search_evidence states which kind of zero it is', () => {
+  it('an empty typed result carries the condition, the census, and a caveat against over-reading it', async () => {
+    const r = await tool('search_evidence').handler({ ...K, kind: 'refused', type: 'basis' }, inProcessCtx) as McpToolResult;
+    const text = r.claims.join(' ');
+    expect(text).toMatch(/0 of 0 refused item\(s\)/);
+    expect(text).toMatch(/statement about the corpus, not a failure/);
+    expect(text).toMatch(/2017-06-30/);                       // where the type IS live
+    expect(text).toMatch(/refused:resolution \(\d+\)/);        // what the kind does hold
+    expect(r.caveats.join(' ')).toMatch(/NOT evidence that the mechanism is absent/);
+  });
+
+  it('the same query at the date the corpus carries it returns records', async () => {
+    const r = await tool('search_evidence').handler(
+      { asOf: '2017-06-30', mode: 'best_known', kind: 'refused', type: 'basis' }, inProcessCtx) as McpToolResult;
+    expect(refusalCount(r)).toBeGreaterThan(0);
+    expect(r.refusals[0].refusalType).toBe('basis');
+    expect(r.refusals[0].remedy).toMatch(/corridor grade/);
+    // Discriminating against the test above: same tool, same type, one date
+    // apart. If both were empty the assertion above would be vacuous.
+    expect(r.claims.join(' ')).not.toMatch(/0 of 0/);
+  });
+
+  it('an undeclared type is refused at the boundary, never answered with an empty list', async () => {
+    await expect(tool('search_evidence').handler({ ...K, kind: 'refused', type: 'bassis' }, inProcessCtx))
+      .rejects.toThrow(/not a declared refused type[\s\S]*basis/);
+  });
+
+  it('a capped page says so and names the uncapped route', async () => {
+    const r = await tool('search_evidence').handler({ ...K, kind: 'refused' }, inProcessCtx) as McpToolResult;
+    const text = r.claims.join(' ');
+    const m = text.match(/(\d+) of (\d+) refused item\(s\)/);
+    expect(m, 'the served/total sentence is the accounting').not.toBeNull();
+    const [, served, total] = m!.map(Number);
+    expect(total).toBeGreaterThan(served);      // the standing queue is deeper than the page
+    expect(text).toMatch(/the page is capped, the queue is not/);
+    expect(r.caveats.join(' ')).toMatch(/api\/economy\/refusals returns the full queue uncapped/);
+  });
+});

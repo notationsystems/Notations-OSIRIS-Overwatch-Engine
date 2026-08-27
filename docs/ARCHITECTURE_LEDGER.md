@@ -2407,6 +2407,121 @@ for three phases running — the researcher afternoon. That is not
 avoidance; it is what "everything buildable is built" looks like when it
 is true.
 
+## Phase 39 — executing the runbook, and the four walls it ran into
+
+The frontier is the researcher afternoon, which is the operator's. What
+was still mine was the runbook: if one of its three moves sends a
+researcher into a wall, the afternoon measures the runbook rather than the
+instrument, and that is not recoverable afterwards because the S-7 window
+starts from that session. So the three moves were EXECUTED against the
+running instrument rather than read.
+
+Move #1 held (and produced phase 38's basis sentence). Move #2 held: the
+probe reported no AS KNOWN control, and investigation showed
+`EconTimeBar` renders it gated on `{!live && …}`, so it appears once a
+date is set — exactly as the runbook describes. **The runbook wording was
+correct; no defect.** Move #3 is where it broke, four ways, all silent.
+
+**1. The empty screen.** Move #3 says "Search `refused:basis`". That
+type has ZERO instances under today's facility topology — the corpus's
+gross-weight corridors are country-level, so it fires at the 2017 country
+vintage (5 hits, measured) and is silent today. The corpus was telling
+the truth; the surface was throwing the truth away. The dropdown does not
+open on an empty result, so a first contact with the refusal system was a
+blank screen indistinguishable from a typo, a dead fetch, or a mechanism
+that was never built.
+
+**2. The token the document itself prints.** The runbook says
+"**`refused:` is a work queue, not an error**" — twice. The parser's
+pattern required at least one type character after the colon, so
+`refused:` failed the evidence grammar entirely, fell through to the
+ENTITY register, matched nothing, and answered with a source-registry
+gap note about copper. The document taught a query the instrument
+rejected.
+
+That one had a consequence past the screen. A true entity miss is a
+DEMAND SIGNAL: it is appended to `data-archive/search-misses.jsonl` and
+ranks the registered-but-unbuilt sources. Because `refused:` fell through
+to the entity register and missed, the miss log accumulated four rows —
+```
+{"ts":"2026-08-27T20:41:13.155Z","q":"refused:","gapIds":["cme-copper-stocks"]}
+```
+— crediting demand for a copper-stocks feed to a token the runbook itself
+prints. The demand instrument was being fed by its own documentation. The
+four rows were discarded rather than committed (they are probe traffic,
+not researcher demand — the same principle as the machine-client
+segregation on the S-7 counters), and quoted here instead so the finding
+survives without the false evidence.
+
+**3. Two stacked silent truncations.** The standing queue holds 30
+refusals; `searchEvidence` served 20; the search bar rendered 6 of those.
+None of the three said so. The truncating function carries a comment
+explaining that the digest passes `Infinity` *because "a work queue that
+silently truncated would read as covered"* — and then truncated the
+interactive queue silently. Worse than the count: the slice runs over a
+list built type-by-type, so a whole refusal TYPE can vanish behind a
+fuller one and the researcher reads "these are the refusals" with a
+mechanism absent.
+
+**4. A typo and an absence were the same answer.** `refused:bassis`
+returned an empty array, identically to `refused:basis`. Refuse-don't-
+default was built into every mechanism in this system and then discarded
+at the display.
+
+**What closed them.** `EvidenceCensus` — the page carries
+`total`/`shown`/`truncated` plus a per-type census taken BEFORE the type
+filter and the cut, so nothing hides behind the cap; `evidenceNote()` —
+the sentence a surface shows when the census is not self-evident, naming
+which kind of nothing it is returning, with `TYPE_CONDITION` giving the
+condition that produces each type (and, for `refused:basis`, the date
+where it is live); a declared taxonomy so an undeclared type is REFUSED
+by name; and the parser accepting the trailing colon the docs print.
+All three surfaces carry it: the route, the search bar (which states its
+own deeper cut, "Showing 6 of 30"), and the MCP tool — where an
+undeclared type now throws at the boundary, as free text does on an
+entity id. An attached model handed a bare empty array writes "the
+instrument holds no basis refusals", which is a claim about the world
+made from a rendering artefact; that is the half of the external-model
+pivot that has to be right.
+
+**The corollary, because it is where two named classes meet:** an
+instrument that declines has to say *which kind of nothing* it is
+returning. Four distinct states — none of that type here, not at this
+date, you named something that does not exist, the page was cut — were
+one empty array.
+
+**And the durable half.** Correcting the runbook's prose fixes it once;
+the runbook is a literal and the corpus keeps moving. `runbookClaims.test.ts`
+now EXTRACTS every evidence query the document prints and runs each one
+at today and at the date the document names: each must return records or
+come back with a note explaining the emptiness. It caught its own author
+on the first run — the corrected prose prints `refused:bassis` as a
+deliberate example of a typo, which the extractor flagged; the right
+assertion was not to mute it but to require that the instrument refuse it
+by name, since a doc example is as much a claim as an instruction. The
+declared taxonomy is a literal too, so it is not trusted either: a
+tripwire runs every mechanism across five vintages and fails if any emits
+a type the list does not declare — a real refusal rejected as a typo
+being the worse half of that failure.
+
+**Measured, not assumed.** `refused:basis` = 0 today, 5 at 2017-06-30
+(both pinned, discriminating in both directions). Queue depth 30, page
+20, bar 6 — all three now stated. Verified in the running configuration
+and at the screen: a browser probe reads the rendered note for all four
+query shapes, no page errors. The restart that produced this verification
+is worth one line of its own: `pkill -f "next start"` matched nothing
+because the process is named `next-server`, the health check returned 200
+from the STALE server, and only reading the payload showed old code. A
+green liveness check is not evidence that the thing you built is running.
+
+668 tests green, typecheck clean — the latter caught twice what vitest
+passed (a `Record` index type, an ES2018 regex flag), which is the
+split-verdict hazard behaving exactly as recorded.
+
+**Exactly one next executable frontier:** unchanged, for a fourth phase —
+the researcher afternoon.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
