@@ -1020,6 +1020,17 @@ consolidated-vs-attributable, attribution scope rides ON the
 observation, and the parse is built against the actual table under
 these four requirements.
 
+**Standing instruction for the build round (round-23 review):** if the
+identity arrives months rather than days after this was written, re-read
+the four requirements against the register AS IT STANDS THEN, not as it
+stood here — a pre-registration that has aged into archaeology must be
+re-taken, not obeyed. While the gate holds, the branch degrades visibly
+rather than sitting still: the extrapolation clock advances against its
+730-day ceiling on every test pass (the Grasberg evidence trigger
+already firing beneath it), and the structural profile stays pinned at
+0% until this ingest is the thing that moves it — which is the property
+the guard exercise was for.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
