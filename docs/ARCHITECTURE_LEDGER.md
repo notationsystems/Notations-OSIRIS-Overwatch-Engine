@@ -2304,6 +2304,40 @@ All six reduce to one question no test asks on its own: *does the thing
 this mechanism affects, and the thing actually in use, have the same
 identity?*
 
+**A seventh instance, found by looking where the class said to look —
+and it was in my own F-5 work.** The class says: does the thing this
+mechanism affects, and the thing in use, have the same identity? So the
+UI was rendered rather than reasoned about — the F-5 map changes had
+only ever been unit-tested at the function level, and the afternoon runs
+through that map.
+
+The map builds all six econ layers, the new paint expressions are live
+and valid, 48 entity features carry BOTH treatments (the non-scale
+`unquantified` radius 3.5 is genuinely applied, off the ramp), and
+coverage rides in the opacity as intended. Then the flows: **every one
+of them arrived `basis: unspecified`, and every one rendered dashed.**
+
+Cause: canonical state holds 48 metal_content and 14 gross_weight flows,
+and the MAP PROJECTION dropped `basis` on the way out. So F-5's "one
+basis per width-scaled layer" was correct, and operating on data whose
+axis had been stripped upstream — a single bucket, one width ramp for
+everything, and a mixed-basis refusal that could never fire because the
+layer never saw two bases. Nothing failed. The unit tests passed because
+they hand `basis` to the function directly. The mechanism, its tests and
+its documentation all agreed with each other and not with the world.
+
+Measured per topology rather than assumed: today's facility topology
+serves 39 flows, ALL metal_content — so a test written against today
+would have been vacuous, and the dashing correctly never fires there.
+The **2017 country vintage serves both: 5 metal_content and 4
+gross_weight.** Before the fix those nine rendered on one width ramp,
+gross-weight beside contained-metal — the incommensurability F-5 exists
+to prevent, rendered, at a date the researcher can scrub to. The
+projection now carries the axis, and the pin lives at the SEAM (the
+route's own payload) against that measured discriminating case, with
+today's single-basis topology asserted separately so nothing is falsely
+marked non-commensurate.
+
 **Exactly one next executable frontier:** unchanged, and now unchanged
 for three phases running — the researcher afternoon. That is not
 avoidance; it is what "everything buildable is built" looks like when it

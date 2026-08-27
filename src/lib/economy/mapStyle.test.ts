@@ -79,3 +79,58 @@ describe('F-5: one basis per width-scaled layer', () => {
     }
   });
 });
+
+describe('F-5 at the SEAM: the basis axis survives the map projection', () => {
+  const mapFlows = async (q = '') => {
+    const { GET } = await import('@/app/api/economy/route');
+    const res = await GET(new Request(`http://localhost/api/economy?commodity=copper&view=map${q}`));
+    const body = await res.json() as { econ_flows: Array<{ basis: string | null; quantity: number }> };
+    return body.econ_flows;
+  };
+
+  it('the map payload carries basis at every topology', async () => {
+    // THE DEFECT THIS PINS (found by rendering the UI, not by unit tests):
+    // canonical state holds 48 metal_content and 14 gross_weight flows,
+    // and the map projection dropped `basis` entirely — so every flow
+    // arrived 'unspecified', the layer never saw two bases, and the
+    // mixed-basis refusal could never fire. Nothing failed: the unit
+    // tests above passed because they hand `basis` to the function
+    // directly. A mechanism correct about its input while the axis was
+    // stripped upstream — the context-severance class at a data seam.
+    for (const q of ['', '&asOf=2017-06-30', '&asOf=2022-06-30']) {
+      const flows = await mapFlows(q);
+      expect(flows.length, `no flows served at ${q || 'today'}`).toBeGreaterThan(0);
+      for (const f of flows) expect('basis' in f, `map flow lost its basis axis at ${q || 'today'}`).toBe(true);
+    }
+  });
+
+  it('the DISCRIMINATING topology: at 2017 the served set is genuinely mixed, and the split does work', async () => {
+    // Measured, not assumed. Today's facility topology serves 39 flows,
+    // ALL metal_content — so the dashing correctly never fires there and
+    // a test written against today would be vacuous. The 2017 country
+    // vintage serves BOTH (5 metal_content, 4 gross_weight): before the
+    // fix those nine rendered on ONE width ramp, gross-weight beside
+    // metal-content, which is the incommensurability F-5 exists to
+    // prevent — at a date the researcher can scrub to.
+    const flows = await mapFlows('&asOf=2017-06-30');
+    const groups = splitFlowsByBasis(flows);
+    expect(groups.size, '2017 must serve more than one basis or this pin is vacuous').toBeGreaterThan(1);
+    expect(groups.has('metal_content')).toBe(true);
+    expect(groups.has('gross_weight')).toBe(true);
+
+    // The mixed set REFUSES; each single-basis group builds.
+    expect(() => buildEconFlowLayerStyles(flows)).toThrow(/mixed-basis/);
+    for (const g of groups.values()) expect(() => buildEconFlowLayerStyles(g)).not.toThrow();
+
+    // And the dashing DISTINGUISHES here rather than marking everything.
+    expect(buildEconFlowLayerStyles(groups.get('metal_content')!).every(f => f.style.dashed === false)).toBe(true);
+    expect(buildEconFlowLayerStyles(groups.get('gross_weight')!).every(f => f.style.dashed === true)).toBe(true);
+  });
+
+  it('today\'s facility topology is single-basis, so nothing is falsely marked non-commensurate', async () => {
+    const flows = await mapFlows();
+    const groups = splitFlowsByBasis(flows);
+    expect([...groups.keys()]).toEqual(['metal_content']);
+    expect(buildEconFlowLayerStyles(flows).every(f => f.style.dashed === false)).toBe(true);
+  });
+});

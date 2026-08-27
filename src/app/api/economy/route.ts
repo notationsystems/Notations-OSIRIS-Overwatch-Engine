@@ -259,6 +259,17 @@ export async function GET(request: Request) {
         id: f.id, from: f.fromEntityId, to: f.toEntityId,
         fromCoord: coords.get(f.fromEntityId)!, toCoord: coords.get(f.toEntityId)!,
         form: f.form, quantity: f.quantity, unit: f.unit, mode: f.mode, confidence: f.confidence,
+        // The MASS BASIS must survive the projection. It did not, and the
+        // consequence was the named class exactly: F-5's "one basis per
+        // width-scaled layer" was correct and operating on data whose axis
+        // had been stripped upstream, so every flow arrived 'unspecified',
+        // all 39 shared one width ramp — gross-weight beside metal-content,
+        // the incommensurability F-5 exists to prevent — and the
+        // mixed-basis refusal could never fire because the layer never saw
+        // two bases. Nothing failed; the unit tests passed because they fed
+        // basis to the function directly. Canonical state holds 48
+        // metal_content and 14 gross_weight flows.
+        basis: f.basis ?? null,
         disrupted: disrupted.has(f.fromEntityId) || disrupted.has(f.toEntityId),
       }));
 

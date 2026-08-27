@@ -138,11 +138,23 @@ anything).**
   over half its calls), and `COMTRADE_DA` (duplicate outbound load, and a
   `knownAt` that could differ between contexts for one record).
 
+- **A seventh, at a DATA seam rather than a module one (phase 38):** the
+  map projection dropped the `basis` axis, so F-5's "one basis per
+  width-scaled layer" ran on a single `unspecified` bucket — one width
+  ramp for gross-weight and contained-metal alike, and a mixed-basis
+  refusal that could never fire. Found by RENDERING the UI after the
+  class said where to look. The mechanism, its unit tests and its
+  documentation all agreed with each other and not with the world.
+
 **Door.** Next.js runs the instrumentation hook in a DIFFERENT module
-context from route handlers, so module-level state is not shared.
+context from route handlers, so module-level state is not shared — and,
+for the seventh instance, a projection that quietly omitted a field.
 
 **Closed by.** `processSingleton` anchors process-wide state on
-`globalThis`; `contextSeverance.test.ts` requires every mutable
+`globalThis`; the map projection carries `basis` and the pin sits at the
+route's own payload, against a measured discriminating topology (2017,
+where the served set is genuinely mixed) rather than today's, where it
+would be vacuous; `contextSeverance.test.ts` requires every mutable
 module-level container to be either shared by construction or listed with
 the argument for why severance is harmless. Vacuity proven at fixture
 level and at file level (a planted severable module in the real tree
