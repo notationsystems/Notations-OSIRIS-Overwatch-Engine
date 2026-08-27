@@ -252,3 +252,60 @@ describe('the graph view answers at the date it is asked about', () => {
     }
   });
 });
+
+/**
+ * COVERAGE OF WHAT — the ink on the map carries a ratio, and a ratio is
+ * per country AND per metric.
+ *
+ * The map applied the MINE-production coverage table to every facility dot,
+ * so a Chinese smelter's opacity was driven by China's mine coverage. It was
+ * invisible while the coverage table dropped its 0% rows — those facilities
+ * fell through to `null`, accidentally honest — and would have become nine
+ * smelters and refineries wearing a measured number from the wrong table the
+ * moment the zeroes were emitted. Two defects hiding each other.
+ */
+describe('the map\'s coverage ink comes from the matching table', () => {
+  it('mines read mine coverage, smelters and refineries read refined coverage', async () => {
+    const body = await (await economyGet(req('/api/economy?commodity=copper&view=map'))).json() as {
+      econ_entities: Array<{ id: string; name: string; kind: string; country: string | null; coverageRatio: number | null }>;
+    };
+    const analytics = await (await economyGet(req('/api/economy?commodity=copper&view=analytics'))).json() as {
+      coverage: { result: { mineProduction: { result: Array<{ countryName: string; ratio: number }> }; refinedProduction: { result: Array<{ countryName: string; ratio: number }> } } };
+    };
+    const mineBy = new Map(analytics.coverage.result.mineProduction.result.map(r => [r.countryName, r.ratio]));
+    const refBy = new Map(analytics.coverage.result.refinedProduction.result.map(r => [r.countryName, r.ratio]));
+
+    let checkedMine = 0, checkedRef = 0, checkedOther = 0;
+    for (const e of body.econ_entities) {
+      if (e.kind === 'mine') {
+        expect(e.coverageRatio, `${e.name}`).toBe(e.country ? mineBy.get(e.country) ?? null : null);
+        if (e.coverageRatio !== null) checkedMine++;
+      } else if (e.kind === 'smelter' || e.kind === 'refinery') {
+        expect(e.coverageRatio, `${e.name}`).toBe(e.country ? refBy.get(e.country) ?? null : null);
+        if (e.coverageRatio !== null) checkedRef++;
+      } else {
+        // A port or a manufacturer has no facility-model coverage figure;
+        // borrowing one from another stage would be a fabricated axis.
+        expect(e.coverageRatio, `${e.name} (${e.kind}) must not borrow a coverage ratio`).toBeNull();
+        checkedOther++;
+      }
+    }
+    // Not vacuous in any of the three branches.
+    expect(checkedMine).toBeGreaterThan(0);
+    expect(checkedRef).toBeGreaterThan(0);
+    expect(checkedOther).toBeGreaterThan(0);
+  });
+
+  it('DISCRIMINATING: the two tables actually disagree, so the choice matters', async () => {
+    const analytics = await (await economyGet(req('/api/economy?commodity=copper&view=analytics'))).json() as {
+      coverage: { result: { mineProduction: { result: Array<{ countryName: string; ratio: number }> }; refinedProduction: { result: Array<{ countryName: string; ratio: number }> } } };
+    };
+    const mine = analytics.coverage.result.mineProduction.result;
+    const ref = analytics.coverage.result.refinedProduction.result;
+    const disagree = mine.filter(m => {
+      const r = ref.find(x => x.countryName === m.countryName);
+      return r && r.ratio !== m.ratio;
+    });
+    expect(disagree.length, 'if the tables agreed everywhere this pin would be vacuous').toBeGreaterThan(0);
+  });
+});

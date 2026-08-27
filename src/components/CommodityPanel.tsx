@@ -73,7 +73,7 @@ interface Analytics {
   concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
   bottlenecks: { result: Bottleneck[]; emptyBecause?: string };
   anomalies: { result: Anomaly[] };
-  coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
+  coverage?: { result: { mineProduction: { result: CoverageRow[]; emptyBecause?: string }; refinedProduction: { result: CoverageRow[]; emptyBecause?: string } } };
   divergence?: { result: DivergenceRec[] };
   corpusHealth?: CorpusHealthRow[];
   /** Whether the flow topology's period can describe the evaluation date. */
@@ -617,23 +617,45 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
               )}
 
               {(analytics.coverage?.result?.mineProduction?.result?.length ?? 0) > 0 && (
-                <Section id="coverage" open={!!openSections['coverage']} onToggle={toggle} title="FACILITY COVERAGE" icon={<Database className="w-3 h-3 text-[#00BCD4]" />} count={analytics.coverage!.result.mineProduction.result.length}>
+                <Section id="coverage" open={!!openSections['coverage']} onToggle={toggle} title="FACILITY COVERAGE" icon={<Database className="w-3 h-3 text-[#00BCD4]" />} count={analytics.coverage!.result.mineProduction.result.length + analytics.coverage!.result.refinedProduction.result.length}>
                   <div className="space-y-1">
                     <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
-                      Share of each country total the facility model accounts for (rolled-up facilities ÷ country observation). The gap is unmodelled capacity; a ratio above 1 is a contradiction.
+                      Share of each country total the facility model accounts for (rolled-up facilities ÷ country observation). The gap is unmodelled capacity; a ratio above 1 is a contradiction; 0% means no facility stands behind the compiled total at all.
                     </div>
-                    {analytics.coverage!.result.mineProduction.result.map(r => (
-                      <div key={r.countryId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-mono text-[#E8E6E0]">{r.countryName}</span>
-                          <span className="flex items-center gap-1.5 shrink-0">
-                            <ScoreBar value={Math.min(1, r.ratio)} color={r.status === 'contradiction' ? '#FF3D3D' : r.status === 'complete' ? '#00E676' : '#00BCD4'} />
-                            <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: r.status === 'contradiction' ? '#FF3D3D' : '#00BCD4' }}>{(r.ratio * 100).toFixed(0)}%</span>
-                          </span>
+                    {/* BOTH metrics. Refined coverage was computed and never
+                        rendered, and the countries with NO modelled facility
+                        were dropped before rendering — so the section read
+                        "(9)" when 19 mine-production countries have a
+                        compiled total and all 17 refined-production ones are
+                        0% modelled. The zeroes are the coverage finding. */}
+                    {([['MINE PRODUCTION', analytics.coverage!.result.mineProduction.result],
+                       ['REFINED PRODUCTION', analytics.coverage!.result.refinedProduction.result]] as const).map(([label, rows]) => (
+                      <div key={label} className="space-y-1">
+                        <div className="text-[8px] font-mono tracking-wider pt-1" style={{ color: 'var(--gold-primary)' }}>
+                          {label} · {rows.length} countr{rows.length === 1 ? 'y' : 'ies'} · {rows.filter(r => r.status === 'uncovered').length} with NO modelled facility
                         </div>
-                        <div className="text-[8px] font-mono text-[var(--text-muted)]">
-                          {r.facilityCount} modeled facilit{r.facilityCount === 1 ? 'y' : 'ies'}: {r.rolledUp.toLocaleString()} of {r.direct.toLocaleString()} {r.unit}{r.status === 'contradiction' ? ' — CONTRADICTION: one side is wrong' : ''}
-                        </div>
+                        {rows.length === 0 && (
+                          <div className="text-[9px] font-mono text-[var(--text-muted)]">
+                            {analytics.coverage!.result[label === 'MINE PRODUCTION' ? 'mineProduction' : 'refinedProduction'].emptyBecause
+                              ?? 'No compiled country total at this date.'}
+                          </div>
+                        )}
+                        {rows.map(r => (
+                          <div key={r.countryId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono text-[#E8E6E0]">{r.countryName}</span>
+                              <span className="flex items-center gap-1.5 shrink-0">
+                                <ScoreBar value={Math.min(1, r.ratio)} color={r.status === 'contradiction' ? '#FF3D3D' : r.status === 'uncovered' ? '#FF9500' : r.status === 'complete' ? '#00E676' : '#00BCD4'} />
+                                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: r.status === 'contradiction' ? '#FF3D3D' : r.status === 'uncovered' ? '#FF9500' : '#00BCD4' }}>{(r.ratio * 100).toFixed(0)}%</span>
+                              </span>
+                            </div>
+                            <div className="text-[8px] font-mono text-[var(--text-muted)]">
+                              {r.status === 'uncovered'
+                                ? `NO modelled facility behind ${r.direct.toLocaleString()} ${r.unit} — the compiled total is the only evidence`
+                                : `${r.facilityCount} modeled facilit${r.facilityCount === 1 ? 'y' : 'ies'}: ${r.rolledUp.toLocaleString()} of ${r.direct.toLocaleString()} ${r.unit}${r.status === 'contradiction' ? ' — CONTRADICTION: one side is wrong' : ''}`}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>

@@ -281,12 +281,38 @@ export async function GET(request: Request) {
     // facility dot carries its country's facility-model coverage ratio so the
     // renderer can put it in the ink (opacity). A country not in the coverage
     // result stays null: unknown coverage is not full coverage.
-    const coverageSuite = systems.coverage.result as { mineProduction?: { result?: Array<{ countryId: string; ratio: number }> } };
-    const ratioByCountryName = new Map<string, number>();
-    for (const r of coverageSuite.mineProduction?.result ?? []) {
-      const countryName = state.entities.find(e => e.id === r.countryId)?.name;
-      if (countryName) ratioByCountryName.set(countryName, r.ratio);
-    }
+    // COVERAGE OF WHAT. The ratio is per country AND per metric, and this
+    // projection applied the MINE-production table to every facility dot —
+    // so a Chinese smelter's ink was driven by China's mine coverage, a
+    // denominator that has nothing to do with it. Invisible while the mine
+    // table dropped its 0% rows (those facilities fell through to `null`,
+    // accidentally honest); the moment the zeroes were emitted it would have
+    // become nine smelters and refineries wearing a measured number from the
+    // wrong table. The table is chosen by the facility's own stage.
+    const coverageSuite = systems.coverage.result as {
+      mineProduction?: { result?: Array<{ countryId: string; ratio: number }> };
+      refinedProduction?: { result?: Array<{ countryId: string; ratio: number }> };
+    };
+    const ratioTable = (rows: Array<{ countryId: string; ratio: number }> | undefined) => {
+      const m = new Map<string, number>();
+      for (const r of rows ?? []) {
+        const countryName = state.entities.find(e => e.id === r.countryId)?.name;
+        if (countryName) m.set(countryName, r.ratio);
+      }
+      return m;
+    };
+    const mineRatios = ratioTable(coverageSuite.mineProduction?.result);
+    const refinedRatios = ratioTable(coverageSuite.refinedProduction?.result);
+    const coverageFor = (e: { kind: string; country?: string }): number | null => {
+      if (!e.country) return null;
+      // Only the kinds the coverage tables actually measure carry a ratio.
+      // A port or a manufacturer has no facility-model coverage figure, and
+      // borrowing one from another stage would be a fabricated axis.
+      const table = e.kind === 'mine' ? mineRatios
+        : e.kind === 'smelter' || e.kind === 'refinery' ? refinedRatios
+          : null;
+      return table?.get(e.country) ?? null;
+    };
 
     const entities = state.entities
       .filter(e => e.lat !== undefined && e.lng !== undefined && e.kind !== 'country' && e.kind !== 'commodity')
@@ -300,7 +326,7 @@ export async function GET(request: Request) {
         bottleneckScore: scoreByEntity.get(e.id) ?? null,
         eventCount: eventsByEntity.get(e.id) ?? 0,
         disrupted: disrupted.has(e.id),
-        coverageRatio: (e.country && ratioByCountryName.get(e.country)) ?? null,
+        coverageRatio: coverageFor(e),
       }));
 
     // Coordinates for ARC endpoints come from the full register (country

@@ -28,6 +28,19 @@ represented it.
 - Unmapped M49 and MCS identifiers vanished at the resolution gate — the
   rows never became candidate records, so they were not "rejected", they
   simply were not.
+- **The coverage table dropped the rows that mattered most** (phase 42).
+  `facilityCoverage` answers one question — how much of a compiled country
+  total does the facility model account for — and it `continue`d past every
+  country with no facility observation. The rows it discarded were exactly
+  the 0% ones. Measured: 19 countries carry a compiled mine-production
+  total and 9 rows were served; the 10 dropped included China (1800 kt/y),
+  Russia (930), Australia (800), Kazakhstan (740), Canada (450) and Poland
+  (410). For refined production the corpus holds NO refinery or smelter
+  production observation at all, so all 17 were dropped and the table was
+  EMPTY — reading as "no coverage question here" rather than "the facility
+  model accounts for 0% of world refined output". The number the facility
+  HHI travels with said its coverage floor was 21.8%; over the true
+  population it is 0%. No test pinned the row count, so nothing tripped.
 - **The evidence layer's own display caps** (phase 39). The standing
   refusal queue held 30 records; `searchEvidence` served 20; the search
   bar rendered 6 of those. None of the three surfaces said so. The

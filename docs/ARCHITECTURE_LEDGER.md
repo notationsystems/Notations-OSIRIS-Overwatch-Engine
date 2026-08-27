@@ -1957,6 +1957,15 @@ modeled facility accounts for its entire compiled figure. The 22–73%
 range is the interval EXCLUDING Panama. The claim sentences render the
 measured range, not the remembered one.
 
+**Superseded at phase 42, and worth reading as a chain.** The order said
+22–73%; the tree said 21.8–100% "across 9 countries"; and the 9 was
+itself the artefact — `facilityCoverage` was dropping every country with
+no facility observation, so the range was measured over the countries
+that happened to have one. Over all 19 it is **0–100%**. Each correction
+was against the tree, and each was still reading a filtered population.
+The number was never wrong about what it measured; the population it
+measured was never the one the sentence named.
+
 **F-3 — the validator, as a service.** The round-1 contract, unbuilt for
 thirty-five phases, built here because the pivot makes cross-model
 validation the arrangement rather than a contrivance
@@ -2639,6 +2648,75 @@ capability gap for the operator to rank, not a defect to close inside a
 discipline round.
 
 674 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
+## Phase 42 — the coverage instrument was dropping the countries it could not cover
+
+The sweep continued into the coverage system, and found the sharpest
+instance of silent filtering in the project since the aluminium filter.
+
+`facilityCoverage` exists to answer exactly one question: how much of a
+compiled country total does the facility model account for. It
+`continue`d past every country with no facility observation. **The rows
+it discarded were the 0% ones** — the answer to its own question, at its
+most important value.
+
+Measured on the copper corpus:
+
+| metric | countries with a compiled total | rows served | dropped |
+|---|---|---|---|
+| mine production | 19 | 9 | **10** — China 1800 kt/y, Russia 930, Australia 800, Kazakhstan 740, Canada 450, Poland 410, India 30, and three zero-total countries |
+| refined production | 17 | **0** | **17** — the corpus holds no refinery or smelter production observation at all |
+
+So the panel read `FACILITY COVERAGE (9)`, which sounds like nine
+countries assessed and was nine countries that happened to have a
+facility behind them; and the refined-coverage table was not empty
+because there was no question — it was empty because the answer was zero
+everywhere, and zero was the value being filtered out.
+
+**The number this fed.** The facility-level HHI travels with a coverage
+range so it is never read as if the model were complete. That range was
+computed over the surviving rows: **21.8%–100%**. Over the real
+population it is **0%–100%** — China contributes 0% to the facility index
+and 1800 kt/y to the world. Phase 36 had already corrected this number
+once, from the order's remembered "22–73%" to the measured "21.8–100%
+across 9 countries". The correction was against the tree and it was still
+reading a filtered population. The number was never wrong about what it
+measured; the population it measured was never the one the sentence
+named. Corrected at its source in the phase-36 entry.
+
+**A second defect, which the first was hiding.** The map applies a
+coverage ratio to each facility dot as opacity (F-5). It used the
+MINE-production table for every dot — so a Chinese smelter's ink was
+driven by China's *mine* coverage, a denominator with nothing to do with
+it. This was invisible precisely because the mine table dropped its 0%
+rows: those facilities fell through to `null`, accidentally honest. The
+moment the zeroes were emitted, nine smelters and refineries would have
+worn a measured number from the wrong table. Two defects hiding each
+other, and fixing one alone would have made the other worse. The ink now
+reads mine coverage for mines and refined coverage for
+smelters/refineries, and a port or manufacturer carries `null` rather
+than borrowing an axis it has no figure for.
+
+**What is now on the screen** (verified): `FACILITY COVERAGE (36)` —
+`MINE PRODUCTION · 19 countries · 7 with NO modelled facility`,
+`REFINED PRODUCTION · 17 countries · 17 with NO modelled facility`, and
+rows reading `NO modelled facility behind 1,800 kt/y — the compiled total
+is the only evidence`. The refined table had been computed on every run
+since it was built and never rendered at all.
+
+Pinned five ways, including the vacuity guards: every country with a
+compiled total gets a row; a zero total with zero facilities stays
+`complete` (a complete model of nothing — the existing documented rule,
+Panama); the bias floor is 0; the two coverage tables genuinely disagree
+so the map's table choice matters; and a tripwire on the one remaining
+drop (a country entity with no `countryCode`, zero today, a register
+defect rather than a coverage fact if it ever fires).
+
+680 tests green, typecheck clean.
 
 **Exactly one next executable frontier:** unchanged — the researcher
 afternoon.

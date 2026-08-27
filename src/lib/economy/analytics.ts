@@ -433,7 +433,11 @@ export interface CoverageRow {
   /** rolledUp / direct. ≈1 complete facility model; <1 unmodelled share;
    *  >1 a real contradiction — one side is wrong. */
   ratio: number;
-  status: 'complete' | 'partial' | 'contradiction';
+  /** `uncovered` is the row that used to be missing: a compiled country
+   *  total with NO facility observation behind it — 0% modelled, which is
+   *  the most important coverage fact there is and the one this table was
+   *  silently dropping. */
+  status: 'complete' | 'partial' | 'contradiction' | 'uncovered';
   unit: string;
 }
 
@@ -457,21 +461,44 @@ export function facilityCoverage(
   const entityById = new Map(state.entities.map(e => [e.id, e]));
 
   const rows: CoverageRow[] = [];
+  // The one remaining drop: a country-level observation whose entity has no
+  // countryCode cannot be rolled up by countryCode at all. It is zero on the
+  // real corpus (pinned as a tripwire in analytics.test.ts) — if it ever
+  // fires, the register has a country entity without its own code, which is
+  // a register defect and not a coverage fact.
+  let unrollable = 0;
   for (const d of direct) {
     const country = entityById.get(d.entityId);
-    if (!country?.countryCode) continue;
+    if (!country?.countryCode) { unrollable += 1; continue; }
     const facilities = facilityObs.filter(o => {
       const ent = entityById.get(o.entityId);
       // Units must agree — a gross-weight figure must not roll up against
       // a copper-content denominator.
       return ent?.countryCode === country.countryCode && o.unit === d.unit;
     });
-    if (facilities.length === 0) continue;
+    // A country with NO facility observation was DROPPED here, silently.
+    // That is the silent-filtering class inside the instrument whose entire
+    // job is to measure how much of a compiled total the facility model
+    // accounts for: the rows it discarded were exactly the 0% ones.
+    // Measured on the copper corpus: 10 of 19 mine-production countries
+    // dropped — China 1800 kt/y, Russia 930, Australia 800, Kazakhstan 740,
+    // Canada 450, Poland 410 — and ALL 17 refined-production countries,
+    // because the corpus holds no refinery/smelter production observations
+    // at all, so the refined coverage table was empty rather than a table of
+    // zeroes. "FACILITY COVERAGE (9)" read as nine countries assessed; it
+    // was nine countries that happened to have any facility behind them.
     const rolledUp = facilities.reduce((s, o) => s + o.value, 0);
     // A zero country total with zero facility output (e.g. Panama after the
     // closure) is a COMPLETE model of nothing — not a contradiction. Facilities
     // producing against a zero country figure IS one; keep it finite for JSON.
     const ratio = d.value > 0 ? rolledUp / d.value : (rolledUp === 0 ? 1 : 99.999);
+    // Zero facilities against a zero total stays 'complete' — a complete
+    // model of nothing, the existing documented rule (Panama after the
+    // closure). Zero facilities against a real total is 'uncovered'.
+    const status: CoverageRow['status'] =
+      facilities.length === 0 && d.value > 0 ? 'uncovered'
+        : ratio > 1.02 ? 'contradiction'
+          : ratio >= 0.95 ? 'complete' : 'partial';
     rows.push({
       countryId: d.entityId,
       countryName: country.name,
@@ -482,16 +509,19 @@ export function facilityCoverage(
       facilityCount: facilities.length,
       facilityObservationIds: facilities.map(o => o.id),
       ratio: Number(ratio.toFixed(3)),
-      status: ratio > 1.02 ? 'contradiction' : ratio >= 0.95 ? 'complete' : 'partial',
+      status,
       unit: d.unit,
     });
   }
   rows.sort((a, b) => b.direct - a.direct);
   return wrap(
     'facilityCoverage',
-    { metric, facilityKinds: facilityKinds.join(','), asOf },
+    { metric, facilityKinds: facilityKinds.join(','), asOf, unrollableCountryObservations: unrollable },
     { observationIds: [...new Set([...rows.map(r => r.directObservationId), ...rows.flatMap(r => r.facilityObservationIds)])] },
     rows,
+    rows.length === 0
+      ? `No country carries a compiled ${metric} total at this evaluation date, so there is nothing to measure coverage against — this is an absence of the DENOMINATOR, not a statement that the facility model is complete.`
+      : undefined,
   );
 }
 
