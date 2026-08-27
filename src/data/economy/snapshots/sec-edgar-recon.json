@@ -1,0 +1,170 @@
+{
+ "recon": "sec-edgar",
+ "probedAt": "2026-08-27",
+ "userAgentPolicy": "data.sec.gov and efts.sec.gov served with plain declared UA; www.sec.gov Archives (document tier) rejected two non-email UAs with the page titled below \u2014 SEC fair-access requires a declared automated-tool identity including a contact email, which is operator-supplied, never defaulted.",
+ "archivesBlockTitle": "SEC.gov | Your Request Originates from an Undeclared Automated Tool",
+ "submissions": {
+  "endpoint": "https://data.sec.gov/submissions/CIK0000831259.json",
+  "name": "FREEPORT-MCMORAN INC",
+  "recentWindow": [
+   "2013-05-10",
+   "2026-08-26"
+  ],
+  "annualReports": [
+   {
+    "form": "10-K",
+    "filingDate": "2026-02-13",
+    "accession": "0000831259-26-000012",
+    "primaryDocument": "fcx-20251231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2025-02-14",
+    "accession": "0000831259-25-000006",
+    "primaryDocument": "fcx-20241231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2024-02-16",
+    "accession": "0000831259-24-000011",
+    "primaryDocument": "fcx-20231231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2023-02-15",
+    "accession": "0000831259-23-000013",
+    "primaryDocument": "fcx-20221231.htm"
+   },
+   {
+    "form": "10-K/A",
+    "filingDate": "2022-02-18",
+    "accession": "0000831259-22-000012",
+    "primaryDocument": "fcx-20211231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2022-02-15",
+    "accession": "0000831259-22-000009",
+    "primaryDocument": "fcx-20211231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2021-02-16",
+    "accession": "0000831259-21-000009",
+    "primaryDocument": "fcx-20201231.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2020-02-14",
+    "accession": "0000831259-20-000004",
+    "primaryDocument": "a2019form10-k.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2019-02-15",
+    "accession": "0000831259-19-000009",
+    "primaryDocument": "a2018form10-k.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2018-02-20",
+    "accession": "0000831259-18-000008",
+    "primaryDocument": "a2017form10-k.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2017-02-24",
+    "accession": "0000831259-17-000012",
+    "primaryDocument": "a2016form10-k.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2016-02-26",
+    "accession": "0000831259-16-000062",
+    "primaryDocument": "a2015form10-k.htm"
+   },
+   {
+    "form": "10-K/A",
+    "filingDate": "2015-06-12",
+    "accession": "0000831259-15-000033",
+    "primaryDocument": "form10-kxa.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2015-02-27",
+    "accession": "0000831259-15-000016",
+    "primaryDocument": "a2014form10-k.htm"
+   },
+   {
+    "form": "10-K",
+    "filingDate": "2014-02-27",
+    "accession": "0000831259-14-000006",
+    "primaryDocument": "a2013form10-k.htm"
+   }
+  ],
+  "olderContinuationFiles": [
+   "CIK0000831259-submissions-001.json"
+  ]
+ },
+ "fullTextSearch": {
+  "endpoint": "https://efts.sec.gov/LATEST/search-index?q=%22Grasberg+minerals+district%22&forms=10-K",
+  "totalHits": {
+   "value": 36,
+   "relation": "eq"
+  },
+  "topHit": {
+   "_index": "edgar_file",
+   "_id": "0000831259-22-000009:a2021trsptfi-exhibit.htm",
+   "_score": 34.80848,
+   "_source": {
+    "ciks": [
+     "0000831259"
+    ],
+    "period_ending": "2021-12-31",
+    "file_num": [
+     "001-11307-01"
+    ],
+    "display_names": [
+     "FREEPORT-MCMORAN INC  (FCX)  (CIK 0000831259)"
+    ],
+    "xsl": null,
+    "sequence": 20,
+    "root_forms": [
+     "10-K"
+    ],
+    "file_date": "2022-02-15",
+    "biz_states": [
+     "AZ"
+    ],
+    "sics": [
+     "1000"
+    ],
+    "form": "10-K",
+    "adsh": "0000831259-22-000009",
+    "film_num": [
+     "22638764"
+    ],
+    "biz_locations": [
+     "Phoenix, AZ"
+    ],
+    "file_type": "EX-96.2",
+    "file_description": "EX-96.2",
+    "inc_states": [
+     "DE"
+    ],
+    "items": []
+   }
+  },
+  "reading": "FCX filing vocabulary is \"Grasberg minerals district\" \u2014 district, not mine."
+ },
+ "xbrlCompanyFacts": {
+  "endpoint": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000831259.json",
+  "namespaces": {
+   "dei": 2,
+   "srt": 25,
+   "us-gaap": 768,
+   "ecd": 5
+  },
+  "reading": "No production-volume tags in any namespace \u2014 facility production lives only in narrative HTML tables, i.e. only behind the document tier."
+ }
+}

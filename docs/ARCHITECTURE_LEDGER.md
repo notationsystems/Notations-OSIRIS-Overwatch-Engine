@@ -917,6 +917,50 @@ Doc-and-registry round; nothing built. Both decisions are recorded on the
    different questions; the second is measured. Provenance continues to
    name the discloser, which is where "who published this" belongs.
 
+## Phase 21 — EDGAR recon: three questions probed, two answered, one gated
+
+Recon-only round against live endpoints from this sandbox; verbatim
+captures in `snapshots/sec-edgar-recon.json`. The three shape questions
+from the round-20 review, in their probe order:
+
+1. **Vintage depth — answered, and it is the pleasant surprise
+   confirmed.** The submissions API serves Freeport's complete filing
+   index: annual reports 2013→2026 in the recent window alone, an older-
+   files continuation beyond it, and the FY2021 **10-K/A amendment
+   sitting beside its original** — supersedes chains pre-exist in the
+   source. `filingDate` is knownAt (~45 days after the Dec-31 period
+   end: knowledge lag measured, not assumed). Unlike Comtrade this
+   source keeps everything, so vintages are recoverable retrospectively
+   rather than now-or-never. **Ingest-shape decision: the first ingest
+   targets the decade, not the latest filing** — backfill is one index
+   call plus N documents, and it is the only structural source whose
+   revision history can be reconstructed after the fact.
+2. **Reporting-unit alignment — direction answered, table shape gated.**
+   Full-text search returns 36 filings for the exact phrase "Grasberg
+   minerals district" — FCX's own vocabulary is the DISTRICT, not the
+   mine the register holds. So EDGAR observations require a curated
+   reporting-unit → entity mapping (or district-level entities); forcing
+   a district or share-weighted figure into a facility observation would
+   be the round-4 basis error in a new place, exactly as the review
+   warned. Whether Morenci is share-weighted and how the
+   consolidated/attributable columns sit needs the document itself.
+3. **Consolidated vs attributable — gated at the document tier.** XBRL
+   company facts verified production-free (800 tags across four
+   namespaces, all financial statements), so production tables live ONLY
+   in the narrative HTML — and the Archives host rejected two truthful
+   non-email UAs: SEC fair-access requires a declared automated-tool
+   identity **including a contact email**. That identity is the
+   operator's to supply (env-var config on the adapter), never
+   defaulted and never borrowed — the recon deliberately did not send
+   one. The block page is captured verbatim as the evidence.
+
+Consequence for the adapter build: everything except the table parse is
+ready (index → knownAt → vintage backfill plan); the parse itself and
+the consolidated/attributable decision resolve on the first document
+fetch once a contact identity is configured. When the answer lands, the
+attribution scope belongs ON the observation, not inferred at read time,
+per the review.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
