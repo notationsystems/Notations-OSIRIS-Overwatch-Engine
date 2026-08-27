@@ -672,12 +672,19 @@ exposed the class.
    CONTINUES (there is no other modeled structure) with the contradiction
    **carried on every projection** — `TopologyValidity.structuralEvidence`
    plus a note escalated to STRUCTURE HAS MOVED, pinned in propagation and
-   API tests — rather than nulled (the affected entity's live event
-   already carries the disruption through propagation; nulling would
-   double-count the event mechanism). The evidence axis thereby graduates
-   from a remembered assumption to a product invariant; the clock ceiling
-   remains the guard's condition, now protecting even evidence-carried
-   extrapolation from outliving a skipped vintage.
+   API tests — rather than nulled. [Reason corrected in phase 16 — the
+   original "nulling would double-count the event mechanism" conflated two
+   different quantities. The event mechanism carries the MAGNITUDE: output
+   falls, impairment propagates along the modeled edges. Structural
+   evidence says the EDGES THEMSELVES may be wrong — force majeure
+   redirects contracts, buyers re-source, routes change shape. Those are
+   two different errors and only the first is handled. Figures continue
+   because NO OTHER STRUCTURE IS MODELED — not because the residual is
+   bounded; the residual at the affected entities is unquantified
+   structural drift, and the banner says so.] The evidence axis thereby
+   graduates from a remembered assumption to a product invariant; the
+   clock ceiling remains the guard's condition, now protecting even
+   evidence-carried extrapolation from outliving a skipped vintage.
 3. **Entity provenance: the divergence resolved toward the code.** Round-1
    prose said each identity record carries provenance; the types say
    `Entity` deliberately does not — an entity is an IDENTITY record, and
@@ -688,6 +695,48 @@ exposed the class.
    provenance-bearing record** (no orphan identities; verified with no
    carve-outs — the commodity node included). This is the same attestation
    rule search's knowledge coherence already applied.
+
+## Phase 16 — the trigger honours the badge, and identity gets its evidence class
+
+1. **The evidence trigger is knowledge-filtered.** Round-15 review caught a
+   genuine inconsistency with the system's own invariant: the trigger was
+   occurrence-filtered, and in the window between occurrence and first
+   report (the mud rush occurred 09-08, entered the evidence base 09-10) an
+   as_known_then evaluation would have fired on an event nobody could yet
+   know — hindsight leakage in the mode built to exclude it. The engine's
+   asKnownThen filter did block this on every current path (unreported
+   events never reach the function), but that protection was POSITIONAL —
+   correctness remembered at the call sites, not checked in the function,
+   which is exactly the shape this project keeps converting. The fix is the
+   observation distinction applied to events: the postdating condition
+   stays on occurrence (a fact about the world); the VISIBILITY condition
+   keys on firstReportedAt under as_known_then and occurrence under
+   best_known, both dates already on the record from the detection-latency
+   work. The sibling pin asserts the two modes disagree at 2025-09-09 and
+   re-agree at 09-10 — and first asserts the mud rush's two dates differ,
+   the vacuity condition without which the pin proves nothing.
+2. **The Phase 15 reason was corrected in place** (see the bracketed
+   amendment there): "nulling would double-count" conflated magnitude
+   impairment with edge-shape wrongness. The banner now claims only what
+   is true — "figures continue because no other structure is modeled" —
+   and names the residual as unquantified structural drift, because that
+   reason is what a future reader will re-decide against.
+3. **Entity attestation carries its class.** The phase-15 orphan test
+   proved every entity is attested but not BY WHAT. `entityAttestation`
+   reports the strongest evidence class attesting each identity (strongest,
+   not weakest: one reported record defeats any number of representative
+   ones as proof the entity is more than curation), with two tiers below
+   the valueKind ladder: `event_only` and `structural_only` (dependency
+   edges alone). Surfaced on search hits (SearchHit.attestation, added to
+   the pinned register fields), the entity API, and the inspector header.
+   The measured finding it immediately produced: country identities are
+   reported-attested via the live USGS series, but **even the corpus's
+   best-known facility (Escondida) is representative-attested — every
+   facility-level quantity is curation-class** — and the JV operating
+   vehicles are structural_only, existing on a curated relationship claim
+   alone. The round-3 real-name/synthetic-number concern, one level up:
+   now labeled wherever the identity appears instead of implied by
+   drilling into its records.
 
 ## Capability gap analysis (post-phase-2)
 
@@ -703,7 +752,7 @@ exposed the class.
 
 ## Verification
 
-Every subsystem above ships with executable tests (160+ economy tests; 526
+Every subsystem above ships with executable tests (160+ economy tests; 529
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
-import { knownAtOf, outranksObservation } from '@/lib/economy/analytics';
+import { entityAttestation, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
@@ -32,6 +32,10 @@ interface SearchHit {
   zoom: number;
   /** One-line evidence summary (latest resolved observation or capacity). */
   headline?: string;
+  /** Strongest evidence class attesting the entity's existence — the
+   *  identity-level sibling of valueKind. 'representative' or below means
+   *  the entity exists, within OSIRIS, purely on curation. */
+  attestation?: AttestationKind;
 }
 
 const KIND_ZOOM: Record<string, number> = {
@@ -147,6 +151,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `unknown commodity "${commodity}"` }, { status: 404 });
   }
   const knowable = restrictTo ? knowableEntities(state, restrictTo) : null;
+  const attestation = entityAttestation(state);
 
   const hits: Array<SearchHit & { _score: number; _rank: number }> = [];
   let withheld = 0;
@@ -165,6 +170,7 @@ export async function GET(request: Request) {
       lng: e.lng,
       zoom: KIND_ZOOM[e.kind] ?? 6,
       headline: headlineFor(state, e.id, restrictTo),
+      attestation: attestation.get(e.id),
       _score: score,
       _rank: KIND_RANK[e.kind] ?? 9,
     });
@@ -173,6 +179,7 @@ export async function GET(request: Request) {
   const results = hits.slice(0, 8).map((h): SearchHit => ({
     id: h.id, name: h.name, kind: h.kind, stage: h.stage, country: h.country,
     operator: h.operator, lat: h.lat, lng: h.lng, zoom: h.zoom, headline: h.headline,
+    attestation: h.attestation,
   }));
 
   // A TRUE miss — no hits and nothing withheld — is a demand signal against

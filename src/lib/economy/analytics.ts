@@ -84,6 +84,50 @@ export function outranksObservation(candidate: Observation, incumbent: Observati
   return outranks(candidate, incumbent);
 }
 
+/* ── Entity attestation ── */
+
+export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structural_only';
+
+/**
+ * The STRONGEST evidence class attesting each entity's existence — the
+ * identity-level sibling of per-record valueKind. An entity whose best
+ * attesting class is 'representative' (or below) exists, within OSIRIS,
+ * purely on curation: a real name carried entirely by synthetic-class
+ * numbers, which is the round-3 concern one level up, at identity rather
+ * than quantity. (Strongest, not weakest, is the right aggregate: an entity
+ * with one reported record is not curation-only however many representative
+ * records also touch it.) Tiers below the valueKind ladder: 'event_only' —
+ * attested solely by curated real-world events (a reported occurrence, but
+ * no quantity of any class); 'structural_only' — attested solely by
+ * dependency edges (a curated relationship claim; the JV operating vehicles
+ * live here by construction).
+ */
+export function entityAttestation(state: EconomyState): Map<string, AttestationKind> {
+  const best = new Map<string, Observation['valueKind']>();
+  const consider = (id: string | undefined, vk: Observation['valueKind']) => {
+    if (!id) return;
+    const cur = best.get(id);
+    if (!cur || VALUE_KIND_RANK[vk] > VALUE_KIND_RANK[cur]) best.set(id, vk);
+  };
+  for (const o of state.observations) { consider(o.entityId, o.valueKind); consider(o.partnerEntityId, o.valueKind); }
+  for (const f of state.flows) { consider(f.fromEntityId, f.valueKind); consider(f.toEntityId, f.valueKind); }
+  for (const c of state.capacities) consider(c.entityId, c.valueKind);
+  const eventAttested = new Set<string>();
+  for (const ev of state.events) if (ev.entityId) eventAttested.add(ev.entityId);
+  const depAttested = new Set<string>();
+  for (const d of state.dependencies) { depAttested.add(d.fromEntityId); depAttested.add(d.toEntityId); }
+  const out = new Map<string, AttestationKind>();
+  for (const e of state.entities) {
+    const vk = best.get(e.id);
+    if (vk) out.set(e.id, vk);
+    else if (eventAttested.has(e.id)) out.set(e.id, 'event_only');
+    else if (depAttested.has(e.id)) out.set(e.id, 'structural_only');
+    // An entity setting nothing here is unattested — the store test pins
+    // that none exist.
+  }
+  return out;
+}
+
 function outranks(candidate: Observation, incumbent: Observation): boolean {
   if (VALUE_KIND_RANK[candidate.valueKind] !== VALUE_KIND_RANK[incumbent.valueKind]) {
     return VALUE_KIND_RANK[candidate.valueKind] > VALUE_KIND_RANK[incumbent.valueKind];

@@ -195,6 +195,25 @@ describe('topology validity (what WAS vs what was KNOWN)', () => {
     expect(before.note).not.toContain('STRUCTURE HAS MOVED');
   });
 
+  it('the evidence trigger honours the knowledge state: occurrence under best_known, first report under as_known_then', async () => {
+    const { state } = await getEconomyState('copper');
+    const ev = state.events.find(e => e.id === 'evt:grasberg-mud-rush-2025')!;
+    // Vacuity: this pin proves something only while the two dates differ —
+    // the mud rush occurred 09-08 and entered the evidence base 09-10.
+    expect(ev.firstReportedAt! > ev.start).toBe(true);
+    // In the occurrence→report window, the contradiction EXISTS (the world
+    // moved) but is not yet KNOWABLE: best_known fires, as_known_then must
+    // not — firing there would be hindsight leakage in the mode built to
+    // exclude it.
+    const best = topologyValidity(state, '2025-09-09');
+    expect(best.structuralEvidence!.map(e => e.id)).toContain('evt:grasberg-mud-rush-2025');
+    const known = topologyValidity(state, '2025-09-09', 'as_known_then');
+    expect((known.structuralEvidence ?? []).map(e => e.id)).not.toContain('evt:grasberg-mud-rush-2025');
+    // From the report date the two modes agree again.
+    const knownAfter = topologyValidity(state, '2025-09-10', 'as_known_then');
+    expect(knownAfter.structuralEvidence!.map(e => e.id)).toContain('evt:grasberg-mud-rush-2025');
+  });
+
   it('an extrapolated evaluation keeps its figures and carries the label', () => {
     const s = syntheticState();
     s.events.push({

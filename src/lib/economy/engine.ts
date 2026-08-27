@@ -161,7 +161,10 @@ const SYSTEMS: EconomySystem[] = [
   {
     name: 'propagation',
     describes: 'Event → state-change propagation: disrupted flow, downstream exposure, alternative capacity',
-    run: (state, graph, ctx) => propagateEvents(state, graph, ctx.asOf ? { asOf: ctx.asOf } : {}),
+    run: (state, graph, ctx) => propagateEvents(state, graph, {
+      ...(ctx.asOf ? { asOf: ctx.asOf } : {}),
+      ...(ctx.knowledge ? { knowledge: ctx.knowledge } : {}),
+    }),
   },
 ];
 

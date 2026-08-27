@@ -65,7 +65,7 @@ export async function GET(request: Request) {
   // The scrubber is honest about observations (knownAt) — it must be equally
   // honest about arcs: flow topology is a single-vintage claim about a
   // period, and an evaluation date outside that period says so.
-  const topology = topologyValidity(state, evalDate);
+  const topology = topologyValidity(state, evalDate, knowledge);
 
   if (view === 'state') {
     return NextResponse.json({ providers, state });

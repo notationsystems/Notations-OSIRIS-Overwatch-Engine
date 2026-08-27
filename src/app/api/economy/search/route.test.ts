@@ -20,6 +20,18 @@ describe('GET /api/economy/search', () => {
     // search result never presents a number without its epistemic status.
     expect(hit.headline).toContain('production');
     expect(hit.headline).toMatch(/reported|estimated|representative|derived/);
+    // The entity itself carries its attestation class too: Escondida's
+    // facility-level evidence is all curation-class, and the hit says so.
+    expect(hit.attestation).toBe('representative');
+  });
+
+  it('attestation distinguishes measured identities from curated ones', async () => {
+    const chile = await (await get('q=chile')).json();
+    expect(chile.results[0].id).toBe('ent:country:cl');
+    expect(chile.results[0].attestation).toBe('reported');
+    const jv = await (await get('q=antamina')).json();
+    const vehicle = jv.results.find((r: { id: string }) => r.id === 'ent:company:antamina-jv');
+    expect(vehicle.attestation).toBe('structural_only'); // exists on a curated relationship claim alone
   });
 
   it('is case-insensitive and matches by operator and country', async () => {
@@ -101,7 +113,7 @@ describe('search miss → registry gap', () => {
 
 describe('search policy: no natural persons', () => {
   it('SearchHit projects register fields only — no person-shaped keys can leak', async () => {
-    const REGISTER_FIELDS = ['id', 'name', 'kind', 'stage', 'country', 'operator', 'lat', 'lng', 'zoom', 'headline'];
+    const REGISTER_FIELDS = ['id', 'name', 'kind', 'stage', 'country', 'operator', 'lat', 'lng', 'zoom', 'headline', 'attestation'];
     const body = await (await get('q=freeport')).json();
     expect(body.results.length).toBeGreaterThan(0);
     for (const hit of body.results) {

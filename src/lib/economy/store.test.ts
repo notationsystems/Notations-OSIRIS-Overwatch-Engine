@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { getEconomyState, entityDetail } from './store';
+import { entityAttestation } from './analytics';
 import { registerAdapter, unregisterAdapter } from './adapters';
 
 describe('economy store (curated copper assembly)', () => {
@@ -41,6 +42,28 @@ describe('economy store (curated copper assembly)', () => {
     for (const ev of state.events) if (ev.entityId) attested.add(ev.entityId);
     const orphans = state.entities.filter(e => !attested.has(e.id));
     expect(orphans.map(e => e.id)).toEqual([]);
+  });
+
+  it('attestation carries its class: WHAT attests an entity, not just that something does', async () => {
+    // The identity-level sibling of valueKind: an entity whose strongest
+    // attesting class is representative (or below) exists purely on
+    // curation — a real name carried entirely by synthetic-class numbers.
+    const { state } = await getEconomyState('copper');
+    const att = entityAttestation(state);
+    // Every entity classified (the orphan test above guarantees coverage).
+    for (const e of state.entities) expect(att.get(e.id), e.id).toBeTruthy();
+    // The measured finding this label exists to surface: country-level
+    // identities are reported-attested (live USGS series), but even the
+    // corpus's best-known FACILITY is representative-attested — every
+    // facility-level quantity is curation-class. The label now says so.
+    expect(att.get('ent:country:cl')).toBe('reported');
+    expect(att.get('ent:mine:escondida')).toBe('representative');
+    // The JV operating vehicles are attested by dependency edges alone —
+    // structural_only by construction (round 11: curated pass-through
+    // vehicles), and the label now says so rather than the panel implying
+    // measured evidence exists.
+    expect(att.get('ent:company:antamina-jv')).toBe('structural_only');
+    expect(att.get('ent:company:collahuasi-jv')).toBe('structural_only');
   });
 
   it('keeps curated records representative; reported/estimated only from live providers', async () => {

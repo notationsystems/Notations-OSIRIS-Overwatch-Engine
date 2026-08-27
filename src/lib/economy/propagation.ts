@@ -147,16 +147,28 @@ const daysBetween = (fromISO: string, toISO: string): number =>
  * a scoped regulatory event rewires crossing flows; a sanction/insolvency
  * re-routes counterparties; an OPEN-ENDED high-severity disruption is the
  * force-majeure shape (a disruption with a curated end is transience — the
- * structure came back). Occurrence axis (ev.start), not knowledge: under
- * as_known_then the state is already knowledge-filtered upstream.
+ * structure came back).
+ *
+ * Two date filters, two different questions. The POSTDATING condition is
+ * about the world and always uses occurrence (ev.start > periodEnd). The
+ * VISIBILITY condition depends on the knowledge mode: best_known admits an
+ * event from its occurrence; as_known_then admits it only from its first
+ * report — in the window between the two, the contradiction exists but
+ * nobody could yet know it, and firing there would be hindsight leakage in
+ * the mode built to exclude it. (The engine's asKnownThen filter also
+ * removes unreported events upstream, but that protection is positional —
+ * this makes the property local to the function.)
  */
 export function structuralTopologyEvidence(
   state: EconomyState,
   periodEnd: string,
   asOf: string,
+  knowledge: 'best_known' | 'as_known_then' = 'best_known',
 ): NonNullable<TopologyValidity['structuralEvidence']> {
+  const visibleAt = (ev: EconEvent): string =>
+    knowledge === 'as_known_then' ? (ev.firstReportedAt ?? ev.start) : ev.start;
   return state.events
-    .filter(ev => ev.start > periodEnd && ev.start <= asOf)
+    .filter(ev => ev.start > periodEnd && visibleAt(ev) <= asOf)
     .filter(ev =>
       ev.type === 'closure'
       || ev.type === 'expansion'
@@ -166,7 +178,11 @@ export function structuralTopologyEvidence(
     .map(ev => ({ id: ev.id, title: ev.title, start: ev.start, type: ev.type }));
 }
 
-export function topologyValidity(state: EconomyState, asOf: string): TopologyValidity {
+export function topologyValidity(
+  state: EconomyState,
+  asOf: string,
+  knowledge: 'best_known' | 'as_known_then' = 'best_known',
+): TopologyValidity {
   if (state.flows.length === 0) {
     return { topologyPeriod: null, evaluatedAt: asOf, status: 'within' };
   }
@@ -185,13 +201,18 @@ export function topologyValidity(state: EconomyState, asOf: string): TopologyVal
       ? { note: `Flow topology describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only. Flow vintages are the recorded fix.` }
       : status === 'extrapolated'
         ? (() => {
-            const evidence = structuralTopologyEvidence(state, end, asOf);
+            const evidence = structuralTopologyEvidence(state, end, asOf, knowledge);
             const base = `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`;
             return {
               extrapolationDays: daysBetween(end, asOf),
               ...(evidence.length > 0 ? { structuralEvidence: evidence } : {}),
+              // Two different errors, only one handled: the event mechanism
+              // carries the output loss along the MODELED edges; whether the
+              // edges themselves still hold is unquantified structural
+              // drift. Figures continue because nothing better is modeled,
+              // not because the residual is bounded.
               note: evidence.length > 0
-                ? `${base} STRUCTURE HAS MOVED since the snapshot: ${evidence.length} post-period structural event(s) [${evidence.map(e => e.id).join(', ')}] contradict extrapolation at the affected entities — their live events already carry the disruption; the snapshot remains the only modeled structure elsewhere.`
+                ? `${base} STRUCTURE HAS MOVED since the snapshot: ${evidence.length} post-period structural event(s) [${evidence.map(e => e.id).join(', ')}] contradict extrapolation at the affected entities. Figures continue because no other structure is modeled — the residual there is unquantified structural drift, not a bounded error.`
                 : base,
             };
           })()
@@ -309,12 +330,12 @@ function regulatoryImpact(
 export function propagateEvents(
   state: EconomyState,
   graph: EconomyGraph,
-  { asOf = new Date().toISOString().slice(0, 10), maxDepth = 4 } = {},
+  { asOf = new Date().toISOString().slice(0, 10), maxDepth = 4, knowledge = 'best_known' as 'best_known' | 'as_known_then' } = {},
 ): AnalyticalResult<EventImpact[]> {
   const throughput = nodeThroughput(graph);
   // asOf filters what was KNOWN; the flow topology claims what WAS, and only
   // one vintage of it exists. Evaluate the mismatch once for the whole pass.
-  const validity = topologyValidity(state, asOf);
+  const validity = topologyValidity(state, asOf, knowledge);
   const predates = validity.status === 'predates';
 
   const impacts: EventImpact[] = [];

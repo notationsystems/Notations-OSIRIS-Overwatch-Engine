@@ -88,6 +88,8 @@ interface Step { id: string; name: string; kind: string; stage: string | null; c
 
 interface EntityDetail {
   entity: { id: string; name: string; kind: string; stage?: string; country?: string; operator?: string; lat?: number; lng?: number; geoPrecision?: string; notes?: string };
+  /** Strongest evidence class attesting the entity's existence. */
+  attestation?: string | null;
   observations: Obs[];
   capacities: Cap[];
   flowsIn: FlowRec[];
@@ -304,6 +306,14 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                   {detail.entity.country ? ` · ${detail.entity.country}` : ''}
                   {detail.entity.operator ? ` · ${detail.entity.operator}` : ''}
                   {detail.entity.geoPrecision ? ` · geo:${detail.entity.geoPrecision}` : ''}
+                  {/* Identity-level evidence class — what attests the entity
+                      itself, not just its numbers. representative-or-below
+                      means the identity rests purely on curation. */}
+                  {detail.attestation ? (
+                    <span> · <span style={{ color: detail.attestation === 'reported' || detail.attestation === 'estimated' ? '#00E676' : '#FF9500' }}>
+                      attested:{detail.attestation.toUpperCase()}
+                    </span></span>
+                  ) : null}
                 </div>
                 {detail.entity.notes && <div className="text-[9px] font-mono text-[var(--text-muted)] opacity-80 mt-1">{detail.entity.notes}</div>}
               </div>
