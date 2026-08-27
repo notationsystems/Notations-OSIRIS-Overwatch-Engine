@@ -125,15 +125,23 @@ describe('scenario: counterfactual injection', () => {
     const onlyNow = now.state.observations.filter(o => !thenObs.has(o.id));
     expect(onlyNow.length).toBeGreaterThan(0);
     // And label what is identical BY CONSTRUCTION, so the assertion above
-    // never silently overclaims: dependency and flow records are curated
-    // with a single vintage and no revision history, so the equality of the
-    // structural walk itself is partially guaranteed. What this test
-    // genuinely establishes is the event-visibility gate (below) and that
-    // the conclusion holds while the observation layer differs — NOT that
-    // the analytics survive dependency-graph revisions, which the dataset
-    // cannot yet exercise.
+    // never silently overclaims: dependency records and CURATED flows are
+    // single-vintage with no revision history, so the equality of the
+    // structural walk itself is partially guaranteed. SOURCED flows stopped
+    // being by-construction when work order 3.2 landed the country flow
+    // vintages: captured 2026-08-27, so as_known_then at 2025 must withhold
+    // them — the capture is the only publication bound the corpus can
+    // honestly claim (Comtrade revises in place), and the earlier date is
+    // refused rather than defaulted. What this test genuinely establishes
+    // is the event-visibility gate (below) and that the conclusion holds
+    // while the observation layer differs — NOT that the analytics survive
+    // dependency-graph revisions, which the dataset cannot yet exercise.
     expect(then.state.dependencies.map(d => d.id)).toEqual(now.state.dependencies.map(d => d.id));
-    expect(then.state.flows.map(f => f.id)).toEqual(now.state.flows.map(f => f.id));
+    const curatedFlowIds = (flows: typeof now.state.flows) => flows.filter(f => f.valueKind === 'representative').map(f => f.id);
+    expect(curatedFlowIds(then.state.flows)).toEqual(curatedFlowIds(now.state.flows));
+    const thenFlowIds = new Set(then.state.flows.map(f => f.id));
+    const withheldVintages = now.state.flows.filter(f => f.valueKind !== 'representative' && !thenFlowIds.has(f.id));
+    expect(withheldVintages.length).toBeGreaterThan(0); // vacuity: the knowledge gate actually withheld flow records here
     // And the frames make the two runs distinguishable — without knowledge in
     // the fingerprint, a disagreeing replay could not tell "baseline moved"
     // from "we know more now".

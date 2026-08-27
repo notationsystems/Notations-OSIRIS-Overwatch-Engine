@@ -1189,6 +1189,153 @@ structural layer is 0% sourced here too.
    important finding twenty-five rounds could produce. Running that
    session is the operator's move; the instrument is ready for it.
 
+## Phase 26 — work order 3.1: the guard evaluation scope is certified, not listed
+
+Report per the standing order (2026-08-27, `docs/WORK_ORDER_2026-08-27.md`):
+one report per item — built, measured, criteria, unanticipated, guards moved.
+
+**Built.** `guardEvaluationScope()` derives the partition set from the
+adapter register (`listAdapters().flatMap(a => a.commodities)`, deduplicated,
+sorted) — never a literal, because a literal partition list is subject to
+the exact defect the certification exists to catch (three instances of
+"checked correctly somewhere, silent everywhere else the condition holds"
+were each found by a human, one twenty rounds late).
+`evaluateAllDeferredDecisions(now)` is THE runner: it walks every
+partition in the derived scope, records every (partition × predicate)
+cell it actually evaluated, and tags every failure with the partition it
+failed in (`ScopedGuardFailure.commodity`) — evaluation scope travels
+with the failure message.
+
+**Measured.** Scope today: `['aluminium', 'copper']`; 7 deferred-decision
+predicates × 2 partitions = 14 cells evaluated by the standing suite,
+which now uses the derived runner (a hand-listed subset elsewhere is the
+named defect).
+
+**Criteria.** All three pre-registered criteria passed: (1) scope derived
+from the register, no literal — pinned by the certification test naming
+the full cross-product; (2) planted-partition test — registering a
+`test-planted-commodity` adapter puts `testium-planted` into the scope
+and the evaluated cells with NO change to the guard module (unregistered
+in `finally`); (3) failures carry their partition.
+
+**Unanticipated — a boundary worth recording.** The certification covers
+the COMMODITY axis because that is the partition the register exposes.
+Item 3.2 promptly demonstrated a different axis of the same species:
+graph-frame vs state-frame (a graph built for one date evaluated under
+another date's validity). The scope certification did not and could not
+catch that one — no register enumerates evaluation frames. The general
+lesson stands as a lesson, not a theorem: each new partition axis needs
+its own derivation source, and the 3.2 fix (the graph carries its own
+selection) is that pattern applied structurally rather than by scope
+enumeration.
+
+**Guards moved.** None in this item.
+
+## Phase 27 — work order 3.2: country flow vintages — historical propagation restored at the granularity the evidence carries
+
+**Built.** Five reporter-years of HS 2603 reporter-declared exports
+captured live 2026-08-27 (CL 2017/2019, PE 2020/2022, ID 2017), archived
+under the now-or-never rule (`data-archive/comtrade/2026-08-27/` + the
+committed snapshot — Comtrade revises in place, so the capture IS the
+vintage). `flowVintages.ts` builds country→country Flow records with full
+RowAccounting (world-aggregate rows, unmapped partners with codes, the
+50 kt noise floor — all named and counted); Chile's rows carry
+`metal_content` (the round-4/5 mirror finding: CL declares contained
+metal, CL→CN ratio 3.97), every other reporter `gross_weight`.
+`selectTopology` serves exactly ONE granularity per graph: the facility
+snapshot for dates it covers, else the latest country vintage at or
+before the date; the graph CARRIES its selection (`graph.selection`) and
+`topologyValidity` classifies against it, so the figure and its label
+provably share one frame. At country granularity: a staged regulatory
+scope binds corridors through the flow FORM (ore/concentrate are
+production-stage output in every modeled chain — no commodity-shaped
+constant; every other pairing is scope-UNDECIDABLE and excluded visibly),
+facility events refuse tonnage with the ALLOCATION MODEL named, an
+uncaptured jurisdiction refuses via VINTAGE COVERAGE (absence of capture
+is not absence of flow), all-refused gross corridors are null with the
+corridor grade as remedy, partial sums are labeled LOWER BOUND. The map
+scrubber draws vintage arcs labeled by granularity and year.
+
+**Measured.** The 2017 Grasberg export halt finds its real crossing
+corridors — JP 445 / KR 204 / CN 185 / IN 287 kt gross (PH 418 dropped:
+partner 608 unmapped, counted in the accounting) — receivers named,
+domestic smelters spared, tonnage basis-REFUSED (gross, no mirror grade
+for ID). Peru 2020 reaches its mines and its receivers (CN/JP/KR/DE),
+tonnage basis-REFUSED likewise. Where the basis resolves the vintage
+QUANTIFIES: a scenario-posed 2019 Chilean export ban states 2,723 kt
+contained metal (CN 1694 + JP 599 + KR 280 + IN 150) from the vintage.
+`structuralClassProfile.flows` now aggregates PER BASIS (summing gross
+and contained metal would be the incommensurability species inside the
+watching instrument): copper metal_content 0 → **0.202** sourced-by-kt,
+gross_weight **1.0** (all vintage, no curated gross flows); capacities
+and attribution edges still 0. India's Comtrade PARTNER code is 699 (not
+ISO 356) — found when Indonesia's third-largest 2017 receiver dropped
+unmapped; exactly the gap class item 3.3's resolution gate exists to
+surface.
+
+**Criteria vs the pre-registration — one disagreement, reported, not
+adjusted.** (1) A 2017 evaluation produces non-null propagation: PASSED
+for reach and corridors; tonnage is basis-refused where the reporter
+declares gross — the number states only what the basis carries. (2)
+'predates' fires only before the earliest vintage: PASSED (2015
+predates; 2017 is served, within, country granularity). (3) **At least
+three of the five nulling events propagate: FAILED at 2 of 5.** Only
+Grasberg-halt 2017 and Peru 2020 are country-shaped events; Escondida
+2017, Chuquicamata 2019 and Las Bambas 2022 are facility events, and
+criterion (4) — facility events still refuse with the allocation model
+named: PASSED — caps them there. Criteria (3) and (4) are jointly
+unsatisfiable over this register: the pre-registration assumed more of
+the truth-set was country-shaped than it is. Per the round-6 rule the
+criteria stand as written and the measurement disagrees with them. (5)
+The flow-vintages guard fires and is re-taken: PASSED — the predicate
+("exactly one distinct flow period exists") fired the day the vintages
+landed, exactly as designed, and was re-taken as
+`allocation-model-deferred` (valid while no flow record mixes
+granularities — a facility-attributed country corridor is the arrival
+that forces the re-take), with its planted vacuity pin.
+
+**Unanticipated.** Four findings, three of them defects this item's own
+wiring exposed or created:
+1. **Graph/frame incoherence (created, then made impossible).** The first
+   wiring re-selected the topology from state inside `propagateEvents`
+   while summing whatever graph it was handed: the old Peru pin returned
+   1,130 facility-kt under a country-vintage label — number and label
+   from different frames, the defect species this system exists to
+   refuse, produced by the feature built to prevent it. Fixed
+   structurally: the graph carries its selection; validity classifies
+   against the graph's own frame; a no-asOf facility graph evaluated at
+   2020 is honestly `predates` with the rebuild remedy named (pinned).
+2. **Hindsight through the structural loophole.** The vintage flows made
+   Canada "knowable" at 2019 via a Peru-2022 corridor: search's
+   `knowableEntities` and the engine's `asKnownThen` treated ALL flows as
+   knowable by construction — true for curated structure, false for
+   sourced records. Sourced flows are now knowledge-gated by capture
+   date. Consequence, stated rather than hidden: under `as_known_then`
+   the vintages are invisible before 2026-08-27 — the capture is the only
+   publication bound the corpus can honestly claim (Comtrade revises in
+   place), so the earlier date is refused, not defaulted.
+3. **The completeness axis at the new boundary.** A jurisdiction absent
+   from the captured reporter-set (Peru at a 2017 evaluation — only CL
+   and ID were captured for 2017) would have rendered 0: absence of
+   capture read as absence of flow. VINTAGE COVERAGE refusal added;
+   and the operational branch's all-refused-basis case (previously an
+   inconsistent 0 against the regulatory branch's null) aligned to null.
+4. **The proportion pin moved exactly as designed — via the source
+   round 18 did not predict.** The 0%-structural pin was written so "the
+   first reported ingest moves a number, not a flag", with EDGAR as the
+   expected mover. The mover was Comtrade country vintages: metal_content
+   0 → 0.202 while EDGAR stays operator-blocked. The design survived its
+   event; the prediction did not — recorded as the deviation it is.
+
+**Guards moved.** `flow-vintages-deferred` fired and was re-taken as
+`allocation-model-deferred` (above). The extrapolation clock still
+grounds on the facility snapshot for live evaluations (604 days today);
+the selection rule's known limit is recorded: one vintage YEAR serves a
+whole graph (a 2020 evaluation serves Peru's reporter-year and does not
+carry Chile's 2019 corridors — per-reporter selection would mix vintage
+periods inside one graph, and is deferred with that reason, not blended
+silently).
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

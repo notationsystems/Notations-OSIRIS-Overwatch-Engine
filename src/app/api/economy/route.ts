@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runEngine, listSystems } from '@/lib/economy/engine';
 import { getEconomyState } from '@/lib/economy/store';
 import { DISRUPTIVE_EVENT_TYPES, isEventActive, topologyValidity } from '@/lib/economy/propagation';
+import { selectTopology } from '@/lib/economy/graph';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
 import { corpusHealthSignals } from '@/lib/economy/horizon';
 import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
@@ -227,8 +228,14 @@ export async function GET(request: Request) {
         disrupted: disrupted.has(e.id),
       }));
 
-    const coords = new Map(entities.map(e => [e.id, [e.lng, e.lat] as [number, number]]));
-    const flows = state.flows
+    // Coordinates for ARC endpoints come from the full register (country
+    // centroids included) — a country-vintage arc needs country coords even
+    // though country dots are not rendered as facilities.
+    const coords = new Map(state.entities.filter(e => e.lat !== undefined && e.lng !== undefined).map(e => [e.id, [e.lng!, e.lat!] as [number, number]]));
+    // Arcs come from the SELECTED topology — a present-day map must not
+    // draw 2017 country vintages beside 2024 facility flows, and a
+    // historical scrub draws the vintage serving its date (work order 3.2).
+    const flows = selectTopology(state, evalDate).flows
       .filter(f => coords.has(f.fromEntityId) && coords.has(f.toEntityId))
       .map(f => ({
         id: f.id, from: f.fromEntityId, to: f.toEntityId,

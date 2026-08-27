@@ -247,7 +247,7 @@ could actually give (Grasberg: occurred 09-08, reported 09-10 — 2 days).
 | `coverage` | Facility-model coverage per country: rolled-up facility observations ÷ the country's own observation. ≈1 complete, <1 the unmodelled share, >1 a contradiction. This is the standing integrity check that keeps facility- and country-level populations from ever being conflated — they meet only here, explicitly, as a ratio. The coverage range is also **attached to the facility-level HHI** (`coverageBias`), because differential coverage biases facility concentration toward better-modeled countries and the number must not travel without that caveat. |
 | `divergence` | Observer disagreement kept as evidence: multi-provider conflicts and **Comtrade mirror pairs** — exporter- vs importer-declared weights of the same bilateral flow. Classification runs a **basis gate first**: a concentrate mirror ratio inside the 3.0–5.0× grade band (20–33% Cu) is the fingerprint of contained-metal-vs-gross-weight declarations and classes `definitional`, never `unexplained` — the Chile→China 3.97× gap (implied 25.2% Cu) is exactly this, a units artifact, not suppression. Classing definitional is **normalization, not dismissal**: the pair is converted at the fixed 25% reference grade and the residual recorded (`basisNormalization`) — Chile→China: 8,433 × 0.25 = 2,108 vs 2,125 declared, a **+0.8% residual: the basis explains the entire gap, no material suppression signal in this corridor**. The residual is the watched baseline — definitional pairs rank on it, never on raw spread — and reclassification keys on **drift** against the corridor's own history, never on level: the level is confounded by the corridor's unknown true grade (a genuine 30%-grade corridor shows +20% at the 25% reference with honest declarations — a stable offset is a grade), while grade moves slowly, so first-differencing removes it and a step beyond ±10 points reclasses the pair `unexplained`. `unexplained` is the hardest class to earn; what earns it (the −25% DRC→China refined gap, where basis cannot be the mechanism) ranks first. An anomaly says the world moved; a divergence says the observers disagree — the two never share a ranking. |
 | `scenario` (via `POST /api/economy/scenario`) | Counterfactual event injection: hypothetical events run through the same engine on an explicit **EvaluationFrame** (`kind: counterfactual`, scenario id, asOf, knowledge) so a hypothetical can never be read as a reconstruction. Returns baseline + counterfactual frames and the structural delta (newly disrupted entities, newly affected downstream, disrupted kt/y). Combined with `as_known_then` it backtests the analytical layer itself: posing Grasberg's halt into the 2025-09-09 knowledge state recovers the same dependent-smelter conclusion the best-known reconstruction reaches — evidence the analytics' structural calls do not depend on hindsight. |
-| `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. Edge traversal is class-gated (`eventClassOf`): operational events walk operator edges, financial events walk shareholder edges too. **Regulatory events propagate by territory + scope, not graph adjacency**: a `RegulatoryScope { jurisdictionCountryCode, commodity?, stages?, direction }` on the event resolves membership through located_in edges and countryCode. `direction: 'all'` disrupts every in-scope entity and its downstream — Peru's 2020 COVID mining halt reaches Cerro Verde, Antamina, Las Bambas, Callao and Onsan, never Escondida (territory means territory). `direction: 'export'` halts only flows *crossing the border*, sparing domestic receivers — Grasberg's 2017 export halt stops outbound concentrate without stopping production (a scenario-posed Chilean export ban shows the full mechanism: Saganoseki, Shanghai and Guixi affected, Caletones spared). A regulatory event **without a scope is refused, not guessed** — its tonnage is `null`, never a 0 a reader could take as "no effect". **Topology validity is checked on every pass**: `asOf` filters what was *known*, but flows are a single-vintage claim about what *was* — an evaluation date that **predates** the flow period gets `null` for every flow-derived tonnage with the mismatch named (a 2017 evaluation against 2024 flows describes a world that did not yet exist; "no entity in scope" is 0, "cannot answer at this date" is null, and the two never render alike), while a date **after** the period uses the snapshot as latest-known structure, labeled **and quantified**: `extrapolationDays` carries the distance past the period (against a fixed snapshot, live evaluations are permanently extrapolated — the status stops carrying information and the distance is the number that moves), bounded on two axes: a clock ceiling (two annual cadences — "should a new vintage exist by now?", a question about the curator) and an **evidence trigger** ("is the old topology still true?", a question about the world — elapsed time is a proxy, the event register holds the thing itself): curated structural events postdating the snapshot (closure, expansion, scoped regulatory, sanction/insolvency, open-ended high-severity disruption — a disruption with a curated end is transience, not movement) surface as `structuralEvidence` with the note escalated to STRUCTURE HAS MOVED — and the escalated note claims only what is true: figures continue because **no other structure is modeled**, and the residual at affected entities is unquantified structural drift (the event mechanism carries the output loss along modeled edges; whether the edges still hold is a different, unhandled error). The trigger honours the knowledge state: postdating keys on occurrence (a fact about the world), visibility keys on `firstReportedAt` under as_known_then — in the occurrence→report window the contradiction exists but is not yet knowable, and best_known and as_known_then provably disagree there (pinned, with the vacuity assert that the two dates differ). Fired on real data at first evaluation: the Sep-2025 Grasberg force majeure contradicts extrapolation today, months ahead of the clock. |
+| `propagation` | Event → state change at `asOf`: disrupted flow volume, downstream entities within N hops, spare capacity at same-stage peers, declared dependents. Distinguishes events live at the evaluation date from historical context. Edge traversal is class-gated (`eventClassOf`): operational events walk operator edges, financial events walk shareholder edges too. **Regulatory events propagate by territory + scope, not graph adjacency**: a `RegulatoryScope { jurisdictionCountryCode, commodity?, stages?, direction }` on the event resolves membership through located_in edges and countryCode. `direction: 'all'` disrupts every in-scope entity and its downstream — Peru's 2020 COVID mining halt reaches Cerro Verde, Antamina, Las Bambas, Callao and Onsan, never Escondida (territory means territory). `direction: 'export'` halts only flows *crossing the border*, sparing domestic receivers — Grasberg's 2017 export halt stops outbound concentrate without stopping production (a scenario-posed Chilean export ban shows the full mechanism: Saganoseki, Shanghai and Guixi affected, Caletones spared). A regulatory event **without a scope is refused, not guessed** — its tonnage is `null`, never a 0 a reader could take as "no effect". **Topology validity is checked on every pass**: `asOf` filters what was *known*, but flows are a single-vintage claim about what *was* — an evaluation date that **predates** the flow period gets `null` for every flow-derived tonnage with the mismatch named (a 2017 evaluation against 2024 flows describes a world that did not yet exist; "no entity in scope" is 0, "cannot answer at this date" is null, and the two never render alike), while a date **after** the period uses the snapshot as latest-known structure, labeled **and quantified**: `extrapolationDays` carries the distance past the period (against a fixed snapshot, live evaluations are permanently extrapolated — the status stops carrying information and the distance is the number that moves), bounded on two axes: a clock ceiling (two annual cadences — "should a new vintage exist by now?", a question about the curator) and an **evidence trigger** ("is the old topology still true?", a question about the world — elapsed time is a proxy, the event register holds the thing itself): curated structural events postdating the snapshot (closure, expansion, scoped regulatory, sanction/insolvency, open-ended high-severity disruption — a disruption with a curated end is transience, not movement) surface as `structuralEvidence` with the note escalated to STRUCTURE HAS MOVED — and the escalated note claims only what is true: figures continue because **no other structure is modeled**, and the residual at affected entities is unquantified structural drift (the event mechanism carries the output loss along modeled edges; whether the edges still hold is a different, unhandled error). The trigger honours the knowledge state: postdating keys on occurrence (a fact about the world), visibility keys on `firstReportedAt` under as_known_then — in the occurrence→report window the contradiction exists but is not yet knowable, and best_known and as_known_then provably disagree there (pinned, with the vacuity assert that the two dates differ). Fired on real data at first evaluation: the Sep-2025 Grasberg force majeure contradicts extrapolation today, months ahead of the clock. **Topology selection (work order 3.2)**: `selectTopology` serves exactly one granularity per graph — the facility snapshot for dates it covers, else the latest country flow vintage at or before the date — and the graph CARRIES its selection, so validity is classified against the same frame the tonnage was summed from (a facility graph evaluated at a vintage date is honestly `predates`, with the rebuild remedy named). At country granularity: a staged regulatory scope binds country corridors through the flow FORM (ore/concentrate are production-stage output in every modeled chain; other pairings are scope-undecidable and excluded visibly), facility events refuse tonnage with the allocation model named (reach is declared-dependency structure only), an uncaptured jurisdiction refuses via VINTAGE COVERAGE, all-gross corridors refuse via basis with the corridor grade as remedy, and partially-refused sums are labeled LOWER BOUND. |
 
 ### Alerts (engine layer only — deliberately no UI yet)
 
@@ -406,9 +406,12 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   `vintage` — with remaining tokens as free filters. The states are TYPED
   because they accumulated as distinct conditions with distinct remedies,
   and the shared fix is what a type is for: `refused:basis` (gross-weight
-  flow, no corridor grade → curate a grade), `refused:component`
-  (bottleneck score null), `refused:topology` (evaluation predates the
-  flow topology → flow vintages), `refused:scope` (regulatory event with
+  flow or corridor with no grade — graph edges AND propagation tonnage
+  whose every in-scope corridor refused conversion → curate a grade),
+  `refused:component` (bottleneck score null), `refused:topology` (the
+  topology frame cannot carry the evaluation: the date predates the
+  earliest vintage, or a facility event under a country vintage needs the
+  deferred allocation model), `refused:scope` (regulatory event with
   no jurisdiction → curate regulatoryScope), `refused:attribution` (null
   operator index → curate operated_by edges); `stale:source` /
   `stale:ladder` / `stale:suspect` (the three corpus-health conditions) /
@@ -486,7 +489,10 @@ A deferred decision is safe only while the condition that made it safe
 still holds — and the condition is executable, not remembered. Six ledger
 entries carry `validWhile` predicates evaluated by the test suite against
 the real state: attribution basis unbuilt (while no sanctions-class event
-is curated), flow vintages deferred (while exactly one flow period exists),
+is curated), the allocation model deferred (while no flow record mixes
+granularities — the RE-TAKE of the flow-vintages deferral, whose predicate
+"exactly one distinct flow period exists" fired the day work order 3.2
+landed the country vintages, exactly as designed),
 the person-name policy's three pins (while every register kind is in the
 canonical identity set), the modality freeze (while no built adapter yields
 events), the Westmetall singularity note (while it is the only daily
@@ -511,12 +517,18 @@ condition it exists to catch.
   curated in contained metal meanwhile) and facility-scoped regulatory
   acts (RegulatoryScope is jurisdiction-shaped; the Alunorte embargo is
   modeled as disruption with the limitation stated on the event).
-- Comtrade bilateral rows are not yet materialized as Flow edges (world totals
-  only) — facility-level flows would double-count against country-level trade
-  edges without an allocation model. When they land, the basis machinery is
-  ready: gross-weight edges convert via mirror-implied corridor grades (with
-  the grade band as uncertainty), and corridors without a grade refuse shares
-  visibly instead of entering as zero.
+- Comtrade bilateral rows ARE now materialized as Flow edges — as
+  **country-level flow vintages** (work order 3.2), one vintage per
+  (reporter, year), serving evaluations the facility snapshot cannot. The
+  double-count hazard is closed structurally, not by care: `selectTopology`
+  serves exactly one granularity per graph (facility when the date is in
+  or after the facility period; else the latest country vintage at or
+  before it), and the basis machinery works as designed — Chile's
+  metal-content corridors quantify directly (a scenario-posed 2019 Chilean
+  export ban states 2,723 kt from the vintage), gross corridors without a
+  mirror-implied grade refuse tonnage visibly. What remains deferred is the
+  country↔facility **allocation model**: attributing one facility's share
+  of its country's trade (guarded: `allocation-model-deferred`).
 - The reference concentrate grade (25%) and the 20–33% band are industry-typical
   constants, not per-corridor assays; the residual level inherits that
   uncertainty (which is why reclassification keys on drift, and where a
@@ -532,24 +544,28 @@ condition it exists to catch.
   archive), and pre-revision vintages that predate OSIRIS's own archive
   (begun 2026-08) are permanently unrecoverable — labeled in the backtest
   caveats, never silently interpolated.
-- Flow records are 2024 annual snapshots; playback re-evaluates events,
-  propagation and observation selection over time, but flow tonnage itself is
-  not yet time-resolved. The topology-validity guard makes the mismatch an
-  enforced invariant rather than a silent error: evaluations predating the
-  flow period return null tonnage with the mismatch named, later evaluations
-  use the snapshot as labeled, quantified latest-known structure, and the
-  playback panel banners both. The capability consequence, stated plainly:
-  **five of the six backtest truth-set disruption events (Escondida 2017,
-  Grasberg halt 2017, Chuquicamata 2019, Peru 2020, Las Bambas 2022)
-  predate the topology — historical propagation over the curated record is
-  structural reach only, with null tonnage, until flow vintages land.** The
-  structural fix is **flow vintages** (several flow periods coexisting, asOf
-  selecting among them — the MCS-vintage shape); part of the material
-  already exists (Comtrade country-level annual trade, archived and
-  knownAt-stamped) and the true blocker is the deferred country↔facility
-  allocation model. Backlog slot 4 under the phase-18 ranking
-  (evidence-layer search kinds → sec-edgar structural ingest →
-  OpenOwnership → flow vintages); the deferral itself is guarded.
+- Flow topology is now TWO-granularity time-resolved: the 2024 facility
+  snapshot plus country flow vintages (2017, 2019, 2020, 2022 — five
+  reporter-years captured 2026-08-27, the capture being the vintage since
+  Comtrade revises in place). `topologyValidity` classifies every
+  evaluation against the graph's own selection (`graph.selection` — the
+  figure and the label provably share one frame), `predates` now means
+  "before the earliest material of ANY granularity", and the playback
+  panel banners country-granularity service by vintage year. The
+  capability consequence of round 13, updated with measurements:
+  **historical propagation is restored at country granularity where the
+  event is country-shaped** — the 2017 Grasberg export halt finds its real
+  crossing corridors (JP/KR/CN/IN receivers), Peru 2020 reaches its mines
+  and receivers — **but tonnage states only what the basis carries**:
+  Indonesia and Peru declare gross weight with no mirror-implied grade, so
+  their disrupted tonnage is basis-refused (null, corridor grade named);
+  Chile's metal-content corridors quantify (2,723 kt for a posed 2019
+  export ban). Facility events at vintage dates refuse via the deferred
+  allocation model; a jurisdiction absent from the captured reporter-set
+  refuses via VINTAGE COVERAGE (absence of capture is not absence of
+  flow); and under `as_known_then` the vintages are knowable only from
+  their capture date — the only publication bound the corpus can honestly
+  claim.
 - A sanctions-class event traverses both operator and shareholder edges,
   but its exposure number has no declared attribution basis yet — the
   sanctioned party's reach is operator-of-record ∪ material shareholding,

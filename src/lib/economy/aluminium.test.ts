@@ -112,9 +112,10 @@ describe('aluminium: the second commodity', () => {
     const att = strongestAttestingClass(state);
     expect(['reported', 'estimated']).toContain(att.get('ent:country:cn')!);
     expect(att.get('ent:smelter:weiqiao-binzhou')).toBe('representative');
-    // Structural layer: 0% sourced here too.
+    // Structural layer: 0% sourced here too (flow aggregates are per
+    // basis — gross and contained metal never share a sum).
     const p = structuralClassProfile(state);
-    expect(p.flows.sourcedShareByKt).toBe(0);
+    for (const cell of Object.values(p.flows.byBasis)) expect(cell.sourcedShareByKt).toBe(0);
     expect(p.capacities.sourcedShareByKt).toBe(0);
     // Topology validity runs per-commodity state.
     expect(topologyValidity(state, '2018-06-01').status).toBe('predates');

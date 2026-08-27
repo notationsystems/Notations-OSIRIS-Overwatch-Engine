@@ -106,12 +106,16 @@ async function archiveSearchMiss(rec: SearchMissRecord & { ts: string }): Promis
 
 /**
  * Under as_known_then, an entity is knowable at asOf iff at least one of its
- * records was: observations by knownAt, events by firstReportedAt. Curated
- * structural records (flows, capacities, dependencies) carry no revision
- * history and are treated as knowable — the same by-construction label the
- * backtest carries. What this excludes is exactly the failure mode: an
- * entity carried only for live sources (e.g. Canada) whose first record
- * postdates the evaluation date.
+ * records was: observations by knownAt, events by firstReportedAt. CURATED
+ * structural records (representative flows, capacities, dependencies) carry
+ * no revision history and are treated as knowable — the same by-construction
+ * label the backtest carries. SOURCED flows are not by-construction: a
+ * country flow vintage captured 2026-08-27 must not make its partner
+ * entities knowable at 2019 — that would be hindsight leaking through the
+ * one structural loophole the by-construction label left open (found when
+ * the vintages landed and Canada became "knowable" in 2019 via a Peru-2022
+ * corridor). What this excludes is exactly the failure mode: an entity
+ * carried only for live sources whose first record postdates the date.
  */
 function knowableEntities(state: EconomyState, asOf: string): Set<string> {
   const out = new Set<string>();
@@ -123,7 +127,10 @@ function knowableEntities(state: EconomyState, asOf: string): Set<string> {
   for (const ev of state.events) {
     if (ev.entityId && (ev.firstReportedAt ?? ev.start) <= asOf) out.add(ev.entityId);
   }
-  for (const f of state.flows) { out.add(f.fromEntityId); out.add(f.toEntityId); }
+  for (const f of state.flows) {
+    if (f.valueKind !== 'representative' && f.provenance.retrievedAt.slice(0, 10) > asOf) continue;
+    out.add(f.fromEntityId); out.add(f.toEntityId);
+  }
   for (const c of state.capacities) out.add(c.entityId);
   for (const d of state.dependencies) { out.add(d.fromEntityId); out.add(d.toEntityId); }
   return out;
@@ -161,7 +168,10 @@ export async function GET(request: Request) {
   const evidenceQuery = parseEvidenceQuery(q);
   if (evidenceQuery) {
     const evidenceState = restrictTo ? asKnownThen(state, restrictTo) : state;
-    const evidenceResults = searchEvidence(evidenceState, buildGraph(evidenceState), evidenceQuery, {
+    // The graph is built AT the evaluation date so the refusals reflect the
+    // topology that actually serves it (a 2017 query runs over the 2017
+    // country vintage, not today's facility snapshot mislabeled).
+    const evidenceResults = searchEvidence(evidenceState, buildGraph(evidenceState, asOf), evidenceQuery, {
       asOf, knowledge: knowledge as 'best_known' | 'as_known_then',
     });
     return NextResponse.json({

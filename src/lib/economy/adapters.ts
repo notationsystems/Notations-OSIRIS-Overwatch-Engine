@@ -21,6 +21,7 @@ import { COPPER_SERIES_OBSERVATIONS, COPPER_SERIES_SOURCES } from '@/data/econom
 // from this module, so nothing evaluates back into it at load time.
 import { LIVE_ADAPTERS } from './liveAdapters';
 import { curatedAluminiumAdapter } from '@/data/economy/aluminium';
+import { comtradeFlowVintagesAdapter } from './flowVintages';
 
 /**
  * Row accounting: every row an adapter fetched is accepted, rejected with a
@@ -95,7 +96,7 @@ export const curatedCopperAdapter: EconomyAdapter = {
 
 /* ── Registry ── */
 
-const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter, curatedAluminiumAdapter, ...LIVE_ADAPTERS];
+const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter, curatedAluminiumAdapter, comtradeFlowVintagesAdapter, ...LIVE_ADAPTERS];
 
 export function listAdapters(): EconomyAdapter[] {
   return [...ADAPTERS];

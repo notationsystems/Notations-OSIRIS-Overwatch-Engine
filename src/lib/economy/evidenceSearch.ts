@@ -75,7 +75,7 @@ export function parseEvidenceQuery(q: string): EvidenceQuery | null {
 const REMEDY: Record<string, string> = {
   'refused:basis': 'Curate a corridor grade (mirror-implied or documented assay) for the gross-weight flow; it converts with the band as uncertainty.',
   'refused:component': 'Resolve the refused flow basis feeding this node — the score computes when its components do.',
-  'refused:topology': 'Evaluate within the flow-topology period, or land flow vintages (backlog slot 4).',
+  'refused:topology': 'Country flow vintages serve 2017+ at country granularity; before the earliest vintage no topology exists. Facility tonnage under a country vintage needs the country↔facility allocation model (deferred — work order scope).',
   'refused:scope': 'Curate regulatoryScope (jurisdiction + commodity/stages/direction) on the event.',
   'refused:attribution': 'Curate operated_by edges for the facilities in scope.',
   'stale:source': 'Check the source; if it has moved or died, the adapter needs re-pointing — the lead ceiling has already degraded.',
@@ -122,15 +122,24 @@ export function searchEvidence(
         evidenceIds: [b.entityId],
       });
     }
-    // topology / scope — null propagation tonnage, split by mechanism.
+    // topology / scope / basis — null propagation tonnage, split by
+    // mechanism (each type is one remedy): no jurisdiction → scope; every
+    // in-scope corridor refused conversion → basis (the corridor grade is
+    // the fix, same as the graph-edge refusals above); a date the topology
+    // frame cannot carry (predates, or facility attribution under a
+    // country vintage) → topology.
     for (const i of propagateEvents(state, graph, { asOf: evalDate, knowledge }).result) {
       if (i.disruptedKtPerYear !== null) continue;
-      const scopeRefusal = i.explanation.some(x => x.includes('WITHOUT A SCOPE'));
+      const text = i.explanation.join(' ');
+      const type = text.includes('WITHOUT A SCOPE') ? 'scope'
+        : text.includes('FACILITY-LEVEL PROPAGATION REFUSED') ? 'topology'
+        : text.includes('REFUSED') && text.includes('corridor grade') ? 'basis'
+        : 'topology';
       push({
-        kind: 'refused', type: scopeRefusal ? 'scope' : 'topology',
+        kind: 'refused', type,
         entityId: i.entityId, entityName: i.entityName,
         title: `${i.eventTitle}: disrupted tonnage refused`,
-        detail: i.explanation.join(' '),
+        detail: text,
         evidenceIds: [i.eventId, ...i.flowIds],
       });
     }

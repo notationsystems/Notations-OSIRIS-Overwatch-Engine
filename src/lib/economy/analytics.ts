@@ -132,7 +132,13 @@ export function weakestInputClass(kinds: Iterable<Observation['valueKind']>): Ob
  * for: the first ingest moves a number from 0 to something.
  */
 export interface StructuralClassProfile {
-  flows: { records: number; sourcedRecords: number; kt: number; sourcedKt: number; sourcedShareByKt: number };
+  /** Flow tonnage aggregates are PER BASIS — summing gross and contained
+   *  metal in one figure would be the incommensurability species inside
+   *  the very instrument built to watch it (work order 3.2). */
+  flows: {
+    records: number; sourcedRecords: number;
+    byBasis: Record<string, { kt: number; sourcedKt: number; sourcedShareByKt: number }>;
+  };
   capacities: { records: number; sourcedRecords: number; kt: number; sourcedKt: number; sourcedShareByKt: number };
   /** operated_by edges carry no valueKind — curation-class by construction
    *  until attribution comes from disclosures; counted so the layer's third
@@ -156,8 +162,22 @@ export function structuralClassProfile(state: EconomyState): StructuralClassProf
       sourcedShareByKt: kt > 0 ? Number((sourcedKt / kt).toFixed(3)) : 0,
     };
   };
+  const flowByBasis: StructuralClassProfile['flows']['byBasis'] = {};
+  let flowSourcedRecords = 0;
+  for (const f of state.flows) {
+    const basis = f.basis ?? 'unspecified';
+    const cell = flowByBasis[basis] ?? (flowByBasis[basis] = { kt: 0, sourcedKt: 0, sourcedShareByKt: 0 });
+    const sourced = f.valueKind === 'reported' || f.valueKind === 'estimated';
+    cell.kt += f.quantity;
+    if (sourced) { cell.sourcedKt += f.quantity; flowSourcedRecords += 1; }
+  }
+  for (const cell of Object.values(flowByBasis)) {
+    cell.kt = Number(cell.kt.toFixed(1));
+    cell.sourcedKt = Number(cell.sourcedKt.toFixed(1));
+    cell.sourcedShareByKt = cell.kt > 0 ? Number((cell.sourcedKt / cell.kt).toFixed(3)) : 0;
+  }
   return {
-    flows: profile(state.flows),
+    flows: { records: state.flows.length, sourcedRecords: flowSourcedRecords, byBasis: flowByBasis },
     capacities: profile(state.capacities),
     attributionEdges: { records: state.dependencies.filter(d => d.type === 'operated_by').length, sourcedRecords: 0 },
     note: 'Sourced = reported|estimated by the publisher\'s own label. Every index computed from structure inherits this layer\'s class (weakestInputClass); no index can be reported-class end-to-end until these shares move.',

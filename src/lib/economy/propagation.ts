@@ -18,8 +18,8 @@
  */
 
 import type { AnalyticalResult, EconEvent, EconomyState } from './types';
-import type { EconomyGraph, EdgeFilter } from './graph';
-import { downstream, nodeThroughput, OPERATIONAL_EDGE_FILTER } from './graph';
+import type { EconomyGraph, EdgeFilter, TopologySelection } from './graph';
+import { downstream, nodeThroughput, selectTopology, OPERATIONAL_EDGE_FILTER } from './graph';
 
 export interface EventImpact {
   eventId: string;
@@ -118,10 +118,17 @@ export function isEventActive(ev: EconEvent, asOf: string): boolean {
  * the mismatch an enforced invariant instead of a documented special case.
  */
 export interface TopologyValidity {
-  /** Union of flow periods in the state; null when no flows are modeled. */
+  /** Period of the SELECTED topology (facility snapshot, or the vintage
+   *  serving asOf); null when nothing is selectable. */
   topologyPeriod: { start: string; end: string } | null;
   evaluatedAt: string;
   status: 'within' | 'extrapolated' | 'predates';
+  /** Which topology serves this evaluation — a country-granularity result
+   *  must never render indistinguishably from a facility one (work order
+   *  3.2 hazard #3). */
+  granularity: 'facility' | 'country';
+  /** Set when a country flow vintage serves the evaluation. */
+  vintageYear?: string;
   /** Days between the topology period's end and the evaluation date —
    *  extrapolation QUANTIFIED, not just flagged: against a fixed snapshot
    *  the status is permanently 'extrapolated' for live evaluations, so the
@@ -182,41 +189,69 @@ export function topologyValidity(
   state: EconomyState,
   asOf: string,
   knowledge: 'best_known' | 'as_known_then' = 'best_known',
+  selection?: TopologySelection,
 ): TopologyValidity {
+  // When a graph's own selection is passed, classify against IT: the figure
+  // and the label must come from the same frame. Re-selecting from state
+  // here while the caller's graph was built for a different date is how a
+  // facility tonnage would get served under a country-vintage label.
+  const sel = selection ?? selectTopology(state, asOf);
+  // What the STATE could serve at this date — named as the remedy when the
+  // caller's graph cannot (a graph built without asOf evaluated at 2019
+  // predates, but a vintage exists; the note says how to reach it).
+  const rebuildRemedy = (): string => {
+    if (selection === undefined) return '';
+    const would = selectTopology(state, asOf);
+    if (would.flows.length === 0 || (would.granularity === sel.granularity && would.vintageYear === sel.vintageYear)) return '';
+    return ` A ${would.granularity}-granularity topology${would.vintageYear ? ` (vintage ${would.vintageYear})` : ''} exists for this date — build the graph at the evaluation date to serve it.`;
+  };
   if (state.flows.length === 0) {
-    return { topologyPeriod: null, evaluatedAt: asOf, status: 'within' };
+    return { topologyPeriod: null, evaluatedAt: asOf, status: 'within', granularity: sel.granularity };
   }
-  let start = state.flows[0].period.start;
-  let end = state.flows[0].period.end;
-  for (const f of state.flows) {
-    if (f.period.start < start) start = f.period.start;
-    if (f.period.end > end) end = f.period.end;
+  if (sel.flows.length === 0) {
+    // Before the earliest topology material of ANY granularity — vintages
+    // included, so 'predates' no longer means "before 2024".
+    return {
+      topologyPeriod: null, evaluatedAt: asOf, status: 'predates', granularity: sel.granularity,
+      note: `No flow topology can describe ${asOf}: the earliest material (vintage or snapshot) starts ${sel.earliestStart}. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only.${rebuildRemedy()}`,
+    };
   }
+  const { start, end } = sel.period!;
+  const gLabel = sel.granularity === 'country'
+    ? `COUNTRY-granularity vintage ${sel.vintageYear} (reporter-declared trade; facility attribution refused — the allocation model is the remedy)`
+    : 'facility-granularity snapshot';
   const status = asOf < start ? 'predates' : asOf > end ? 'extrapolated' : 'within';
-  return {
-    topologyPeriod: { start, end },
-    evaluatedAt: asOf,
-    status,
-    ...(status === 'predates'
-      ? { note: `Flow topology describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only. Flow vintages are the recorded fix.` }
-      : status === 'extrapolated'
-        ? (() => {
-            const evidence = structuralTopologyEvidence(state, end, asOf, knowledge);
-            const base = `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`;
-            return {
-              extrapolationDays: daysBetween(end, asOf),
-              ...(evidence.length > 0 ? { structuralEvidence: evidence } : {}),
-              // Two different errors, only one handled: the event mechanism
-              // carries the output loss along the MODELED edges; whether the
-              // edges themselves still hold is unquantified structural
-              // drift. Figures continue because nothing better is modeled,
-              // not because the residual is bounded.
-              note: evidence.length > 0
-                ? `${base} STRUCTURE HAS MOVED since the snapshot: ${evidence.length} post-period structural event(s) [${evidence.map(e => e.id).join(', ')}] contradict extrapolation at the affected entities. Figures continue because no other structure is modeled — the residual there is unquantified structural drift, not a bounded error.`
-                : base,
-            };
-          })()
+  const base = { evaluatedAt: asOf, granularity: sel.granularity, ...(sel.vintageYear ? { vintageYear: sel.vintageYear } : {}) };
+  if (status === 'within') {
+    return {
+      ...base, topologyPeriod: sel.period, status,
+      ...(sel.granularity === 'country'
+        ? { note: `Serving the ${gLabel}, period ${start}–${end}.` }
         : {}),
+    };
+  }
+  if (status === 'predates') {
+    // Reached when the caller's graph was built for a later world than the
+    // evaluation date (a no-asOf facility graph evaluated at 2019) — the
+    // honest statement is about THAT graph, with the rebuild remedy named.
+    return {
+      ...base, topologyPeriod: sel.period, status,
+      note: `Selected topology (${gLabel}) describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero.${rebuildRemedy()}`,
+    };
+  }
+  const evidence = structuralTopologyEvidence(state, end, asOf, knowledge);
+  const baseNote = `Selected topology (${gLabel}) describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`;
+  return {
+    ...base, topologyPeriod: sel.period, status,
+    extrapolationDays: daysBetween(end, asOf),
+    ...(evidence.length > 0 ? { structuralEvidence: evidence } : {}),
+    // Two different errors, only one handled: the event mechanism carries
+    // the output loss along the MODELED edges; whether the edges themselves
+    // still hold is unquantified structural drift. Figures continue because
+    // nothing better is modeled, not because the residual is bounded.
+    note: evidence.length > 0
+      ? `${baseNote} STRUCTURE HAS MOVED since the snapshot: ${evidence.length} post-period structural event(s) [${evidence.map(e => e.id).join(', ')}] contradict extrapolation at the affected entities. Figures continue because no other structure is modeled — the residual there is unquantified structural drift, not a bounded error.`
+      : baseNote,
   };
 }
 
@@ -268,6 +303,29 @@ function regulatoryImpact(
     return true;
   };
 
+  // COUNTRY-granularity scope decisions (work order 3.2). A country node
+  // aggregates every stage in its jurisdiction, so an entity-level stage
+  // check cannot bind it. A staged scope can still bind a country corridor
+  // when the flow's FORM is unambiguous about the stage that produced it:
+  // ore and concentrate are pre-smelter output in every modeled chain
+  // (bauxite moves as 'ore'), so a production-stage halt stops them. Any
+  // other stage/form pairing is UNDECIDABLE at this granularity — excluded
+  // VISIBLY, never silently counted either way.
+  const PRE_SMELTER_FORMS = new Set(['ore', 'concentrate']);
+  type CountryEdgeScope = 'in' | 'undecidable';
+  const countryEdgeScope = (edge: { flow: { form: string; commodity: string } }): CountryEdgeScope => {
+    if (!scope.stages) return 'in';
+    return scope.stages.includes('production') && PRE_SMELTER_FORMS.has(edge.flow.form) ? 'in' : 'undecidable';
+  };
+  const countryNodeInJurisdiction = (id: string): boolean => {
+    const e = graph.nodes.get(id);
+    if (!e || e.kind !== 'country') return false;
+    if (e.countryCode !== scope.jurisdictionCountryCode) return false;
+    if (scope.commodity && e.commodity && e.commodity !== scope.commodity) return false;
+    return true;
+  };
+  let scopeUndecidable = 0;
+
   const affectedMap = new Map<string, { entityId: string; name: string; kind: string; depth: number }>();
   const addAffected = (id: string, depth: number) => {
     const e = graph.nodes.get(id);
@@ -277,6 +335,7 @@ function regulatoryImpact(
   };
   const flowIds: string[] = [];
   let disrupted = 0;
+  let unquantifiedEdges = 0;
   // Predating evaluation: the flow walk still yields structural reach, but
   // its tonnage describes the topology's period, not asOf's world.
   const predates = validity.status === 'predates';
@@ -289,11 +348,16 @@ function regulatoryImpact(
       if (edge.kind !== 'flow') continue;
       const from = graph.nodes.get(edge.from);
       const to = graph.nodes.get(edge.to);
-      if (!from || !to || !inScope(edge.from)) continue;
+      if (!from || !to) continue;
+      if (from.kind === 'country') {
+        if (!countryNodeInJurisdiction(edge.from)) continue;
+        if (countryEdgeScope(edge) === 'undecidable') { scopeUndecidable += 1; continue; }
+      } else if (!inScope(edge.from)) continue;
       if (to.countryCode === scope.jurisdictionCountryCode) continue; // domestic — spared
       if (scope.commodity && edge.flow.commodity !== scope.commodity) continue;
       flowIds.push(edge.id);
-      disrupted += edge.ktPerYear ?? 0;
+      if (edge.ktPerYear === null) unquantifiedEdges += 1;
+      else disrupted += edge.ktPerYear;
       addAffected(edge.from, 1); // the blocked exporter
       addAffected(edge.to, 1);   // the foreign receiver
       for (const step of downstream(graph, edge.to, maxDepth - 1)) addAffected(step.entityId, step.depth + 1);
@@ -301,24 +365,76 @@ function regulatoryImpact(
     explanation.push(`Export halt in ${scope.jurisdictionCountryCode}: ${flowIds.length} crossing flow(s) (${ktText(disrupted)}) stop while production continues — domestic receivers keep supply, foreign receivers and their downstream lose it.`);
   } else {
     // All in-scope activity halts: in-scope entities and their downstream.
-    for (const [id] of graph.nodes) {
+    for (const [id, node] of graph.nodes) {
+      if (node.kind === 'country') {
+        // The jurisdiction's own country node: its corridors carry the
+        // halted output at country granularity — each decided per flow
+        // form, since the node itself has no stage to check.
+        if (!countryNodeInJurisdiction(id)) continue;
+        let counted = false;
+        for (const edge of graph.out.get(id) ?? []) {
+          if (edge.kind !== 'flow') continue;
+          if (scope.commodity && edge.flow.commodity !== scope.commodity) continue;
+          if (countryEdgeScope(edge) === 'undecidable') { scopeUndecidable += 1; continue; }
+          counted = true;
+          flowIds.push(edge.id);
+          if (edge.ktPerYear === null) unquantifiedEdges += 1;
+          else disrupted += edge.ktPerYear;
+          addAffected(edge.to, 1); // the receiver losing supply
+          for (const step of downstream(graph, edge.to, maxDepth - 1)) addAffected(step.entityId, step.depth + 1);
+        }
+        if (counted) addAffected(id, 0);
+        continue;
+      }
       if (!inScope(id)) continue;
       addAffected(id, 0);
       for (const edge of graph.out.get(id) ?? []) {
         if (edge.kind !== 'flow') continue;
         flowIds.push(edge.id);
-        disrupted += edge.ktPerYear ?? 0;
+        if (edge.ktPerYear === null) unquantifiedEdges += 1;
+        else disrupted += edge.ktPerYear;
       }
       for (const step of downstream(graph, id, maxDepth)) addAffected(step.entityId, step.depth);
     }
     explanation.push(`Jurisdiction-wide halt in ${scope.jurisdictionCountryCode}${scope.stages ? ` (${scope.stages.join(', ')})` : ''}: ${affectedMap.size} entity(ies) in scope or downstream; ${ktText(disrupted)} of outbound flow interrupted.`);
+  }
+  if (scopeUndecidable > 0) {
+    explanation.push(`${scopeUndecidable} country-granularity corridor(s) could not be scope-decided (a staged scope against an aggregated country node, and the flow form does not pin the producing stage) — excluded VISIBLY, counted neither as halted nor as spared.`);
+  }
+  // Basis honesty over vintage topologies: an unconvertible gross flow is
+  // REFUSED tonnage, never zero. All-refused → the figure is null with the
+  // remedy named; partially refused → the stated sum is a lower bound.
+  if (unquantifiedEdges > 0 && disrupted === 0) {
+    explanation.push(`${unquantifiedEdges} in-scope flow(s) carry gross-weight tonnage with no mirror-implied corridor grade — disrupted tonnage is REFUSED (unknown, not zero); reach is real. Remedy: a corridor grade (mirror-implied or documented assay).`);
+  } else if (unquantifiedEdges > 0) {
+    explanation.push(`${unquantifiedEdges} further in-scope flow(s) refused conversion (gross weight, no corridor grade) — the stated tonnage is a LOWER BOUND.`);
+  }
+  // Completeness honesty: the captured vintages are a SUBSET of the world's
+  // reporters. A jurisdiction with zero corridors in the serving vintage is
+  // not exporting nothing — it is uncaptured, and a 0 here would read
+  // absence of capture as absence of flow (the completeness axis of the
+  // incommensurability species, at the one place it could slip through).
+  const vintageUncovered = validity.granularity === 'country' && !predates
+    && !graph.edges.some(e => {
+      if (e.kind !== 'flow') return false;
+      const from = graph.nodes.get(e.from);
+      return from?.kind === 'country' && from.countryCode === scope.jurisdictionCountryCode;
+    });
+  if (vintageUncovered) {
+    explanation.push(`VINTAGE COVERAGE REFUSAL: the ${validity.vintageYear ?? 'serving'} vintage holds no reporter-declared corridors for ${scope.jurisdictionCountryCode} — captured reporters are a subset of the world, and absence of capture is not absence of flow. Disrupted tonnage is null (unknown), not zero. Remedy: capture the ${scope.jurisdictionCountryCode} reporter-year from Comtrade.`);
   }
   if (validity.note) explanation.push(validity.note);
 
   return {
     eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
     entityId: ev.entityId!, entityName,
-    disruptedKtPerYear: predates ? null : Math.round(disrupted),
+    // Null over zero wherever the zero would be a claim the evidence cannot
+    // carry: out-of-period, uncaptured jurisdiction, every edge refused
+    // conversion, or every edge scope-undecidable.
+    disruptedKtPerYear: predates || vintageUncovered
+      || (unquantifiedEdges > 0 && disrupted === 0)
+      || (scopeUndecidable > 0 && flowIds.length === 0)
+      ? null : Math.round(disrupted),
     affected: [...affectedMap.values()].sort((a, b) => a.depth - b.depth),
     alternatives: [], dependents: [],
     flowIds: [...new Set(flowIds)],
@@ -333,9 +449,13 @@ export function propagateEvents(
   { asOf = new Date().toISOString().slice(0, 10), maxDepth = 4, knowledge = 'best_known' as 'best_known' | 'as_known_then' } = {},
 ): AnalyticalResult<EventImpact[]> {
   const throughput = nodeThroughput(graph);
-  // asOf filters what was KNOWN; the flow topology claims what WAS, and only
-  // one vintage of it exists. Evaluate the mismatch once for the whole pass.
-  const validity = topologyValidity(state, asOf, knowledge);
+  // asOf filters what was KNOWN; the flow topology claims what WAS. The
+  // validity is classified against the GRAPH'S OWN selection — the tonnage
+  // below comes from that graph's edges, so its label must describe the
+  // same frame (a graph built for one date evaluated under another date's
+  // state-level selection is how a facility figure would render under a
+  // country-vintage label).
+  const validity = topologyValidity(state, asOf, knowledge, graph.selection);
   const predates = validity.status === 'predates';
 
   const impacts: EventImpact[] = [];
@@ -352,6 +472,35 @@ export function propagateEvents(
     }
 
     const active = isEventActive(ev, asOf);
+
+    // COUNTRY-granularity topology cannot attribute a single facility's
+    // share of its country's trade — that is the allocation model, which
+    // stays deferred (work order 3.2 scope). A facility event under a
+    // vintage topology refuses its tonnage with the remedy named; the
+    // dependency-declared structural reach still shows. A PREDATING
+    // evaluation takes the predates refusal below instead — naming the
+    // allocation model when no vintage serves the date would prescribe the
+    // wrong remedy.
+    if (validity.granularity === 'country' && !predates && entity.kind !== 'country') {
+      const affected = downstream(graph, ev.entityId, maxDepth, traversableEdgeFilter(ev.type)).map(s => {
+        const e = graph.nodes.get(s.entityId);
+        return { entityId: s.entityId, name: e?.name ?? s.entityId, kind: e?.kind ?? 'unknown', depth: s.depth };
+      });
+      impacts.push({
+        eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
+        entityId: ev.entityId, entityName: entity.name,
+        disruptedKtPerYear: null,
+        affected, alternatives: [], dependents: [],
+        flowIds: [], capacityIds: [], dependencyIds: [],
+        explanation: [
+          active ? 'Event window covers the evaluation date — treated as a live state change.' : 'Event window closed — shown as structural context.',
+          `FACILITY-LEVEL PROPAGATION REFUSED AT COUNTRY GRANULARITY: the ${validity.vintageYear ?? 'selected'} vintage topology is country-level trade, and attributing ${entity.name}'s share of its country's flows requires the country↔facility ALLOCATION MODEL (deferred). Tonnage is null, not zero; reach shown is declared-dependency structure only.`,
+          ...(validity.note ? [validity.note] : []),
+        ],
+      });
+      continue;
+    }
+
     const t = throughput.get(ev.entityId);
     const disrupted = t ? Math.max(t.inKt, t.outKt) : 0;
 
@@ -411,7 +560,10 @@ export function propagateEvents(
     impacts.push({
       eventId: ev.id, eventTitle: ev.title, eventType: ev.type, severity: ev.severity, active,
       entityId: ev.entityId, entityName: entity.name,
-      disruptedKtPerYear: predates ? null : Math.round(disrupted),
+      // All-refused basis is the regulatory branch's rule applied here too:
+      // a node whose every flow refused conversion has UNKNOWN disrupted
+      // tonnage, not zero — 0 stays reserved for "carries no modeled flow".
+      disruptedKtPerYear: predates || (disrupted === 0 && unquantified.length > 0) ? null : Math.round(disrupted),
       affected, alternatives, dependents,
       flowIds: [...(t?.flowIds ?? []), ...unquantified],
       capacityIds: altCapacityIds,
@@ -434,6 +586,8 @@ export function propagateEvents(
       params: {
         asOf, maxDepth,
         topologyStatus: validity.status,
+        topologyGranularity: validity.granularity,
+        topologyVintage: validity.vintageYear,
         topologyPeriod: validity.topologyPeriod ? `${validity.topologyPeriod.start}..${validity.topologyPeriod.end}` : undefined,
       },
     },

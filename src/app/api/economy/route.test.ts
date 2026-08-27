@@ -79,12 +79,21 @@ describe('GET /api/economy', () => {
   });
 
   it('labels topology validity on playback projections — the scrubber must be as honest about arcs as about observations', async () => {
-    // Scrubbed before the flow period: 2024 arcs cannot describe a 2017
-    // world — the projection says so instead of drawing them under a clean
-    // badge.
+    // Scrubbed to 2017: the country vintage now SERVES it (work order 3.2)
+    // — the scrubber draws the 2017 reporter-declared corridors, labeled
+    // country-granularity, instead of refusing the date.
     const early = await (await economyGet(req('/api/economy?commodity=copper&view=map&asOf=2017-02-15'))).json();
-    expect(early.topology.status).toBe('predates');
-    expect(early.topology.note).toContain('predates');
+    expect(early.topology.status).toBe('within');
+    expect(early.topology.granularity).toBe('country');
+    expect(early.topology.vintageYear).toBe('2017');
+    expect(early.topology.note).toContain('COUNTRY-granularity vintage 2017');
+    // The arcs are the vintage's corridors, not the 2024 facility flows.
+    expect(early.econ_flows.some((f: { id: string }) => f.id.startsWith('flow:vintage:2603:id:'))).toBe(true);
+    expect(early.econ_flows.some((f: { id: string }) => f.id === 'flow:grasberg-amamapare')).toBe(false);
+    // Before the earliest vintage, 'predates' still refuses honestly.
+    const before = await (await economyGet(req('/api/economy?commodity=copper&view=map&asOf=2015-06-01'))).json();
+    expect(before.topology.status).toBe('predates');
+    expect(before.topology.note).toContain('null (unknown), not zero');
     // Inside the flow period: no caveat to carry.
     const within = await (await economyGet(req('/api/economy?commodity=copper&view=analytics&asOf=2024-06-15'))).json();
     expect(within.topology.status).toBe('within');

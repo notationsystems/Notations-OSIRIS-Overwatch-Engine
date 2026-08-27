@@ -458,12 +458,18 @@ const COMTRADE_REQUESTS: Array<[m49: number, hs: '2603' | '7403', flow: 'X' | 'M
   [156, '7403', 'M', 2023],
 ];
 
-const M49_TO_ENTITY: Record<number, string> = {
+export const M49_TO_ENTITY: Record<number, string> = {
   152: 'ent:country:cl', 604: 'ent:country:pe', 180: 'ent:country:cd', 156: 'ent:country:cn',
   842: 'ent:country:us', 360: 'ent:country:id', 36: 'ent:country:au', 894: 'ent:country:zm',
   484: 'ent:country:mx', 398: 'ent:country:kz', 643: 'ent:country:ru', 496: 'ent:country:mn',
   616: 'ent:country:pl', 392: 'ent:country:jp', 410: 'ent:country:kr', 276: 'ent:country:de',
   356: 'ent:country:in', 591: 'ent:country:pa', 124: 'ent:country:ca',
+  // Comtrade uses its own historic code for India as a PARTNER (699, vs the
+  // ISO M49 356 it uses as a reporter) — found by the flow-vintage ingest
+  // when Indonesia's third-largest 2017 receiver dropped as unmapped. The
+  // resolution gate (work order 3.3) is what makes this class of gap
+  // visible instead of silent.
+  699: 'ent:country:in',
 };
 
 interface ComtradeRow {
@@ -1164,3 +1170,8 @@ export const westmetallStocksAdapter: EconomyAdapter = {
 export const LIVE_ADAPTERS: EconomyAdapter[] = [
   usgsMcsAdapter, usgsMcsAluminiumAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter, westmetallStocksAdapter,
 ];
+
+/* The country flow-vintage adapter lives in flowVintages.ts and is
+ * registered by adapters.ts alongside these — kept separate because it
+ * serves committed captures (Comtrade revises in place; the capture IS the
+ * vintage), not the live ladder. */

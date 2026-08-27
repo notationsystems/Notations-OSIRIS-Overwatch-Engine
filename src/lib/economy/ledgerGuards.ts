@@ -90,12 +90,20 @@ export const DEFERRED_DECISIONS: DeferredDecision[] = [
     },
   },
   {
-    id: 'flow-vintages-deferred',
-    ledgerRef: 'Phase 13 §3 / capability table',
-    reason: 'Flow vintages (several flow periods coexisting, asOf selecting among them) are deferred below the two search items because exactly one snapshot exists: "latest at or before asOf" has nothing to select among, and the topology guard covers the mismatch honestly.',
+    // RE-TAKEN under work order 3.2 (the original deferral's predicate —
+    // "exactly one distinct flow period exists" — fired the day the country
+    // vintages landed, exactly as designed). Country-level flow vintages
+    // are BUILT; what remains deferred is the country↔facility ALLOCATION
+    // MODEL: attributing a single facility's share of its country's
+    // reporter-declared trade. Facility events at vintage dates refuse
+    // with the model named (propagation.ts).
+    id: 'allocation-model-deferred',
+    ledgerRef: 'Phase 13 §3 / work order 2026-08-27 item 3.2',
+    reason: 'The country↔facility allocation model is deferred: country vintages carry reporter-declared corridors only, and splitting a corridor across the facilities inside the reporter is a derivation with no source — any split would be fabricated precision. The refusal (facility tonnage null at country granularity, model named as remedy) is the honest boundary while no source attributes facility-level trade.',
     validWhile: {
-      description: 'exactly one distinct flow period exists — a second vintage makes the guard\'s selection rule live and the deferral unsound',
-      predicate: (state) => new Set(state.flows.map(f => `${f.period.start}..${f.period.end}`)).size <= 1,
+      description: 'no flow record mixes granularities (exactly one endpoint a country) — a facility-attributed country corridor arriving means a source now provides what the allocation model was deferred for lacking, and the deferral must be re-taken against it',
+      predicate: (state) => !state.flows.some(f =>
+        f.fromEntityId.startsWith('ent:country:') !== f.toEntityId.startsWith('ent:country:')),
     },
   },
   {

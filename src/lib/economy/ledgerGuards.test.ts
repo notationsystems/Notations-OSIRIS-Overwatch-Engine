@@ -105,14 +105,20 @@ describe('validWhile guards on deferred ledger decisions', () => {
     expect(failures.map(f => f.id)).toContain('facility-scoped-regulation-unbuilt');
   });
 
-  it('a second flow vintage trips the flow-vintages deferral', () => {
+  it('a mixed-granularity flow trips the allocation-model deferral', () => {
+    // The predecessor guard (flow-vintages-deferred: "exactly one distinct
+    // flow period exists") FIRED when work order 3.2 landed the country
+    // vintages — exactly as designed — and was re-taken as this narrower
+    // deferral: the allocation model stays unbuilt while no source
+    // attributes facility-level shares of country trade. The planted firing
+    // condition is that arrival: a flow with exactly one country endpoint.
     const s = syntheticState();
     s.flows.push({
-      ...s.flows[0], id: 'flow:planted-2025',
-      period: { start: '2025-01-01', end: '2025-12-31' },
+      ...s.flows[0], id: 'flow:planted-facility-attributed',
+      fromEntityId: 'ent:mine:alpha', toEntityId: 'ent:country:planted',
     });
     const failures = evaluateDeferredDecisions(s, '2025-06-01');
-    expect(failures.map(f => f.id)).toContain('flow-vintages-deferred');
+    expect(failures.map(f => f.id)).toContain('allocation-model-deferred');
   });
 
   it('a person-shaped entity kind trips the person-name-policy surface guard', () => {

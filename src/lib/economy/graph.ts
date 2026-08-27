@@ -57,11 +57,83 @@ export interface EconomyGraph {
   out: Map<string, GraphEdge[]>;
   /** Edges arriving at a node. */
   in: Map<string, GraphEdge[]>;
+  /**
+   * The topology this graph was built from. Every consumer that states a
+   * flow-derived figure must classify its evaluation date against THIS
+   * selection, never re-select from state — a graph built for one date
+   * evaluated under another date's validity is how a facility tonnage gets
+   * served under a country-vintage label (the incoherence work order 3.2's
+   * wiring briefly created and this field exists to make impossible).
+   */
+  selection: TopologySelection;
 }
 
-export function buildGraph(state: EconomyState): EconomyGraph {
+/* ── Topology selection (work order 3.2) ──
+ *
+ * Two topologies can now coexist in one state: the facility-level snapshot
+ * (2024) and country-level flow vintages (2017+, reporter-declared Comtrade
+ * exports). They are DIFFERENT GRANULARITIES and never share a graph — a
+ * country flow beside facility flows would double-count tonnage and let a
+ * country-granularity result render as a facility one. Selection follows
+ * the standard rule (latest claim at or before asOf):
+ *
+ *   asOf within/after the facility period  → facility flows only.
+ *   asOf before it                         → the latest country vintage
+ *                                            whose year ≤ asOf; none → an
+ *                                            empty topology (predates).
+ */
+export interface TopologySelection {
+  flows: Flow[];
+  granularity: 'facility' | 'country';
+  /** Union of the SELECTED flows' periods; null when nothing selected. */
+  period: { start: string; end: string } | null;
+  /** Earliest period start across ALL topology material — 'predates' fires
+   *  only before this, not before the facility snapshot. */
+  earliestStart: string | null;
+  vintageYear?: string;
+}
+
+const isCountryFlow = (f: Flow) =>
+  f.fromEntityId.startsWith('ent:country:') && f.toEntityId.startsWith('ent:country:');
+
+function periodUnion(flows: Flow[]): { start: string; end: string } | null {
+  if (flows.length === 0) return null;
+  let start = flows[0].period.start, end = flows[0].period.end;
+  for (const f of flows) {
+    if (f.period.start < start) start = f.period.start;
+    if (f.period.end > end) end = f.period.end;
+  }
+  return { start, end };
+}
+
+export function selectTopology(state: EconomyState, asOf?: string): TopologySelection {
+  const evalDate = asOf ?? new Date().toISOString().slice(0, 10);
+  const facility = state.flows.filter(f => !isCountryFlow(f));
+  const vintages = state.flows.filter(isCountryFlow);
+  const facilityPeriod = periodUnion(facility);
+  const all = periodUnion(state.flows);
+  const earliestStart = all?.start ?? null;
+  if (facilityPeriod && evalDate >= facilityPeriod.start) {
+    return { flows: facility, granularity: 'facility', period: facilityPeriod, earliestStart };
+  }
+  const years = [...new Set(vintages.map(f => f.period.start.slice(0, 4)))].sort();
+  const year = [...years].reverse().find(y => y <= evalDate.slice(0, 4));
+  if (!year) {
+    // Nothing serves this date. Granularity names the material that WOULD
+    // serve nearest ahead: with no vintages at all (aluminium today) the
+    // only topology is the facility snapshot — labeling the empty selection
+    // 'country' there would route facility events into the allocation
+    // refusal, which names a model that has no vintage to allocate.
+    return { flows: [], granularity: vintages.length > 0 ? 'country' : 'facility', period: null, earliestStart };
+  }
+  const selected = vintages.filter(f => f.period.start.slice(0, 4) === year);
+  return { flows: selected, granularity: 'country', period: periodUnion(selected), earliestStart, vintageYear: year };
+}
+
+export function buildGraph(state: EconomyState, asOf?: string): EconomyGraph {
   const nodes = new Map<string, Entity>();
   for (const e of state.entities) nodes.set(e.id, e);
+  const selection = selectTopology(state, asOf);
 
   // Basis handling: a gross-weight flow must never enter throughput at face
   // value (mixed bases skew inbound shares toward the fat-basis supplier) —
@@ -71,7 +143,7 @@ export function buildGraph(state: EconomyState): EconomyGraph {
   const corridorGrades = impliedCorridorGrades(state);
 
   const edges: GraphEdge[] = [];
-  for (const f of state.flows) {
+  for (const f of selection.flows) {
     const raw = toKtPerYear(f.quantity, f.unit);
     let ktPerYear: number | null = raw;
     let basisConversion: BasisConversion | undefined;
@@ -108,7 +180,7 @@ export function buildGraph(state: EconomyState): EconomyGraph {
     inn.get(edge.to)!.push(edge);
   }
 
-  return { nodes, edges, out, in: inn };
+  return { nodes, edges, out, in: inn, selection };
 }
 
 export interface TraversalStep {

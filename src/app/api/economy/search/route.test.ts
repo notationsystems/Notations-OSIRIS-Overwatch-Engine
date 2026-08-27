@@ -122,17 +122,31 @@ describe('second commodity through the search surface', () => {
 });
 
 describe('evidence-layer search kinds', () => {
-  it('refused:topology finds the predating refusals with their shared remedy', async () => {
+  it('refused:topology at 2017 finds the facility events the country vintage cannot attribute — one shared remedy per type', async () => {
+    // Work order 3.2 changed what refuses at 2017: the country vintage
+    // SERVES the date, so facility events refuse via the allocation model
+    // (topology frame), while the Grasberg export halt — whose corridors
+    // are served but gross — refuses via basis and moves to refused:basis.
     const body = await (await get('q=refused:topology&asOf=2017-02-15')).json();
     expect(body.evidenceKind).toBe('refused');
     expect(body.evidenceType).toBe('topology');
     expect(body.results).toEqual([]);
     const titles = body.evidenceResults.map((h: { title: string }) => h.title);
-    expect(titles.join(' ')).toContain('Grasberg concentrate export halt');
+    expect(titles.join(' ')).toContain('Escondida 44-day strike');
+    expect(titles.join(' ')).not.toContain('Grasberg concentrate export halt');
     for (const h of body.evidenceResults) {
       expect(h.type).toBe('topology');
       expect(h.remedy).toContain('flow vintages'); // the shared fix is what the type is FOR
+      expect(h.remedy).toContain('allocation model');
     }
+  });
+
+  it('refused:basis at 2017 finds the export halt whose real corridors refuse conversion', async () => {
+    const body = await (await get('q=refused:basis&asOf=2017-02-15')).json();
+    const halt = body.evidenceResults.find((h: { title: string }) => h.title.includes('Grasberg concentrate export halt'));
+    expect(halt).toBeDefined();
+    expect(halt.type).toBe('basis');
+    expect(halt.detail).toContain('corridor grade');
   });
 
   it('stale:topology surfaces the live extrapolation contradiction', async () => {

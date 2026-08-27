@@ -67,9 +67,13 @@ describe('event propagation (copper)', () => {
 });
 
 describe('regulatory propagation (territory + scope)', () => {
-  it('Peru 2020: a jurisdiction-wide mining halt reaches Peruvian mines and their downstream, never Chile', async () => {
+  it('Peru 2020: the country vintage carries the halt — Peruvian mines and foreign receivers, never Chile, tonnage basis-refused', async () => {
+    // Work order 3.2: a 2020 evaluation is served by the 2020 country
+    // vintage (Peru's reporter-declared corridors), not refused as
+    // predating. The graph is built AT the evaluation date — graph and
+    // validity share one frame by construction now (graph.selection).
     const { state } = await getEconomyState('copper');
-    const r = propagateEvents(state, buildGraph(state), { asOf: '2020-04-15' });
+    const r = propagateEvents(state, buildGraph(state, '2020-04-15'), { asOf: '2020-04-15' });
     const peru = r.result.find(i => i.eventId === 'evt:peru-covid-shutdown-2020')!;
     expect(peru).toBeDefined();
     expect(peru.active).toBe(true);
@@ -78,40 +82,103 @@ describe('regulatory propagation (territory + scope)', () => {
     expect(affected).toContain('ent:mine:cerro-verde');
     expect(affected).toContain('ent:mine:antamina');
     expect(affected).toContain('ent:mine:las-bambas');
-    // …and the material consequences propagate downstream through the ports.
-    expect(affected).toContain('ent:port:callao');
-    expect(affected).toContain('ent:smelter:onsan');
+    // …and the halt's material reach is the vintage's corridors: the
+    // jurisdiction's country node and the receivers of its concentrate
+    // (the staged scope binds country corridors through the FORM —
+    // concentrate is production-stage output in every modeled chain).
+    expect(affected).toContain('ent:country:pe');
+    expect(affected).toContain('ent:country:cn');
+    expect(affected).toContain('ent:country:jp');
+    // Facility detail is NOT visible at country granularity: no port hop.
+    expect(affected).not.toContain('ent:port:callao');
     // Territory means territory: Chilean mines are untouched.
     expect(affected).not.toContain('ent:mine:escondida');
-    // A 2020 evaluation PREDATES the 2024 flow topology: the reach above is
-    // structural, but the tonnage cannot be stated — null, never a number
-    // computed from a world that did not yet exist.
+    // Peru declares GROSS weight and no mirror-implied grade exists for its
+    // corridors — the tonnage is basis-REFUSED (null, unknown), with the
+    // corridor grade named as the remedy. Reach is real; the number is not
+    // fabricable from a 4x-wrong basis.
     expect(peru.disruptedKtPerYear).toBeNull();
-    expect(peru.explanation.join(' ')).toContain('predates');
-    // The guard is general, not regulatory-only: every flow-derived figure
-    // at a predating date is null — the 2017 Escondida strike included.
+    expect(peru.explanation.join(' ')).toContain('corridor grade');
+    expect(peru.explanation.join(' ')).toContain('COUNTRY-granularity vintage 2020');
+    // A facility event under the country vintage refuses with the
+    // allocation model named — country granularity cannot attribute one
+    // mine's share of its country's trade.
     const strike = r.result.find(i => i.eventId === 'evt:escondida-strike-2017')!;
     expect(strike.disruptedKtPerYear).toBeNull();
+    expect(strike.explanation.join(' ')).toContain('ALLOCATION MODEL');
   });
 
-  it('Grasberg 2017: an export halt spares domestic receivers — and a predating evaluation refuses the tonnage as null', async () => {
-    // Round 12 pinned this as an honest 0 with the flow-vintage limitation
-    // in prose (the modeled Indonesian topology is the post-2023 domestic-
-    // processing regime, so a 2017 halt finds no crossing flows). Round 13
-    // converts the documented special case into the enforced invariant:
-    // "topology out of period" and "no entity in scope" must never render
-    // alike, so a 2017 evaluation against 2024 flows returns null, not 0.
+  it('Grasberg 2017: the export halt finds its real crossing corridors in the 2017 vintage — receivers named, tonnage basis-refused', async () => {
+    // Round 12 pinned this as an honest 0 (the modeled facility topology is
+    // the post-2023 domestic regime); round 13 made it null (predates).
+    // Work order 3.2 lands the world that was actually there: Indonesia's
+    // reporter-declared 2017 exports — the flows the halt actually stopped.
     const { state } = await getEconomyState('copper');
-    const r = propagateEvents(state, buildGraph(state), { asOf: '2017-02-15' });
+    const r = propagateEvents(state, buildGraph(state, '2017-02-15'), { asOf: '2017-02-15' });
     const halt = r.result.find(i => i.eventId === 'evt:grasberg-export-halt-2017')!;
     expect(halt).toBeDefined();
     expect(halt.active).toBe(true);
     expect(halt.explanation.join(' ')).toContain('Export halt');
     const affected = halt.affected.map(a => a.entityId);
+    // The real 2017 receivers (Comtrade reporter-declared, captured
+    // 2026-08-27): Japan, Korea, China, India — the flows that stopped.
+    expect(affected).toContain('ent:country:id');
+    expect(affected).toContain('ent:country:jp');
+    expect(affected).toContain('ent:country:in');
     expect(affected).not.toContain('ent:smelter:gresik'); // domestic — spared
     expect(affected).not.toContain('ent:smelter:manyar');
-    expect(halt.disruptedKtPerYear).toBeNull(); // 2017 predates the 2024 topology — refused, not zero
-    expect(halt.explanation.join(' ')).toContain('predates');
+    // Indonesia declares gross weight; no mirror grade → REFUSED, not zero.
+    expect(halt.disruptedKtPerYear).toBeNull();
+    expect(halt.explanation.join(' ')).toContain('corridor grade');
+    expect(r.operation.params.topologyGranularity).toBe('country');
+    expect(r.operation.params.topologyVintage).toBe('2017');
+  });
+
+  it('a TRUE predates date (before the earliest vintage) still refuses everything as null', async () => {
+    const { state } = await getEconomyState('copper');
+    const r = propagateEvents(state, buildGraph(state, '2015-06-01'), { asOf: '2015-06-01' });
+    expect(r.operation.params.topologyStatus).toBe('predates');
+    for (const i of r.result) expect(i.disruptedKtPerYear, i.eventId).toBeNull();
+  });
+
+  it('a graph built for a LATER world refuses a historical evaluation — the graph, not the date, decides the frame', async () => {
+    // The incoherence this exists to prevent: hand propagateEvents a
+    // facility graph (built without asOf) and evaluate at 2020 — the old
+    // wiring re-selected the 2020 vintage for the LABEL while summing
+    // FACILITY edges for the number. Now validity classifies against the
+    // graph's own selection: this call is honestly 'predates', and the note
+    // names the rebuild remedy.
+    const { state } = await getEconomyState('copper');
+    const r = propagateEvents(state, buildGraph(state), { asOf: '2020-04-15' });
+    expect(r.operation.params.topologyStatus).toBe('predates');
+    const peru = r.result.find(i => i.eventId === 'evt:peru-covid-shutdown-2020')!;
+    expect(peru.disruptedKtPerYear).toBeNull();
+    expect(peru.explanation.join(' ')).toContain('predates');
+    expect(peru.explanation.join(' ')).toContain('build the graph at the evaluation date');
+  });
+
+  it('where the basis resolves, the vintage QUANTIFIES: a scenario-posed Chilean export ban at 2019 states real tonnage', async () => {
+    // Chile declares CONTAINED METAL under HS 2603 (the mirror-established
+    // deviation) — its vintage corridors are metal_content and quantify
+    // directly. The refusals above are basis-honesty, not a blanket rule.
+    const run = await runEngine('copper', {
+      asOf: '2019-06-01',
+      scenario: {
+        id: 'cl-export-ban-2019', label: 'Chile concentrate export ban (posed, 2019)',
+        events: [{
+          entityId: 'ent:country:cl', type: 'policy', title: 'Export ban (posed)', start: '2019-06-01', severity: 'high',
+          regulatoryScope: { jurisdictionCountryCode: 'CL', commodity: 'copper', direction: 'export' },
+        }],
+      },
+    });
+    const impacts = (run.systems.propagation as { result: Array<{ eventId: string; affected: Array<{ entityId: string }>; disruptedKtPerYear: number | null; explanation: string[] }> }).result;
+    const ban = impacts.find(i => i.eventId.startsWith('evt:scenario:cl-export-ban-2019'))!;
+    // CL 2019 mapped corridors: CN 1694 + JP 599 + KR 280 + IN 150 = 2723 kt
+    // contained metal (reporter-declared, captured 2026-08-27).
+    expect(ban.disruptedKtPerYear).toBe(2723);
+    const affected = ban.affected.map(a => a.entityId);
+    expect(affected).toContain('ent:country:cn');
+    expect(affected).toContain('ent:country:jp');
   });
 
   it('a scenario-posed Chilean export ban halts crossing flows and spares domestic smelting', async () => {
@@ -157,10 +224,14 @@ describe('topology validity (what WAS vs what was KNOWN)', () => {
   it('classifies the evaluation date against the union of flow periods', () => {
     const s = syntheticState(); // all flows 2024-01-01..2024-12-31
     expect(topologyValidity(s, '2024-07-01').status).toBe('within');
+    // With vintages in the model, 'predates' means "before the earliest
+    // topology material of ANY granularity" and selects nothing: the period
+    // is null (nothing serves), and the note names where material begins.
     expect(topologyValidity(s, '2017-02-15')).toMatchObject({
       status: 'predates',
-      topologyPeriod: { start: '2024-01-01', end: '2024-12-31' },
+      topologyPeriod: null,
     });
+    expect(topologyValidity(s, '2017-02-15').note).toContain('earliest material');
     expect(topologyValidity(s, '2017-02-15').note).toContain('null (unknown), not zero');
     // Forward is the standard latest-claim-at-asOf convention: the snapshot
     // serves as latest-known structure, labeled — never silently.

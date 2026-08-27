@@ -218,6 +218,15 @@ export function asKnownThen(state: EconomyState, asOf: string): EconomyState {
     ...state,
     observations: state.observations.filter(o => knownAtOf(o) <= asOf),
     events: state.events.filter(ev => (ev.firstReportedAt ?? ev.start) <= asOf),
+    // Structural records: curated (representative) flows are knowable by
+    // construction — the same label the backtest carries. SOURCED flows are
+    // not: a country flow vintage captured 2026-08-27 was not in anyone's
+    // hands at a 2019 knowledge state (Comtrade revises in place, so the
+    // capture date is the only publication bound we can honestly claim —
+    // refusing the earlier date rather than defaulting to it). Without this
+    // filter the vintages would leak hindsight into every as-known-then
+    // graph.
+    flows: state.flows.filter(f => f.valueKind === 'representative' || f.provenance.retrievedAt.slice(0, 10) <= asOf),
   };
 }
 
@@ -267,7 +276,10 @@ export async function runEngine(commodity: string, ctx: SystemContext = {}): Pro
     knowledge: ctx.knowledge ?? 'best_known',
     ...(ctx.scenario ? { scenarioId: ctx.scenario.id, scenarioLabel: ctx.scenario.label, injectedEventIds } : {}),
   };
-  const graph = buildGraph(state);
+  // Topology selection is asOf-aware (work order 3.2): a historical run
+  // gets the country vintage serving its date, never a mixed-granularity
+  // graph.
+  const graph = buildGraph(state, ctx.asOf);
   const systems: Record<string, AnalyticalResult<unknown>> = {};
   for (const system of SYSTEMS) {
     systems[system.name] = system.run(state, graph, ctx);

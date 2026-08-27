@@ -66,21 +66,27 @@ describe('economy store (curated copper assembly)', () => {
     expect(att.get('ent:company:collahuasi-jv')).toBe('structural_only');
   });
 
-  it('the structural layer is 0% sourced — a proportion pinned so the first reported ingest moves a number, not a flag', async () => {
-    // The accurate statement (narrower than any numbers-vs-structure
-    // split): NO index in the system is reported-class end-to-end, and
-    // none CAN be until this layer's shares move — every index's
-    // weakestInputClass ultimately stands on it. A boolean pin here would
-    // break PARTIALLY when the first filings source lands (filers only;
-    // Codelco sits outside — a mixed layer, not a converted one), inviting
-    // an argument about the flag; the proportion survives the event it was
-    // written for. Update these measured values when they move.
+  it('the structural profile is a measurement, not a flag — and the first sourced ingest moved it', async () => {
+    // Written (round 18) as a 0% pin with "update these measured values
+    // when they move" — expecting the mover to be a filings source. The
+    // mover was Comtrade country flow vintages (work order 3.2): reported
+    // reporter-declared corridors entered the flow layer, and the
+    // proportion did exactly what it was designed to do — moved a number
+    // instead of breaking a flag. Measured 2026-08-27, per basis (gross
+    // and contained metal never share a sum):
+    //   metal_content 0 → 0.202 (Chile vintages are contained metal — the
+    //     mirror-established deviation — mixed with curated flows)
+    //   gross_weight — sourced 1.0 (all vintage; no curated gross flows)
+    //   capacities and attribution edges — still 0: NO capacity quantity
+    //   or operated_by edge is publisher-sourced. That was the round-18
+    //   expectation for EDGAR, which remains operator-blocked.
     const { state } = await getEconomyState('copper');
     const p = structuralClassProfile(state);
     expect(p.flows.records).toBeGreaterThan(20);
     expect(p.capacities.records).toBeGreaterThan(10);
     expect(p.attributionEdges.records).toBeGreaterThan(5);
-    expect(p.flows.sourcedShareByKt).toBe(0);
+    expect(p.flows.byBasis.metal_content.sourcedShareByKt).toBe(0.202);
+    expect(p.flows.byBasis.gross_weight.sourcedShareByKt).toBe(1);
     expect(p.capacities.sourcedShareByKt).toBe(0);
     expect(p.attributionEdges.sourcedRecords).toBe(0);
   });
