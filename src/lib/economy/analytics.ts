@@ -794,7 +794,7 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
     const refused = t.unquantifiedFlowIds.length > 0;
     const explanation: string[] = [];
     if (refused) {
-      explanation.push(`SCORE REFUSED: ${t.unquantifiedFlowIds.length} flow(s) at this node (${t.unquantifiedFlowIds.join(', ')}) declare gross weight with no corridor grade (or an unconvertible unit) — shares and redundancy would be computed against a total known to be wrong. Supply a mirror-implied corridor grade or a cu_content declaration.`);
+      explanation.push(`SCORE REFUSED: ${t.unquantifiedFlowIds.length} flow(s) at this node (${t.unquantifiedFlowIds.join(', ')}) declare gross weight with no corridor grade (or an unconvertible unit) — shares and redundancy would be computed against a total known to be wrong. Supply a mirror-implied corridor grade or a metal_content declaration.`);
       explanation.push(`Quantified lower bound: ${Math.round(through)} kt/y.`);
     } else {
       explanation.push(`${Math.round(through)} kt/y passes through (${Math.round(throughputShare * 100)}% of network max)`);

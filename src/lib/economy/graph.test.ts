@@ -63,7 +63,7 @@ describe('economy graph (synthetic)', () => {
   });
 
   it('basis conversion: a gross-only supplier keeps its tonnage via the corridor-implied grade', () => {
-    // The case the old firewall silenced: a smelter drawing 100 kt cu_content
+    // The case the old firewall silenced: a smelter drawing 100 kt metal_content
     // from A and 400 kt gross from B is DUAL-sourced. Zeroing B made it read
     // single-sourced — supplier count dropped, redundancy inverted, and a
     // disruption at B propagated nothing. Here the mirror pair implies the
@@ -76,7 +76,7 @@ describe('economy graph (synthetic)', () => {
     const prov = s.observations[0].provenance;
     const period = { start: '2024-01-01', end: '2024-12-31' };
     s.observations.push(
-      { id: 'obs:mirror:gamma-exp', entityId: 'ent:mine:gamma', partnerEntityId: 'ent:port:gate', metric: 'concentrate_exports', value: 100, unit: 'kt', period, basis: 'cu_content', valueKind: 'reported', confidence: 'medium', provenance: prov },
+      { id: 'obs:mirror:gamma-exp', entityId: 'ent:mine:gamma', partnerEntityId: 'ent:port:gate', metric: 'concentrate_exports', value: 100, unit: 'kt', period, basis: 'metal_content', valueKind: 'reported', confidence: 'medium', provenance: prov },
       { id: 'obs:mirror:gate-imp', entityId: 'ent:port:gate', partnerEntityId: 'ent:mine:gamma', metric: 'concentrate_imports', value: 400, unit: 'kt', period, basis: 'gross_weight', valueKind: 'reported', confidence: 'medium', provenance: prov },
     );
     const g = buildGraph(s);

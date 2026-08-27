@@ -20,6 +20,7 @@ import { COPPER_SERIES_OBSERVATIONS, COPPER_SERIES_SOURCES } from '@/data/econom
 // Runtime-safe despite the apparent cycle: liveAdapters imports only TYPES
 // from this module, so nothing evaluates back into it at load time.
 import { LIVE_ADAPTERS } from './liveAdapters';
+import { curatedAluminiumAdapter } from '@/data/economy/aluminium';
 
 export interface AdapterPayload {
   commodity: string;
@@ -69,7 +70,7 @@ export const curatedCopperAdapter: EconomyAdapter = {
 
 /* ── Registry ── */
 
-const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter, ...LIVE_ADAPTERS];
+const ADAPTERS: EconomyAdapter[] = [curatedCopperAdapter, curatedAluminiumAdapter, ...LIVE_ADAPTERS];
 
 export function listAdapters(): EconomyAdapter[] {
   return [...ADAPTERS];

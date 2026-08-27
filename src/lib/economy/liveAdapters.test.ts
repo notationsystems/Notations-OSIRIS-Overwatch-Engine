@@ -182,7 +182,7 @@ describe('parseWestmetallTable / westmetallObs (against the committed real captu
     expect(latest.id).toBe('obs:lme-stock-daily:2026-08-25');
     expect(latest.value).toBeCloseTo(238.725, 3); // tonnes → kt
     expect(latest.unit).toBe('kt');
-    expect(latest.basis).toBe('cu_content');
+    expect(latest.basis).toBe('metal_content');
     expect(latest.period).toEqual({ start: '2026-08-25', end: '2026-08-25' });
     // Previous session's closing stock publishes the next morning.
     expect(latest.knownAt).toBe('2026-08-26');

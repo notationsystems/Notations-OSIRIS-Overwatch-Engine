@@ -107,6 +107,7 @@ const CONCENTRATION_LABELS: Record<string, string> = {
   mineProductionByOperator: 'MINE PRODUCTION / OPERATOR (CONTROL)',
   mineProductionByOperatorEconomic: 'MINE PRODUCTION / OPERATOR (ECONOMIC)',
   refinedProductionByCountry: 'REFINED PRODUCTION / COUNTRY',
+  intermediateProductionByCountry: 'INTERMEDIATE PRODUCTION / COUNTRY',
   consumptionByRegion: 'CONSUMPTION / REGION',
   smeltingCapacityByCountry: 'SMELTING CAPACITY / COUNTRY',
   refiningCapacityByCountry: 'REFINING CAPACITY / COUNTRY',
@@ -467,7 +468,11 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                       </div>
                     );
                   })()}
-                  {(Object.entries(analytics.concentration).filter(([key]) => key !== 'trajectory') as Array<[string, ConcentrationBlock]>).map(([key, block]) => (
+                  {/* Empty indices (a metric this commodity's chain lacks)
+                      render nothing — an absent index is not a claim. */}
+                  {(Object.entries(analytics.concentration).filter(([key]) => key !== 'trajectory') as Array<[string, ConcentrationBlock]>)
+                    .filter(([, block]) => (block.result?.shares?.length ?? 0) > 0)
+                    .map(([key, block]) => (
                     <div key={key} className="px-2 py-1.5 rounded bg-white/[0.03] border border-white/5">
                       <button onClick={() => toggleEvidence(key)} className="w-full text-left">
                         <div className="flex justify-between items-baseline">

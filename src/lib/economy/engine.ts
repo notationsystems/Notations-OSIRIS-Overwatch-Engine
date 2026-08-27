@@ -118,6 +118,9 @@ const SYSTEMS: EconomySystem[] = [
         mineProductionByOperator: operatorConcentration(state, 'production', ['mine'], 'control', ctx.asOf),
         mineProductionByOperatorEconomic: operatorConcentration(state, 'production', ['mine'], 'economic_interest', ctx.asOf),
         refinedProductionByCountry: concentration(state, 'refined_production', 'country', ctx.asOf),
+        // The chain's first-transformation stage (alumina; copper's blister
+        // analog is unquantified) — empty for commodities without it.
+        intermediateProductionByCountry: concentration(state, 'intermediate_production', 'country', ctx.asOf),
         consumptionByRegion: concentration(state, 'consumption', 'region', ctx.asOf),
         smeltingCapacityByCountry: capacityConcentration(state, 'smelting'),
         refiningCapacityByCountry: capacityConcentration(state, 'refining'),

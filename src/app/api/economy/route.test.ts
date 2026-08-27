@@ -41,6 +41,22 @@ describe('GET /api/economy', () => {
     expect(body.state.observations.every((o: { provenance?: { sourceId?: string } }) => o.provenance?.sourceId)).toBe(true);
   });
 
+  it('serves the second commodity end-to-end: the instrument, not just the engine', async () => {
+    const map = await (await economyGet(req('/api/economy?commodity=aluminium&view=map'))).json();
+    expect(map.commodity).toBe('aluminium');
+    expect(map.econ_entities.length).toBeGreaterThan(25);
+    expect(map.econ_flows.length).toBeGreaterThan(10);
+    const kitimat = map.econ_entities.find((e: { id: string }) => e.id === 'ent:smelter:kitimat');
+    expect(kitimat).toMatchObject({ kind: 'smelter', stage: 'smelting' });
+    const analytics = await (await economyGet(req('/api/economy?commodity=aluminium&view=analytics'))).json();
+    expect(analytics.concentration.refinedProductionByCountry.result.shares[0].name).toBe('China');
+    // The intermediate index exists here and is empty for copper — an
+    // absent index is not a claim, and the panel renders nothing for it.
+    expect(analytics.concentration.intermediateProductionByCountry.result.shares.length).toBeGreaterThan(5);
+    const copperAnalytics = await (await economyGet(req('/api/economy?commodity=copper&view=analytics'))).json();
+    expect(copperAnalytics.concentration.intermediateProductionByCountry.result.band).toBe('no-data');
+  });
+
   it('404s unknown commodities and 400s unknown views and malformed asOf', async () => {
     expect((await economyGet(req('/api/economy?commodity=vibranium'))).status).toBe(404);
     expect((await economyGet(req('/api/economy?commodity=copper&view=nope'))).status).toBe(400);

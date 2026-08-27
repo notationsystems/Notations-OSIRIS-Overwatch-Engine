@@ -111,6 +111,16 @@ describe('search miss → registry gap', () => {
   });
 });
 
+describe('second commodity through the search surface', () => {
+  it('finds aluminium entities with attestation, and evidence kinds run per commodity', async () => {
+    const hit = await (await get('q=bratsk&commodity=aluminium')).json();
+    expect(hit.results[0].id).toBe('ent:smelter:bratsk');
+    expect(hit.results[0].attestation).toBe('representative');
+    const vintages = await (await get('q=vintage&commodity=aluminium')).json();
+    expect(vintages.evidenceResults.map((h: { type: string }) => h.type)).toContain('usgs-mcs2025-live');
+  });
+});
+
 describe('evidence-layer search kinds', () => {
   it('refused:topology finds the predating refusals with their shared remedy', async () => {
     const body = await (await get('q=refused:topology&asOf=2017-02-15')).json();

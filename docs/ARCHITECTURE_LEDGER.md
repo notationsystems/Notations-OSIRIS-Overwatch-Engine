@@ -1031,6 +1031,104 @@ already firing beneath it), and the structural profile stays pinned at
 0% until this ingest is the thing that moves it — which is the property
 the guard exercise was for.
 
+## Phase 23 — the completion assessment, and the usage finding
+
+Against the founding directive's Phase-1 definition of done, the system is
+complete: the full research path runs, with much alongside it that was
+never asked for. Against the mission it is not, and the review's ranked
+gaps are recorded: one commodity (the untested central claim — resolved in
+phase 24); the structural layer 0% reported (EDGAR, gated); recall 0.18
+structurally (the modality gap, deliberately deferred); historical
+structure absent (flow vintages, slot 4); and **entity resolution has a
+contract and no gate** — verified this round: an unmapped external
+identifier (a Comtrade M49 code outside M49_TO_ENTITY, an MCS country
+outside the map) is silently dropped (`return null` / `continue`), the
+round-5 "zero is a claim" shape at the resolution layer, outstanding since
+round 1 and now on the record.
+
+**The usage finding, sharpened by where it was measured**: the review
+asked whether anyone has used the instrument, pointing at the one gauge
+built for it. `search-misses.jsonl` does not exist — zero misses ever
+recorded; the only archive write is the Comtrade vintage the build's own
+acquisition made. In production that emptiness would be ambiguous (unused
+vs perfectly served — two states one file renders alike, the exact
+ambiguity this project refuses elsewhere, and the system has no instrument
+for use itself). In THIS sandbox it is unambiguous: every interaction on
+record is the builder's own validation. Twenty-three rounds of verified
+instrument; zero researcher-hours. The mission was an instrument someone
+keeps open all day — one commodity is a demonstration, two is an
+instrument someone might keep open, which is what phase 24 is for.
+
+## Phase 24 — aluminium: the substrate survives its falsification test
+
+The founding directive claimed the architecture extends to new commodities
+without conceptual rewrite; nothing had ever tested it. Aluminium was
+chosen as the SHARPEST test, not the easiest — bauxite → alumina → primary
+metal breaks copper's shape deliberately: chemical refining BEFORE
+electrolytic smelting (inverting copper's device order), a different basis
+per stage, electricity as a first-class input.
+
+**Verdict: the substrate survived — no conceptual rewrite.** Every engine
+system, the graph, knowledge machinery, topology guard, attestation,
+structural profile, weakestInputClass, evidence search and the guards ran
+over the aluminium state UNCHANGED, and the second commodity is served
+live end-to-end (map, analytics, search) from the same routes. What the
+experiment found, in the review's predicted category of "secretly
+copper-shaped", was VOCABULARY, not architecture:
+
+1. `cu_content` → `metal_content` (the basis was copper-named; 26 refs,
+   mechanical rename).
+2. The metric vocabulary had no intermediate slot, and its
+   equipment-derived name inverts for aluminium — USGS's own row types
+   confirm it ("Smelter production, aluminum" is the FINAL metal;
+   "Refinery production, alumina" the intermediate). Added
+   `intermediate_production`, named by CHAIN POSITION; copper's
+   `smelter_production` stands as recorded legacy naming for its
+   intermediate, not silently renamed.
+3. `MaterialForm` gained `alumina` (bauxite moves as `ore`, metal as
+   `refined`); `SupplyStage` survived untouched — it is order-free, and
+   no code assumed copper's ordering.
+4. The MCS parser hardcoded `!== 'Copper'` against a file that was
+   ALL-COMMODITY all along — the copper adapter had been fetching
+   aluminium's world data for twenty rounds and throwing it away.
+   `McsCommoditySpec` parameterizes commodity rows, type→metric mapping
+   and per-row basis; the aluminium chain arrives live (reported 2023 +
+   estimated 2024, bauxite gross dry tons / alumina gross calcined /
+   metal content) from the same fetch, same ladder, new snapshot rung.
+   `observationOnlyPayload` had `commodity: 'copper'` hardcoded too.
+5. Electricity as a declared constraint needed NO new machinery —
+   `depends_on` edges to infrastructure entities (Kitimat→Kemano at
+   strength 1.0 is the real case: a smelter that exists because of its
+   dam) — the dependency type existed; aluminium is the first commodity
+   to need it as a real constraint.
+
+**Two scope gaps recorded unbuilt, both real findings:**
+- The corridor-grade machinery assumes mirror-implied CONCENTRATE grades;
+  aluminium's gross bauxite/alumina flows need form-level stage-conversion
+  constants (bauxite ~25% Al, calcined alumina 52.9%). V1 curates flows in
+  contained metal (the copper convention for curated flows), and the
+  gross-flow conversion generalization is on the record, unbuilt.
+- `RegulatoryScope` is jurisdiction-shaped and cannot express a
+  FACILITY-scoped regulatory act: the real Alunorte court embargo
+  (2018–19, half production by court order) is modeled as an operational
+  disruption with the limitation stated on the event. The scope schema is
+  copper-shaped in exactly this respect — copper's regulatory truth set
+  happened to be jurisdiction-wide.
+- (Also: the UI defaults remain copper-shaped — panel fetches and layer
+  labels; the API and engine are commodity-clean.)
+
+Measured on first run, all class gates exercised on a commodity they were
+never written against: primary-aluminium country HHI is CHINA-CONCENTRATED
+(>2500, band high — a different landscape from copper's 1339); the
+intermediate index exists for aluminium and reads no-data for copper (an
+absent index is not a claim; the panel renders nothing); the OFAC-Rusal
+sanction (real, 2018-04-06 → 2019-01-27) reaches Bratsk and Krasnoyarsk
+through the owner exactly as the MIND ID pin promised; a 2018 evaluation
+predates the 2024 aluminium topology and nulls its tonnage — the guard is
+commodity-agnostic; countries attest reported/estimated while every
+facility attests representative — the copper split reproduces; the
+structural layer is 0% sourced here too.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -1045,7 +1143,7 @@ the guard exercise was for.
 
 ## Verification
 
-Every subsystem above ships with executable tests (170+ economy tests; 542
+Every subsystem above ships with executable tests (180+ economy tests; 551
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

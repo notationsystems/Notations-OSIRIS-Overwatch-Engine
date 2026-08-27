@@ -103,6 +103,14 @@ export interface Entity {
 export type Metric =
   | 'production'
   | 'refined_production'
+  /** Output of the chain's FIRST transformation stage (alumina from bauxite
+   *  refining; copper's blister/anode analog). Named by chain position, not
+   *  equipment: the aluminium chain inverts copper's device names (its
+   *  refineries make the intermediate, its smelters make the final metal),
+   *  so equipment-named metrics do not generalize. `smelter_production`
+   *  below is copper-shaped legacy naming for copper's intermediate —
+   *  recorded in the ledger, not silently renamed. */
+  | 'intermediate_production'
   | 'smelter_production'
   | 'inventory'
   | 'utilization'
@@ -172,7 +180,7 @@ export interface Observation {
  * content under HS 2603 — so declared basis is a claim, and the divergence
  * system's grade-band gate is the check.
  */
-export type QuantityBasis = 'cu_content' | 'gross_weight' | 'unspecified';
+export type QuantityBasis = 'metal_content' | 'gross_weight' | 'unspecified';
 
 /* ── Measurement classes ── */
 
@@ -205,6 +213,10 @@ export function measurementClassOf(metric: Metric): MeasurementClass {
 /** Physical form the commodity takes while moving. */
 export type MaterialForm =
   | 'ore'
+  /** Calcined alumina (Al2O3) — the aluminium chain's intermediate; a
+   *  chemical product, not a concentrate, so it gets its own name. Bauxite
+   *  moves as 'ore'; primary aluminium as 'refined'. */
+  | 'alumina'
   | 'concentrate'
   | 'blister'
   | 'anode'

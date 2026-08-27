@@ -485,8 +485,16 @@ condition it exists to catch.
 
 ## Known limitations
 
-- One commodity (copper). The adapter registry, engine and UI are
-  commodity-agnostic; a second commodity needs only a dataset + adapter.
+- Two commodities: copper (deep) and aluminium (the round-25 substrate
+  test — the full research path serves `commodity=aluminium` from the same
+  routes, with live MCS bauxite/alumina/metal figures from the same world
+  file). The substrate claim is now tested, not assumed (ledger phase 24);
+  remaining copper-shape: the UI defaults (panel fetches, layer labels)
+  and two recorded scope gaps — gross bauxite/alumina flow conversion
+  (form-level stage-conversion constants, unbuilt; aluminium flows are
+  curated in contained metal meanwhile) and facility-scoped regulatory
+  acts (RegulatoryScope is jurisdiction-shaped; the Alunorte embargo is
+  modeled as disruption with the limitation stated on the event).
 - Comtrade bilateral rows are not yet materialized as Flow edges (world totals
   only) — facility-level flows would double-count against country-level trade
   edges without an allocation model. When they land, the basis machinery is

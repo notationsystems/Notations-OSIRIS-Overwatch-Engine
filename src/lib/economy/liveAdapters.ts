@@ -30,6 +30,7 @@ import type { AdapterPayload, EconomyAdapter } from './adapters';
 import { cachedSource } from '@/lib/sourceCache';
 import { MCS_SNAPSHOT_CSV, MCS_SNAPSHOT_CAPTURED_AT } from '@/data/economy/snapshots/mcs2025-world-copper';
 import { MCS2024_SNAPSHOT_CSV, MCS2024_SNAPSHOT_CAPTURED_AT, MCS2024_PUBLISHED_AT } from '@/data/economy/snapshots/mcs2024-world-copper';
+import { MCS_AL_SNAPSHOT_CSV, MCS_AL_SNAPSHOT_CAPTURED_AT } from '@/data/economy/snapshots/mcs2025-world-aluminium';
 import comtradeSnapshot from '@/data/economy/snapshots/comtrade-copper.json';
 import yahooSnapshot from '@/data/economy/snapshots/yahoo-hg-10y.json';
 import cftcSnapshot from '@/data/economy/snapshots/cftc-copper-1yr.json';
@@ -168,10 +169,62 @@ export const MCS2024_SPEC: McsVintageSpec = {
   notesCol: 'Prod_notes',
 };
 
+/**
+ * Which rows of the ALL-COMMODITY world file a state ingests, and what each
+ * row type means in canonical vocabulary. The world CSV carries every MCS
+ * chapter; until round 25 the parser hardcoded `!== 'Copper'` — the
+ * commodity spec is the generalization the aluminium experiment forced.
+ * Note the basis differences the spec makes explicit: copper's MCS figures
+ * are contained metal; bauxite and alumina figures are GROSS mass (dry
+ * tons / calcined weight) — same metric slot, different basis, carried on
+ * the observation.
+ */
+export interface McsCommoditySpec {
+  /** COMMODITY column values to admit. */
+  commodities: string[];
+  /** Row TYPE → canonical metric + basis; null skips the row. */
+  metricFor: (type: string) => { metric: 'production' | 'refined_production' | 'intermediate_production'; basis: 'metal_content' | 'gross_weight' } | null;
+  countryMap: Record<string, string>;
+}
+
+export const MCS_COPPER_CSPEC: McsCommoditySpec = {
+  commodities: ['Copper'],
+  metricFor: (type) => type.startsWith('Mine production') ? { metric: 'production', basis: 'metal_content' }
+    : type.startsWith('Refinery production') ? { metric: 'refined_production', basis: 'metal_content' }
+      : null,
+  countryMap: {}, // filled below (MCS_COUNTRY_MAP is declared earlier in the file)
+};
+
+const AL_COUNTRY_MAP: Record<string, string> = {
+  'United States': 'ent:country:us', 'Australia': 'ent:country:au', 'Bahrain': 'ent:country:bh',
+  'Brazil': 'ent:country:br', 'Canada': 'ent:country:ca', 'China': 'ent:country:cn',
+  'Iceland': 'ent:country:is', 'India': 'ent:country:in', 'Malaysia': 'ent:country:my',
+  'Norway': 'ent:country:no', 'Russia': 'ent:country:ru', 'United Arab Emirates': 'ent:country:ae',
+  'Guinea': 'ent:country:gn', 'Indonesia': 'ent:country:id', 'Jamaica': 'ent:country:jm',
+  'Kazakhstan': 'ent:country:kz', 'Saudi Arabia': 'ent:country:sa', 'Vietnam': 'ent:country:vn',
+  'Greece': 'ent:country:gr', 'Turkey': 'ent:country:tr',
+  // Germany/Ireland/Spain alumina rows stay unmapped until the register
+  // carries those countries — an unmapped reporter is a dropped row, which
+  // is the resolution gap the round-25 assessment names; kept small here.
+};
+
+export const MCS_ALUMINIUM_CSPEC: McsCommoditySpec = {
+  commodities: ['Aluminum', 'Bauxite'],
+  metricFor: (type) =>
+    // USGS's own vocabulary confirms the chain inversion: aluminium
+    // SMELTERS produce the final metal, its REFINERIES the intermediate.
+    type.startsWith('Smelter production, aluminum') ? { metric: 'refined_production', basis: 'metal_content' }
+      : type.startsWith('Mine production, bauxite') ? { metric: 'production', basis: 'gross_weight' }
+        : type.startsWith('Refinery production, alumina') ? { metric: 'intermediate_production', basis: 'gross_weight' }
+          : null,
+  countryMap: AL_COUNTRY_MAP,
+};
+
 export function parseMcsWorldCsv(
   csvText: string,
   prov: (ref: string, note?: string) => Provenance,
   spec: McsVintageSpec = MCS2025_SPEC,
+  cspec?: McsCommoditySpec,
 ): Observation[] {
   const lines = csvText.replace(/^\ufeff/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
   const header = splitCsvRow(lines[0]).map(h => h.trim());
@@ -192,16 +245,17 @@ export function parseMcsWorldCsv(
     return Number.isFinite(v) ? v : null;
   };
 
+  const cs: McsCommoditySpec = cspec ?? { ...MCS_COPPER_CSPEC, countryMap: MCS_COUNTRY_MAP };
   const obs: Observation[] = [];
   for (const line of lines.slice(1)) {
     const row = splitCsvRow(line);
-    if (iCommodity >= 0 && (row[iCommodity] ?? '').trim() !== 'Copper') continue;
-    const entityId = MCS_COUNTRY_MAP[(row[iCountry] ?? '').trim()];
+    if (iCommodity >= 0 && !cs.commodities.includes((row[iCommodity] ?? '').trim())) continue;
+    const entityId = cs.countryMap[(row[iCountry] ?? '').trim()];
     if (!entityId) continue; // "Other Countries", "World total", unmapped
     const type = (row[iType] ?? '').trim();
-    const metric = type.startsWith('Mine production') ? 'production' as const
-      : type.startsWith('Refinery production') ? 'refined_production' as const
-        : null;
+    const mapped = cs.metricFor(type);
+    const metric = mapped?.metric ?? null;
+    const basis = mapped?.basis ?? 'metal_content';
     const slug = entityId.split(':')[2];
     if (metric) {
       // USGS flags some "reported" figures as its own estimates in the notes
@@ -212,7 +266,7 @@ export function parseMcsWorldCsv(
       if (vReported !== null) {
         obs.push({
           id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.reportedYear}`,
-          entityId, metric, value: vReported, unit: 'kt/y', basis: 'cu_content',
+          entityId, metric, value: vReported, unit: 'kt/y', basis,
           period: { start: `${spec.reportedYear}-01-01`, end: `${spec.reportedYear}-12-31` },
           knownAt: spec.publishedAt,
           valueKind: noteEstimated ? 'estimated' : 'reported', confidence: 'high',
@@ -223,7 +277,7 @@ export function parseMcsWorldCsv(
       if (vEstimated !== null) {
         obs.push({
           id: `obs:${spec.idPrefix}:${metric}:${slug}:${spec.estimatedYear}`,
-          entityId, metric, value: vEstimated, unit: 'kt/y', basis: 'cu_content',
+          entityId, metric, value: vEstimated, unit: 'kt/y', basis,
           period: { start: `${spec.estimatedYear}-01-01`, end: `${spec.estimatedYear}-12-31` },
           knownAt: spec.publishedAt,
           valueKind: 'estimated', confidence: 'high',
@@ -295,6 +349,33 @@ function mcsSnapshot(reason: string): Observation[] {
     sourceRef: ref,
     note: [`bundled snapshot (${reason})`, note].filter(Boolean).join(' — '),
   }), MCS2025_SPEC);
+}
+
+/* ── Aluminium from the same world file ── */
+
+function mcsAlProv(retrievedAt: string, note?: string) {
+  return (ref: string, extra?: string): Provenance => ({
+    sourceId: 'usgs-mcs2025-live',
+    sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
+    sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
+    retrievedAt, sourceRef: ref, note: [note, extra].filter(Boolean).join(' — ') || undefined,
+  });
+}
+
+async function fetchMcsAluminiumLive(): Promise<Observation[]> {
+  const item = await fetchJson<ScienceBaseItem>(MCS_ITEM_URL);
+  const file = item.files?.find(f => /World_Data.*\.csv$/i.test(f.name ?? ''));
+  if (!file?.url) throw new Error('MCS World Data CSV not found on ScienceBase item');
+  const csv = await fetchText(file.url);
+  return parseMcsWorldCsv(csv, mcsAlProv(new Date().toISOString()), MCS2025_SPEC, MCS_ALUMINIUM_CSPEC);
+}
+
+function mcsAluminiumSnapshot(reason: string): Observation[] {
+  return parseMcsWorldCsv(
+    MCS_AL_SNAPSHOT_CSV,
+    mcsAlProv(`${MCS_AL_SNAPSHOT_CAPTURED_AT}T00:00:00Z`, `bundled snapshot (${reason})`),
+    MCS2025_SPEC, MCS_ALUMINIUM_CSPEC,
+  );
 }
 
 /* ══════════════ UN Comtrade preview ══════════════ */
@@ -418,7 +499,7 @@ export function parseComtradeResponse(
     // is a CLAIM about the reporter's declaration, not verified fact — the
     // divergence grade-band gate detects reporters who deviate (e.g. Chile
     // appears to declare contained metal under HS 2603).
-    basis: hs === '2603' ? 'gross_weight' : 'cu_content',
+    basis: hs === '2603' ? 'gross_weight' : 'metal_content',
     period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
     ...(knownAt ? { knownAt } : {}),
     // A world total OSIRIS computed by summing partner rows is inference,
@@ -466,7 +547,7 @@ export function parseComtradeBilateral(
       entityId, partnerEntityId, metric,
       value: Math.round(row.netWgt / 1e6),
       unit: hs === '2603' ? 'kt gross/y' : 'kt/y',
-      basis: hs === '2603' ? 'gross_weight' : 'cu_content',
+      basis: hs === '2603' ? 'gross_weight' : 'metal_content',
       period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
       ...(knownAt ? { knownAt } : {}),
       valueKind: 'reported',
@@ -756,7 +837,7 @@ export function westmetallObs(rows: WestmetallRow[], prov: (ref: string, note?: 
       metric: 'inventory' as const,
       value: Number((r.stockTonnes / 1000).toFixed(3)),
       unit: 'kt',
-      basis: 'cu_content' as const, // refined cathode: contained ≈ gross
+      basis: 'metal_content' as const, // refined cathode: contained ≈ gross
       period: { start: r.date, end: r.date },
       knownAt: dayAfter,
       valueKind: 'reported' as const,
@@ -840,10 +921,14 @@ function westmetallSnapshotObs(reason: string): Observation[] {
 
 /* ══════════════ Adapter assembly ══════════════ */
 
-function observationOnlyPayload(observations: Observation[], source: AdapterPayload['sources'][number]): AdapterPayload {
+function observationOnlyPayload(
+  observations: Observation[],
+  source: AdapterPayload['sources'][number],
+  commodity: [slug: string, name: string] = ['copper', 'Copper'], // was hardcoded 'copper' until round 25
+): AdapterPayload {
   return {
-    commodity: 'copper',
-    commodityName: 'Copper',
+    commodity: commodity[0],
+    commodityName: commodity[1],
     entities: [], flows: [], capacities: [], dependencies: [], events: [],
     observations,
     sources: [source],
@@ -854,6 +939,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 const loaders = {
   usgs: withSnapshotFallback('econ:usgs-mcs', 30 * DAY, fetchMcsLive, mcsSnapshot),
+  usgsAluminium: withSnapshotFallback('econ:usgs-mcs-al', 30 * DAY, fetchMcsAluminiumLive, mcsAluminiumSnapshot),
   comtrade: withSnapshotFallback('econ:comtrade', 30 * DAY, fetchComtradeLive, comtradeSnapshotObs),
   yahoo: withSnapshotFallback('econ:yahoo-hg', 12 * 60 * 60 * 1000, fetchYahooLive, yahooSnapshotObs),
   cftc: withSnapshotFallback('econ:cftc-cot', 12 * 60 * 60 * 1000, fetchCftcLive, cftcSnapshotObs),
@@ -878,6 +964,23 @@ export const usgsMcsAdapter: EconomyAdapter = {
       sourceUrl: 'https://www.sciencebase.gov/catalog/item/65b7d77ed34e36a39045b4b2',
     });
     return payload;
+  },
+};
+
+export const usgsMcsAluminiumAdapter: EconomyAdapter = {
+  providerId: 'usgs-mcs-aluminium-live',
+  providerName: 'USGS Mineral Commodity Summaries World Data — aluminium chain (live, ScienceBase)',
+  commodities: ['aluminium'],
+  async load() {
+    // Same world file, same ladder, different commodity spec: bauxite mine
+    // production (gross dry tons), alumina refinery production (gross
+    // calcined weight, intermediate_production) and primary aluminium
+    // smelter production (metal content, refined_production).
+    return observationOnlyPayload(await loaders.usgsAluminium(), {
+      sourceId: 'usgs-mcs2025-live',
+      sourceName: 'USGS Mineral Commodity Summaries 2025 — World Data (ScienceBase)',
+      sourceUrl: `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}`,
+    }, ['aluminium', 'Aluminium']);
   },
 };
 
@@ -934,5 +1037,5 @@ export const westmetallStocksAdapter: EconomyAdapter = {
 };
 
 export const LIVE_ADAPTERS: EconomyAdapter[] = [
-  usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter, westmetallStocksAdapter,
+  usgsMcsAdapter, usgsMcsAluminiumAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter, westmetallStocksAdapter,
 ];
