@@ -450,6 +450,19 @@ export interface AnalyticalResult<T> {
   /** Evidence identity: exact inputs the result was computed from. */
   inputs: { observationIds?: string[]; flowIds?: string[]; capacityIds?: string[]; entityIds?: string[] };
   result: T;
+  /**
+   * Why the result is EMPTY — set only when it is, and never as a caveat on
+   * a populated one (a note on every result is a note on none).
+   *
+   * An analytical operation that returns nothing has said one of several
+   * different things: nothing qualified, the inputs it needs are absent at
+   * this evaluation date, or the population it ranks over is excluded by
+   * construction here. A bare empty array says none of them, and the reader
+   * supplies the wrong one — usually "the instrument is broken" or "there
+   * are no bottlenecks", when the truth was "no facility structure exists
+   * at this date to rank".
+   */
+  emptyBecause?: string;
 }
 
 /* ── Divergence ── */

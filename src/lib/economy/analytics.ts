@@ -25,8 +25,14 @@ function wrap<T>(
   params: Record<string, string | number | undefined>,
   inputs: AnalyticalResult<T>['inputs'],
   result: T,
+  emptyBecause?: string,
 ): AnalyticalResult<T> {
-  return { operation: { name, params }, execution: { executedAt: new Date().toISOString(), engine: ENGINE }, inputs, result };
+  return {
+    operation: { name, params },
+    execution: { executedAt: new Date().toISOString(), engine: ENGINE },
+    inputs, result,
+    ...(emptyBecause ? { emptyBecause } : {}),
+  };
 }
 
 /* ── Concentration (HHI) ── */
@@ -855,11 +861,31 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
   candidates.sort((a, b) =>
     Number(b.score === null) - Number(a.score === null)
     || (b.score ?? 0) - (a.score ?? 0));
+  // WHY IT IS EMPTY, when it is. The runbook leads with this list — "find
+  // a constraint" is move #1, the one it says to do if you do nothing else
+  // — and a researcher who has followed move #2 first (set a past date) met
+  // an empty panel at EVERY date the time bar can reach except the present.
+  // 35 candidates today, 0 at 2017, 2019 and 2022. Honest and unexplained:
+  // the historical vintages are country↔country corridors, and countries
+  // are aggregates rather than chokepoints, so there is no sited structure
+  // to rank. That reads as "no bottlenecks" or "broken" unless it is said.
+  let emptyBecause: string | undefined;
+  if (candidates.length === 0) {
+    const carrying = [...throughput.keys()].filter(id => graph.nodes.has(id));
+    const aggregates = carrying.filter(id => {
+      const k = graph.nodes.get(id)!.kind;
+      return k === 'country' || k === 'region';
+    });
+    emptyBecause = carrying.length === 0
+      ? 'No node carries flow in the topology serving this date, so there is nothing to rank. Ranking requires a flow topology; check the topology banner for whether one covers the date at all.'
+      : `All ${carrying.length} node(s) carrying flow at this date are AGGREGATES (${aggregates.length} country/region) — a country is a sink, not a chokepoint, so none is a bottleneck candidate. The topology serving this date is country-granularity; facility-level chokepoints need the country↔facility allocation model (deferred). The MAP draws these corridors.`;
+  }
   return wrap(
     'bottleneckCandidates',
     { commodity: state.commodity },
     { flowIds: [...allFlowIds], capacityIds: [...allCapIds] },
     candidates,
+    emptyBecause,
   );
 }
 

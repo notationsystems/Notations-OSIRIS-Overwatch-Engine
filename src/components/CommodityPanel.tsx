@@ -71,7 +71,7 @@ interface Analytics {
   providers: string[];
   knowledge?: string;
   concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
-  bottlenecks: { result: Bottleneck[] };
+  bottlenecks: { result: Bottleneck[]; emptyBecause?: string };
   anomalies: { result: Anomaly[] };
   coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
   divergence?: { result: DivergenceRec[] };
@@ -528,6 +528,20 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
 
               <Section id="bottlenecks" open={!!openSections['bottlenecks']} onToggle={toggle} title="CANDIDATE BOTTLENECKS" icon={<AlertTriangle className="w-3 h-3 text-[#FF9500]" />} count={analytics.bottlenecks.result.length}>
                 <div className="space-y-1">
+                  {/* The runbook's FIRST move lands here. At every historical
+                      date the time bar can reach, this list is empty — and
+                      an unexplained empty list reads as "no bottlenecks" or
+                      "broken", neither of which is what the corpus said. */}
+                  {analytics.bottlenecks.result.length === 0 && analytics.bottlenecks.emptyBecause && (
+                    <div
+                      data-testid="bottlenecks-empty-because"
+                      className="px-2 py-2 rounded bg-white/[0.03] border-l-2 text-[9px] font-mono leading-relaxed text-[var(--text-muted)]"
+                      style={{ borderLeftColor: '#FF9500' }}
+                    >
+                      <span className="text-[#FF9500]">NO CANDIDATES AT THIS DATE — </span>
+                      {analytics.bottlenecks.emptyBecause}
+                    </div>
+                  )}
                   {analytics.bottlenecks.result.slice(0, 8).map(b => (
                     <div key={b.entityId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
                       <button onClick={() => onSelectEntity(b.entityId)} className="w-full text-left">

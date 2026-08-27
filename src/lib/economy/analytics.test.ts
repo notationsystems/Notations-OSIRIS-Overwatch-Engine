@@ -525,3 +525,46 @@ describe('the bottleneck sentence states the basis it is on (the researcher\'s f
     }
   });
 });
+
+/**
+ * The runbook's FIRST move meets an empty list at every historical date.
+ *
+ * Measured: 35 bottleneck candidates today, ZERO at 2017, 2019 and 2022 —
+ * every date the time bar can reach except the present, and the runbook's
+ * move #2 ("set a past date") sends a researcher there before move #1 sends
+ * them here. The zero is honest: the historical vintages are country↔country
+ * corridors and a country is an aggregate, not a chokepoint, so nothing
+ * qualifies. Unexplained, it reads as "no bottlenecks in 2017" — a claim
+ * about the world made from a rendering artefact.
+ */
+describe('an empty analytical result says why it is empty', () => {
+  it('MEASURED: candidates today, none at the country vintage', async () => {
+    const { state } = await getEconomyState('copper');
+    const today = bottleneckCandidates(state, buildGraph(state));
+    expect(today.result.length, 'the present-day ranking must be populated or this pin is vacuous').toBeGreaterThan(0);
+    expect(today.emptyBecause, 'a note on a populated result is a note on none').toBeUndefined();
+
+    for (const asOf of ['2017-06-30', '2019-06-30', '2022-06-30']) {
+      const past = bottleneckCandidates(state, buildGraph(state, asOf));
+      expect(past.result.length, `expected no candidates at ${asOf}`).toBe(0);
+      expect(past.emptyBecause, `${asOf} returned an unexplained empty list`).toBeTruthy();
+      // It says WHICH nothing: aggregates carry the flow, so nothing is a
+      // chokepoint — and it names the recorded deferral as the remedy.
+      expect(past.emptyBecause).toMatch(/AGGREGATES/);
+      expect(past.emptyBecause).toMatch(/allocation model/);
+    }
+  });
+
+  it('the OTHER nothing: no flow at all reads differently from aggregates-only', async () => {
+    // Two empty results that must not carry the same sentence. A date no
+    // vintage covers has nothing to rank at all; a country-vintage date has
+    // a topology whose nodes are excluded by construction here.
+    const { state } = await getEconomyState('copper');
+    const noTopology = bottleneckCandidates(state, buildGraph(state, '1990-01-01'));
+    expect(noTopology.result.length).toBe(0);
+    expect(noTopology.emptyBecause).toMatch(/No node carries flow/);
+    expect(noTopology.emptyBecause).not.toMatch(/AGGREGATES/);
+    const countryVintage = bottleneckCandidates(state, buildGraph(state, '2017-06-30'));
+    expect(countryVintage.emptyBecause).not.toBe(noTopology.emptyBecause);
+  });
+});

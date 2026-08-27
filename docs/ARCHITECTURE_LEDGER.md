@@ -2598,6 +2598,52 @@ the third zero exists because of that failure.
 afternoon.
 
 
+## Phase 41 — the runbook's first move, at the date its second move sends you to
+
+Continuing the sweep: the corollary was applied to the analytical results
+themselves rather than to the search and graph surfaces.
+
+**Measured.** `bottleneckCandidates` returns **35 candidates today and
+ZERO at 2017, 2019 and 2022** — every date the time bar can reach except
+the present. Move #1 of the runbook is "find a constraint: open the
+Bottlenecks list", stated as the thing to do *if you do nothing else*.
+Move #2 is "set a past date". A researcher who does them in the printed
+order meets an empty panel with a count of `(0)` and no other text.
+
+The zero is honest, and it is the same root cause as phase 40's third
+zero: at a country-granularity vintage every node carrying flow is a
+country, and a country is a sink rather than a chokepoint, so nothing
+qualifies. Unexplained, an empty ranked list reads as *"there were no
+bottlenecks in 2017"* — a claim about the world produced by a rendering
+artefact, and a more dangerous one than the graph's blank canvas because
+it looks like an answer.
+
+**What changed.** `AnalyticalResult` gained an optional `emptyBecause`,
+documented as set only when the result IS empty — a note on every result
+is a note on none. It distinguishes the two nothings by measuring them,
+not by assuming: *no node carries flow at all* (no vintage covers the
+date) reads differently from *all 7 nodes carrying flow are aggregates*
+(a topology exists; this ranking's population is excluded from it by
+construction), and both name the recorded deferral rather than proposing
+to widen the operation. The panel renders it above the empty list;
+verified at the screen — `CANDIDATE BOTTLENECKS(35)` with no note today,
+and at the earliest scrubbable date `NO CANDIDATES AT THIS DATE — All 7
+node(s) carrying flow at this date are AGGREGATES…`.
+
+**Reported, not fixed:** there is no `bottlenecks` MCP tool. The eleven
+tools cover search, entity, observations, concentration, propagation,
+scenario, refusals, corpus health, source registry and claim validation —
+so the runbook's *first* move has no machine equivalent, and an attached
+model cannot ask the question the instrument leads with. That is a
+capability gap for the operator to rank, not a defect to close inside a
+discipline round.
+
+674 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
