@@ -210,7 +210,7 @@ export interface EngineRun {
  * firstReportedAt (falling back to occurrence, which assumes immediate
  * reporting — curated events set it explicitly).
  */
-function asKnownThen(state: EconomyState, asOf: string): EconomyState {
+export function asKnownThen(state: EconomyState, asOf: string): EconomyState {
   return {
     ...state,
     observations: state.observations.filter(o => knownAtOf(o) <= asOf),

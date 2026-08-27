@@ -836,6 +836,48 @@ exposed the class.
    The two criteria disagree only about the top slot, and there the
    mission decides; below it they agree.
 
+## Phase 19 — the epistemic state becomes searchable (backlog slot 1 closes)
+
+Evidence-layer search kinds, the last item of the search arc
+(`evidenceSearch.ts`, wired through `/api/economy/search` and the search
+bar). Search found entities; it now also finds the system's own epistemic
+state. The round-18 review's refinement shaped the design: since the
+original spec, "refused" had become at least five distinct conditions and
+"stale" four, each with a different remedy — a single bucket would have
+been less useful than the machinery deserves, and TYPED states let an
+analyst find the ones with a shared fix, which is the actual research move.
+
+- **Typed refusals** — `refused:basis` (unconverted gross-weight flow →
+  curate a corridor grade), `refused:component` (bottleneck score null),
+  `refused:topology` (evaluation predates the topology → flow vintages),
+  `refused:scope` (unscoped regulatory event → curate regulatoryScope),
+  `refused:attribution` (null operator index → curate operated_by edges).
+  Each type maps to exactly one mechanism in code and carries that
+  mechanism's own explanation verbatim plus the type's shared remedy. The
+  throw-based refusals (concentration on market metrics) produce no state
+  and so cannot be search hits — by design, not omission.
+- **Typed staleness** — `stale:source` / `stale:ladder` / `stale:suspect`
+  from corpus health, `stale:topology` from the extrapolation
+  contradiction. Four conditions, four responses, stated on the hit.
+- **`contested`** typed by divergence class (`contested:unexplained` ranks
+  the hardest-earned class first); **`vintage`** inventories the source
+  editions actually held with knowability ranges — what as-known-then can
+  and cannot reconstruct, as a search result.
+- **Coherence, end-to-end**: evidence queries under `as_known_then`
+  compute from the knowledge-filtered state (`asKnownThen` exported from
+  the engine rather than re-implemented). Pinned through the full stack:
+  `stale:topology` at 2025-09-09 fires under best_known and returns empty
+  under AS KNOWN — the mud rush's occurrence→report window again, now at
+  the search surface.
+- Per-type vacuity tests plant each condition (a dark gross-weight flow,
+  an unscoped decree, a predating evaluation, a post-period force
+  majeure, the fixture's unattributed operators) and assert the typed hit
+  appears with its remedy.
+
+Backlog after this round: 1) ~~evidence-layer search kinds~~ CLOSED,
+2) sec-edgar structural ingest, 3) OpenOwnership parent chains, 4) flow
+vintages.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -850,7 +892,7 @@ exposed the class.
 
 ## Verification
 
-Every subsystem above ships with executable tests (160+ economy tests; 530
+Every subsystem above ships with executable tests (170+ economy tests; 542
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

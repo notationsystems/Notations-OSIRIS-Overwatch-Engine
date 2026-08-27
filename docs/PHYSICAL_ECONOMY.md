@@ -384,6 +384,26 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   counted (`queryWithheld`) but its string is never persisted, because the
   policy's real property is that the system does not accumulate
   person-directed queries, not merely that it declines to answer them.
+  **Evidence-layer kinds** (the last item of the search arc): queries whose
+  first token names an epistemic state search the state itself instead of
+  the register — `refused[:type]`, `stale[:type]`, `contested[:class]`,
+  `vintage` — with remaining tokens as free filters. The states are TYPED
+  because they accumulated as distinct conditions with distinct remedies,
+  and the shared fix is what a type is for: `refused:basis` (gross-weight
+  flow, no corridor grade → curate a grade), `refused:component`
+  (bottleneck score null), `refused:topology` (evaluation predates the
+  flow topology → flow vintages), `refused:scope` (regulatory event with
+  no jurisdiction → curate regulatoryScope), `refused:attribution` (null
+  operator index → curate operated_by edges); `stale:source` /
+  `stale:ladder` / `stale:suspect` (the three corpus-health conditions) /
+  `stale:topology` (extrapolation under structural contradiction);
+  `contested` typed by divergence class; `vintage` inventories the source
+  editions actually held with their knowability ranges. Every hit carries
+  its mechanism's own explanation and the type's remedy. Evidence queries
+  honour the knowledge state end-to-end: under `as_known_then` the
+  evidence is computed from the knowledge-filtered state, so a
+  contradiction in the occurrence→report window surfaces under best_known
+  and not under AS KNOWN (pinned).
 
 ## Spatial + research interface
 

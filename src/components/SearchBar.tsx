@@ -30,7 +30,25 @@ export interface EconSearchHit {
   lng?: number;
   zoom: number;
   headline?: string;
+  attestation?: string;
 }
+
+/** Evidence-layer hit: a refusal, staleness condition, contest or vintage —
+ *  the epistemic state as search results (queries like `refused:topology`,
+ *  `stale`, `contested:unexplained`, `vintage`). */
+export interface EvidenceSearchHit {
+  kind: 'refused' | 'stale' | 'contested' | 'vintage';
+  type: string;
+  entityId?: string;
+  entityName?: string;
+  title: string;
+  detail: string;
+  remedy: string;
+}
+
+const EVIDENCE_COLOR: Record<EvidenceSearchHit['kind'], string> = {
+  refused: '#FF3D3D', stale: '#FF9500', contested: '#7E57C2', vintage: '#00BCD4',
+};
 
 interface SearchBarProps {
   onLocate: (lat: number, lng: number, zoom?: number) => void;
@@ -113,6 +131,7 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [econResults, setEconResults] = useState<EconSearchHit[]>([]);
+  const [evidenceResults, setEvidenceResults] = useState<EvidenceSearchHit[]>([]);
   const [econWithheldNote, setEconWithheldNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -200,9 +219,10 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
           if (res.ok) {
             const data = await res.json();
             setEconResults((data.results ?? []).slice(0, 4));
+            setEvidenceResults((data.evidenceResults ?? []).slice(0, 6));
             setEconWithheldNote(data.withheldNote ?? null);
-          } else { setEconResults([]); setEconWithheldNote(null); }
-        } catch { setEconResults([]); setEconWithheldNote(null); }
+          } else { setEconResults([]); setEvidenceResults([]); setEconWithheldNote(null); }
+        } catch { setEconResults([]); setEvidenceResults([]); setEconWithheldNote(null); }
       }
       try {
         // Use addressdetails=1 for better type detection and limit=8 for more results
@@ -233,6 +253,7 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
     setValue('');
     setResults([]);
     setEconResults([]);
+    setEvidenceResults([]);
     setEconWithheldNote(null);
     setSelectedIdx(-1);
   };
@@ -250,8 +271,20 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
     clearAll();
   };
 
-  // Keyboard navigation spans both blocks: econ entities first, then places.
-  const totalResults = econResults.length + results.length;
+  const handleSelectEvidence = (hit: EvidenceSearchHit) => {
+    // An evidence hit with an entity opens that entity in the panel; hits
+    // without one (a vintage, a null index) have nowhere to fly.
+    if (hit.entityId) {
+      onSelectEconEntity?.({ id: hit.entityId, name: hit.entityName ?? hit.entityId, kind: 'entity', zoom: 6 });
+      if (!alwaysExpanded) setOpen(false);
+      clearAll();
+    }
+  };
+
+  // Keyboard navigation spans all blocks: evidence, then econ, then places.
+  const totalResults = evidenceResults.length + econResults.length + results.length;
+  const econBase = evidenceResults.length;
+  const geoBase = evidenceResults.length + econResults.length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -274,10 +307,12 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
     if (e.key === 'Enter') {
       e.preventDefault();
       const idx = selectedIdx >= 0 ? selectedIdx : 0;
-      if (idx < econResults.length) {
-        if (econResults.length > 0) handleSelectEcon(econResults[idx]);
+      if (idx < evidenceResults.length) {
+        if (evidenceResults.length > 0) handleSelectEvidence(evidenceResults[idx]);
+      } else if (idx < geoBase) {
+        if (econResults.length > 0) handleSelectEcon(econResults[idx - econBase]);
       } else if (results.length > 0) {
-        handleSelect(results[Math.min(idx - econResults.length, results.length - 1)]);
+        handleSelect(results[Math.min(idx - geoBase, results.length - 1)]);
       }
     }
   };
@@ -322,18 +357,45 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
         )}
       </div>
 
-      {(results.length > 0 || econResults.length > 0 || econWithheldNote) && (
+      {(results.length > 0 || econResults.length > 0 || evidenceResults.length > 0 || econWithheldNote) && (
         <div
           className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden max-h-[320px] overflow-y-auto styled-scrollbar z-[9999]"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.6), 0 0 1px rgba(212,175,55,0.2)' }}
         >
-          {econResults.map((hit, i) => {
+          {evidenceResults.map((hit, i) => {
             const isSelected = i === selectedIdx;
+            const color = EVIDENCE_COLOR[hit.kind];
+            return (
+              <button
+                key={`${hit.kind}:${hit.type}:${hit.title}`}
+                onClick={() => handleSelectEvidence(hit)}
+                onMouseEnter={() => setSelectedIdx(i)}
+                className={`w-full text-left px-3 py-2 transition-colors border-b border-[var(--border-secondary)] ${
+                  isSelected ? 'bg-[rgba(212,175,55,0.08)]' : 'hover:bg-[var(--hover-accent)]'
+                } ${hit.entityId ? '' : 'cursor-default'}`}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] text-[var(--text-primary)] font-mono truncate leading-tight">{hit.title}</span>
+                  <span className="text-[8px] font-mono uppercase tracking-wider flex-shrink-0" style={{ color }}>
+                    {hit.kind}:{hit.type}
+                  </span>
+                </div>
+                <div className="text-[8px] text-[var(--text-muted)] font-mono mt-0.5 leading-tight line-clamp-2">{hit.detail}</div>
+                {hit.remedy && (
+                  <div className="text-[8px] font-mono mt-0.5 leading-tight" style={{ color: 'var(--gold-primary)' }}>
+                    ↳ {hit.remedy}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+          {econResults.map((hit, i) => {
+            const isSelected = i + econBase === selectedIdx;
             return (
               <button
                 key={hit.id}
                 onClick={() => handleSelectEcon(hit)}
-                onMouseEnter={() => setSelectedIdx(i)}
+                onMouseEnter={() => setSelectedIdx(i + econBase)}
                 className={`w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-secondary)] flex items-start gap-2.5 ${
                   isSelected ? 'bg-[rgba(212,175,55,0.08)]' : 'hover:bg-[var(--hover-accent)]'
                 }`}
@@ -364,12 +426,12 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
           )}
           {results.map((r, i) => {
             const { primary, secondary } = formatLabel(r.label);
-            const isSelected = i + econResults.length === selectedIdx;
+            const isSelected = i + geoBase === selectedIdx;
             return (
               <button
                 key={i}
                 onClick={() => handleSelect(r)}
-                onMouseEnter={() => setSelectedIdx(i + econResults.length)}
+                onMouseEnter={() => setSelectedIdx(i + geoBase)}
                 className={`w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-secondary)] last:border-0 flex items-start gap-2.5 ${
                   isSelected ? 'bg-[rgba(212,175,55,0.08)]' : 'hover:bg-[var(--hover-accent)]'
                 }`}

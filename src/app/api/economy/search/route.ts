@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
 import { strongestAttestingClass, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
+import { parseEvidenceQuery, searchEvidence } from '@/lib/economy/evidenceSearch';
+import { asKnownThen } from '@/lib/economy/engine';
+import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
 /**
@@ -150,6 +153,26 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ error: `unknown commodity "${commodity}"` }, { status: 404 });
   }
+  // Evidence-layer queries (`refused[:type]`, `stale[:type]`, `contested`,
+  // `vintage`) search the EPISTEMIC STATE instead of the entity register —
+  // and honour the knowledge state the same way: under as_known_then the
+  // evidence is computed from the knowledge-filtered state, so a refusal or
+  // contradiction that entered the corpus later never surfaces early.
+  const evidenceQuery = parseEvidenceQuery(q);
+  if (evidenceQuery) {
+    const evidenceState = restrictTo ? asKnownThen(state, restrictTo) : state;
+    const evidenceResults = searchEvidence(evidenceState, buildGraph(evidenceState), evidenceQuery, {
+      asOf, knowledge: knowledge as 'best_known' | 'as_known_then',
+    });
+    return NextResponse.json({
+      commodity, query: q, asOf: asOf ?? null, knowledge,
+      evidenceKind: evidenceQuery.kind,
+      ...(evidenceQuery.type ? { evidenceType: evidenceQuery.type } : {}),
+      results: [], withheld: 0,
+      evidenceResults,
+    });
+  }
+
   const knowable = restrictTo ? knowableEntities(state, restrictTo) : null;
   const attestation = strongestAttestingClass(state);
 

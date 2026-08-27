@@ -111,6 +111,49 @@ describe('search miss → registry gap', () => {
   });
 });
 
+describe('evidence-layer search kinds', () => {
+  it('refused:topology finds the predating refusals with their shared remedy', async () => {
+    const body = await (await get('q=refused:topology&asOf=2017-02-15')).json();
+    expect(body.evidenceKind).toBe('refused');
+    expect(body.evidenceType).toBe('topology');
+    expect(body.results).toEqual([]);
+    const titles = body.evidenceResults.map((h: { title: string }) => h.title);
+    expect(titles.join(' ')).toContain('Grasberg concentrate export halt');
+    for (const h of body.evidenceResults) {
+      expect(h.type).toBe('topology');
+      expect(h.remedy).toContain('flow vintages'); // the shared fix is what the type is FOR
+    }
+  });
+
+  it('stale:topology surfaces the live extrapolation contradiction', async () => {
+    const body = await (await get('q=stale:topology')).json();
+    const hit = body.evidenceResults[0];
+    expect(hit).toBeDefined();
+    expect(hit.title).toContain('structural contradiction');
+    expect(hit.evidenceIds).toContain('evt:grasberg-mud-rush-2025');
+  });
+
+  it('evidence queries honour the knowledge state end-to-end', async () => {
+    // 2025-09-09 sits in the mud rush's occurrence→report window: the
+    // contradiction exists under best_known, and is not yet knowable under
+    // as_known_then — the evidence layer must not be a way around the badge.
+    const best = await (await get('q=stale:topology&asOf=2025-09-09')).json();
+    expect(best.evidenceResults.length).toBeGreaterThan(0);
+    const known = await (await get('q=stale:topology&asOf=2025-09-09&knowledge=as_known_then')).json();
+    expect(known.evidenceResults).toEqual([]);
+  });
+
+  it('contested is typed by divergence class and vintage inventories the held editions', async () => {
+    const contested = await (await get('q=contested:unexplained')).json();
+    expect(contested.evidenceResults.length).toBeGreaterThan(0);
+    for (const h of contested.evidenceResults) expect(h.type).toBe('unexplained');
+    const vintages = await (await get('q=vintage usgs')).json();
+    const ids = vintages.evidenceResults.map((h: { type: string }) => h.type);
+    expect(ids).toContain('usgs-mcs2025-live');
+    expect(ids).toContain('usgs-mcs2024-vintage');
+  });
+});
+
 describe('search policy: no natural persons', () => {
   it('SearchHit projects register fields only — no person-shaped keys can leak', async () => {
     const REGISTER_FIELDS = ['id', 'name', 'kind', 'stage', 'country', 'operator', 'lat', 'lng', 'zoom', 'headline', 'attestation'];
