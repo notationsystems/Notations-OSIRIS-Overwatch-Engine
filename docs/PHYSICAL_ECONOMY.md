@@ -399,6 +399,25 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 - `GET /api/economy?commodity=copper&view=state` — the full canonical state (research/debug).
 - `GET /api/economy/entity?commodity=copper&id=…` — entity detail: observations,
   capacities, flows in/out, events, and resolved upstream/downstream chains.
+- `GET /api/economy/refusals?commodity=copper[&asOf=…&knowledge=…]` — the
+  `refused:*` queue as an exportable digest (work order 3.7): everything
+  the instrument declined to answer, grouped by refusal type with the
+  type's shared remedy, most-blocking mechanism first — a WORK QUEUE, and
+  the most useful artifact a researcher session produces. Uncapped (a
+  work queue that silently truncated would read as "covered"); the graph
+  is built at the evaluation date so refusals reflect the serving
+  topology. Measured: today's copper queue is 30 refusals, ALL
+  `resolution` (the unresolved-identifier work list IS the standing
+  queue); at `asOf=2017-02-15` it is 45 — resolution 30, topology 8,
+  basis 5, attribution 2. `?view=session` returns the SESSION DIGEST:
+  queries served, misses, withheld, person-shaped-counted, evidence
+  queries by kind, digests exported, canonical entity ids inspected —
+  instrument telemetry with no personal data (query strings are never
+  held in telemetry; the miss log's vocabulary gate governs the one
+  place text persists). Verified in the RUNNING configuration (`next
+  start`, real HTTP): the miss log wrote both record shapes and the
+  builder's own verification queries were then deleted — the researcher
+  afternoon starts with an empty log, so what accumulates is demand.
 - `GET /api/economy/search?q=escondida[&asOf=…&knowledge=…]` — entity search
   over the canonical register (name, operator, country, kind — companies
   included) with a one-line evidence headline per hit (latest resolved

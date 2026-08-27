@@ -3,6 +3,7 @@ import { getEconomyState } from '@/lib/economy/store';
 import { strongestAttestingClass, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
 import { parseEvidenceQuery, searchEvidence } from '@/lib/economy/evidenceSearch';
+import { recordEvidenceQuery, recordQuery } from '@/lib/economy/sessionTelemetry';
 import { asKnownThen } from '@/lib/economy/engine';
 import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
@@ -95,10 +96,14 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  * search.
  */
 async function archiveSearchMiss(rec: SearchMissRecord & { ts: string }): Promise<void> {
-  if (process.env.VITEST) return;
+  // Suppressed under test by design (synthetic queries are not demand) —
+  // except when the readiness test forces the REAL write path (work order
+  // 3.7: "verify the miss log writes in the running configuration, not
+  // only in principle"), pointing it at a scratch directory.
+  if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
   try {
     const fs = await import('node:fs/promises');
-    const dir = `${process.cwd()}/data-archive`;
+    const dir = process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(`${dir}/search-misses.jsonl`, JSON.stringify(rec) + '\n');
   } catch { /* best-effort by design */ }
@@ -167,6 +172,7 @@ export async function GET(request: Request) {
   // contradiction that entered the corpus later never surfaces early.
   const evidenceQuery = parseEvidenceQuery(q);
   if (evidenceQuery) {
+    recordEvidenceQuery(evidenceQuery.kind);
     const evidenceState = restrictTo ? asKnownThen(state, restrictTo) : state;
     // The graph is built AT the evaluation date so the refusals reflect the
     // topology that actually serves it (a 2017 query runs over the 2017
@@ -239,10 +245,13 @@ export async function GET(request: Request) {
       state.commodity, state.commodityName,
       ...state.entities.flatMap(e => [e.name, e.kind, e.stage ?? '', e.country ?? '', e.countryCode ?? '', e.operator ?? '']),
     ];
-    await archiveSearchMiss({
-      ts: new Date().toISOString(),
-      ...missRecord({ q, commodity, asOf: asOf ?? null, knowledge, gapIds: gaps.map(g => g.sourceId), extraVocabulary }),
-    });
+    const rec = missRecord({ q, commodity, asOf: asOf ?? null, knowledge, gapIds: gaps.map(g => g.sourceId), extraVocabulary });
+    // Telemetry counts the person-shaped miss; the STRING lives only in
+    // the vocabulary-gated record (and there only when the gate admits it).
+    recordQuery({ miss: true, withheld, personShaped: 'queryWithheld' in rec });
+    await archiveSearchMiss({ ts: new Date().toISOString(), ...rec });
+  } else {
+    recordQuery({ miss: false, withheld, personShaped: false });
   }
 
   return NextResponse.json({

@@ -96,7 +96,7 @@ export function searchEvidence(
   state: EconomyState,
   graph: EconomyGraph,
   query: EvidenceQuery,
-  { asOf, knowledge = 'best_known' }: { asOf?: string; knowledge?: 'best_known' | 'as_known_then' } = {},
+  { asOf, knowledge = 'best_known', limit = 20 }: { asOf?: string; knowledge?: 'best_known' | 'as_known_then'; limit?: number } = {},
 ): EvidenceHit[] {
   const evalDate = asOf ?? new Date().toISOString().slice(0, 10);
   const hits: EvidenceHit[] = [];
@@ -240,5 +240,7 @@ export function searchEvidence(
     const hay = `${h.type} ${h.entityId ?? ''} ${h.entityName ?? ''} ${h.title} ${h.detail}`.toLowerCase();
     return query.terms.every(t => hay.includes(t));
   });
-  return filtered.slice(0, 20);
+  // Interactive search caps at 20; the refusals DIGEST passes Infinity —
+  // a work queue that silently truncated would read as "covered".
+  return filtered.slice(0, limit);
 }

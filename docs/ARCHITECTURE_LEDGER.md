@@ -1538,6 +1538,69 @@ and the UA form is recorded where the EDGAR build will read it.
 
 **Guards moved.** None.
 
+## Phase 32 — work order 3.7: the instrument is armed for the afternoon
+
+**Built.** Three pieces, all in service of the one experiment no build
+can replace. (1) The miss log verified in the RUNNING configuration —
+not in principle: a production `next start`, two real HTTP queries, and
+`data-archive/search-misses.jsonl` written by the real path — the
+vocabulary miss with its string and gap id
+(`"q":"vessel shipping movements","gapIds":["maritime-ais"]`), the
+person-shaped query as `"queryWithheld":true` with NO string. Then the
+file was DELETED: those two lines were builder validation, and the
+round-23 finding ("if search-misses.jsonl is empty, that's the finding")
+only stays measurable if the afternoon starts at zero — what accumulates
+from here is demand. (2) `GET /api/economy/refusals` — the `refused:*`
+queue as an exportable digest, grouped by type with the type's shared
+remedy, most-blocking first, UNCAPPED (the interactive search's 20-hit
+cap became an explicit `limit` option; a silently truncated work queue
+would read as "covered"). (3) `sessionTelemetry.ts` + `?view=session` —
+queries, misses, withheld, person-shaped-counted, evidence queries by
+kind, digests exported, canonical entity ids inspected. Counters and
+canonical ids only; query strings are never held in telemetry.
+
+**Measured.** Today's copper refusal queue: 30 refusals, ALL type
+`resolution` — the standing work queue at the present date IS item 3.3's
+unresolved-identifier list (every date-scoped refusal mechanism only
+binds under a historical evaluation). At 2017-02-15 the queue is 45:
+resolution 30, topology 8 (allocation refusals), basis 5 (the Grasberg
+halt's gross corridors among them), attribution 2. The digest is the
+work-order backlog, ranked by what actually blocks answers.
+
+**Criteria.** Both pre-registered criteria passed, in the SIMULATED
+session (env seams force the real write path into a scratch directory
+under vitest) and in the live server: (1) a session produces a non-empty
+miss log and a non-empty refusal digest — pinned end-to-end through the
+real route handlers (hit → inspect → vocabulary miss → person-shaped
+miss → evidence query → digest → session digest); (2) the vocabulary
+gate holds — the person-shaped query is counted (`personShapedCounted:
+1`, `queryWithheld: true`) and its string appears NOWHERE: not in the
+log, not in the telemetry, asserted against the full serialized digest.
+
+**Unanticipated.** Nothing structural. One measurement worth keeping:
+the present-date refusal queue being 100% resolution-type is itself a
+statement about the instrument's current shape — at today's date, with
+the facility topology serving and curated basis discipline holding, the
+only thing the system currently refuses is identity resolution; every
+other refusal mechanism is date-conditional.
+
+**Guards moved.** None.
+
+**The order's definition of done, checked.** All seven items are
+complete or recorded blocked-with-evidence: 3.1 ✓ (phase 26), 3.2 ✓
+with one pre-registered criterion failed and REPORTED, not adjusted
+(phase 27), 3.3 ✓ (phase 28), 3.4 recorded-inability-with-evidence
+(phase 29), 3.5 ✓ (phase 30), 3.6 ✓ (phase 31), 3.7 ✓ (this entry).
+Suite green (571 passing). `structuralClassProfile`, reported whatever
+it says: flows per basis — copper metal_content 0.202 sourced-by-kt,
+gross_weight 1.0 (mover: Comtrade vintages, not the EDGAR round 18
+predicted); capacities 0%; attribution edges 0 of 44 sourced. Guards
+that fired during the work: one — `flow-vintages-deferred`, re-taken as
+`allocation-model-deferred` (phase 27). The two operator blocks stand
+as the order left them: the EDGAR contact identity (procurement-shaped;
+UA now specified under the Sea Dog Terminal name) and the researcher
+afternoon — which this item leaves armed.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
