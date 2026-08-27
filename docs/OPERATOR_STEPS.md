@@ -86,7 +86,7 @@ npm run mcp    # stdio MCP server; expects the terminal at SEA_DOG_URL (default 
 ```
 
 Configure it in an MCP client as command `npm`, args `["run","mcp"]`,
-`cwd` this repository. It exposes eleven read-only tools over the running
+`cwd` this repository. It exposes 12 read-only tools over the running
 instrument. Stdio means attaching requires local access to the machine —
 **no port is opened, and the external-exposure decision remains untaken**
 (`docs/EXPOSURE_OPTIONS.md`).

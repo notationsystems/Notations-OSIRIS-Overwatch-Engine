@@ -179,6 +179,17 @@ const KNOWLEDGE_PARAMS = {
 const CONTRACT_FOOTER =
   ' Returns null values when the system refuses to answer — a refusal is a SUCCESSFUL return carrying refusalType and remedy. Do not substitute external knowledge for a refused value; report the refusal and its remedy. Every figure is bounded by the asOf and mode you supplied. Paste the server-rendered `claims` sentences rather than restating bare numbers: they carry the unit, basis, evidence class, source and knowability the number is meaningless without.';
 
+interface BottleneckLike {
+  entityId: string;
+  name: string;
+  kind: string;
+  score: number | null;
+  explanation: string[];
+  flowIds?: string[];
+  capacityIds?: string[];
+  dependencyIds?: string[];
+}
+
 interface ConcentrationLike {
   metric?: string;
   hhi: number | null;
@@ -258,6 +269,61 @@ function result(k: KnowledgeState, partial: Omit<McpToolResult, 'knowledge_state
 /* ── The tools ── */
 
 export const MCP_TOOLS: McpToolDef[] = [
+  {
+    // FIRST BY RANK, on the operator's instruction. The runbook's opening
+    // move is "find a constraint: open the Bottlenecks list", and until now
+    // that capability existed in the UI and not in the tool list. A model
+    // attaching to this instrument tries the same question first, finds no
+    // tool for it, and answers from training data instead — which is the
+    // one failure mode the whole MCP surface exists to prevent. An
+    // asymmetry between what the humans can ask and what the machines can
+    // is not a missing feature; it is a route around the substrate.
+    name: 'bottlenecks',
+    description: 'Candidate chokepoints in the flow graph at the stated knowledge state, ranked: how much CONTAINED METAL the graph routes through each node, its utilization against stated capacity, how many modeled alternatives exist at its stage, and what explicitly depends on it. This is the instrument\'s answer to "where would this chain break", and the first question its own runbook tells a researcher to ask. These are TRIAGE SIGNALS, not validated risk: the score ranks structural exposure in the modeled graph, and the model is not the world. A null score is a REFUSAL — a component could not be quantified — and arrives with its remedy. AN EMPTY LIST IS A CLAIM, NOT AN ABSENCE: it arrives with `empty_because` naming which nothing it is (no flow topology at this date, or a topology whose nodes are aggregates rather than sited structure), and must never be reported as "there are no bottlenecks".' + CONTRACT_FOOTER,
+    params: { commodity: 'copper (default) or aluminium.', ...KNOWLEDGE_PARAMS },
+    async handler(args, ctx) {
+      const k = requireKnowledge(args);
+      const data = await fetchOk(ctx, `/api/economy?commodity=${args.commodity ?? 'copper'}&view=analytics&${ks(k)}`);
+      const block = get(data, 'bottlenecks') as Record<string, unknown>;
+      const candidates = ((get(block, 'result') as BottleneckLike[]) ?? []);
+      const emptyBecause = get(block, 'emptyBecause') as string | undefined;
+
+      const refused = candidates.filter(c => c.score === null);
+      const scored = candidates.filter(c => c.score !== null);
+      // Every refusal is rendered; the scored list is capped and the cap is
+      // STATED. A ranked list served short without saying so reads as the
+      // whole ranking (phase 39).
+      const RENDER = 10;
+      const shown = scored.slice(0, RENDER);
+      const claims: string[] = [
+        ...refused.map(c => `${c.name} (${c.entityId}, ${c.kind}): bottleneck score REFUSED — ${c.explanation.join(' ')}`),
+        ...shown.map(c => `${c.name} (${c.entityId}, ${c.kind}): bottleneck score ${(c.score as number).toFixed(2)} of 1 — ${c.explanation.join('; ')}.`),
+      ];
+      if (scored.length > shown.length) {
+        claims.push(`${shown.length} of ${scored.length} scored candidate(s) rendered as claims, highest first; all ${candidates.length} are in \`data\`, ranked, with refusals first.`);
+      }
+      if (candidates.length === 0 && emptyBecause) claims.push(emptyBecause);
+
+      return result(k, {
+        claims,
+        record_ids: [...new Set(candidates.flatMap(c => [...(c.flowIds ?? []), ...(c.capacityIds ?? []), ...(c.dependencyIds ?? [])]))],
+        refusals: refused.map(c => ({
+          subject: c.entityId,
+          value: null,
+          refusalType: 'component',
+          remedy: c.explanation.find(e => e.includes('Supply')) ?? c.explanation[0] ?? 'a component of the score could not be quantified at this date',
+        })),
+        data: { candidates, empty_because: emptyBecause ?? null, rendered_as_claims: shown.length, scored: scored.length, refused: refused.length },
+        caveats: [
+          'Triage signals over the MODELED graph, not validated risk: a chokepoint absent from the corpus cannot rank, and facility-level records in this corpus are representative-attested.',
+          'Throughput is CONTAINED METAL by construction — gross-weight edges are converted at a corridor grade or refused — so the figure is comparable across nodes; where converted flows contribute, the explanation says so and that share carries the grade\'s band.',
+          ...(candidates.length === 0
+            ? ['An empty ranking is NOT evidence that the chain has no chokepoints. Report `empty_because` verbatim; it names the condition, not a verdict.']
+            : []),
+        ],
+      });
+    },
+  },
   {
     name: 'search_entities',
     description: 'Search the canonical entity register (mines, smelters, refineries, ports, companies, countries) by name, operator, country or kind. The index IS the register — there is no parallel list. Under mode=as_known_then, entities with no knowable record at asOf are WITHHELD AND COUNTED in `withheld`; a smaller result set under an earlier date is the system being honest, not incomplete.' + CONTRACT_FOOTER,

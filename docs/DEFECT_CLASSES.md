@@ -275,9 +275,78 @@ a typo is the worse half of that failure.
 
 ---
 
+## 7. The empty collection that carries no warrant
+
+**Signature.** A collection comes back empty. It is truthful, internally
+consistent, and answers a question the reader did not ask. Nothing
+distinguishes *refused*, *the population is excluded here*, *genuinely
+nil*, and *rows were dropped upstream* — all four render as blankness,
+and the reader supplies the missing sentence themselves. Usually they
+supply the most reassuring one.
+
+**Why it took thirty-eight phases to see.** The project's oldest rule is
+refuse-don't-default: null is not zero. That rule distinguishes UNKNOWN
+from NONE at the level of a VALUE. A collection is a third thing, and it
+had no rule. Every refusal in this system carries a remedy; an empty
+array carries nothing at all.
+
+> **Silence is not a value. An empty collection is a claim, and it
+> requires a warrant like any other.**
+
+**Instances (phases 39–43, all five on the researcher's actual path —
+the first move, the first contact, the first click):**
+- **Evidence search.** One empty array for four distinct states, including
+  the exact query the runbook sends a first-time reader to. The dropdown
+  did not open at all: first contact with the refusal system was a screen
+  indistinguishable from a typo or a dead fetch.
+- **The graph view.** Not empty but WORSE — it drew today's network at
+  every historical date, under its own `AS OF <past date>` chip. Closing
+  that produced a genuine empty (a country-granularity topology it cannot
+  represent), which then needed a warrant of its own.
+- **The bottleneck ranking.** `(0)` at every date the time bar can reach
+  except the present — and it is the runbook's FIRST move. An empty
+  ranked list reads as *"there were no bottlenecks in 2017"*: a claim
+  about the world produced by a rendering artefact, and more dangerous
+  than a blank canvas because it looks like an answer.
+- **The coverage table.** The 0% rows were dropped, so the table's own
+  worst cases were the ones it could not show; the refined table was
+  empty because the answer was zero everywhere, and zero was the value
+  being filtered out. Class 1 and class 7 compounding: a dropped row is
+  not an absent row, it is a row that was REMOVED, and removal
+  propagates — the map then drove smelter opacity from the mine table,
+  invisible only because those rows were missing.
+- **Corpus health.** The section did not render a zero; it did not render
+  AT ALL. A health instrument that cannot distinguish *nothing is wrong*
+  from *nothing was checked* has lost the distinction that is its
+  product.
+
+**Door.** A collection returned without the population it was drawn from.
+Every one of these surfaces knew why it was empty at the moment it became
+empty, and threw that away on the way out.
+
+**Closed by.** `emptyWarrant.test.ts`: nine collection-returning surfaces
+are fetched at four evaluation dates spanning the corpus's three topology
+regimes, and any that comes back empty without a warrant fails BY NAME
+AND DATE. Two vacuity guards — the sweep must actually produce empty
+collections, and the warrants a researcher meets must be sentences rather
+than status words. Proven to bite: with the bottleneck warrant removed,
+the check fails naming the surface and three dates. Exempt surfaces are
+listed WITH the argument (entity search, which has carried three warrants
+since round 12 and is the model the rest are catching up to), because an
+exemption someone can read is a decision and an exemption nobody wrote
+down is the defect returning.
+
+**Does not generalise.** The check covers the surfaces in its registry.
+A new projection is not in it, and nothing forces a new one to be — the
+same limitation every door in this document has. What carries forward is
+the question: *if this comes back empty, which nothing is it, and does
+the reader receive that?*
+
+---
+
 ## The standing question
 
-All six reduce to one question, which no test asks on its own:
+The first six reduce to one question, which no test asks on its own:
 
 > **Does the thing this mechanism affects, and the thing actually in
 > use, have the same identity?**
@@ -287,10 +356,20 @@ the severance sweep, the pinned count, the evidence census and the
 extracted runbook claims are eight places that question has been answered
 permanently. There will be a ninth door.
 
-Phase 39 added a corollary worth stating on its own, because it is where
-two of these classes meet: **an instrument that declines has to say which
-kind of nothing it is returning.** "None of that type here", "not at this
-date", "you named something that does not exist" and "the page was cut"
-were one empty array, on three surfaces — the search bar, the route, and
-the MCP tool an external model attaches to. Refuse-don't-default was
-built into every mechanism and then discarded at the display.
+**Class 7 asks a second question the first cannot reach.** Not *is this
+the thing in use*, but *does what I am handing back say what it is*:
+
+> **If this comes back empty, which nothing is it — and does the reader
+> receive that?**
+
+The corollary that produced it, stated where it was found, because it is
+where the two questions meet: **an instrument that declines has to say
+which kind of nothing it is returning.** "None of that type here", "not
+at this date", "you named something that does not exist" and "the page
+was cut" were one empty array, on three surfaces — the search bar, the
+route, and the MCP tool an external model attaches to. Refuse-don't-
+default was built into every mechanism and then discarded at the display.
+
+Both questions have the same shape at bottom, and it is the shape of this
+whole document: **a mechanism that is correct about what it examined, and
+silent about what it handed on.**

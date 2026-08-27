@@ -51,6 +51,7 @@ const tool = (name: string) => MCP_TOOLS.find(t => t.name === name)!;
 
 /** Valid minimal args per tool, for the no-mutation sweep. */
 const VALID_ARGS: Record<string, Record<string, unknown>> = {
+  bottlenecks: { ...K },
   search_entities: { ...K, q: 'escondida' },
   search_evidence: { ...K, kind: 'refused' },
   get_entity: { ...K, id: 'ent:mine:escondida' },
@@ -68,7 +69,7 @@ describe('F-2: the MCP tool surface (pre-registered criteria)', () => {
   // ── Criterion 1: a tool call omitting knowledge state fails with the
   //    missing parameter NAMED — on every tool, never defaulted. ──
   it('every tool refuses a call without asOf/mode, naming the missing parameter', async () => {
-    expect(MCP_TOOLS.length).toBe(11);
+    expect(MCP_TOOLS.length).toBe(12);
     for (const def of MCP_TOOLS) {
       await expect(def.handler({}, inProcessCtx), def.name).rejects.toThrow(/missing required parameter: asOf/);
       await expect(def.handler({ asOf: '2026-08-27' }, inProcessCtx), def.name).rejects.toThrow(/missing required parameter: mode/);
@@ -373,5 +374,91 @@ describe('search_evidence states which kind of zero it is', () => {
     expect(total).toBeGreaterThan(served);      // the standing queue is deeper than the page
     expect(text).toMatch(/the page is capped, the queue is not/);
     expect(r.caveats.join(' ')).toMatch(/api\/economy\/refusals returns the full queue uncapped/);
+  });
+});
+
+/**
+ * The runbook's first move, given a machine equivalent.
+ *
+ * Ranked first on the operator's instruction: "the first move is the one an
+ * attaching model will also try first, and a capability present in the UI
+ * and absent from the tool list is exactly the asymmetry that makes an
+ * external client answer from training data instead." The gap was reported
+ * in the previous round and closed here.
+ */
+describe('bottlenecks — the first question, available to an attached model', () => {
+  it('ranks candidates with the basis stated and the cap declared', async () => {
+    const r = await tool('bottlenecks').handler({ ...K }, inProcessCtx) as McpToolResult;
+    expect(r.claims.length).toBeGreaterThan(0);
+    const data = r.data as { candidates: Array<{ score: number | null }>; scored: number; rendered_as_claims: number; empty_because: string | null };
+    expect(data.candidates.length).toBeGreaterThan(0);
+    expect(data.empty_because).toBeNull();
+    // The magnitude carries its basis into a client we do not control.
+    expect(r.claims.join(' ')).toMatch(/CONTAINED METAL/);
+    // The rendered set is capped and the cap is STATED — a ranked list
+    // served short without saying so reads as the whole ranking.
+    expect(data.rendered_as_claims).toBeLessThanOrEqual(data.scored);
+    if (data.scored > data.rendered_as_claims) {
+      expect(r.claims.join(' ')).toMatch(new RegExp(`${data.rendered_as_claims} of ${data.scored} scored candidate`));
+    }
+    // Ranked, highest first, refusals rendered ahead of scores.
+    const scores = data.candidates.filter(c => c.score !== null).map(c => c.score as number);
+    expect([...scores].sort((a, b) => b - a)).toEqual(scores);
+    expect(r.record_ids.length).toBeGreaterThan(0);
+  });
+
+  it('an EMPTY ranking arrives as a claim with its warrant, never as an absence', async () => {
+    // The whole point of the round that found this gap: at every historical
+    // date the ranking is empty, and an attached model handed a bare empty
+    // array writes "there were no bottlenecks in 2017".
+    const r = await tool('bottlenecks').handler({ asOf: '2017-06-30', mode: 'best_known' }, inProcessCtx) as McpToolResult;
+    const data = r.data as { candidates: unknown[]; empty_because: string | null };
+    expect(data.candidates).toEqual([]);
+    expect(data.empty_because).toBeTruthy();
+    expect(r.claims.join(' '), 'the warrant must reach the claims, not only the payload').toMatch(/AGGREGATES/);
+    expect(r.caveats.join(' ')).toMatch(/NOT evidence that the chain has no chokepoints/);
+    // And the caveat is absent when the ranking is populated — a caveat on
+    // every result is a caveat on none.
+    const today = await tool('bottlenecks').handler({ ...K }, inProcessCtx) as McpToolResult;
+    expect(today.caveats.join(' ')).not.toMatch(/NOT evidence that the chain has no chokepoints/);
+  });
+
+  it('a refused score is a successful return carrying its remedy', async () => {
+    // Planted through the REAL pipeline: the refusal path exists in the
+    // corpus only when a node's contributing flow refuses conversion, so
+    // the assertion is written to hold either way and to be explicit about
+    // which case it saw.
+    const r = await tool('bottlenecks').handler({ ...K }, inProcessCtx) as McpToolResult;
+    const data = r.data as { refused: number };
+    expect(refusalCount(r)).toBe(data.refused);
+    for (const ref of r.refusals) {
+      expect(ref.value).toBeNull();
+      expect(ref.refusalType).toBe('component');
+      expect(ref.remedy.length).toBeGreaterThan(10);
+    }
+  });
+});
+
+/**
+ * The tool count in the operator-facing docs is PINNED, not restated.
+ *
+ * Class 6, whose first instance moved a miscount from a ledger sentence
+ * into two operator work orders: a hand-maintained number describing
+ * something the tree already knows. `bottlenecks` made the documents say
+ * eleven while the surface served twelve, which is exactly how the last one
+ * started.
+ */
+describe('the documented tool count is derived, not remembered', () => {
+  it('every operator-facing doc states the real number', async () => {
+    const { readFileSync } = await import('node:fs');
+    const n = MCP_TOOLS.length;
+    for (const doc of ['docs/OPERATOR_STEPS.md', 'docs/PHYSICAL_ECONOMY.md']) {
+      const text = readFileSync(new URL(`../../../${doc}`, import.meta.url), 'utf8');
+      const claims = [...text.matchAll(/(\d+|eleven|twelve|ten)\s+read-only tools/gi)].map(m => m[1]);
+      const sweeps = [...text.matchAll(/sweep of all (\d+|eleven|twelve|ten)/gi)].map(m => m[1]);
+      const all = [...claims, ...sweeps];
+      expect(all.length, `${doc} no longer states a tool count — the pin has gone vacuous`).toBeGreaterThan(0);
+      for (const c of all) expect(Number(c), `${doc} states "${c}" read-only tools; the surface serves ${n}`).toBe(n);
+    }
   });
 });

@@ -443,7 +443,7 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 ## The MCP tool surface (external models attach; final order F-2)
 
 `npm run mcp` starts a stdio MCP server (`src/mcp/server.ts`) exposing
-eleven read-only tools over the RUNNING terminal's own HTTP routes — one
+12 read-only tools over the RUNNING terminal's own HTTP routes — one
 logic path, so the machine surface cannot drift from what the terminal
 serves. The operator's pivot: external models attach to the substrate
 rather than a reasoning layer being built inside it. That moves the
@@ -461,7 +461,7 @@ interface carries the discipline (`src/lib/economy/mcpTools.ts`):
 - **Refusals return successfully**: `value: null` plus `refusalType` and
   `remedy`. Never an error code — an error invites a retry or a
   workaround, a null-with-remedy invites a report.
-- **Nothing mutates state**, pinned structurally: a sweep of all eleven
+- **Nothing mutates state**, pinned structurally: a sweep of all 12
   tools leaves the canonical state fingerprint unchanged.
 - **Machine traffic is segregated from the frozen S-7 demand instruments**
   (`machineClient.ts`): served identically, never counted as researcher

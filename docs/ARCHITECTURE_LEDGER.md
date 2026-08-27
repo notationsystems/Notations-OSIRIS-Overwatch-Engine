@@ -2780,6 +2780,74 @@ corpus had not earned.
 afternoon.
 
 
+## Phase 44 — class 7 named, and the first move given a machine equivalent
+
+The operator's reading, taken as the directive: the five findings are one
+class, not five fixes.
+
+**Class 7 — the empty collection that carries no warrant.** The project's
+oldest rule, refuse-don't-default, distinguishes UNKNOWN from NONE at the
+level of a VALUE. A collection is a third thing and it had no rule, for
+thirty-eight phases. Five surfaces were returning it: empty because
+refused, empty because the population is aggregates-only, empty because
+genuinely nil, empty because rows were dropped — all rendering
+identically as blankness, and the reader supplying the missing sentence
+themselves, usually the most reassuring one.
+
+> Every refusal in this system carries a remedy. An empty array carries
+> nothing at all. **Silence is not a value, and an empty collection is a
+> claim requiring a warrant like any other.**
+
+`docs/DEFECT_CLASSES.md` now holds seven classes. The document's closing
+section states the second standing question the first cannot reach — not
+*is this the thing in use*, but *if this comes back empty, which nothing
+is it, and does the reader receive that?* Both have the same shape, and
+it is the shape of the whole register: a mechanism correct about what it
+examined and silent about what it handed on.
+
+**The standing check.** `emptyWarrant.test.ts` sweeps nine
+collection-returning surfaces at four evaluation dates spanning the
+corpus's three topology regimes; any that comes back empty without a
+warrant fails BY NAME AND DATE. Two vacuity guards — the sweep must
+actually produce empty collections, and the warrants a researcher meets
+must be sentences rather than status words (a one-word status satisfies
+"carries a warrant" and tells a reader nothing). Proven to bite: with the
+bottleneck warrant removed, it fails naming the surface and three dates.
+Exemptions are listed WITH their argument — entity search, which has
+carried three warrants since round 12 and is the model the rest are
+catching up to — because an exemption someone can read is a decision and
+an exemption nobody wrote down is the defect returning.
+
+**The gap, closed and ranked first.** `bottlenecks` is now an MCP tool,
+placed FIRST in the tool list on the operator's instruction: the runbook's
+opening move is the one an attaching model will also try first, and a
+capability present in the UI and absent from the tool list is the
+asymmetry that makes an external client answer from training data
+instead. It carries the discipline the surface was built for — server-
+rendered claim sentences stating CONTAINED METAL, a null score returned
+as a SUCCESSFUL refusal with its remedy, the render cap stated rather
+than silently applied, and an empty ranking arriving as a claim with
+`empty_because` in the claims and a caveat forbidding the reading "there
+are no bottlenecks". Verified twice, as F-2 requires: in-process against
+the real route handlers, and through a real MCP client over stdio against
+a running `next start` — `tools: 12 | first: bottlenecks`, the claim
+reading *"Guixi Refinery … bottleneck score 0.55 of 1 — 2200 kt/y
+CONTAINED METAL passes through (48% of network max)"*, and at 2017 zero
+candidates with the aggregates warrant in the claim.
+
+**And the count is pinned, not restated.** Adding the twelfth tool made
+two operator-facing documents say eleven — which is precisely how class
+6's first instance started, a hand-maintained number describing something
+the tree already knows. Corrected, and pinned against `MCP_TOOLS.length`
+with a vacuity guard for when a document stops stating a count at all.
+
+689 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon, and now the only thing left that this kind of work cannot
+substitute for.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
