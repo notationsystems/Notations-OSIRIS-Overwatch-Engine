@@ -2861,6 +2861,77 @@ afternoon, and now the only thing left that this kind of work cannot
 substitute for.
 
 
+## Phase 45 — the self-application step, and the S-6 kit checked against the tree
+
+Two things: the operator's instruction that self-application become a
+step, and their S-6 setup kit, which arrived mid-round and is checkable.
+
+**The step.** Applying a named class to the instrument's OWN instruments
+has now found a live instance three times — the severance check failing
+on `boot.ts` because its literal pattern missed a generic call form (a
+checker blind to a calling form is the class one level up); the guard
+miscount travelling from a ledger sentence into two work orders; and
+`scripts/smoke.mjs` asserting *"empty is the healthy state"* at the
+moment of highest trust. `selfApplication.test.ts` makes the two
+mechanisable parts mechanical and forces the rest:
+
+- **Class 6, mechanised.** A registry of counts the TREE knows (MCP
+  tools, `validWhile` guards, named defect classes) is scanned across
+  every live document; a stated count that disagrees with its register
+  fails. This replaces pinning one number at a time — the guard count and
+  the tool count were pinned individually, and the third instance would
+  have needed a third pin. Documents deliberately NOT scanned carry their
+  argument: the work orders are frozen pre-registration, and one of them
+  contains the seven-guards miscount verbatim — correcting it would erase
+  the evidence of how a literal travelled into an instruction; the
+  ledger's phase entries are true about their own phase, and a register
+  that rewrites its history to stay consistent with the present has
+  destroyed the only record of what changed.
+- **Class 7, applied to the checks.** The checking artifacts — the smoke
+  script, the manifest generator, every workflow — are linted for
+  assertions that treat emptiness as a verdict, with the caught wording
+  as the first banned pattern. Comments explaining the ban are exempt (a
+  record of the fix is not the defect), and the positive form is asserted
+  too: the smoke check must actively require the accounting, or the next
+  payload without one passes silently.
+- **The checklist.** What applying each class to the instrument's own
+  instruments found, one entry per class, pinned against the number of
+  classes in the register — so naming class 8 forces the sweep rather
+  than hoping for the insight.
+
+**The S-6 kit, checked rather than assumed.** Two corrections and one
+confirmation, all measured:
+
+1. **`main` is at `72e352a`, five commits behind the working branch.**
+   `docker-publish.yml` publishes `:latest` from `main`, and
+   `DEPLOYMENT.md` said to run `:latest`. A session deployed that way
+   would run an instrument WITHOUT phases 39–45 — no evidence census, no
+   graph topology fix, no coverage rows, no corpus-health accounting, no
+   `bottlenecks` tool, and the `refused:` parser bug still manufacturing
+   false demand rows into the miss log the frozen criterion reads. The
+   deploy command now pins the version tag and the document names the
+   hazard as what it is: the split-commit hazard at the deploy layer.
+2. **The image did not know its own commit.** `attribution.ts` reports
+   `commit: null, commit_source: 'unstamped-build'` when
+   `SEA_DOG_BUILD_SHA` is unset, and nothing set it — not the Dockerfile,
+   not the publish workflow, not the docs. Step 5 of the kit captures
+   `/api/economy/guards` as `session-baseline.json` so every finding is
+   attributable to a known state; it would have recorded a state
+   fingerprint and no commit. The image now carries `github.sha`.
+3. **Confirmed against the tree:** the guards payload DOES carry the
+   per-commodity state fingerprint (in `states[]`) alongside the guard
+   verdict, so the kit's claim for step 5 holds once the commit is
+   stamped; `ci-verify/guard-breach` still exists and is still unmerged;
+   no `v*` tag exists yet, so step 1 is genuinely undone; the miss log is
+   absent, so the four false `refused:` rows have a clean baseline to be
+   absent from.
+
+695 tests green, typecheck clean.
+
+**The frontier is now the operator's alone.** Everything the kit needs
+from the tree is in the tree.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

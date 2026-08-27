@@ -15,7 +15,23 @@ Nothing is deployed today. What exists:
 - No hosting target, no credentials to one, in this build environment —
   standing a public URL up is the operator's step, deliberately (see the
   access decision below). One command on any Docker host:
-  `docker run -p 3000:3000 ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest`
+
+  ```
+  docker run -p 3000:3000 ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:0.1.0
+  ```
+
+  **PIN THE VERSION TAG, do not deploy `:latest`.** `latest` is published
+  from `main` only. The working branch runs ahead of `main` between
+  merges, so `:latest` can be an older instrument than the one a session
+  was prepared against — the split-commit hazard at the deploy layer, and
+  the same shape as every other "two greens about two different artifacts"
+  in this project. Before a session, confirm the running instance is the
+  intended tree: `/api/economy/guards` reports `version.commit`, which the
+  image now carries. A `commit_source` of `unstamped-build` means the
+  image was built outside the publish workflow; pass the SHA explicitly
+  (`--build-arg SEA_DOG_BUILD_SHA=<sha>` at build, or
+  `-e SEA_DOG_BUILD_SHA=<sha>` at run) rather than accepting a baseline
+  that cannot be attributed to a tree.
 
 ## Configuration seams (fail loudly, never degrade)
 

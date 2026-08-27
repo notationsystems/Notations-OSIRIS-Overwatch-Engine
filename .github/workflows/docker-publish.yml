@@ -53,6 +53,11 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # The image carries the commit it was built from, so a deployed
+          # instance can be attributed to a tree rather than reporting
+          # 'unstamped-build' honestly and uselessly.
+          build-args: |
+            SEA_DOG_BUILD_SHA=${{ github.sha }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
