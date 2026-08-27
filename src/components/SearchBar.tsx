@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, MapPin, Navigation, Building2, Globe2, Landmark } from 'lucide-react';
+import { Search, X, MapPin, Navigation, Building2, Globe2, Landmark, Mountain } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
    OSIRIS — Enhanced Search / Locate Bar
@@ -19,8 +19,25 @@ interface SearchResult {
   zoomLevel: number;     // computed ideal zoom
 }
 
+export interface EconSearchHit {
+  id: string;
+  name: string;
+  kind: string;
+  stage?: string;
+  country?: string;
+  operator?: string;
+  lat?: number;
+  lng?: number;
+  zoom: number;
+  headline?: string;
+}
+
 interface SearchBarProps {
   onLocate: (lat: number, lng: number, zoom?: number) => void;
+  /** When provided, physical-economy entities (mines, smelters, ports…)
+   *  appear above geographic results and selecting one opens it in the
+   *  research panel as well as flying the map. */
+  onSelectEconEntity?: (hit: EconSearchHit) => void;
   alwaysExpanded?: boolean;
 }
 
@@ -86,10 +103,11 @@ function formatLabel(displayName: string): { primary: string; secondary: string 
   };
 }
 
-export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBarProps) {
+export default function SearchBar({ onLocate, onSelectEconEntity, alwaysExpanded = false }: SearchBarProps) {
   const [open, setOpen] = useState(alwaysExpanded);
   const [value, setValue] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [econResults, setEconResults] = useState<EconSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +145,7 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         setResults([]);
+        setEconResults([]);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -148,6 +167,7 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
     // Direct coordinate input
     const coords = parseCoords(q);
     if (coords) {
+      setEconResults([]);
       setResults([{
         label: `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`,
         ...coords,
@@ -160,10 +180,22 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
     }
 
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (q.trim().length < 2) { setResults([]); return; }
+    if (q.trim().length < 2) { setResults([]); setEconResults([]); return; }
 
     timerRef.current = setTimeout(async () => {
       setLoading(true);
+      // Physical-economy entities resolve from canonical state — shown above
+      // geographic hits, since a researcher typing "escondida" wants the
+      // mine's state, not the Chilean locality of the same name.
+      if (onSelectEconEntity) {
+        try {
+          const res = await fetch(`/api/economy/search?q=${encodeURIComponent(q)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setEconResults((data.results ?? []).slice(0, 4));
+          } else setEconResults([]);
+        } catch { setEconResults([]); }
+      }
       try {
         // Use addressdetails=1 for better type detection and limit=8 for more results
         const res = await fetch(
@@ -171,8 +203,9 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
           { headers: { 'Accept-Language': 'en', 'User-Agent': 'OSIRIS-Intelligence-Platform/1.0' } }
         );
         const data = await res.json();
-        setResults(data.map((r: any) => {
-          const zoom = getZoomForType(r.type, r.class, r.boundingbox);
+        interface NominatimRow { display_name: string; lat: string; lon: string; type?: string; class?: string; importance?: number; boundingbox?: string[] }
+        setResults((data as NominatimRow[]).map((r) => {
+          const zoom = getZoomForType(r.type ?? 'unknown', r.class ?? 'unknown', r.boundingbox);
           return {
             label: r.display_name,
             lat: parseFloat(r.lat),
@@ -186,31 +219,44 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
       } catch { setResults([]); }
       setLoading(false);
     }, 300);
-  }, []);
+  }, [onSelectEconEntity]);
+
+  const clearAll = () => {
+    setValue('');
+    setResults([]);
+    setEconResults([]);
+    setSelectedIdx(-1);
+  };
 
   const handleSelect = (r: SearchResult) => {
     onLocate(r.lat, r.lng, r.zoomLevel);
     if (!alwaysExpanded) setOpen(false);
-    setValue('');
-    setResults([]);
-    setSelectedIdx(-1);
+    clearAll();
   };
+
+  const handleSelectEcon = (hit: EconSearchHit) => {
+    onSelectEconEntity?.(hit);
+    if (hit.lat !== undefined && hit.lng !== undefined) onLocate(hit.lat, hit.lng, hit.zoom);
+    if (!alwaysExpanded) setOpen(false);
+    clearAll();
+  };
+
+  // Keyboard navigation spans both blocks: econ entities first, then places.
+  const totalResults = econResults.length + results.length;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       if (alwaysExpanded) {
-        setValue('');
-        setResults([]);
+        clearAll();
         inputRef.current?.blur();
       } else {
         setOpen(false);
-        setValue('');
-        setResults([]);
+        clearAll();
       }
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIdx(i => Math.min(i + 1, results.length - 1));
+      setSelectedIdx(i => Math.min(i + 1, totalResults - 1));
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -218,10 +264,11 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (selectedIdx >= 0 && selectedIdx < results.length) {
-        handleSelect(results[selectedIdx]);
+      const idx = selectedIdx >= 0 ? selectedIdx : 0;
+      if (idx < econResults.length) {
+        if (econResults.length > 0) handleSelectEcon(econResults[idx]);
       } else if (results.length > 0) {
-        handleSelect(results[0]);
+        handleSelect(results[Math.min(idx - econResults.length, results.length - 1)]);
       }
     }
   };
@@ -258,27 +305,57 @@ export default function SearchBar({ onLocate, alwaysExpanded = false }: SearchBa
         <span className="text-[9px] text-[var(--text-muted)] font-mono opacity-50 hidden md:inline">CTRL+F</span>
         {(value || !alwaysExpanded) && (
           <button onClick={() => {
-            if (alwaysExpanded) { setValue(''); setResults([]); }
-            else { setOpen(false); setValue(''); setResults([]); }
+            if (alwaysExpanded) { clearAll(); }
+            else { setOpen(false); clearAll(); }
           }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <X className="w-3 h-3" />
           </button>
         )}
       </div>
 
-      {results.length > 0 && (
+      {(results.length > 0 || econResults.length > 0) && (
         <div
           className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden max-h-[320px] overflow-y-auto styled-scrollbar z-[9999]"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.6), 0 0 1px rgba(212,175,55,0.2)' }}
         >
+          {econResults.map((hit, i) => {
+            const isSelected = i === selectedIdx;
+            return (
+              <button
+                key={hit.id}
+                onClick={() => handleSelectEcon(hit)}
+                onMouseEnter={() => setSelectedIdx(i)}
+                className={`w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-secondary)] flex items-start gap-2.5 ${
+                  isSelected ? 'bg-[rgba(212,175,55,0.08)]' : 'hover:bg-[var(--hover-accent)]'
+                }`}
+              >
+                <div className="mt-0.5"><Mountain className="w-3 h-3 text-[var(--gold-primary)] flex-shrink-0" /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] text-[var(--text-primary)] font-mono truncate leading-tight">
+                    {hit.name}
+                    {hit.operator && <span className="text-[var(--text-muted)]"> · {hit.operator}</span>}
+                  </div>
+                  <div className="text-[9px] text-[var(--text-muted)] font-mono truncate mt-0.5">
+                    {[hit.country, hit.headline].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span className="text-[9px] text-[var(--gold-primary)] font-mono uppercase tracking-wider">
+                    {hit.kind}
+                  </span>
+                  <span className="text-[9px] text-[var(--text-muted)] font-mono opacity-60">ECON</span>
+                </div>
+              </button>
+            );
+          })}
           {results.map((r, i) => {
             const { primary, secondary } = formatLabel(r.label);
-            const isSelected = i === selectedIdx;
+            const isSelected = i + econResults.length === selectedIdx;
             return (
               <button
                 key={i}
                 onClick={() => handleSelect(r)}
-                onMouseEnter={() => setSelectedIdx(i)}
+                onMouseEnter={() => setSelectedIdx(i + econResults.length)}
                 className={`w-full text-left px-3 py-2.5 transition-colors border-b border-[var(--border-secondary)] last:border-0 flex items-start gap-2.5 ${
                   isSelected ? 'bg-[rgba(212,175,55,0.08)]' : 'hover:bg-[var(--hover-accent)]'
                 }`}

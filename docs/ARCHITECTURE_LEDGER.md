@@ -289,6 +289,43 @@ unflattering one. Shipped, in the review's order:
    evidence exists, 312 states): with the daily source in the corpus, the
    evaluation grid had become the binding constraint on measurable lead.
 
+## Phase 8 — the bound, the freeze, and the return to the instrument
+
+Round-6 review closed the alerting thread it had opened, reading the null
+and the two negative price-leads as one finding from two directions:
+**where a numeric series can detect, it cannot beat the price; where lead
+would matter, a numeric series cannot detect at all.** Five of six truth
+events are labour/regulatory/logistics — announced in language before they
+occur in matter (Escondida's strike notice preceded the stoppage by two
+days, a negative reporting delay no series can reproduce). The gap is a
+missing acquisition modality (news/filings event extraction, AIS), already
+named in the phase-2 source registry with `adapter: null` — a second
+programme with a harder provenance story, to be funded deliberately, not
+drifted into. Decisions taken, per the review:
+
+- **Detector frozen** (not deleted): measured, documented, honest, with
+  `precisionPreRegisteredOnly: null` and the attribution-sensitivity table
+  attached. It becomes useful when a faster physical series or the missing
+  modality exists. The attribution window default is now set by mechanism,
+  not outcome: no anticipation mechanism is argued for current signal
+  classes, so it is 0 days (precisionAll 0.947 / median lead −5d are the
+  conservative in-prose figures); the null can only stop being null via a
+  pre-registered external chronology or a holdout — never retrospective
+  relabeling.
+- **Corpus health shipped**: surfaced in the analytics view and the research
+  panel (renders only when signals exist), and hardened from liveness to
+  SAFETY: a plausibility gate on the Westmetall parse (sanity range,
+  day-over-day ratio, monotonic dates, row count) rejects fresh-but-wrong
+  data — the wrong-column-latch failure that staleness checks cannot see —
+  deliberately degrading the ladder and firing the new `source_suspect`
+  signal at high severity.
+- **Returned to the instrument**: entity search shipped — canonical-register
+  search (name/operator/country/kind) with an evidence headline per hit
+  (value + valueKind, never a bare number), econ hits above geographic hits
+  in the search bar, selection flying the map and opening the research
+  panel. Verified end-to-end in the running app: "escondida" → mine →
+  strike event, resolved observations, flows, dependency tree.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -298,8 +335,8 @@ unflattering one. Shipped, in the review's order:
 | Time-series state | ✅ (decade series, asOf engine, playback UI) | time-resolved flow tonnage | quarterly/annual flow snapshots per period | medium |
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
-| Search over entities | ❌ | find "Escondida" from the search bar | extend existing `SearchBar`/geosearch with econ entities | medium |
-| Alerting | engine layer ✅ (suppression memory, retraction, decade backtest) | UI withheld by measurement: precision 0.438 / recall 0.2 / lead −30d | better-cadence stock feed + richer event record, then re-measure | low |
+| Search over entities | ✅ (canonical-register search, evidence headlines, map+panel selection) | fuzzy matching, cross-commodity when a second commodity lands | — | done |
+| Alerting | numeric detector FROZEN by measurement (structural bound: can't beat price where it detects; can't detect where lead matters); corpus health SHIPPED | missing acquisition modality: event-from-language, AIS | separate funded programme — see Phase 8 | deliberate decision, not next increment |
 
 ## Verification
 

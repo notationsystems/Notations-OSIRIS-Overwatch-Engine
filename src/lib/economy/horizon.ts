@@ -94,7 +94,10 @@ export function arrivalGapDays(knownAts: string[]): number | null {
  * consequence computed, not asserted.
  */
 export interface CorpusHealthSignal {
-  kind: 'source_stale' | 'ladder_rung_pinned';
+  /** source_suspect = a plausibility gate rejected a live fetch: freshness
+   *  is a liveness property, correctness a safety property — this is the
+   *  safety one, and it outranks staleness. */
+  kind: 'source_stale' | 'ladder_rung_pinned' | 'source_suspect';
   sourceId: string;
   /** Median arrival gap this source normally shows, days. */
   expectedGapDays: number;
@@ -138,12 +141,35 @@ export function corpusHealthSignals(state: EconomyState, asOf: string): CorpusHe
   const bestCeiling = Math.max(...rows.map(r => -r.minDelay));
 
   const signals: CorpusHealthSignal[] = [];
+
+  // Safety first: a plausibility-gate rejection means the source served
+  // fresh-but-implausible data — reported immediately, independent of
+  // staleness, because the wrongness is invisible to every liveness check.
+  for (const [sourceId, obs] of bySource) {
+    const suspectNote = obs.map(o => o.provenance.note ?? '').find(n => n.includes('plausibility violation'));
+    if (!suspectNote) continue;
+    const row = rows.find(x => x.sourceId === sourceId);
+    signals.push({
+      kind: 'source_suspect',
+      sourceId,
+      expectedGapDays: row?.gap ?? 0,
+      observedStalenessDays: row?.staleness ?? 0,
+      servingRung: 'snapshot',
+      consecutivePeriodsDegraded: row && row.gap > 0 ? Math.floor(row.staleness / row.gap) : 0,
+      leadCeilingBefore: row ? -row.minDelay : 0,
+      leadCeilingNow: row ? -row.staleness : 0,
+      loadBearing: row ? -row.minDelay === bestCeiling : false,
+      explanation: `${sourceId} REJECTED its live fetch on a plausibility violation and is serving prior data — the source is reachable but its content failed sanity checks (wrong-column latch, impossible values, or broken ordering). ${suspectNote.slice(suspectNote.indexOf('plausibility violation'))}`,
+    });
+  }
+
   for (const r of rows) {
     // Degraded when the newest knowable value is older than the source's own
     // cadence explains (3× the arrival gap, floor 5 days for weekends and
     // holidays on daily sources).
     const threshold = Math.max(5, 3 * r.gap);
     if (r.staleness <= threshold) continue;
+    if (signals.some(s => s.sourceId === r.sourceId)) continue; // suspect already covers it
     const loadBearing = -r.minDelay === bestCeiling;
     const before = -r.minDelay;
     const now = -r.staleness;

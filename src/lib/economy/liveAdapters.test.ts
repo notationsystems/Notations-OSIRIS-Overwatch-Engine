@@ -3,7 +3,7 @@ import type { Provenance } from './types';
 import { validateState } from './types';
 import {
   parseMcsWorldCsv, parseComtradeResponse, parseComtradeBilateral, parseYahooChart, parseCftcRows,
-  parseWestmetallTable, westmetallObs,
+  parseWestmetallTable, westmetallObs, checkWestmetallPlausibility,
   usgsMcsAdapter, comtradeAdapter, yahooPriceAdapter, cftcPositioningAdapter,
 } from './liveAdapters';
 import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.json';
@@ -152,6 +152,26 @@ describe('parseWestmetallTable / westmetallObs (against the committed real captu
       { date: '2026-01-02', stockTonnes: 99150 },
       { date: '2026-08-25', stockTonnes: 238725 },
     ]);
+  });
+
+  it('plausibility gate: accepts the real capture, rejects fresh-but-wrong data', () => {
+    const rows = (westmetallSnapshot as { rows: Array<{ date: string; stockTonnes: number }> }).rows;
+    // The real series passes.
+    expect(checkWestmetallPlausibility(rows)).toBeNull();
+    // A wrong-column latch (price ~14,425 USD/t parsed as stock) is caught by
+    // the sanity range: freshness would be nominal, content nonsense.
+    expect(checkWestmetallPlausibility([{ date: '2026-08-25', stockTonnes: 14425 }]))
+      .toContain('wrong-column latch');
+    // A discontinuous jump is caught even inside the sanity range.
+    expect(checkWestmetallPlausibility([
+      { date: '2026-08-24', stockTonnes: 240000 },
+      { date: '2026-08-25', stockTonnes: 100000 },
+    ])).toContain('day-over-day change');
+    // Broken ordering is caught.
+    expect(checkWestmetallPlausibility([
+      { date: '2026-08-25', stockTonnes: 240000 },
+      { date: '2026-08-24', stockTonnes: 239000 },
+    ])).toContain('not strictly increasing');
   });
 
   it('converts the snapshot to daily kt observations with day-after knowability', () => {

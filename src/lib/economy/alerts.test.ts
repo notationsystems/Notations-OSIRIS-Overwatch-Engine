@@ -201,6 +201,21 @@ describe('corpus health (the system watching its own blindness)', () => {
     expect(generateAlerts(fakeRun(healthy, '2026-03-31')).filter(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape')).toEqual([]);
   });
 
+  it('source_suspect: fresh-but-wrong outranks stale — a rejected plausibility gate is reported as safety, not liveness', () => {
+    const s = syntheticState();
+    // The ladder degraded deliberately: the live fetch was REJECTED on a
+    // plausibility violation, so served data carries the violation note.
+    // Staleness checks alone would stay silent until the snapshot aged.
+    dailyStockObs(s, 30, 'bundled snapshot (live fetch failed: plausibility violation: value 14.4 kt on 2026-03-31 outside sanity range [20, 1500] kt — possible wrong-column latch)');
+    const alerts = generateAlerts(fakeRun(s, '2026-03-31'));
+    const suspect = alerts.find(a => a.kind === 'corpus' && a.entityId === 'test-daily-scrape')!;
+    expect(suspect).toBeDefined();
+    expect(suspect.signalKey).toBe('corpus:source_suspect:test-daily-scrape');
+    expect(suspect.severity).toBe('high');
+    expect(suspect.title).toContain('SOURCE SUSPECT');
+    expect(suspect.explanation).toContain('wrong-column latch');
+  });
+
   it('a cleared condition resolves — it is not a withdrawn claim', () => {
     const stale = syntheticState();
     dailyStockObs(stale, 15);
@@ -254,11 +269,15 @@ describe('alert backtest (decade of monthly knowledge states)', () => {
     // event is independent public record.
     expect(sc.postHocEvents.sort()).toEqual(['evt:lme-stock-drawdown', 'evt:lme-tariff-drawdown-2025']);
     expect(sc.preRegisteredEvents.length).toBeGreaterThanOrEqual(9);
-    // THE headline: on the clean (pre-registered) truth set, no measurement
-    // is currently possible — no independent event is detectable and no
-    // alert went unmatched. Null IS the honest answer; a number here must
-    // come from detecting an independent event, never from curation.
-    expect(sc.precisionPreRegisteredOnly).toBeNull();
+    // THE headline: no pre-registered event is detected, so the clean-set
+    // precision can only be null (no trials) or 0 (unmatched alerts and no
+    // independent detections) — never a positive number. A positive value
+    // here must come from detecting an independent event, not from curation
+    // or window choice. Under the zero pre-window the January early signal
+    // goes unmatched, so the current measurement is 0 over a denominator of
+    // 1 — a small-n zero, not a capability claim in either direction.
+    expect(r.truthEvents.filter(t => t.curation === 'independent' && t.detected)).toEqual([]);
+    expect(sc.precisionPreRegisteredOnly === null || sc.precisionPreRegisteredOnly === 0).toBe(true);
     // precisionAll exists for context and is never the headline.
     expect(sc.precisionAll).not.toBeNull();
     // Episodes, not alerts: many firings on one drawdown are one success.
@@ -271,8 +290,11 @@ describe('alert backtest (decade of monthly knowledge states)', () => {
     const w90 = sc.attributionSensitivity[3];
     expect(w0.precisionAll !== w90.precisionAll || w0.medianLeadDays !== w90.medianLeadDays).toBe(true);
     // The axis precision cannot see: firing volume when nothing happens.
+    // Under the mechanism-set zero window, the January pre-event firing
+    // counts as quiet-period volume rather than anticipation — which is the
+    // point of setting the window by mechanism.
     expect(sc.quietMonths).toBeGreaterThan(0);
-    expect(sc.quietPeriodAlertRate).toBe(0); // silent in quiet months — corpus fact
+    expect(sc.quietPeriodAlertRate).toBeLessThan(0.1); // near-silent, honestly counted
 
     /* ── Lead vs the market (COMEX benchmarks, never feeds) ── */
     for (const t of r.truthEvents.filter(x => x.detected && x.leadVsPriceDays !== undefined)) {

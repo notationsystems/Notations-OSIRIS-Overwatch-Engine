@@ -156,8 +156,18 @@ export function monthEnds(from: string, to: string): string[] {
  * 60 days]. The pre-window is the free parameter that maps alerts to events
  * — it raises precision and lead time together, which is why the scorecard
  * publishes precision at several settings instead of hiding the knob.
+ *
+ * The DEFAULT is set by causal mechanism, not by which value it produces —
+ * and no mechanism has been argued for pre-event anticipation on the
+ * current signal classes: for an exchange-stock event the event IS the
+ * number moving, so "the series anticipated the event" is incoherent (a
+ * draw preceding the curated start is the event starting earlier than
+ * curated, not foresight). Absent an argued mechanism, zero is the
+ * conservative default; a future signal class with a real anticipation
+ * mechanism (e.g. consumers drawing inventory ahead of a disruption
+ * becoming public) should raise it WITH the argument stated here.
  */
-export const DEFAULT_PRE_WINDOW_DAYS = 90;
+export const DEFAULT_PRE_WINDOW_DAYS = 0;
 
 function withinEventWindow(signalMonth: string, ev: EconEvent, horizon: string, preWindowDays: number): boolean {
   const lo = new Date(Date.parse(ev.start) - preWindowDays * DAY_MS).toISOString().slice(0, 7);
@@ -389,7 +399,7 @@ export async function backtestAlerts(
       `Ground truth is the curated event record: ${truthRows.length} event(s) in window (${preRegisteredEvents.length} pre-registered, ${postHocEvents.length} post-hoc) — treat the percentages as small-n measurements, not general performance claims.`,
       'precisionAll pools post-hoc events (curated after observing detector output) with independent ones; only precisionPreRegisteredOnly may be quoted as detector quality, and null there means "no measurement possible on the clean truth set", which is itself the finding.',
       'Annual production series can only be detected at publication (the following year): production-derived detections structurally lag occurrence.',
-      `Matching allows one structural hop and a −${DEFAULT_PRE_WINDOW_DAYS}d/+60d window; the window is a free parameter that moves precision and lead together — see scorecard.attributionSensitivity.`,
+      `Matching allows one structural hop and a −${DEFAULT_PRE_WINDOW_DAYS}d/+60d window. The pre-window default is set by causal mechanism, not outcome: no anticipation mechanism has been argued for the current signal classes, so it is zero; the knob's effect is published in scorecard.attributionSensitivity.`,
       'leadVsPrice uses monthly COMEX closes as a benchmark (never an input): its resolution is one month, and a reaction "at" a month-end may have occurred any day inside that month.',
       'Evaluation grid is hybrid: month-ends everywhere plus daily dates where daily evidence exists.',
       'Comtrade is a single-version source revised in place: as_known_then is blind before the release date of the held version, and pre-revision vintages that predate OSIRIS\'s archive (begun 2026-08) are permanently unrecoverable.',

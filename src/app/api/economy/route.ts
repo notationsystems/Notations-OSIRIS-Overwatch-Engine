@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runEngine, listSystems } from '@/lib/economy/engine';
 import { DISRUPTIVE_EVENT_TYPES, isEventActive } from '@/lib/economy/propagation';
 import type { BottleneckCandidate } from '@/lib/economy/analytics';
+import { corpusHealthSignals } from '@/lib/economy/horizon';
 import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
 import { toKtPerYear } from '@/lib/economy/types';
 
@@ -82,6 +83,10 @@ export async function GET(request: Request) {
       coverage: systems.coverage,
       divergence: systems.divergence,
       propagation: systems.propagation,
+      // The system watching its own blindness: fires when a source's lead
+      // ceiling degrades or a plausibility gate rejected its live data.
+      // Empty on a healthy corpus — the panel renders nothing then.
+      corpusHealth: corpusHealthSignals(state, evalDate),
       events: state.events,
       sources: state.sources,
     });

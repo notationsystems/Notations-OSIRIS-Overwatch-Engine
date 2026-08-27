@@ -235,8 +235,10 @@ export function generateAlerts(run: EngineRun): Alert[] {
       signalKind: 'corpus_health',
       entityId: s.sourceId,
       entityName: s.sourceId,
-      title: `${s.loadBearing ? 'WARNING CAPABILITY DEGRADED: ' : ''}${s.sourceId} ${s.kind === 'ladder_rung_pinned' ? 'pinned to snapshot' : 'stale'} — lead ceiling ${s.leadCeilingBefore >= 0 ? '+' : ''}${s.leadCeilingBefore}d → ${s.leadCeilingNow}d`,
-      severity: s.loadBearing ? 'high' : 'medium',
+      title: s.kind === 'source_suspect'
+        ? `SOURCE SUSPECT: ${s.sourceId} rejected its live data on a plausibility violation`
+        : `${s.loadBearing ? 'WARNING CAPABILITY DEGRADED: ' : ''}${s.sourceId} ${s.kind === 'ladder_rung_pinned' ? 'pinned to snapshot' : 'stale'} — lead ceiling ${s.leadCeilingBefore >= 0 ? '+' : ''}${s.leadCeilingBefore}d → ${s.leadCeilingNow}d`,
+      severity: s.kind === 'source_suspect' || s.loadBearing ? 'high' : 'medium',
       detectedAt: asOf,
       signalPeriod: asOf.slice(0, 7),
       detectionLatencyDays: null,

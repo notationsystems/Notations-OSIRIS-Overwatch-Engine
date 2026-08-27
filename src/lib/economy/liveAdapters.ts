@@ -766,12 +766,59 @@ export function westmetallObs(rows: WestmetallRow[], prov: (ref: string, note?: 
   });
 }
 
+/*
+ * Plausibility gate — SAFETY, where the degradation ladder is only
+ * LIVENESS. The failure mode a scrape is most likely to produce is fresh
+ * but wrong: if the markup shifts and the parser latches onto the adjacent
+ * column (a ~14,000 USD/t price parsed as ~14 kt of stock), the fetch
+ * succeeds, knownAt is current, cadence is nominal — and corpus health is
+ * correctly silent while the series is nonsense. A violated gate REJECTS
+ * the fetch, which degrades the ladder deliberately and turns the invisible
+ * failure into a 'source_suspect' the health system already reports.
+ */
+export const WESTMETALL_GATE = {
+  /** Absolute sanity bounds, kt. LME copper stocks have ranged ~30–900 kt
+   *  historically; a price-column latch lands near 14 kt, far outside. */
+  valueRangeKt: [20, 1500] as [number, number],
+  /** Exchange stocks rarely move >25% day-over-day even on mass warrant
+   *  cancellations; a column latch jumps discontinuously. */
+  maxDailyChangeRatio: 0.25,
+  /** Year-to-date table: 1 row on Jan 2, ~260 by late December. */
+  expectedRowCountRange: [1, 400] as [number, number],
+};
+
+export function checkWestmetallPlausibility(rows: WestmetallRow[]): string | null {
+  const [minRows, maxRows] = WESTMETALL_GATE.expectedRowCountRange;
+  if (rows.length < minRows || rows.length > maxRows) {
+    return `row count ${rows.length} outside expected [${minRows}, ${maxRows}]`;
+  }
+  const [lo, hi] = WESTMETALL_GATE.valueRangeKt;
+  for (let i = 0; i < rows.length; i++) {
+    const kt = rows[i].stockTonnes / 1000;
+    if (kt < lo || kt > hi) {
+      return `value ${kt.toFixed(1)} kt on ${rows[i].date} outside sanity range [${lo}, ${hi}] kt — possible wrong-column latch`;
+    }
+    if (i > 0) {
+      if (rows[i].date <= rows[i - 1].date) return `dates not strictly increasing at ${rows[i].date}`;
+      const prev = rows[i - 1].stockTonnes;
+      const change = prev > 0 ? Math.abs(rows[i].stockTonnes - prev) / prev : 0;
+      if (change > WESTMETALL_GATE.maxDailyChangeRatio) {
+        return `day-over-day change ${(change * 100).toFixed(0)}% on ${rows[i].date} exceeds ${(WESTMETALL_GATE.maxDailyChangeRatio * 100).toFixed(0)}%`;
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchWestmetallLive(): Promise<Observation[]> {
   const html = await fetchText(WM_URL, 20000, {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
   });
+  const rows = parseWestmetallTable(html);
+  const violation = checkWestmetallPlausibility(rows);
+  if (violation) throw new Error(`plausibility violation: ${violation}`);
   const retrievedAt = new Date().toISOString();
-  return westmetallObs(parseWestmetallTable(html), (ref, note) => ({
+  return westmetallObs(rows, (ref, note) => ({
     sourceId: 'westmetall-lme-stocks',
     sourceName: 'LME daily copper stocks (via Westmetall market data)',
     sourceUrl: WM_URL,

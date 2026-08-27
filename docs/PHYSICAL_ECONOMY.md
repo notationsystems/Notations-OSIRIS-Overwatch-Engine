@@ -236,6 +236,22 @@ computed — never a fresh computation. Trust discipline, in order:
    from revised evidence) is retracted with its reason and the divergence id.
    Retractions are records, not deletions; a re-firing signal names its prior
    retraction. A system that cannot withdraw a claim becomes one nobody reads.
+**STATUS: the numeric detector is FROZEN** (not deleted). The measurement
+programme answered its own question: where a numeric series can detect, it
+cannot beat the price (leadVsPrice −31 and −13 days on the only detectable
+event class); where lead would matter — labour, regulatory and logistics
+events, five of six in the truth set, announced in language before they
+occur in matter (Escondida's strike notice preceded its stoppage by two
+days: a negative reporting delay no series can reproduce) — a numeric
+series cannot detect at all. That bound is structural: closing it requires
+a different acquisition modality (event extraction from language, AIS for
+movement — both already registered with `adapter: null`), which is a
+separate programme, not the next increment. The detector stays measured,
+documented and honest, frozen with `precisionPreRegisteredOnly: null` and
+the sensitivity table attached, and becomes useful the moment a faster
+physical series or the missing modality exists. Corpus health (below) is
+the one alert class that shipped.
+
 4. **Backtest before wiring** (`alertBacktest.ts`) — the detector runs
    against a decade of knowledge states on a hybrid grid (month-ends
    everywhere, daily where daily evidence exists), strictly `as_known_then`,
@@ -313,6 +329,11 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 - `GET /api/economy?commodity=copper&view=state` — the full canonical state (research/debug).
 - `GET /api/economy/entity?commodity=copper&id=…` — entity detail: observations,
   capacities, flows in/out, events, and resolved upstream/downstream chains.
+- `GET /api/economy/search?q=escondida` — entity search over the canonical
+  register (name, operator, country, kind) with a one-line evidence headline
+  per hit (latest resolved observation, labeled with its valueKind — a search
+  result never presents a number without its epistemic status). The search
+  index IS the entity register; there is no parallel list to drift.
 
 ## Spatial + research interface
 
@@ -340,10 +361,17 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
   every record, capacities, flows, events, clickable upstream/downstream
   dependency trees). Shows an `AS OF` badge and re-evaluates during playback.
 
-Research workflow this supports end-to-end: open OSIRIS → copper layers →
-producing regions → processing/refining structure → flows → select a node →
-inspect state → traverse dependencies → concentration → candidate bottlenecks →
-inspect supporting evidence.
+- **SearchBar** — physical-economy entities resolve from the canonical
+  register and appear above geographic hits (a researcher typing "escondida"
+  wants the mine's state, not the Chilean locality): each hit shows kind,
+  operator, country and its evidence headline; selecting one flies the map to
+  the entity and opens it in the research panel. Ctrl+F, arrow keys, Enter.
+
+Research workflow this supports end-to-end: open OSIRIS → type a name →
+land on the entity (or: copper layers → producing regions →
+processing/refining structure → flows → select a node) → inspect state →
+traverse dependencies → concentration → candidate bottlenecks → inspect
+supporting evidence.
 
 ## Testing
 

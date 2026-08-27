@@ -54,6 +54,11 @@ interface DivergenceRec {
   relativeSpread: number; direction: string; persistence: number; class: string; explanation: string;
 }
 
+interface CorpusHealthRow {
+  kind: string; sourceId: string; expectedGapDays: number; observedStalenessDays: number;
+  servingRung: string; leadCeilingBefore: number; leadCeilingNow: number; loadBearing: boolean; explanation: string;
+}
+
 interface Analytics {
   /** Which evaluation date produced this payload (client bookkeeping). */
   _evalKey?: string;
@@ -65,6 +70,7 @@ interface Analytics {
   anomalies: { result: Anomaly[] };
   coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
   divergence?: { result: DivergenceRec[] };
+  corpusHealth?: CorpusHealthRow[];
   events: EconEvent[];
   sources: Array<{ sourceId: string; sourceName: string; sourceUrl?: string }>;
 }
@@ -497,6 +503,27 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                   </div>
                 </div>
               </Section>
+
+              {(analytics.corpusHealth?.length ?? 0) > 0 && (
+                <Section id="corpus-health" open={openSections['corpus-health'] ?? true} onToggle={toggle} title="CORPUS HEALTH" icon={<AlertTriangle className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.corpusHealth!.length}>
+                  <div className="space-y-1">
+                    <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
+                      The instrument watching its own blindness: a source going stale or failing sanity checks degrades the best achievable warning, silently, unless reported here.
+                    </div>
+                    {analytics.corpusHealth!.map(s => (
+                      <div key={`${s.kind}-${s.sourceId}`} className="px-2 py-1 rounded bg-[#FF3D3D]/5 border-l-2 border-[#FF3D3D]">
+                        <div className="text-[9px] font-mono font-bold text-[#FF3D3D]">
+                          {s.kind.replace(/_/g, ' ').toUpperCase()} · {s.sourceId}{s.loadBearing ? ' · LOAD-BEARING' : ''}
+                        </div>
+                        <div className="text-[8px] font-mono text-[var(--text-muted)] tabular-nums">
+                          lead ceiling {s.leadCeilingBefore >= 0 ? '+' : ''}{s.leadCeilingBefore}d → {s.leadCeilingNow}d · stale {s.observedStalenessDays}d (expects ~{s.expectedGapDays}d) · rung: {s.servingRung}
+                        </div>
+                        <div className="text-[9px] font-mono text-[#E8E6E0] leading-tight">{s.explanation}</div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
 
               {(analytics.divergence?.result?.length ?? 0) > 0 && (
                 <Section id="divergences" open={!!openSections['divergences']} onToggle={toggle} title="DIVERGENCES" icon={<Activity className="w-3 h-3 text-[#FFB300]" />} count={analytics.divergence!.result.length}>
