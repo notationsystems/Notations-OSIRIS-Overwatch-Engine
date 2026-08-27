@@ -186,6 +186,33 @@ export function corpusHealthSignals(state: EconomyState, asOf: string): CorpusHe
       explanation: `${r.sourceId} normally arrives every ~${r.gap}d but its newest knowable value is ${r.staleness}d old${r.rung === 'snapshot' ? ' and it is serving from the bundled snapshot rung' : ''}. Best achievable warning from this source has fallen from ${before >= 0 ? '+' : ''}${before}d to ${now}d.${loadBearing ? ' THIS IS THE CORPUS\'S BEST-LEAD SOURCE: the whole system\'s warning capability degrades with it.' : ''}`,
     });
   }
+  // The flow snapshot as a source with a MAINTENANCE cadence (shipping
+  // order S-5): the facility topology is annual-intent curation, and until
+  // now the only thing that noticed it aging was the extrapolation clock's
+  // 730-day CEILING — a guard, not a cadence. This signal fires when the
+  // snapshot is past its intended annual refresh (365d + 90d grace), so
+  // corpus health says "the topology is due" long before the guard says
+  // "the topology is inadmissible".
+  const facilityFlows = state.flows.filter(f =>
+    !(f.fromEntityId.startsWith('ent:country:') && f.toEntityId.startsWith('ent:country:')));
+  if (facilityFlows.length > 0) {
+    const periodEnd = facilityFlows.map(f => f.period.end).reduce((a, b) => (a > b ? a : b));
+    const age = days(periodEnd, asOf);
+    const FLOW_SNAPSHOT_CADENCE_DAYS = 365;
+    if (age > FLOW_SNAPSHOT_CADENCE_DAYS + 90) {
+      signals.push({
+        kind: 'source_stale',
+        sourceId: 'curated-flow-snapshot',
+        expectedGapDays: FLOW_SNAPSHOT_CADENCE_DAYS,
+        observedStalenessDays: age,
+        servingRung: 'snapshot',
+        consecutivePeriodsDegraded: Math.floor(age / FLOW_SNAPSHOT_CADENCE_DAYS),
+        leadCeilingBefore: 0, leadCeilingNow: 0,
+        loadBearing: false,
+        explanation: `The facility flow snapshot's period ended ${age}d ago against an annual maintenance cadence — every propagation and throughput figure serves latest-known structure that is ${Math.floor(age / 30)} months old. The extrapolation guard's hard ceiling is 730d; this signal is the cadence, not the ceiling. Remedy: refresh the facility flow snapshot (see the source registry's maintenance entry).`,
+      });
+    }
+  }
   // Load-bearing failures first.
   signals.sort((a, b) => Number(b.loadBearing) - Number(a.loadBearing) || b.observedStalenessDays - a.observedStalenessDays);
   return signals;

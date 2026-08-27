@@ -30,7 +30,7 @@ export interface ConfigCheck {
   missing: Array<{ key: string; reason: string }>;
 }
 
-export function checkRequiredConfig(env: NodeJS.ProcessEnv = process.env): ConfigCheck {
+export function checkRequiredConfig(env: Record<string, string | undefined> = process.env): ConfigCheck {
   const missing: ConfigCheck['missing'] = [];
   if (env.SEA_DOG_EDGAR_ENABLED === '1') {
     if (!env.SEA_DOG_SEC_UA_ORG) {
@@ -46,7 +46,7 @@ export function checkRequiredConfig(env: NodeJS.ProcessEnv = process.env): Confi
 /** Startup gate — throws with every missing key named. Called from the
  *  Next.js instrumentation hook so a misconfigured deploy dies at boot,
  *  not at first request. */
-export function assertRequiredConfig(env: NodeJS.ProcessEnv = process.env): void {
+export function assertRequiredConfig(env: Record<string, string | undefined> = process.env): void {
   const check = checkRequiredConfig(env);
   if (!check.ok) {
     throw new Error(

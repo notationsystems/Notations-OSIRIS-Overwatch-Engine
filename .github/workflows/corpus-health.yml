@@ -1,0 +1,71 @@
+# Sea Dog Terminal — corpus health digest (shipping order S-5).
+#
+# Weekly: build, serve, read corpus health for both commodities, and file
+# ONE GitHub issue when any signal is present — the digest a human
+# receives. Silence on a healthy corpus is the design: no signals, no
+# issue, no noise. An existing open digest issue is updated, not
+# duplicated.
+#
+# The signals themselves are computed by the instrument
+# (corpusHealthSignals): staleness against measured cadence, snapshot-rung
+# pinning, plausibility rejections, and the flow snapshot's age against
+# its annual maintenance cadence.
+
+name: Corpus health digest
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # weekly, Monday 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install and build
+        run: npm ci && npm run build
+      - name: Serve and collect signals
+        run: |
+          npx next start -p 3999 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3999/api/economy?commodity=copper\&view=analytics -o /dev/null && break; sleep 2; done
+          curl -sf "http://localhost:3999/api/economy?commodity=copper&view=analytics" | jq '{commodity:"copper", corpusHealth}' > health-copper.json
+          curl -sf "http://localhost:3999/api/economy?commodity=aluminium&view=analytics" | jq '{commodity:"aluminium", corpusHealth}' > health-aluminium.json
+          jq -s '[.[] | .corpusHealth[]] | length' health-copper.json health-aluminium.json > signal-count.txt
+          echo "signals: $(cat signal-count.txt)"
+      - name: File or update the digest issue when signals exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COUNT=$(cat signal-count.txt)
+          if [ "$COUNT" = "0" ]; then
+            echo "Corpus healthy — silent by design."
+            exit 0
+          fi
+          TITLE="Corpus health digest: $COUNT signal(s)"
+          BODY_FILE=digest.md
+          {
+            echo "Generated $(date -u +%FT%TZ) by the corpus-health workflow."
+            echo
+            echo "Each signal carries its own explanation and remedy; the source"
+            echo "registry's \`owner\`/\`maintenance\` fields say whose move it is."
+            echo
+            echo '```json'
+            jq -s '.' health-copper.json health-aluminium.json
+            echo '```'
+          } > "$BODY_FILE"
+          EXISTING=$(gh issue list --state open --search "Corpus health digest in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --title "$TITLE" --body-file "$BODY_FILE"
+            gh issue comment "$EXISTING" --body "Digest refreshed: $COUNT signal(s) as of $(date -u +%F)."
+          else
+            gh issue create --title "$TITLE" --body-file "$BODY_FILE"
+          fi
