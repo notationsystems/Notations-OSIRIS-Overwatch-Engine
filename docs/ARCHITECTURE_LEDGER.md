@@ -591,13 +591,66 @@ export routes are what changed.
    ACCUMULATE person-directed queries, not merely that it declines to
    answer them; the third policy pin tests exactly that.
 
+## Phase 14 — the ledger becomes a set of conditions the test suite maintains
+
+A deferred decision is safe only while the condition that made it safe still
+holds — and that condition should be executable rather than remembered. Not
+a new capability and not a backlog item: guard work on decisions already
+recorded, the same category as the topology-validity guard, which converted
+one documented assumption into an enforced invariant and immediately
+exposed the class.
+
+1. **validWhile predicates** (`ledgerGuards.ts`): six deferred decisions
+   now carry the condition under which each remains the right one, and one
+   test evaluates all of them against the real state. A failure names the
+   entry, the original reason, and the condition that stopped holding —
+   "a decision needs re-taking, and here is why it was taken", which is a
+   different and more useful thing than a broken build. The entries:
+   Phase 12 §3 (attribution basis unbuilt — valid while no sanction/
+   insolvency event is curated); flow vintages deferred (valid while
+   exactly one distinct flow period exists); the person-name policy's
+   three pins (valid while every register kind stays in the canonical
+   identity set); the modality freeze (valid while no built adapter
+   yields events); the Westmetall singularity note (valid while exactly
+   one daily physical stream is built); forward extrapolation (valid
+   while the distance stays under the bound). Guards do not re-decide —
+   a failing predicate raises the decision, a human takes it — and do
+   not cover built work, which has its own tests.
+2. **Vacuity discipline applies to the guards themselves**: a check
+   designed never to fire in its shipping state must be shown able to
+   fire. Each predicate has a planted-condition test — a curated sanction,
+   a second flow vintage, a person-shaped kind, an event-yielding adapter,
+   a second daily stream, an out-of-bound date — asserting it fails
+   exactly there.
+3. **Extrapolation is quantified, not just flagged.** Against a fixed
+   snapshot, live evaluations are permanently 'extrapolated' — the status
+   stops carrying information and the DISTANCE is the number that moves.
+   `TopologyValidity.extrapolationDays` now carries it (in the note and
+   the panel banner), and the guard's bound is stated with its basis:
+   **two annual snapshot cadences (730 days)** — one cadence to produce
+   the next vintage plus one grace cadence; beyond that, an expected
+   vintage has been skipped and "latest-known structure" must be
+   re-argued or the vintage refreshed. Measured today: 604 days — the
+   bound forces the re-take in roughly four months.
+4. **Two consequences of the guard, recorded**: (a) five of the six
+   backtest truth-set disruption events (Escondida 2017, Grasberg halt
+   2017, Chuquicamata 2019, Peru 2020, Las Bambas 2022) predate the 2024
+   flow topology — their propagated tonnage is now null and historical
+   propagation over the curated record is structural-reach-only until
+   flow vintages land; the capability statement says so. (b) The
+   flow-vintage material partially EXISTS already: Comtrade holds
+   country-level annual trade by period (archived, knownAt-stamped) —
+   what defers flow vintages is the same allocation model that defers
+   bilateral rows as graph edges (country↔facility double-counting), not
+   acquisition. Recorded on the backlog line.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
 |---|---|---|---|---|
 | Canonical state + provenance | ✅ copper | more commodities | new curated/live adapters; state model needs no change | high |
 | Live acquisition | ✅ 4 providers | bilateral trade flows as graph edges; LME stocks | allocation model for country↔facility flow reconciliation; paid/licensed stock feeds | medium |
-| Time-series state | ✅ (decade series, asOf engine, playback UI, topology-validity guard) | flow VINTAGES: several flow periods coexisting, asOf selecting among them (the MCS-vintage shape) — the structural fix behind phase 13's guard | per-period flow snapshots through the existing supersedes machinery | ranked below evidence-layer search kinds and the OpenOwnership adapter |
+| Time-series state | ✅ (decade series, asOf engine, playback UI, topology-validity guard) | flow VINTAGES: several flow periods coexisting, asOf selecting among them (the MCS-vintage shape) — the structural fix behind phase 13's guard. The vintage material partially exists: Comtrade country-level annual trade by period is already archived and knownAt-stamped; the blocker is the deferred allocation model (country↔facility double-counting), not acquisition | per-period flow snapshots through the existing supersedes machinery + the allocation model | ranked below evidence-layer search kinds and the OpenOwnership adapter; deferral guarded by `flow-vintages-deferred` (phase 14) |
 | Graph UI | ✅ force-graph explorer | path analysis, community detection | operate on the existing `view=graph` payload | medium |
 | Scenario analysis | seed (propagation system) | flow rebalancing, what-if | new engine system; registry makes this additive | high |
 | Search over entities | ✅ (canonical-register search, evidence headlines, knowledge coherence, miss→registry-gap demand signal) | evidence-layer kinds (refused/contested/stale, vintage ids); fuzzy matching; cross-commodity when a second commodity lands | ranked instrument backlog (phase 12 §4) | high |
@@ -605,7 +658,7 @@ export routes are what changed.
 
 ## Verification
 
-Every subsystem above ships with executable tests (150+ economy tests; 516
+Every subsystem above ships with executable tests (160+ economy tests; 524
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

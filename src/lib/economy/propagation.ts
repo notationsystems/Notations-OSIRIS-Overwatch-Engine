@@ -122,9 +122,18 @@ export interface TopologyValidity {
   topologyPeriod: { start: string; end: string } | null;
   evaluatedAt: string;
   status: 'within' | 'extrapolated' | 'predates';
+  /** Days between the topology period's end and the evaluation date —
+   *  extrapolation QUANTIFIED, not just flagged: against a fixed snapshot
+   *  the status is permanently 'extrapolated' for live evaluations, so the
+   *  distance is the number that actually moves (and the number the
+   *  extrapolation-bound guard watches). Present only when extrapolated. */
+  extrapolationDays?: number;
   /** Human-readable statement of the mismatch; absent when within. */
   note?: string;
 }
+
+const daysBetween = (fromISO: string, toISO: string): number =>
+  Math.round((Date.parse(toISO) - Date.parse(fromISO)) / 86_400_000);
 
 export function topologyValidity(state: EconomyState, asOf: string): TopologyValidity {
   if (state.flows.length === 0) {
@@ -144,7 +153,10 @@ export function topologyValidity(state: EconomyState, asOf: string): TopologyVal
     ...(status === 'predates'
       ? { note: `Flow topology describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only. Flow vintages are the recorded fix.` }
       : status === 'extrapolated'
-        ? { note: `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure.` }
+        ? {
+            extrapolationDays: daysBetween(end, asOf),
+            note: `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`,
+          }
         : {}),
   };
 }

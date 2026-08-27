@@ -167,6 +167,11 @@ describe('topology validity (what WAS vs what was KNOWN)', () => {
     const ahead = topologyValidity(s, '2026-08-27');
     expect(ahead.status).toBe('extrapolated');
     expect(ahead.note).toContain('latest-known structure');
+    // Extrapolation is QUANTIFIED, not just flagged: against a fixed
+    // snapshot the status is permanently 'extrapolated' for live
+    // evaluations, so the distance is the number that actually moves.
+    expect(ahead.extrapolationDays).toBe(604);
+    expect(ahead.note).toContain('604 days past the period');
   });
 
   it('an extrapolated evaluation keeps its figures and carries the label', () => {
