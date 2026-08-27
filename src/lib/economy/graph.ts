@@ -9,14 +9,20 @@
 import type { Dependency, EconomyState, Entity, Flow } from './types';
 import { toKtPerYear } from './types';
 import { impliedCorridorGrades } from './basis';
+import { formConversionFor } from './stageConversion';
 
 export interface BasisConversion {
-  /** Corridor-implied Cu mass fraction applied to the gross quantity. */
+  /** Contained-metal mass fraction applied to the gross quantity. */
   grade: number;
-  /** kt/y range across the concentrate grade uncertainty band. */
+  /** kt/y range across the conversion's uncertainty band. */
   ktRange: [number, number];
-  /** Mirror observation ids the grade was implied from. */
-  derivedFrom: [string, string];
+  /** Mirror observation ids — present when a corridor grade converted the
+   *  edge (copper concentrate: per-corridor, mirror-implied). */
+  derivedFrom?: [string, string];
+  /** Documented form-level constant's provenance — present when a stage
+   *  conversion converted the edge (work order 3.5: bauxite/alumina).
+   *  Exactly one of derivedFrom/source is set. */
+  source?: string;
 }
 
 export interface FlowEdge {
@@ -150,9 +156,18 @@ export function buildGraph(state: EconomyState, asOf?: string): EconomyGraph {
     let basisUnresolved: true | undefined;
     if (f.basis === 'gross_weight') {
       const g = corridorGrades.get(`${f.fromEntityId}|${f.toEntityId}`);
+      // Most specific first: a mirror-implied corridor grade (per-corridor
+      // measured variance). Then a documented FORM-level stage-conversion
+      // constant keyed by (commodity, form) — the aluminium chain's path
+      // (work order 3.5), which can never serve another commodity. Neither
+      // → the tonnage refuses visibly.
+      const fc = formConversionFor(f.commodity, f.form);
       if (g && raw !== null) {
         ktPerYear = raw * g.grade;
         basisConversion = { grade: g.grade, ktRange: [raw * g.band[0], raw * g.band[1]], derivedFrom: g.derivedFrom };
+      } else if (fc && raw !== null) {
+        ktPerYear = raw * fc.factor;
+        basisConversion = { grade: fc.factor, ktRange: [raw * fc.band[0], raw * fc.band[1]], source: fc.source };
       } else {
         ktPerYear = null;
         basisUnresolved = true;

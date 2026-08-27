@@ -612,6 +612,12 @@ export function validateState(state: EconomyState): ValidationIssue[] {
 export function toKtPerYear(value: number, unit: string): number | null {
   switch (unit) {
     case 'kt/y': return value;
+    // Gross-mass kilotonnes: the MAGNITUDE parses identically — what makes
+    // it gross is the record's `basis`, which the graph's conversion
+    // firewall governs (corridor grade / stage constant / visible refusal).
+    // Refusing the unit here would double-encode basis in the unit string
+    // and make gross flows unconvertible even when a grade exists.
+    case 'kt gross/y': return value;
     case 'Mt/y': return value * 1000;
     case 't/y': return value / 1000;
     default: return null;

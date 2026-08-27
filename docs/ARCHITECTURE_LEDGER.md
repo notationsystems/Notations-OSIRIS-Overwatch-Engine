@@ -1459,6 +1459,54 @@ BO-register jurisdiction.
 deferral's ground changed — the backlog slot is retired with evidence
 rather than left open as an assumption.
 
+## Phase 30 — work order 3.5: the aluminium chain's gross forms convert — with variance, or not at all
+
+**Built.** `stageConversion.ts`: form-level constants in the corridor
+grade's epistemic shape — factor + uncertainty band + documented source
+on every converted edge. `aluminium/ore` (bauxite): 0.222, band
+[0.20, 0.25] — the published 4–5 t bauxite per t primary Al ratio,
+spread driven by deposit grade. `aluminium/alumina`: 0.520, band
+[0.515, 0.529] — stoichiometry (Al share of Al2O3 = 0.529) is the hard
+ceiling, smelter practice (1.91–1.94 t alumina per t Al) the floor.
+`buildGraph`'s gross branch now tries most-specific-first: a
+mirror-implied corridor grade, then the (commodity, form) constant, then
+visible refusal. `BasisConversion` distinguishes the two provenances —
+`derivedFrom` (mirror observation ids) XOR `source` (documented ratio).
+
+**The never-cross-commodity property is structural, not tested-only.**
+The table has NO copper sub-table at all: copper's one gross form
+(concentrate) converts per-corridor via mirror grades because
+concentrate grade genuinely varies by corridor — a form-level
+concentrate constant would erase exactly the variance the mirror system
+exists to measure. The planted cross-commodity lookups (copper/ore,
+copper/alumina, copper/concentrate, aluminium/concentrate) all miss, and
+a planted gross copper flow in bauxite's form refuses through
+`refused:basis` — pinned.
+
+**Criteria.** All three passed: (1) a gross bauxite flow converts with
+stated factor/band/source (1000 kt gross → 222 kt contained Al, range
+[200, 250]); a gross alumina flow converts under the stoichiometric
+ceiling; a constant-less pairing refuses through the existing
+`refused:basis` path. (2) The cross-commodity plant fails — pinned as
+above. (3) Aluminium's curated contained-metal flows are untouched
+(every metal_content edge: no conversion record, tonnage non-null —
+pinned with a vacuity assert that the curated chain is present).
+
+**Unanticipated — a hidden double-refusal removed.** `toKtPerYear` did
+not recognize the `'kt gross/y'` unit string, so gross vintage corridors
+were refusing on UNIT PARSE before the grade lookup ever ran — the right
+outcome for the wrong reason (had a corridor grade existed, the edge
+would still have refused). The unit now parses (the magnitude is
+kilotonnes; gross-ness is the `basis` dimension the conversion firewall
+governs — encoding it in the unit string double-encoded basis). Measured
+outcomes did not move — no vintage corridor holds a grade today — but
+every gross refusal now states its true mechanism, which is what the
+refusal taxonomy is for.
+
+**Guards moved.** None. The `facility-scoped-regulation-unbuilt`
+deferral is now the aluminium vertical's ONE remaining recorded scope
+gap; round 25's other gap is closed by this item.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

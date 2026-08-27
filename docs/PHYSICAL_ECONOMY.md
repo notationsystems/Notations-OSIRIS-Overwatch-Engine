@@ -537,11 +537,19 @@ condition it exists to catch.
   routes, with live MCS bauxite/alumina/metal figures from the same world
   file). The substrate claim is now tested, not assumed (ledger phase 24);
   remaining copper-shape: the UI defaults (panel fetches, layer labels)
-  and two recorded scope gaps — gross bauxite/alumina flow conversion
-  (form-level stage-conversion constants, unbuilt; aluminium flows are
-  curated in contained metal meanwhile) and facility-scoped regulatory
+  and one recorded scope gap — facility-scoped regulatory
   acts (RegulatoryScope is jurisdiction-shaped; the Alunorte embargo is
-  modeled as disruption with the limitation stated on the event).
+  modeled as disruption with the limitation stated on the event). The
+  other round-25 gap — gross bauxite/alumina conversion — is CLOSED
+  (work order 3.5): form-level stage-conversion constants
+  (`stageConversion.ts`) convert gross 'ore' (bauxite, factor 0.222,
+  band [0.20, 0.25], the 4–5 t/t industry ratio) and 'alumina' (factor
+  0.520, band [0.515, 0.529] — stoichiometry is the ceiling) to
+  contained aluminium, each edge carrying factor + band + documented
+  source; the lookup is keyed (commodity, form) with NO cross-commodity
+  fallback (copper's concentrate stays per-corridor mirror-implied —
+  a form constant would erase the corridor variance the mirror system
+  measures), and a missing constant refuses through `refused:basis`.
 - Comtrade bilateral rows ARE now materialized as Flow edges — as
   **country-level flow vintages** (work order 3.2), one vintage per
   (reporter, year), serving evaluations the facility snapshot cannot. The
