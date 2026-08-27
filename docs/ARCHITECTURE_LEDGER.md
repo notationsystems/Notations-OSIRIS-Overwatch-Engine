@@ -1507,6 +1507,37 @@ refusal taxonomy is for.
 deferral is now the aluminium vertical's ONE remaining recorded scope
 gap; round 25's other gap is closed by this item.
 
+## Phase 31 — work order 3.6: the instrument is Sea Dog Terminal
+
+**Recorded 2026-08-27.** The physical-economy instrument is renamed from
+OSIRIS (Notations OSIRIS Overwatch Engine) to **Sea Dog Terminal**. The
+rename is ADDITIVE, per the order's own reasoning: historical phase
+entries are historical statements and stay as written — rewriting them
+to match the present is the archaeology problem inverted, the same
+reason the 2024 MCS vintage is not rewritten when 2025 lands. Module
+headers and provenance records naming OSIRIS were true when written and
+remain; files created from this order forward carry the new name.
+
+**The one outbound touch.** The SEC EDGAR document-tier User-Agent —
+still operator-blocked on the contact identity — is now specified as
+`SeaDogTerminal/<version> OrgName role@org` (recorded on the `sec-edgar`
+registry entry beside the phase-22 build requirements): the instrument
+must not introduce itself to a regulator under a retired name. The
+substrate's existing outbound UA strings (USGS/Comtrade/Yahoo fetches
+under `OSIRIS-Overwatch/0.1`, and the wider OSIRIS platform's) are NOT
+rewritten by this entry: the order names the SEC UA as the one place the
+rename touches something outbound, and widening that unasked would be
+scope creep in an identity string. If the operator wants the running
+system's generic UA renamed, that is a one-constant change
+(`liveAdapters.ts` `UA`) taken on request, not silently.
+
+**Criteria.** The item pre-registers none beyond its shape (additive; new
+name forward; SEC UA clause) — all three hold: no historical entry was
+edited, the living doc's title and this entry carry the name forward,
+and the UA form is recorded where the EDGAR build will read it.
+
+**Guards moved.** None.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

@@ -1,4 +1,11 @@
-# OSIRIS — Physical Economy Engine
+# Sea Dog Terminal — Physical Economy Engine
+
+> Renamed from OSIRIS on 2026-08-27 (work order 3.6). The rename is
+> additive: historical ledger entries, module headers, and provenance
+> records naming OSIRIS were true when written and stay as written — the
+> new name applies forward. The one outbound touch is the SEC document-tier
+> User-Agent, which carries `SeaDogTerminal` when the operator sets the
+> contact identity.
 
 This document describes the physical-economy subsystem as it actually exists and runs.
 It covers only executable reality; planned work lives in **Known Limitations**.
