@@ -329,6 +329,9 @@ export const COPPER_CAPACITIES: Capacity[] = capacityRows.map(([id, entityId, st
 type FlowRow = [id: string, from: string, to: string, form: Flow['form'], qty: number, mode: Flow['mode'], conf: Flow['confidence'], note?: string];
 
 const flowRows: FlowRow[] = [
+  // CI-VERIFY PLANT (never merge): a facility-attributed country corridor
+  // — the allocation-model-deferred guard's firing condition.
+  ['flow:ci-verify-planted-breach', 'ent:mine:escondida', 'ent:country:cn', 'concentrate', 100, 'sea', 'low', 'CI verification plant.'],
   // Chilean mines → export ports (concentrate)
   ['flow:escondida-antofagasta', 'ent:mine:escondida', 'ent:port:antofagasta', 'concentrate', 750, 'rail', 'medium', 'Escondida concentrate railed to coast; SX-EW cathode excluded.'],
   ['flow:collahuasi-antofagasta', 'ent:mine:collahuasi', 'ent:port:antofagasta', 'concentrate', 540, 'road', 'low', 'Collahuasi actually ships via Punta Patache; folded into Antofagasta node in phase 1.'],
