@@ -1,8 +1,11 @@
 name: Publish Docker image
 
+# Branch trigger corrected during the shipping order (S-1): the repository
+# has never had a `master` branch — the trigger was inherited dead. The
+# mainline is `main` from v0.1.0 onward; the tag trigger was always live.
 on:
   push:
-    branches: [master]
+    branches: [main]
     tags: ["v*.*.*"]
   workflow_dispatch:
 

@@ -1,0 +1,48 @@
+# Sea Dog Terminal — CI (shipping order S-1).
+#
+# The full suite runs on every push and PR — including the seven validWhile
+# guards, which evaluate every deferred ledger decision over every commodity
+# the adapter register serves (the derived scope, work order 3.1). The
+# guards are the system's self-check: a deferral whose ground has moved
+# fails this pipeline with the decision's original reason attached, which
+# is a different and more useful thing than a broken build.
+#
+# Tests are hermetic by construction: live fetches are disabled under
+# vitest (liveAdapters gates on VITEST), so CI exercises parsers against
+# the committed snapshot captures — the runner needs no network access to
+# any data source.
+
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**", "ci-verify/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Test (full suite, guards included)
+        run: npm test
+
+      - name: Build
+        run: npm run build
