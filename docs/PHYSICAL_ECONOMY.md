@@ -537,9 +537,13 @@ supporting evidence.
 ## Deferred decisions are guarded (`ledgerGuards.ts`)
 
 A deferred decision is safe only while the condition that made it safe
-still holds — and the condition is executable, not remembered. Six ledger
-entries carry `validWhile` predicates evaluated by the test suite against
-the real state: attribution basis unbuilt (while no sanctions-class event
+still holds — and the condition is executable, not remembered. Seven
+ledger entries carry `validWhile` predicates evaluated by the test suite
+against the real state: typed refusal emission unbuilt (while a planted
+instance of every refusal mechanism, run through the real pipeline,
+still classifies into its own bucket — the refusal queue's type is
+parsed from explanation prose, and a rewording that would silently
+retype the queue fails this guard instead of shipping), attribution basis unbuilt (while no sanctions-class event
 is curated), the allocation model deferred (while no flow record mixes
 granularities — the RE-TAKE of the flow-vintages deferral, whose predicate
 "exactly one distinct flow period exists" fired the day work order 3.2

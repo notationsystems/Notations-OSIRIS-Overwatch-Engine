@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFERRED_DECISIONS, EXTRAPOLATION_BOUND_DAYS, dailyPhysicalStreamCount,
   evaluateDeferredDecisions, evaluateAllDeferredDecisions, guardEvaluationScope,
-  noEventAdapterBuilt,
+  noEventAdapterBuilt, refusalTypeCouplingIntact,
 } from './ledgerGuards';
 import { SOURCE_REGISTRY } from './sourceRegistry';
 import { registerAdapter, unregisterAdapter } from './adapters';
@@ -119,6 +119,18 @@ describe('validWhile guards on deferred ledger decisions', () => {
     });
     const failures = evaluateDeferredDecisions(s, '2025-06-01');
     expect(failures.map(f => f.id)).toContain('allocation-model-deferred');
+  });
+
+  it('a broken prose→type coupling trips the typed-refusal-emission deferral', () => {
+    // The check runs planted instances of every refusal mechanism through
+    // the real pipeline; here it is handed a classifier that types
+    // everything 'topology' — the shape a reworded explanation would
+    // produce (the wrong-attribution species, phase 33: the export ban's
+    // basis refusal lands in the wrong bucket). The check must fail.
+    expect(refusalTypeCouplingIntact()).toBe(true); // shipping state holds
+    expect(refusalTypeCouplingIntact(() => 'topology')).toBe(false);
+    // And a subtler break: only the scope mechanism mistyped.
+    expect(refusalTypeCouplingIntact(t => t.includes('corridor grade') ? 'basis' : 'topology')).toBe(false);
   });
 
   it('a person-shaped entity kind trips the person-name-policy surface guard', () => {

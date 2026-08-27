@@ -1673,6 +1673,47 @@ is what the rule was always for.
 
 **Guards moved.** None. Suite green after the audit fixes.
 
+## Phase 34 — the wrong-attribution class named, and its structural fix deferred under guard
+
+**The class, named.** Alongside silent filtering (round 26), the
+scoped-check blindness (3.1's three instances), and the vacuous-example
+species: **a refusal correct in outcome and wrong in attribution.** The
+figure is honestly null, every test asserting "a refusal occurred"
+passes, and the diagnosis — the remedy on the explanation, the type on
+the queue — points at the wrong mechanism. Three confirmed instances,
+each found by audit rather than by a failing test, which is the class's
+signature: (1) the 'kt gross/y' unit shadow — gross corridors refused on
+unit parse before the grade lookup ran; (2) the regulatory basis-honesty
+notes firing at predating dates — the corridor-grade remedy pushed when
+the mechanism was topology; (3) the compounding path — the evidence
+classifier keys on that prose, so the mistyped explanation propagated
+into the QUEUE type: wrong remedy, wrong bucket, wrong specialist, on
+the exact artifact the researcher afternoon exports. Every refusal in
+this system carries a remedy; that is what makes the class expensive
+here, and what makes "expect a refusal" never a sufficient assertion.
+The next instance will not look like the class either.
+
+**The structural fix, deferred under guard rather than remembered.** The
+classifier (`classifyRefusalExplanation`, now a single exported site)
+couples diagnosis to prose: any wording change in propagation's
+explanations silently retypes the queue. The durable fix — each
+mechanism emits its refusal type and the text is rendered FROM it, so
+the failure mode disappears rather than being guarded per site — is a
+build item, not this round's. Recorded as
+`typed-refusal-emission-unbuilt` with an EXECUTABLE validWhile: a
+planted instance of every refusal mechanism (unscoped → scope; all-gross
+export ban → basis; facility event under a country vintage → topology;
+everything at a predating date → topology, the export ban's gross
+corridors included — the phase-33 fix held as a condition) runs through
+the real `propagateEvents` pipeline and the real classifier on every
+guard evaluation. A rewording that would retype the queue now fails a
+named guard with the deferral's reason attached, instead of shipping.
+Vacuity shown both coarse (a classifier that types everything
+'topology') and subtle (one that gets basis right and scope wrong).
+
+**Guards moved.** One added: `typed-refusal-emission-unbuilt` — the
+seventh deferred decision under validWhile.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |

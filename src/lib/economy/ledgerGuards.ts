@@ -23,9 +23,11 @@
  *     is for the entries with no test because nothing was built.
  */
 
-import type { EconomyState, EntityKind } from './types';
+import type { EconomyState, EntityKind, Provenance } from './types';
 import { SOURCE_REGISTRY, type RegisteredSource } from './sourceRegistry';
-import { topologyValidity } from './propagation';
+import { propagateEvents, topologyValidity } from './propagation';
+import { buildGraph } from './graph';
+import { classifyRefusalExplanation } from './evidenceSearch';
 import { listAdapters } from './adapters';
 import { getEconomyState } from './store';
 
@@ -38,6 +40,68 @@ export const noEventAdapterBuilt = (registry: RegisteredSource[]): boolean =>
 export const dailyPhysicalStreamCount = (registry: RegisteredSource[]): number =>
   registry.filter(s =>
     s.adapter !== null && s.category === 'stocks' && (s.cadence === 'daily' || s.cadence === 'continuous')).length;
+
+/**
+ * The prose→type coupling check behind `typed-refusal-emission-unbuilt`.
+ *
+ * The refusal queue's type is derived by PARSING the refusal's explanation
+ * (classifyRefusalExplanation) — diagnosis coupled to prose. The durable
+ * fix is typed emission (each mechanism emits its type; text rendered from
+ * it), deferred as a build item. The deferral is safe only while a planted
+ * instance of EVERY refusal mechanism, run through the real propagation
+ * pipeline, still classifies into its own bucket — a wording change that
+ * would silently retype the queue fails here instead of shipping.
+ *
+ * Parameterized on the classifier so the vacuity test can show the check
+ * failing under a broken one — a guard designed never to fire in its
+ * shipping state must still be shown able to fire.
+ */
+export function refusalTypeCouplingIntact(
+  classify: (text: string) => string = classifyRefusalExplanation,
+): boolean {
+  const prov: Provenance = { sourceId: 'guard-fixture', sourceName: 'guard fixture', retrievedAt: '2026-01-01T00:00:00Z' };
+  const s: EconomyState = {
+    commodity: 'guardium', commodityName: 'Guardium',
+    entities: [
+      { id: 'ent:country:ga', kind: 'country', name: 'Guardia', countryCode: 'GA', commodity: 'guardium' },
+      { id: 'ent:country:gb2', kind: 'country', name: 'Guardborough', countryCode: 'GB2', commodity: 'guardium' },
+      { id: 'ent:mine:g-mine', kind: 'mine', name: 'Guard Mine', countryCode: 'GA', commodity: 'guardium', stage: 'production' },
+      { id: 'ent:smelter:g-smelter', kind: 'smelter', name: 'Guard Smelter', countryCode: 'GB2', commodity: 'guardium', stage: 'smelting' },
+    ],
+    observations: [], capacities: [], dependencies: [],
+    flows: [
+      // Facility-period gross crossing corridor, no grade, no stage
+      // constant → the basis mechanism.
+      { id: 'flow:g-cross', fromEntityId: 'ent:mine:g-mine', toEntityId: 'ent:smelter:g-smelter', commodity: 'guardium', form: 'concentrate', quantity: 100, unit: 'kt gross/y', basis: 'gross_weight', period: { start: '2024-01-01', end: '2024-12-31' }, mode: 'sea', valueKind: 'representative', confidence: 'medium', provenance: prov },
+      // A country vintage → the country-granularity (allocation) mechanism.
+      { id: 'flow:g-vintage', fromEntityId: 'ent:country:ga', toEntityId: 'ent:country:gb2', commodity: 'guardium', form: 'concentrate', quantity: 80, unit: 'kt gross/y', basis: 'gross_weight', period: { start: '2017-01-01', end: '2017-12-31' }, mode: 'sea', valueKind: 'reported', confidence: 'medium', provenance: prov },
+    ],
+    events: [
+      { id: 'evt:g-unscoped', entityId: 'ent:mine:g-mine', type: 'policy', title: 'Unscoped decree (guard)', start: '2024-02-01', severity: 'medium', provenance: prov },
+      { id: 'evt:g-export', entityId: 'ent:mine:g-mine', type: 'policy', title: 'Export ban (guard)', start: '2024-02-01', severity: 'high', regulatoryScope: { jurisdictionCountryCode: 'GA', direction: 'export' }, provenance: prov },
+      { id: 'evt:g-outage', entityId: 'ent:mine:g-mine', type: 'outage', title: 'Outage (guard)', start: '2017-02-01', severity: 'high', provenance: prov },
+    ],
+    sources: [],
+  };
+  const textOf = (r: ReturnType<typeof propagateEvents>, id: string): string =>
+    r.result.find(i => i.eventId === id)!.explanation.join(' ');
+  // Mechanism 1+2 — scope refusal and all-gross basis refusal, within the
+  // facility period.
+  const within = propagateEvents(s, buildGraph(s, '2024-06-15'), { asOf: '2024-06-15' });
+  if (classify(textOf(within, 'evt:g-unscoped')) !== 'scope') return false;
+  if (classify(textOf(within, 'evt:g-export')) !== 'basis') return false;
+  // Mechanism 3 — facility event under a country vintage: allocation
+  // refusal, typed topology.
+  const country = propagateEvents(s, buildGraph(s, '2017-06-15'), { asOf: '2017-06-15' });
+  if (classify(textOf(country, 'evt:g-outage')) !== 'topology') return false;
+  // Mechanism 4 — predates: every refusal is topology-typed, INCLUDING the
+  // export ban whose corridors are gross (the phase-33 wrong-attribution
+  // fix, held here as a condition rather than remembered).
+  const predates = propagateEvents(s, buildGraph(s), { asOf: '2015-01-01' });
+  if (classify(textOf(predates, 'evt:g-outage')) !== 'topology') return false;
+  if (classify(textOf(predates, 'evt:g-export')) !== 'topology') return false;
+  return true;
+}
 
 export interface DeferredDecision {
   id: string;
@@ -104,6 +168,15 @@ export const DEFERRED_DECISIONS: DeferredDecision[] = [
       description: 'no flow record mixes granularities (exactly one endpoint a country) — a facility-attributed country corridor arriving means a source now provides what the allocation model was deferred for lacking, and the deferral must be re-taken against it',
       predicate: (state) => !state.flows.some(f =>
         f.fromEntityId.startsWith('ent:country:') !== f.toEntityId.startsWith('ent:country:')),
+    },
+  },
+  {
+    id: 'typed-refusal-emission-unbuilt',
+    ledgerRef: 'Phase 33 / Phase 34 (wrong-attribution class)',
+    reason: 'The refusal queue derives each propagation refusal\'s TYPE by parsing its explanation prose (classifyRefusalExplanation) — diagnosis coupled to wording, so a reworded explanation would silently retype the queue the researcher session exports. The durable fix (each mechanism emits its type; text rendered FROM it) is deferred as a build item; the per-site !predates guard holds meanwhile.',
+    validWhile: {
+      description: 'a planted instance of every refusal mechanism, run through the real propagation pipeline, still classifies into its own bucket — a wording change that would silently retype the queue fails this predicate instead of shipping',
+      predicate: () => refusalTypeCouplingIntact(),
     },
   },
   {

@@ -92,6 +92,24 @@ function entityName(state: EconomyState, id?: string): string | undefined {
   return id ? state.entities.find(e => e.id === id)?.name ?? id : undefined;
 }
 
+/**
+ * The one place a propagation refusal's TYPE is derived from its
+ * explanation. This coupling of diagnosis to prose is a recorded hazard —
+ * a wording change in propagation.ts would silently retype the refusal
+ * queue (the wrong-attribution species, phase 33) — and it is guarded,
+ * not remembered: `typed-refusal-emission-unbuilt` in ledgerGuards runs a
+ * planted instance of every mechanism through the real pipeline and this
+ * classifier, and fires if any lands in the wrong bucket. The durable fix
+ * (mechanisms emit their type; text rendered FROM it) is the deferred
+ * build that guard exists for.
+ */
+export function classifyRefusalExplanation(text: string): 'scope' | 'topology' | 'basis' {
+  return text.includes('WITHOUT A SCOPE') ? 'scope'
+    : text.includes('FACILITY-LEVEL PROPAGATION REFUSED') ? 'topology'
+    : text.includes('REFUSED') && text.includes('corridor grade') ? 'basis'
+    : 'topology';
+}
+
 export function searchEvidence(
   state: EconomyState,
   graph: EconomyGraph,
@@ -135,10 +153,7 @@ export function searchEvidence(
     for (const i of propagateEvents(state, graph, { asOf: evalDate, knowledge }).result) {
       if (i.disruptedKtPerYear !== null) continue;
       const text = i.explanation.join(' ');
-      const type = text.includes('WITHOUT A SCOPE') ? 'scope'
-        : text.includes('FACILITY-LEVEL PROPAGATION REFUSED') ? 'topology'
-        : text.includes('REFUSED') && text.includes('corridor grade') ? 'basis'
-        : 'topology';
+      const type = classifyRefusalExplanation(text);
       push({
         kind: 'refused', type,
         entityId: i.entityId, entityName: i.entityName,
