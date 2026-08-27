@@ -1,0 +1,1 @@
+statements=32813462 antamina=1 collahuasi=0 glencore_control=53

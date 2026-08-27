@@ -1397,6 +1397,68 @@ is unchanged: unresolved records carry source identifiers (M49 codes,
 country names), not person-shaped data, and the vocabulary gate on the
 miss log is untouched.
 
+## Phase 29 — work order 3.4: OpenOwnership cannot answer the question — recorded with evidence, not assumed
+
+**Recon (2026-08-27, captures in `data-archive/openownership/2026-08-27/`).**
+The Register application is RETIRED: `register.openownership.org`
+redirects to a www.openownership.org topic page behind a Cloudflare JS
+challenge (403, "Just a moment…" page captured); the documented
+`bulk-data.openownership.org` host does not resolve (CONNECT 502). What
+remains reachable is the register's S3 bucket: full BODS statement
+exports, public, no auth — FROZEN at 2023-07-19, with per-source files
+naming the coverage set: UK PSC, Denmark CVR, Slovakia RPVS, Ukraine
+EDR. Reachability class: open-but-frozen; the live product this backlog
+slot was written against no longer exists.
+
+**The coverage measurement.** One full streaming pass over the frozen
+combined export — 32,813,462 statements, nothing stored but matches:
+- `Compañía Minera Doña Inés de Collahuasi SCM`: **zero** hits.
+- `Compañía Minera Antamina S.A.`: **zero** hits. The single substring
+  match is FANTAMINA LTD — a Bristol company incorporated 2022 whose
+  name happens to contain 'antamina' (captured verbatim): the exact
+  name-collision species item 3.3's gate exists to refuse, met in the
+  wild one item later.
+- Positive control: 53 Glencore statements — the stream and the match
+  machinery demonstrably work; the zeros are absence, not a broken scan.
+
+**Why the absence is structural, not a gap that patience fixes.** The
+four source registers record who CONTROLS their own domestic companies —
+the direction is inbound. UK PSC can say who stands behind a UK company;
+it cannot say what a UK-listed group owns abroad. A Peruvian S.A. or a
+Chilean SCM can never be a SUBJECT in any of the four, so the two JV
+vehicles are out of the source's expressible universe — a universe
+mismatch (the incommensurability species' universe axis), not sparse
+data. Recorded on the `openownership` registry entry so the next reader
+of a miss-suggested source sees the boundary, not just the category.
+
+**Criteria (pre-registered), each measured.** (1) Parents-or-recorded-
+inability: the inability branch, with the full-corpus evidence above.
+(2) `strongestAttestingClass` on the two vehicles: measured
+`structural_only`, both — unchanged, as the existing pin states. (3)
+`structuralClassProfile` re-measured: attributionEdges 44 records,
+sourcedRecords **0**; capacities 20 records, 0% sourced by tonnage. It
+stayed at 0% — that is the finding, and per the pre-registration it is
+reported as such: the structural-attribution layer still has NO
+publisher-sourced record, and the one open source ranked for it cannot
+reach the entities that matter here. (4) Two-purposes split: holds — no
+operator-of-record data was touched; nothing crossed into the purpose
+EDGAR owns (which remains operator-blocked).
+
+**Unanticipated.** Two things. The register's retirement (the phase-18
+ranking assumed a live product; the frozen 2023 vintage would have made
+even a hit a staleness-labeled import). And the direction finding: the
+recon question was "does the source COVER Peru/Chile" — the sharper
+truth is that BO registers of this shape cannot cover any foreign-held
+subsidiary as a subject, which re-scopes what "OpenOwnership coverage"
+can ever mean for a facility-ownership instrument: it serves parent
+chains only where the OPERATING vehicle itself is registered in a
+BO-register jurisdiction.
+
+**Guards moved.** None. The ownership purpose stays curated
+(`structural_only` vehicles with declared shareholder edges); no
+deferral's ground changed — the backlog slot is retired with evidence
+rather than left open as an assumption.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
