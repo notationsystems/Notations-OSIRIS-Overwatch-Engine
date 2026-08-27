@@ -644,6 +644,51 @@ exposed the class.
    bilateral rows as graph edges (country↔facility double-counting), not
    acquisition. Recorded on the backlog line.
 
+## Phase 15 — the evidence trigger fires, and identity is never self-standing
+
+1. **The extrapolation bound gets its second axis — and the basis
+   correction that motivated it.** Phase 14's two-cadence ceiling answers
+   "should a new vintage exist by now?" — a question about the CURATOR.
+   The guard needs to answer "is the old topology still true?" — a
+   question about the WORLD, and the two coincide only if vintage cadence
+   tracked structural churn, which it doesn't (it is annual because
+   curation is annual). Churn-derived bounds don't survive contact with
+   the data (six events over a decade support no rate estimate); what
+   survives is the doctrine one level deeper — check the condition, don't
+   remember a proxy for it. Elapsed time is a proxy for "something
+   probably changed"; **the event register holds the thing itself**.
+   `structuralTopologyEvidence`: curated events postdating the snapshot
+   period whose shape implies structural movement — closure, expansion,
+   scoped regulatory, sanction/insolvency, or an OPEN-ENDED high-severity
+   disruption (a disruption with a curated end is transience: the
+   structure came back). Occurrence-filtered by asOf, so a scrub before
+   the event stays uncontradicted — no future leak.
+2. **The trigger fired on its first evaluation, as predicted:**
+   `evt:grasberg-mud-rush-2025` — open-ended force majeure on Indonesian
+   concentrate, ~400 kt of deferred output — postdates the 2024 snapshot
+   and contradicts extrapolation today, roughly four months ahead of the
+   clock ceiling. That firing is the argument for the trigger. The
+   decision was re-taken, and the re-take is recorded here: extrapolation
+   CONTINUES (there is no other modeled structure) with the contradiction
+   **carried on every projection** — `TopologyValidity.structuralEvidence`
+   plus a note escalated to STRUCTURE HAS MOVED, pinned in propagation and
+   API tests — rather than nulled (the affected entity's live event
+   already carries the disruption through propagation; nulling would
+   double-count the event mechanism). The evidence axis thereby graduates
+   from a remembered assumption to a product invariant; the clock ceiling
+   remains the guard's condition, now protecting even evidence-carried
+   extrapolation from outliving a skipped vintage.
+3. **Entity provenance: the divergence resolved toward the code.** Round-1
+   prose said each identity record carries provenance; the types say
+   `Entity` deliberately does not — an entity is an IDENTITY record, and
+   evidence lives on the five record kinds that reference it (all
+   provenance-checked by `validateState`). The docs now state the model
+   precisely, and provenance totality gained its missing second half,
+   enforced by test: **every entity is attested by at least one
+   provenance-bearing record** (no orphan identities; verified with no
+   carve-outs — the commodity node included). This is the same attestation
+   rule search's knowledge coherence already applied.
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -658,7 +703,7 @@ exposed the class.
 
 ## Verification
 
-Every subsystem above ships with executable tests (160+ economy tests; 524
+Every subsystem above ships with executable tests (160+ economy tests; 526
 total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,

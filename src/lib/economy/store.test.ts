@@ -25,6 +25,24 @@ describe('economy store (curated copper assembly)', () => {
     }
   });
 
+  it('every entity is attested by at least one provenance-bearing record — identity is never self-standing', async () => {
+    // Entities are identity records and deliberately carry no provenance of
+    // their own; provenance totality holds because every EVIDENCE record
+    // (observation, flow, capacity, dependency, event) carries it, and every
+    // entity must be reachable from at least one such record. An entity
+    // nothing references would be an unattested identity — the one shape
+    // provenance totality would silently miss.
+    const { state } = await getEconomyState('copper');
+    const attested = new Set<string>();
+    for (const o of state.observations) { attested.add(o.entityId); if (o.partnerEntityId) attested.add(o.partnerEntityId); }
+    for (const f of state.flows) { attested.add(f.fromEntityId); attested.add(f.toEntityId); }
+    for (const c of state.capacities) attested.add(c.entityId);
+    for (const d of state.dependencies) { attested.add(d.fromEntityId); attested.add(d.toEntityId); }
+    for (const ev of state.events) if (ev.entityId) attested.add(ev.entityId);
+    const orphans = state.entities.filter(e => !attested.has(e.id));
+    expect(orphans.map(e => e.id)).toEqual([]);
+  });
+
   it('keeps curated records representative; reported/estimated only from live providers', async () => {
     const { state } = await getEconomyState('copper');
     const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'usgs-mcs2024-vintage', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot', 'westmetall-lme-stocks']);

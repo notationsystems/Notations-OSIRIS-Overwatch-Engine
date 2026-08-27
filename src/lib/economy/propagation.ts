@@ -128,12 +128,43 @@ export interface TopologyValidity {
    *  distance is the number that actually moves (and the number the
    *  extrapolation-bound guard watches). Present only when extrapolated. */
   extrapolationDays?: number;
+  /** First-hand evidence the structure has MOVED since the snapshot: curated
+   *  structural events postdating the topology period (and occurred by
+   *  asOf — no future leak). Elapsed time is a proxy for "something
+   *  probably changed"; the event register holds the thing itself. Present
+   *  only when extrapolated and non-empty. */
+  structuralEvidence?: Array<{ id: string; title: string; start: string; type: EconEvent['type'] }>;
   /** Human-readable statement of the mismatch; absent when within. */
   note?: string;
 }
 
 const daysBetween = (fromISO: string, toISO: string): number =>
   Math.round((Date.parse(toISO) - Date.parse(fromISO)) / 86_400_000);
+
+/**
+ * Events that are first-hand evidence of topology movement, when they
+ * postdate the snapshot period: a closure or expansion changes what exists;
+ * a scoped regulatory event rewires crossing flows; a sanction/insolvency
+ * re-routes counterparties; an OPEN-ENDED high-severity disruption is the
+ * force-majeure shape (a disruption with a curated end is transience — the
+ * structure came back). Occurrence axis (ev.start), not knowledge: under
+ * as_known_then the state is already knowledge-filtered upstream.
+ */
+export function structuralTopologyEvidence(
+  state: EconomyState,
+  periodEnd: string,
+  asOf: string,
+): NonNullable<TopologyValidity['structuralEvidence']> {
+  return state.events
+    .filter(ev => ev.start > periodEnd && ev.start <= asOf)
+    .filter(ev =>
+      ev.type === 'closure'
+      || ev.type === 'expansion'
+      || eventClassOf(ev.type) === 'financial'
+      || (eventClassOf(ev.type) === 'regulatory' && !!ev.regulatoryScope)
+      || (!ev.end && ev.severity === 'high' && DISRUPTIVE.includes(ev.type)))
+    .map(ev => ({ id: ev.id, title: ev.title, start: ev.start, type: ev.type }));
+}
 
 export function topologyValidity(state: EconomyState, asOf: string): TopologyValidity {
   if (state.flows.length === 0) {
@@ -153,10 +184,17 @@ export function topologyValidity(state: EconomyState, asOf: string): TopologyVal
     ...(status === 'predates'
       ? { note: `Flow topology describes ${start}–${end}; a ${asOf} evaluation predates it. Flow-derived tonnage is null (unknown), not zero; reach shown is structural only. Flow vintages are the recorded fix.` }
       : status === 'extrapolated'
-        ? {
-            extrapolationDays: daysBetween(end, asOf),
-            note: `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`,
-          }
+        ? (() => {
+            const evidence = structuralTopologyEvidence(state, end, asOf);
+            const base = `Flow topology describes ${start}–${end}; the ${asOf} evaluation uses it as latest-known structure, ${daysBetween(end, asOf)} days past the period.`;
+            return {
+              extrapolationDays: daysBetween(end, asOf),
+              ...(evidence.length > 0 ? { structuralEvidence: evidence } : {}),
+              note: evidence.length > 0
+                ? `${base} STRUCTURE HAS MOVED since the snapshot: ${evidence.length} post-period structural event(s) [${evidence.map(e => e.id).join(', ')}] contradict extrapolation at the affected entities — their live events already carry the disruption; the snapshot remains the only modeled structure elsewhere.`
+                : base,
+            };
+          })()
         : {}),
   };
 }

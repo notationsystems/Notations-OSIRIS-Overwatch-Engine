@@ -72,10 +72,14 @@ describe('GET /api/economy', () => {
     // Inside the flow period: no caveat to carry.
     const within = await (await economyGet(req('/api/economy?commodity=copper&view=analytics&asOf=2024-06-15'))).json();
     expect(within.topology.status).toBe('within');
-    // After it: the snapshot serves as latest-known structure, labeled.
+    // After it: the snapshot serves as latest-known structure, labeled —
+    // and the label carries the first-hand evidence that structure has
+    // moved where the register holds it (the projection is where a
+    // researcher would otherwise read extrapolation as uncontradicted).
     const later = await (await economyGet(req('/api/economy?commodity=copper&view=analytics&asOf=2026-08-01'))).json();
     expect(later.topology.status).toBe('extrapolated');
     expect(later.topology.note).toContain('latest-known structure');
+    expect(later.topology.structuralEvidence.map((e: { id: string }) => e.id)).toContain('evt:grasberg-mud-rush-2025');
   });
 
   it('serves the timeline view with a playback range and dated events', async () => {

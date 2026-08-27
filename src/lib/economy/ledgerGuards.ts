@@ -112,10 +112,10 @@ export const DEFERRED_DECISIONS: DeferredDecision[] = [
   },
   {
     id: 'forward-extrapolation-defensible',
-    ledgerRef: 'Phase 13 §1',
-    reason: 'The topology guard is asymmetric: forward extrapolation keeps figures because the snapshot is the latest claim under the standard selection rule. That is defensible while the snapshot is recent enough that no expected successor vintage has been skipped; the distance is quantified (TopologyValidity.extrapolationDays), and the bound is two annual cadences.',
+    ledgerRef: 'Phase 13 §1 / Phase 15',
+    reason: 'Forward extrapolation keeps figures because the snapshot is the latest claim under the standard selection rule. Two axes bound that: a CLOCK ceiling (two annual cadences answers "should a new vintage exist by now?" — a question about the curator) and an EVIDENCE trigger ("is the old topology still true?" — a question about the world; elapsed time is a proxy, the event register holds the thing itself). The evidence trigger FIRED on its first evaluation — evt:grasberg-mud-rush-2025, open-ended force majeure postdating the snapshot, four months ahead of the clock — and the decision was re-taken (Phase 15): extrapolation continues as the only modeled structure, with the contradiction CARRIED on every projection (TopologyValidity.structuralEvidence + escalated note), so the evidence axis is enforced in the product and pinned in propagation tests, not remembered here. The clock ceiling remains this guard\'s condition.',
     validWhile: {
-      description: `extrapolation distance stays under ${EXTRAPOLATION_BOUND_DAYS} days (two annual snapshot cadences) — beyond it, at least one expected vintage has been skipped and "latest-known structure" must be re-argued or the vintage refreshed`,
+      description: `extrapolation distance stays under ${EXTRAPOLATION_BOUND_DAYS} days (two annual snapshot cadences) — beyond it, at least one expected vintage has been skipped and even evidence-carried extrapolation must be re-argued or the vintage refreshed`,
       predicate: (state, now) => {
         const v = topologyValidity(state, now);
         return v.status !== 'extrapolated' || (v.extrapolationDays ?? 0) < EXTRAPOLATION_BOUND_DAYS;

@@ -174,6 +174,27 @@ describe('topology validity (what WAS vs what was KNOWN)', () => {
     expect(ahead.note).toContain('604 days past the period');
   });
 
+  it('the evidence trigger fires on the real register: Grasberg force majeure contradicts extrapolation today', async () => {
+    // Elapsed time is a proxy for "something probably changed"; the event
+    // register holds the thing itself. The open-ended Sep-2025 mud rush
+    // postdates the 2024 snapshot — first-hand evidence the Indonesian
+    // concentrate topology moved, months ahead of the clock ceiling.
+    const { state } = await getEconomyState('copper');
+    const now = topologyValidity(state, '2026-08-27');
+    expect(now.status).toBe('extrapolated');
+    expect(now.structuralEvidence!.map(e => e.id)).toContain('evt:grasberg-mud-rush-2025');
+    expect(now.note).toContain('STRUCTURE HAS MOVED');
+    // Transience is not movement: Kakula's disruption has a curated end —
+    // the structure came back, so it never appears as evidence.
+    expect(now.structuralEvidence!.map(e => e.id)).not.toContain('evt:kakula-seismic-2025');
+    // No future leak: scrubbed to mid-2025, the mud rush has not happened
+    // yet — extrapolation is uncontradicted at that date.
+    const before = topologyValidity(state, '2025-08-01');
+    expect(before.status).toBe('extrapolated');
+    expect(before.structuralEvidence).toBeUndefined();
+    expect(before.note).not.toContain('STRUCTURE HAS MOVED');
+  });
+
   it('an extrapolated evaluation keeps its figures and carries the label', () => {
     const s = syntheticState();
     s.events.push({
