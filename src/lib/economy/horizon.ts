@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Information horizon: what the corpus can know, and when.
+ * Payload — Information horizon: what the corpus can know, and when.
  *
  * Alert lead time has a hard ceiling set by the sources, and that ceiling is
  * computable WITHOUT a detector: for every source, the distribution of
@@ -317,7 +317,7 @@ export function informationHorizons(state: EconomyState): AnalyticalResult<{
 
   return {
     operation: { name: 'informationHorizons', params: { commodity: state.commodity } },
-    execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+    execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
     inputs: { observationIds: usedObs },
     result: { sources, events },
   };

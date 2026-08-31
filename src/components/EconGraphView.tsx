@@ -7,7 +7,7 @@ import { graphLinkTreatment } from '@/lib/economy/mapStyle';
 import { X, Network } from 'lucide-react';
 
 /**
- * OSIRIS — Flow graph explorer.
+ * Payload — Flow graph explorer.
  *
  * A force-directed projection of the engine's flow/dependency graph
  * (`/api/economy?view=graph`). Directional particles animate along material

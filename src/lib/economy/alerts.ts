@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Alert derivation with suppression memory and retraction.
+ * Payload — Alert derivation with suppression memory and retraction.
  *
  * This system has already produced two findings that would have fired as
  * alerts and were wrong — a 10.3σ splice artifact and a 75% "suppression"
@@ -200,7 +200,7 @@ export function generateAlerts(run: EngineRun): Alert[] {
   const alertableEventTypes: EconEvent['type'][] = [...DISRUPTIVE_EVENT_TYPES, 'demand_surge'];
   for (const ev of state.events) {
     if (!ev.entityId || !alertableEventTypes.includes(ev.type)) continue;
-    if (ev.provenance.sourceId === 'osiris-scenario') continue; // hypotheticals never alert
+    if (ev.provenance.sourceId === 'payload-scenario') continue; // hypotheticals never alert
     const reportedAt = ev.firstReportedAt ?? ev.start;
     if (reportedAt > asOf) continue; // not yet knowable at this evaluation date
     alerts.push({

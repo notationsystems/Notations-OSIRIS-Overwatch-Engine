@@ -3110,3 +3110,66 @@ is genuinely shared.
   radar, satellites, cctv, aircraft, flights, gdelt, cyber-*) are
   classified `general-purpose` and still served. Retiring them behind a
   flag, and out of the alert feeds, is A-1 and is not done here.
+
+
+## Phase 47 — the rename, as its own commit
+
+A-0d deliberately deferred the in-code rename: *comment headers updated as
+files are touched, not in a sweep — a rename commit that touches 200 files
+hides the real changes.* The operator then asked for the branding to reflect
+**Payload Terminal V0** across the project, which supersedes that caution.
+The reconciliation is that the sweep happens, and it happens **alone** —
+after A-0 and A-3 were committed and pushed, so nothing substantive hides
+inside it.
+
+**What the sweep found that the A-0 gate had missed.** `src/app/layout.tsx`
+carries the shipped page metadata, and it advertised the prohibited
+capabilities harder than the README ever did: `nmap online`,
+`port scanner online`, `penetration testing tools`, `palantir alternative`
+as SEO keywords, and *"Nmap port scanning from the browser — no install
+required"* as the **first entry** in the schema.org `featureList`. That is
+what a search engine indexes and what a link preview renders — more public
+than the README, not less.
+
+It survived A-0 because the shipped-description gate read `README.md` and
+nothing else. **A gate on "the shipped description" that checks one artifact
+is the same defect it was written to catch** — narrower than it appears,
+with nothing failing. The gate now covers `layout.tsx` too, and asserts the
+scanning keywords are absent by name.
+
+### What was renamed, and what deliberately was not
+
+Renamed: `OsirisMap.tsx` → `PayloadMap.tsx`; `osirisTheme`/`OsirisTheme`;
+`osirisWatchFlight`; the CSS tokens (`osiris-glow`, `osiris-pulse`,
+`osiris-scan`, `osiris-rotate`, layer ids); `public/osiris-icon.png`;
+`package.json` name; the web manifests; the CasaOS store metadata; the
+`OSIRIS —` comment headers; and two more outbound identity strings found
+only by the sweep — `OsirisIntelPlatform/1.0` on the region-dossier route,
+and `ingestOsirisData` in the SDK client.
+
+**Not renamed, each for a reason:**
+
+- `OSIRIS_PORT`, `OSIRIS_DISABLE_LIVE`, `OSIRIS_TELEGRAM_CHANNELS` in
+  `envCompat.ts` and its test — those literal strings ARE the compatibility
+  layer. Renaming them would delete the landing strip the rename needs.
+- This ledger. It is the historical record: renaming OSIRIS out of the
+  phases that describe the OSIRIS era would falsify it.
+- `notations-osiris-overwatch-engine` in repository URLs. The GitHub
+  repository genuinely still carries that name; rewriting the URL would
+  break the link rather than rename anything.
+- `src/data/economy/snapshots/`. The sweep initially rewrote
+  `comtrade-da.json` and the archive-manifest test failed on a byte count —
+  **2298 where 2278 was pinned.** Archived evidence is immutable by
+  construction and a branding pass is not an exception to that; the
+  snapshots were restored. The hash pin caught it immediately, which is the
+  pin doing precisely its job.
+
+Curated dataset `sourceName` strings WERE updated (`OSIRIS curated
+aluminium dataset` → `Payload Terminal curated aluminium dataset`) while
+every `sourceId` was left alone. That is the right split: identifiers stay
+stable so supersession chains and manifests keep resolving, display names
+follow the instrument that produced them.
+
+**719 tests green, typecheck clean, production build compiles.** The four
+Turbopack warnings are pre-existing dynamic `node:fs` imports, verified
+against a stashed baseline rather than assumed.

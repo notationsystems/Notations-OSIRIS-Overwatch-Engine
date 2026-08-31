@@ -40,7 +40,7 @@ block as the tag.
 ## 3. Stand up a reachable instance
 
 ```bash
-docker run -d -p 3000:3000 --name sea-dog ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest
+docker run -d -p 3000:3000 --name sea-dog ghcr.io/notationsystems/sea-dog-payload-terminal-v0:latest
 ```
 
 That is the whole deployment: the image is built and published by CI on

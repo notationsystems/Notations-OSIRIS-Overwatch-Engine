@@ -29,7 +29,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
       .join(',');
     if (layerKeys) params.set('layers', layerKeys);
 
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://osiris.vercel.app';
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://payload.vercel.app';
     return `${base}/?${params.toString()}`;
   }, [mapView, activeLayers, mouseCoords]);
 
@@ -83,7 +83,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto osiris-glow z-[300]"
+            className="absolute top-12 right-0 w-72 glass-panel p-4 pointer-events-auto payload-glow z-[300]"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
             {/* Quick Share */}
             <div className="flex gap-2">
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏛️ OSIRIS — Global Intelligence Dashboard')}&url=${encodeURIComponent(generateShareUrl())}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('🏛️ Payload — Global Intelligence Dashboard')}&url=${encodeURIComponent(generateShareUrl())}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#1DA1F2] hover:text-[#1DA1F2] transition-colors"
               >
@@ -145,7 +145,7 @@ export default function SharePanel({ mapView, activeLayers, mouseCoords }: Share
                 IN SHARE
               </a>
               <a
-                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('OSIRIS — Open Source Global Intelligence Platform')}`}
+                href={`https://reddit.com/submit?url=${encodeURIComponent(generateShareUrl())}&title=${encodeURIComponent('Payload — Open Source Global Intelligence Platform')}`}
                 target="_blank"
                 className="flex-1 text-center py-1.5 rounded text-[9px] font-mono tracking-wider text-[var(--text-muted)] border border-[var(--border-primary)] hover:border-[#FF4500] hover:text-[#FF4500] transition-colors"
               >

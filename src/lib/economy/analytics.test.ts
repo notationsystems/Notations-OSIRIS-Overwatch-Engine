@@ -17,7 +17,7 @@ describe('concentration (synthetic, hand-computable)', () => {
     // Traceability: exactly the two country observations were used.
     expect(r.inputs.observationIds?.sort()).toEqual(['obs:prod:aa', 'obs:prod:bb']);
     expect(r.operation.name).toBe('concentration');
-    expect(r.execution.engine).toContain('osiris-economy-analytics');
+    expect(r.execution.engine).toContain('payload-economy-analytics');
   });
 
   it('never mixes entity kinds in one calculation', () => {

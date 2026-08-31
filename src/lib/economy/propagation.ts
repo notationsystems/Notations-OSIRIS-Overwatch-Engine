@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Event propagation system.
+ * Payload — Event propagation system.
  *
  * The engine loop the platform is built around:
  *
@@ -596,7 +596,7 @@ export function propagateEvents(
         topologyPeriod: validity.topologyPeriod ? `${validity.topologyPeriod.start}..${validity.topologyPeriod.end}` : undefined,
       },
     },
-    execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+    execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
     inputs: {
       flowIds: [...new Set(impacts.flatMap(i => i.flowIds))],
       capacityIds: [...new Set(impacts.flatMap(i => i.capacityIds))],

@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Live acquisition adapters for the physical economy.
+ * Payload — Live acquisition adapters for the physical economy.
  *
  * Four providers, each behind the same degradation ladder:
  *
@@ -42,7 +42,7 @@ import { withHostRateLimit } from './outboundRate';
 import { processSingleton } from './processSingleton';
 import { readEnvWithLegacy } from './envCompat';
 
-const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
+const UA = 'Payload Terminal-Overwatch/0.1 (internal research instrument)';
 
 function liveDisabled(): boolean {
   // VITEST is set by the vitest runner regardless of NODE_ENV; NODE_ENV alone
@@ -102,7 +102,7 @@ function withSnapshotFallback(
 const MCS_ITEM_ID = '6798fd34d34ea8c18376e8ee';
 const MCS_ITEM_URL = `https://www.sciencebase.gov/catalog/item/${MCS_ITEM_ID}?format=json&fields=files`;
 
-/** MCS COUNTRY column → OSIRIS country entity. Names carry stray spaces. */
+/** MCS COUNTRY column → Payload Terminal country entity. Names carry stray spaces. */
 const MCS_COUNTRY_MAP: Record<string, string> = {
   'United States': 'ent:country:us',
   'Australia': 'ent:country:au',
@@ -518,12 +518,12 @@ interface ComtradeResponse { data?: ComtradeRow[] }
  *   1. knownAt is real, not a retrieval-time fallback: each (reporter,
  *      period) dataset carries firstReleased and lastReleased.
  *   2. Comtrade keeps ONE version of a dataset — revisions overwrite in
- *      place with no archive of prior versions. The figure OSIRIS holds is
+ *      place with no archive of prior versions. The figure Payload Terminal holds is
  *      therefore the lastReleased version, and is stamped with THAT date:
  *      as_known_then earlier than lastReleased is honestly blind for this
  *      value, because the vintage that WAS knowable then no longer exists
  *      anywhere (both Chile years have already been revised in place).
- *      This is also why the archival rung below exists: OSIRIS's own
+ *      This is also why the archival rung below exists: Payload Terminal's own
  *      snapshots are the only Comtrade vintage archive there will ever be.
  */
 interface ComtradeDaRow { reporterCode: number; period: number; firstReleased: string; lastReleased: string }
@@ -687,7 +687,7 @@ export function parseComtradeResponse(
     basis: hs === '2603' ? 'gross_weight' : 'metal_content',
     period: { start: `${yearStr}-01-01`, end: `${yearStr}-12-31` },
     ...(knownAt ? { knownAt } : {}),
-    // A world total OSIRIS computed by summing partner rows is inference,
+    // A world total Payload Terminal computed by summing partner rows is inference,
     // not the reporter's own aggregate — the identity charter says so.
     valueKind: derivedFromPartners ? 'derived' : 'reported',
     confidence: estimated ? 'medium' : 'high',

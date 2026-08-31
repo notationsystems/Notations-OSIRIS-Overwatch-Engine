@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Canonical Physical-Economy State
+ * Payload — Canonical Physical-Economy State
  *
  * Identity discipline (do not blur these):
  *  - Entity       persistent real-world object (mine, smelter, port, country…)
@@ -22,7 +22,7 @@ export interface Provenance {
   sourceId: string;
   sourceName: string;
   sourceUrl?: string;
-  /** When OSIRIS acquired the value (ISO 8601). */
+  /** When Payload Terminal acquired the value (ISO 8601). */
   retrievedAt: string;
   /** Locator within the source: table, page, series id. */
   sourceRef?: string;

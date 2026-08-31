@@ -10,7 +10,7 @@ import type { AnalyticalResult, EconomyState } from '@/lib/economy/types';
 import { toKtPerYear } from '@/lib/economy/types';
 
 /**
- * OSIRIS — Physical-economy engine API.
+ * Payload — Physical-economy engine API.
  *
  *   GET /api/economy?commodity=copper&view=map[&asOf=YYYY-MM-DD]
  *       map-ready entities+flows; with asOf, event-disruption flags are

@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Evidence-layer search: the last item of the search arc.
+ * Payload — Evidence-layer search: the last item of the search arc.
  *
  * Search finds entities; this finds the EPISTEMIC STATE — the places where
  * the system refused to answer, where observers disagree, where evidence has

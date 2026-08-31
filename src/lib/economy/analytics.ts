@@ -1,5 +1,5 @@
 /**
- * OSIRIS — First analytical layer over the canonical economy state.
+ * Payload — First analytical layer over the canonical economy state.
  *
  * Deliberately small and interpretable: HHI concentration, flow centrality,
  * candidate bottleneck scoring, and simple anomaly primitives. Every result
@@ -18,7 +18,7 @@ export function knownAtOf(o: Observation): string {
   return o.knownAt ?? o.provenance.retrievedAt.slice(0, 10);
 }
 
-const ENGINE = 'osiris-economy-analytics/0.1';
+const ENGINE = 'payload-economy-analytics/0.1';
 
 function wrap<T>(
   name: string,
@@ -197,7 +197,7 @@ export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structu
 /**
  * The STRONGEST evidence class attesting each entity's existence — the
  * identity-level sibling of per-record valueKind. An entity whose best
- * attesting class is 'representative' (or below) exists, within OSIRIS,
+ * attesting class is 'representative' (or below) exists, within Payload Terminal,
  * purely on curation: a real name carried entirely by synthetic-class
  * numbers, which is the round-3 concern one level up, at identity rather
  * than quantity. (Strongest, not weakest, is the right aggregate here —

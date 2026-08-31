@@ -3,9 +3,9 @@ import zlib from 'zlib';
 import type { Readable } from 'stream';
 
 /**
- * OSIRIS — JSON fetch over Node's https client.
+ * Payload — JSON fetch over Node's https client.
  *
- * Some upstreams OSIRIS depends on cannot be reached with the bundled undici
+ * Some upstreams Payload Terminal depends on cannot be reached with the bundled undici
  * `fetch` from the Next server runtime — it stalls and throws
  * UND_ERR_CONNECT_TIMEOUT after 10s, while `https.get` to the same URL returns
  * in a few hundred ms. This helper is the shared escape hatch.

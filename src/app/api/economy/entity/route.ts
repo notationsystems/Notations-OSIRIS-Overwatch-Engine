@@ -6,7 +6,7 @@ import { recordEntityInspected } from '@/lib/economy/sessionTelemetry';
 import { isMachineClient } from '@/lib/economy/machineClient';
 
 /**
- * OSIRIS — Entity inspector endpoint.
+ * Payload — Entity inspector endpoint.
  *
  *   GET /api/economy/entity?commodity=copper&id=ent:mine:escondida
  *

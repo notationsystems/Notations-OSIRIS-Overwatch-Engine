@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import ErrorBoundary from '@/components/ErrorBoundary';
 import "./globals.css";
 
-const SITE_URL = "https://osirisai.live";
-const SITE_NAME = "OSIRIS";
-const SITE_TITLE = "OSIRIS — Open Source Intelligence Platform | Live Flight Tracking, CCTV, OSINT Tools & More";
-const SITE_DESCRIPTION = "The open-source Palantir alternative. Track 10,000+ aircraft, 2,000 satellites, and worldwide CCTV cameras in real-time on a 3D globe. Run Nmap scans, DNS lookups, WHOIS queries, SSL cert analysis & threat intelligence — all from your browser. 20+ live data feeds including earthquakes, wildfires, nuclear facilities, cyber threats, and global conflicts. Free & open source.";
+const SITE_URL = "https://payload-terminal.app";
+const SITE_NAME = "Payload Terminal";
+const SITE_TITLE = "Payload Terminal — Freight & Physical-Commerce Operating System";
+const SITE_DESCRIPTION = "A provenance-preserving instrument for freight and physical commerce. Loads, lanes, carriers, commitments and outcomes, where every figure carries its source, its basis and the date it became knowable — and an unanswerable question returns a typed refusal with a remedy rather than a zero. Commodity and freight verticals on one canonical world state, with as-known-then playback for bid post-mortems.";
 
 export const viewport: Viewport = {
   themeColor: "#D4AF37",
@@ -19,44 +19,27 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: "%s | OSIRIS Intelligence",
+    template: "%s | Payload Terminal",
   },
   description: SITE_DESCRIPTION,
   keywords: [
-    // OSINT Tools - Primary focus
-    "OSINT tools", "free OSINT tools", "online OSINT toolkit", "OSINT framework",
-    "nmap online", "nmap scanner online", "free nmap scan", "port scanner online",
-    "DNS lookup tool", "WHOIS lookup", "reverse DNS", "DNS records",
-    "SSL certificate checker", "certificate transparency", "cert lookup",
-    "BGP routing lookup", "ASN lookup", "IP geolocation",
-    "threat intelligence", "threat intel lookup", "IP reputation check",
-    "network reconnaissance", "recon tools", "penetration testing tools",
-    "cybersecurity tools", "infosec tools", "security scanner",
-    "linux OSINT tools", "kali linux tools online", "OSINT browser tools",
-    
-    // Intelligence Platform
-    "OSINT", "open source intelligence", "intelligence platform", "global intelligence",
-    "geospatial intelligence", "GEOINT", "SIGINT", "real-time tracking",
-    "palantir alternative", "open source palantir", "intelligence dashboard",
-    
-    // Tracking & Data
-    "flight tracker", "aircraft tracking", "ADS-B tracker", "live flight radar",
-    "satellite tracking", "ISS tracker", "space station tracker",
-    "CCTV cameras live", "security cameras worldwide", "live cameras",
-    "earthquake monitor", "seismic activity", "USGS earthquake",
-    "wildfire tracker", "NASA FIRMS", "active fires",
-    "nuclear facilities map", "nuclear power plants",
-    "severe weather alerts", "weather radar",
-    "cyber threats dashboard", "CVE tracker",
-    "space weather", "solar storm", "GPS jamming",
-    "defense stocks", "commodities tracker",
-    
+    // What this instrument is for
+    "freight operating system", "supply chain operating system", "physical commerce",
+    "load management", "lane analytics", "carrier vetting", "freight brokerage software",
+    "landed cost", "truck-legal routing", "transit time variance", "appointment slippage",
+    "bill of lading reconciliation", "double brokering detection",
+
+    // The discipline
+    "data provenance", "knownAt", "as-known-then replay", "typed refusals",
+    "measurement basis", "coverage annotation", "append-only ledger",
+    "commodity intelligence", "supply chain concentration", "HHI concentration",
+
     // Brand
-    "osiris", "osirisai", "osirisai.live",
+    "payload", "payload terminal",
   ],
-  authors: [{ name: "Osiris Project", url: SITE_URL }],
-  creator: "Osiris Project",
-  publisher: "Osiris Project",
+  authors: [{ name: "Notation Systems", url: SITE_URL }],
+  creator: "Notation Systems",
+  publisher: "Notation Systems",
   robots: {
     index: true,
     follow: true,
@@ -91,8 +74,8 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "OSIRIS — The Open-Source Palantir Alternative | Live Flights, CCTV, Satellites & OSINT Tools",
-    description: "Track 10K+ aircraft, 2K satellites & worldwide CCTV on a 3D globe. Run Nmap, DNS, WHOIS & threat intel scans from your browser. 20+ live intelligence feeds. Free. Open source.",
+    title: "Payload Terminal — Freight & Physical-Commerce Operating System",
+    description: "Loads, lanes, carriers and commitments on a provenance-preserving world state. Every figure carries its source, its basis and the date it became knowable.",
     type: "website",
     siteName: SITE_NAME,
     locale: "en_US",
@@ -102,25 +85,23 @@ export const metadata: Metadata = {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "OSIRIS — Open Source Intelligence Platform with Live Tracking & OSINT Tools",
+        alt: "Payload Terminal — freight and physical-commerce operating system",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "🛰️ OSIRIS — Open Source Palantir Alternative | Live Tracking + OSINT Tools",
-    description: "Track 10K+ flights, satellites & CCTV worldwide. Run Nmap, DNS, WHOIS scans from your browser. 20+ live intel feeds. Free & open source.",
-    creator: "@simplifaisoul",
-    site: "@simplifaisoul",
+    title: "Payload Terminal — Freight & Physical-Commerce Operating System",
+    description: "A freight instrument that refuses to guess: provenance on every claim, and a typed refusal where a number would be a fabrication.",
     images: [`${SITE_URL}/og-image.png`],
   },
   category: "technology",
-  classification: "Intelligence & Security",
+  classification: "Logistics & Supply Chain",
   other: {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "OSIRIS",
+    "apple-mobile-web-app-title": "Payload",
     "mobile-web-app-capable": "yes",
     "msapplication-TileColor": "#06060C",
     "msapplication-config": "none",
@@ -131,11 +112,11 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "OSIRIS — OSINT Toolkit & Intelligence Platform",
-  alternateName: ["OSIRIS", "OsirisAI", "Osiris OSINT"],
+  name: "Payload Terminal — Freight & Physical-Commerce Operating System",
+  alternateName: ["Payload", "Payload Terminal", "Payload Supply Chain Management"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
-  applicationCategory: "SecurityApplication",
+  applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
   browserRequirements: "Requires a modern web browser",
   offers: {
@@ -145,31 +126,25 @@ const jsonLd = {
     availability: "https://schema.org/InStock",
   },
   featureList: [
-    "Nmap port scanning from the browser — no install required",
-    "DNS record lookup (A, AAAA, MX, NS, TXT, CNAME)",
-    "WHOIS domain registration lookup",
-    "SSL/TLS certificate transparency search",
-    "BGP routing & ASN lookup",
-    "IP geolocation & threat intelligence",
-    "Real-time flight tracking (10,000+ aircraft via ADS-B)",
-    "Satellite tracking (2,000+ objects including ISS)",
-    "Worldwide CCTV camera monitoring (1,400+ feeds)",
-    "Earthquake monitoring (USGS live feed)",
-    "Wildfire detection (NASA FIRMS satellite data)",
-    "Nuclear facility mapping (worldwide)",
-    "Severe weather alerts & tracking",
-    "Cyber threat & CVE intelligence",
-    "Space weather & solar storm monitoring",
-    "GPS jamming detection",
-    "Defense & commodity market tracking",
-    "SIGINT news aggregation feed",
-    "Interactive 3D globe with day/night cycle",
-    "Region intelligence dossier reports",
+    "Append-only freight book with supersession, never in-place edits",
+    "Lane residuals by carrier, lane and season, with a minimum-trials floor",
+    "Three-state carrier vetting — cleared, blocked, and undetermined",
+    "Exception queue where the tender and the bill of lading disagree",
+    "Landed cost that refuses rather than defaulting a missing component",
+    "Truck-legal mileage, with legality derived from the profile supplied",
+    "Facility resolution that surfaces suspected duplicates and never merges them",
+    "Provenance on every claim: source, method, and knownAt",
+    "As-known-then playback — what did we know when we priced it",
+    "Typed refusals carrying remedies, as a work queue",
+    "Coverage annotation travelling with every index",
+    "Commodity concentration, flow centrality and candidate bottlenecks",
+    "Divergence records where two sources disagree about one quantity",
+    "Counterparty sanctions screening for organisations, vessels and aircraft",
   ],
   screenshot: `${SITE_URL}/og-image.png`,
   author: {
     "@type": "Organization",
-    name: "Osiris Project",
+    name: "Notation Systems",
     url: SITE_URL,
   },
 };
@@ -198,7 +173,7 @@ export default function RootLayout({
 
       </head>
       <body className="antialiased">
-        <ErrorBoundary name="OSIRIS Core">
+        <ErrorBoundary name="Payload Terminal">
           {children}
         </ErrorBoundary>
       </body>

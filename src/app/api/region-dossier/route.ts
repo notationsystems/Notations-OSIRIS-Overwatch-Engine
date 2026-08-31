@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Region Dossier API
+ * Payload — Region Dossier API
  * Provides country intelligence for any coordinate (right-click on map)
  * Fix #115: Steps 2-4 now run in parallel via Promise.allSettled
  */
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=5&addressdetails=1`,
       {
         signal: AbortSignal.timeout(8000),
-        headers: { 'User-Agent': 'OsirisIntelPlatform/1.0' },
+        headers: { 'User-Agent': 'Payload/1.0' },
       }
     );
 
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
               thumbnail: wiki.thumbnail?.source,
             };
           }
-        } catch (e) { console.warn('[OSIRIS] Wikipedia fetch error:', e instanceof Error ? e.message : e); }
+        } catch (e) { console.warn('[Payload Terminal] Wikipedia fetch error:', e instanceof Error ? e.message : e); }
         return null;
       })(),
 
@@ -101,14 +101,14 @@ export async function GET(request: Request) {
             `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`,
             {
               signal: AbortSignal.timeout(6000),
-              headers: { 'User-Agent': 'OsirisIntelPlatform/1.0', 'Accept': 'application/json' },
+              headers: { 'User-Agent': 'Payload/1.0', 'Accept': 'application/json' },
             }
           );
           if (res.ok) {
             const wd = await res.json();
             return wd.results?.bindings?.[0] || null;
           }
-        } catch (e) { console.warn('[OSIRIS] Wikidata fetch error:', e instanceof Error ? e.message : e); }
+        } catch (e) { console.warn('[Payload Terminal] Wikidata fetch error:', e instanceof Error ? e.message : e); }
         return null;
       })(),
     ]);

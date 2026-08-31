@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Divergence analysis: disagreement as evidence.
+ * Payload — Divergence analysis: disagreement as evidence.
  *
  * Series resolution (analytics.ts) collapses same-period multi-provider
  * observations to the hardest evidence, which is correct for computing state
@@ -291,7 +291,7 @@ export function detectDivergences(state: EconomyState): AnalyticalResult<Diverge
 
   return {
     operation: { name: 'detectDivergences', params: { minRelativeSpread: MIN_RELATIVE_SPREAD } },
-    execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+    execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
     inputs: { observationIds: [...usedObs] },
     result: records,
   };

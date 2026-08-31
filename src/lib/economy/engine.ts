@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Economy engine core.
+ * Payload — Economy engine core.
  *
  * Storm-engine-inspired lifecycle, adapted to an analytical world-state
  * engine rather than a frame-loop game engine:
@@ -45,7 +45,7 @@ export interface SystemContext {
   /**
    * Counterfactual injection: hypothetical events evaluated as if they had
    * occurred. The run's frame is marked 'counterfactual' and every injected
-   * event is branded (evt:scenario:* id, osiris-scenario provenance) so a
+   * event is branded (evt:scenario:* id, payload-scenario provenance) so a
    * hypothetical can never be read back as a reconstruction.
    */
   scenario?: ScenarioSpec;
@@ -104,7 +104,7 @@ const SYSTEMS: EconomySystem[] = [
       // Compound projection of several concentration operations; each inner
       // result keeps its own operation/execution/evidence identity.
       operation: { name: 'concentration-suite', params: { asOf: ctx.asOf, knowledge: ctx.knowledge } },
-      execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+      execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
       inputs: {},
       result: {
         mineProductionByCountry: concentration(state, 'production', 'country', ctx.asOf),
@@ -149,7 +149,7 @@ const SYSTEMS: EconomySystem[] = [
     describes: 'Facility-model coverage: rolled-up facilities vs direct country observations, per metric',
     run: (state, _graph, ctx) => ({
       operation: { name: 'coverage-suite', params: { asOf: ctx.asOf } },
-      execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+      execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
       inputs: {},
       result: {
         mineProduction: facilityCoverage(state, 'production', ['mine'], ctx.asOf),
@@ -244,8 +244,8 @@ function injectScenario(state: EconomyState, scenario: ScenarioSpec): { state: E
       firstReportedAt: ev.start,
       description: `[COUNTERFACTUAL — scenario "${scenario.label}"] ${ev.description ?? ''}`.trim(),
       provenance: {
-        sourceId: 'osiris-scenario',
-        sourceName: `OSIRIS scenario injection: ${scenario.label}`,
+        sourceId: 'payload-scenario',
+        sourceName: `Payload Terminal scenario injection: ${scenario.label}`,
         retrievedAt: new Date().toISOString(),
         note: 'Hypothetical event — not an observation of the world.',
       },

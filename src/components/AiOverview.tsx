@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader2, RefreshCw, X } from 'lucide-react';
 
 /**
- * OSIRIS — One-Click AI Overview
+ * Payload — One-Click AI Overview
  * Drop-in button that generates an intelligence read-out for whatever
  * data payload it's handed. Posts to /api/ai/overview which works with
  * or without a Gemini key (heuristic analyst fallback), so it always
@@ -86,7 +86,7 @@ export default function AiOverview({ mode, payload, accent = '#7C4DFF' }: AiOver
               {/* Header row */}
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-mono tracking-widest text-[9px]" style={{ color: accent }}>
-                  {result ? `OSIRIS ${result.generatedBy === 'gemini' ? 'AI' : 'ANALYST'}` : 'OSIRIS ANALYST'}
+                  {result ? `Payload Terminal ${result.generatedBy === 'gemini' ? 'AI' : 'ANALYST'}` : 'Payload Terminal ANALYST'}
                 </span>
                 <div className="flex items-center gap-2">
                   <button onClick={generate} disabled={loading} className="hover:opacity-70 transition-opacity" title="Regenerate">

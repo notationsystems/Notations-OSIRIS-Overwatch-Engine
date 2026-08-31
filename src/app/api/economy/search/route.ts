@@ -10,7 +10,7 @@ import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
 
 /**
- * OSIRIS — Entity search: find "Escondida" from the search bar.
+ * Payload — Entity search: find "Escondida" from the search bar.
  *
  *   GET /api/economy/search?q=escondida[&commodity=copper]
  *
@@ -39,7 +39,7 @@ interface SearchHit {
   headline?: string;
   /** Strongest evidence class attesting the entity's existence — the
    *  identity-level sibling of valueKind. 'representative' or below means
-   *  the entity exists, within OSIRIS, purely on curation. */
+   *  the entity exists, within Payload Terminal, purely on curation. */
   attestation?: AttestationKind;
 }
 

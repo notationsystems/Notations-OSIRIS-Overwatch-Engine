@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Mountain, X, ChevronLeft, ChevronDown, ChevronRight, Crosshair, AlertTriangle, Activity, Database, Network } from 'lucide-react';
 
 /**
- * OSIRIS — Physical Economy research panel (phase 1: copper).
+ * Payload — Physical Economy research panel (phase 1: copper).
  *
  * A projection of the canonical economy state served by /api/economy — the
  * panel holds no truth of its own. Overview mode shows concentration,
@@ -518,7 +518,7 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                             </div>
                           ))}
                           <div className="text-[8px] font-mono text-[var(--text-muted)] mt-0.5">
-                            evidence: {(block.inputs.observationIds ?? block.inputs.capacityIds ?? []).length} records · derived by OSIRIS analytics
+                            evidence: {(block.inputs.observationIds ?? block.inputs.capacityIds ?? []).length} records · derived by Payload Terminal analytics
                           </div>
                         </div>
                       )}

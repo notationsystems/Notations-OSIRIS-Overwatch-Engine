@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Quantity-basis normalization.
+ * Payload — Quantity-basis normalization.
  *
  * Contained metal and gross shipped weight differ by the ore grade (~4x for
  * copper concentrate). Two failure modes bracket the handling of that fact:

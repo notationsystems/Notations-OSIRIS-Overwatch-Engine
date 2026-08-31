@@ -52,7 +52,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'SDK',
-    fullLabel: 'OSIRIS SDK',
+    fullLabel: 'Payload Terminal SDK',
     icon: Network,
     layers: [
       { key: 'sdk_sea', label: 'Maritime Lines', dataKey: 'sdk_entities' },

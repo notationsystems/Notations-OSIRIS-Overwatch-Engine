@@ -5,7 +5,7 @@ import { cachedSource } from '@/lib/sourceCache';
 export const maxDuration = 20;
 
 /**
- * OSIRIS — Location search for the route planner.
+ * Payload — Location search for the route planner.
  *
  * Nominatim alone was the problem: it is a *geocoder*, not a type-ahead index,
  * so it needs near-complete input. Measured side by side, "eiffel tow" returns
@@ -188,7 +188,7 @@ export async function GET(request: Request) {
       { headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1800' } },
     );
   } catch (error) {
-    console.error('[OSIRIS] Geosearch error:', error);
+    console.error('[Payload Terminal] Geosearch error:', error);
     return NextResponse.json({ results: [], error: 'Search failed' }, { status: 500 });
   }
 }

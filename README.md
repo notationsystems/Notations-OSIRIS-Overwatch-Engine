@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⬡ Payload
+# ⬡ Payload Terminal V0
 
 ### Payload Supply Chain Management — the physical-commerce operating system
 

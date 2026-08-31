@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Play, Pause, Radio } from 'lucide-react';
 
 /**
- * OSIRIS — Temporal playback scrubber for the physical-economy layers.
+ * Payload — Temporal playback scrubber for the physical-economy layers.
  *
  * Scrubs an evaluation date (month granularity) across the engine's event
  * horizon; the map refetches its projection at that date so disruption flags,

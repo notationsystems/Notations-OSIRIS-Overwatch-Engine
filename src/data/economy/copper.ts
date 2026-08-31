@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Curated copper dataset (provider payload for the curated adapter).
+ * Payload — Curated copper dataset (provider payload for the curated adapter).
  *
  * Magnitudes are assembled from public sources (USGS Mineral Commodity
  * Summaries 2025, ICSG World Copper Factbook, company disclosures) and are
@@ -21,7 +21,7 @@ const RETRIEVED = '2026-08-26T00:00:00Z';
 const SOURCES = [
   { sourceId: 'usgs-mcs-2025', sourceName: 'USGS Mineral Commodity Summaries 2025 — Copper', sourceUrl: 'https://pubs.usgs.gov/periodicals/mcs2025/mcs2025-copper.pdf' },
   { sourceId: 'icsg-factbook-2024', sourceName: 'ICSG World Copper Factbook 2024', sourceUrl: 'https://icsg.org/copper-factbook/' },
-  { sourceId: 'osiris-curated-2026', sourceName: 'OSIRIS curated facility dataset (public company disclosures)', sourceUrl: undefined },
+  { sourceId: 'payload-curated-2026', sourceName: 'Payload Terminal curated facility dataset (public company disclosures)', sourceUrl: undefined },
   { sourceId: 'lme-representative', sourceName: 'Representative exchange warehouse stock series (LME-shaped)', sourceUrl: 'https://www.lme.com/en/market-data' },
   { sourceId: 'public-news-2025', sourceName: 'Public news & company statements (2023–2025)', sourceUrl: undefined },
 ];
@@ -31,7 +31,7 @@ const usgs = (ref?: string, note?: string): Provenance =>
 const icsg = (ref?: string, note?: string): Provenance =>
   ({ sourceId: 'icsg-factbook-2024', sourceName: SOURCES[1].sourceName, sourceUrl: SOURCES[1].sourceUrl, retrievedAt: RETRIEVED, sourceRef: ref, note });
 const curated = (note?: string): Provenance =>
-  ({ sourceId: 'osiris-curated-2026', sourceName: SOURCES[2].sourceName, retrievedAt: RETRIEVED, note });
+  ({ sourceId: 'payload-curated-2026', sourceName: SOURCES[2].sourceName, retrievedAt: RETRIEVED, note });
 const lme = (note?: string): Provenance =>
   ({ sourceId: 'lme-representative', sourceName: SOURCES[3].sourceName, sourceUrl: SOURCES[3].sourceUrl, retrievedAt: RETRIEVED, note });
 const news = (note?: string): Provenance =>

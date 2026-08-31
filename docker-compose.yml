@@ -1,13 +1,13 @@
-name: osiris
+name: payload
 services:
-  osiris:
+  payload:
     # Builds locally from the Dockerfile so you always run the cloned code.
     # To use the prebuilt image instead, replace the `build:` block below with
     # `image: ghcr.io/simplifaisoul/osiris:latest`.
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: osiris
+    container_name: payload
     # Host port is configurable via PAYLOAD_PORT in .env (defaults to 3000).
     # OSIRIS_PORT is honoured for one release so a running deployment does
     # not break on the rename; it stops being read after v0.2.0.
@@ -30,25 +30,25 @@ services:
       - default
       - umami_default
 
-  osiris-cache:
+  payload-cache:
     image: nginx:alpine
-    container_name: osiris-cache
+    container_name: payload-cache
     ports:
       - "8080:8080"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx-cache:/var/cache/nginx
     depends_on:
-      - osiris
+      - payload
     restart: unless-stopped
     networks:
       - default
 
-  osiris-intel:
+  payload-intel:
     build:
       context: ./intel
       dockerfile: Dockerfile
-    container_name: osiris-intel
+    container_name: payload-intel
     ports:
       - "4000:4000"
     restart: unless-stopped
@@ -67,7 +67,7 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  main: osiris
+  main: payload
   author: simplifaisoul
   developer: simplifaisoul
   category: Productivity

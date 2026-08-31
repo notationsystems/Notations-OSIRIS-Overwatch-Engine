@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Flow / dependency graph over the canonical economy state.
+ * Payload — Flow / dependency graph over the canonical economy state.
  *
  * Nodes are entities; edges are material flows (directional, quantified) and
  * typed dependencies. Traversal answers "what feeds this?" (upstream) and

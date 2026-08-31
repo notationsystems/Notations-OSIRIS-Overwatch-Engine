@@ -71,13 +71,13 @@ running the newer tag:
 ```bash
 # staging: run the freshly built image on a second port
 docker run -d -p 3001:3000 --name sea-dog-staging \
-  ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest
+  ghcr.io/notationsystems/sea-dog-payload-terminal-v0:latest
 node scripts/smoke.mjs http://localhost:3001    # the D-6 check, against staging
 
 # promote: only after the smoke check passes
 docker stop sea-dog && docker rm sea-dog
 docker run -d -p 3000:3000 --name sea-dog \
-  ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest
+  ghcr.io/notationsystems/sea-dog-payload-terminal-v0:latest
 ```
 
 The rule the order is really asking for, stated plainly: **never deploy

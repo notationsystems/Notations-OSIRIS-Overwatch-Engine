@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Plane, Gauge, ArrowUp, Radio, Crosshair, Loader2 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Flight Watch
+   Payload — Flight Watch
    Pin several aircraft and follow them side by side
    ═══════════════════════════════════════════════════════════════ */
 

@@ -298,6 +298,29 @@ describe('the shipped description advertises no prohibited capability', () => {
     ].join(' ')).toEqual([]);
   });
 
+  /**
+   * The page metadata is MORE public than the README: it is what a search
+   * engine indexes and what a link preview shows. It advertised
+   * `nmap online`, `port scanner online` and `penetration testing tools`
+   * as SEO keywords, and listed browser-based port scanning first in its
+   * schema.org featureList — found only when the rename swept through the
+   * file, because the first version of this gate read README.md and
+   * nothing else. A gate on "the shipped description" that checks one
+   * artifact is the same defect it was written to catch.
+   */
+  it('does not advertise a prohibited capability in the page metadata', () => {
+    const layout = readFileSync(join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
+    const named = ADVERTISED_PROHIBITIONS
+      .filter(({ pattern }) => pattern.test(layout))
+      .map(({ capability }) => capability);
+    expect(named, 'src/app/layout.tsx advertises a prohibited capability').toEqual([]);
+    // The scanning keywords had no other spelling in the file, so they are
+    // asserted directly rather than through the shared patterns.
+    for (const term of ['nmap', 'penetration testing', 'port scanner', 'palantir']) {
+      expect(layout.toLowerCase(), `metadata must not advertise ${term}`).not.toContain(term);
+    }
+  });
+
   it('states the prohibition it is exempted for (the section cannot be emptied)', () => {
     // Markdown wraps, so the assertions run over whitespace-collapsed text:
     // a sentence broken across two lines is the same sentence.

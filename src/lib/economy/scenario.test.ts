@@ -27,7 +27,7 @@ describe('scenario: counterfactual injection', () => {
     expect(cf.frame.injectedEventIds).toEqual(['evt:scenario:test-strike:0']);
     // The injected event is branded beyond mistake.
     const injected = cf.state.events.find(e => e.id === 'evt:scenario:test-strike:0')!;
-    expect(injected.provenance.sourceId).toBe('osiris-scenario');
+    expect(injected.provenance.sourceId).toBe('payload-scenario');
     expect(injected.description).toContain('[COUNTERFACTUAL');
     // Propagation evaluates it like any state change.
     const strike = impacts(cf).find(i => i.eventId === 'evt:scenario:test-strike:0')!;

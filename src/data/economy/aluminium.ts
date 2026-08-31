@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Curated aluminium dataset (round 25: the second commodity).
+ * Payload — Curated aluminium dataset (round 25: the second commodity).
  *
  * The substrate-falsification experiment: aluminium was chosen because it
  * BREAKS copper's shape deliberately — the chain is bauxite → alumina →
@@ -30,14 +30,14 @@ const RETRIEVED = '2026-08-27T00:00:00Z';
 
 const curated = (note?: string): Provenance => ({
   sourceId: 'curated-aluminium-v1',
-  sourceName: 'OSIRIS curated aluminium dataset (USGS/IAI-derived representative data)',
+  sourceName: 'Payload Terminal curated aluminium dataset (USGS/IAI-derived representative data)',
   retrievedAt: RETRIEVED,
   note,
 });
 
 const news = (note: string): Provenance => ({
   sourceId: 'curated-aluminium-v1',
-  sourceName: 'OSIRIS curated aluminium dataset — public event record',
+  sourceName: 'Payload Terminal curated aluminium dataset — public event record',
   retrievedAt: RETRIEVED,
   note,
 });
@@ -278,12 +278,12 @@ export const ALUMINIUM_EVENTS: EconEvent[] = [
 ];
 
 export const ALUMINIUM_SOURCES = [
-  { sourceId: 'curated-aluminium-v1', sourceName: 'OSIRIS curated aluminium dataset (USGS/IAI-derived representative data)' },
+  { sourceId: 'curated-aluminium-v1', sourceName: 'Payload Terminal curated aluminium dataset (USGS/IAI-derived representative data)' },
 ];
 
 export const curatedAluminiumAdapter: EconomyAdapter = {
   providerId: 'curated-aluminium-v1',
-  providerName: 'OSIRIS curated aluminium dataset (USGS/IAI-derived representative data)',
+  providerName: 'Payload Terminal curated aluminium dataset (USGS/IAI-derived representative data)',
   commodities: ['aluminium'],
   async load(commodity: string): Promise<AdapterPayload> {
     if (commodity !== 'aluminium') throw new Error(`curated-aluminium-v1 cannot serve commodity "${commodity}"`);

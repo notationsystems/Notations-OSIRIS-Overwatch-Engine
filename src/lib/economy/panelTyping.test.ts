@@ -36,7 +36,7 @@ const COMPONENTS = join(process.cwd(), 'src/components');
  * a new instance of the defect A-3 deleted.
  */
 const ANY_PROPS_INHERITED: Readonly<Record<string, string>> = {
-  'OsirisMap.tsx': 'The map shell, taking a layer payload per general-purpose feed. Types arrive with the feeds themselves as each is retired or converted.',
+  'PayloadMap.tsx': 'The map shell, taking a layer payload per general-purpose feed. Types arrive with the feeds themselves as each is retired or converted.',
   'LiveAlerts.tsx': 'Aggregates alerts across every general-purpose feed; the union is only knowable once those feeds are retired (A-1).',
   'LayerPanel.tsx': 'Toggles the general-purpose layers by id.',
   'MarketsPanel.tsx': 'Quote payload from /api/markets, still the base shape.',

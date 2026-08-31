@@ -1,5 +1,5 @@
 /**
- * Balkans-focused data sources for OSIRIS.
+ * Balkans-focused data sources for Payload Terminal.
  * NIGGG-BAS (seismic), GDACS (EU civil protection), BG news feeds.
  */
 

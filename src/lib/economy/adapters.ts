@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Acquisition layer for the physical economy.
+ * Payload — Acquisition layer for the physical economy.
  *
  *   Provider → Adapter → Normalized records → Canonical EconomyState
  *
@@ -82,7 +82,7 @@ export interface EconomyAdapter {
 
 export const curatedCopperAdapter: EconomyAdapter = {
   providerId: 'curated-copper-v1',
-  providerName: 'OSIRIS curated copper dataset (USGS/ICSG-derived representative data)',
+  providerName: 'Payload Terminal curated copper dataset (USGS/ICSG-derived representative data)',
   commodities: ['copper'],
   async load(commodity: string): Promise<AdapterPayload> {
     if (commodity !== 'copper') throw new Error(`curated-copper-v1 cannot serve commodity "${commodity}"`);

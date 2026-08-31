@@ -1,6 +1,6 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — API Catalog
+ *  Payload — API Catalog
  *  Machine-readable description of every public route under /api.
  *  Kept in sync by hand with src/app/api/ * /route.ts
  * ═══════════════════════════════════════════════════════════════

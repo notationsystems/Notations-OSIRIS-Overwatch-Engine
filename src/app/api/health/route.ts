@@ -36,7 +36,7 @@ export async function GET() {
   if (!warm) {
     return NextResponse.json({
       status: 'operational',
-      platform: 'OSIRIS',
+      platform: 'Payload Terminal',
       version: '1.0.0',
       uptime: process.uptime ? Math.round(process.uptime()) : 0,
       timestamp: new Date().toISOString(),
@@ -79,7 +79,7 @@ export async function GET() {
 
   return NextResponse.json({
     status: 'operational',
-    platform: 'OSIRIS',
+    platform: 'Payload Terminal',
     version: '1.0.0',
     uptime: process.uptime ? Math.round(process.uptime()) : 0,
     timestamp: new Date().toISOString(),

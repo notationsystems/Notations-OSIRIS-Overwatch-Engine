@@ -1,5 +1,5 @@
 /**
- * OSIRIS — validWhile guards on deferred ledger decisions.
+ * Payload — validWhile guards on deferred ledger decisions.
  *
  * The pattern: a deferred decision is safe only while the condition that
  * made it safe still holds — and that condition should be EXECUTABLE rather

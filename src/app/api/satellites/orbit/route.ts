@@ -6,7 +6,7 @@ import { orbitPath, orbitalPeriodMinutes, splitAtAntimeridian } from '@/lib/orbi
 export const dynamic = 'force-dynamic';
 
 /**
- * OSIRIS — one satellite's orbit track.
+ * Payload — one satellite's orbit track.
  *
  * Returns a full revolution, sampled from the same TLE the map position came
  * from, so the track passes through the satellite rather than near it.

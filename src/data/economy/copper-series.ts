@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Copper time-series extension (temporal state substrate).
+ * Payload — Copper time-series extension (temporal state substrate).
  *
  * Multi-year observation series that give the engine a time axis: annual mine
  * production by country 2015–2023 (2024 lives in copper.ts as the current

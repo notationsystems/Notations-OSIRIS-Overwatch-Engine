@@ -5,7 +5,7 @@ import { Loader2, Sparkles, Bug, Flame, ShieldAlert, ExternalLink } from 'lucide
 import type { LucideIcon } from 'lucide-react';
 
 /**
- * OSIRIS — Daily chain-threat brief.
+ * Payload — Daily chain-threat brief.
  *
  * Rendered inside the RECON toolkit's CHAIN INTEL tab. Self-contained: owns
  * its own fetch, window selector, unattended refresh and AI overview, so the
