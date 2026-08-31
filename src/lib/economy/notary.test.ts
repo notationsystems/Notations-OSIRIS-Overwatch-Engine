@@ -4,7 +4,10 @@ import {
   notarizeCondition, notarizeCustody, postedInTime, POST_GRACE_SECONDS,
   type Reading, type Handoff,
 } from './notary';
-import { requiresNotary, type Commitment, type ConditionPredicate, type DeviceTrust, type NotaryPolicy, type ProofRef } from './notary.types';
+import {
+  requiresNotary, notaryRequirement,
+  type Commitment, type ConditionPredicate, type DeviceTrust, type NotaryPolicy, type ProofRef,
+} from './notary.types';
 
 const NOW = '2026-08-31T12:00:00.000Z';
 
@@ -247,23 +250,191 @@ describe('custody does not overstate what a linked chain shows', () => {
   });
 });
 
-describe('the policy refuses toward notarizing on an incomparable basis', () => {
+describe('the policy has three states, because the boolean was the bug', () => {
   const POLICY: NotaryPolicy = {
     policyId: 'p1', valueThreshold: { amount: 25000, currency: 'CAD' },
     alwaysNotarize: ['pharma'], custodyRequired: [], notarizeOnDispute: true,
   };
-  it('a cross-currency value notarizes rather than silently skipping', () => {
-    // Comparing 50,000 MXN to a 25,000 CAD threshold needs a rate and a date.
-    // Returning false would leave a possibly high-value load unnotarized.
-    expect(requiresNotary(POLICY, { declaredValue: { amount: 50000, currency: 'MXN' } })).toBe(true);
+
+  // THE DISAGREEMENT THAT PRODUCED THIS TYPE. Two readings of the same function
+  // were each right about their half:
+  //
+  //   returning FALSE  → a possibly high-value load ships unnotarized, and the
+  //                      cost of that surfaces later as a claim.
+  //   returning TRUE   → the threshold is asserted cleared when nothing compared
+  //                      it; that is a silent conversion at an unstated rate.
+  //
+  // Neither is the answer. 50,000 MXN against a 25,000 CAD threshold is
+  // UNDETERMINED — the comparison needs a rate and a date this function does not
+  // have. Same collapse `NotaryVerdict` refuses with held/breached/unproven,
+  // one layer down in the policy that decides whether to evaluate at all.
+
+  it('a cross-currency value is undetermined, not a silent yes and not a silent no', () => {
+    const r = notaryRequirement(POLICY, { declaredValue: { amount: 50000, currency: 'MXN' } });
+    expect(r.required).toBe('undetermined');
+    if (r.required === 'undetermined') {
+      expect(r.reason).toContain('rate');
+      expect(r.remedy).toContain('CAD');
+    }
   });
-  it('an unknown value is not "below threshold"', () => {
-    expect(requiresNotary(POLICY, {})).toBe(true);
+
+  it('an unknown value is not "below threshold" — it is undetermined', () => {
+    const r = notaryRequirement(POLICY, {});
+    expect(r.required).toBe('undetermined');
+    if (r.required === 'undetermined') {
+      expect(r.reason).toContain('not a value below the threshold');
+    }
   });
-  it('the commodity class overrides value', () => {
-    expect(requiresNotary(POLICY, { commodityClass: 'pharma', declaredValue: { amount: 10, currency: 'CAD' } })).toBe(true);
+
+  it('the commodity class decides before value is even consulted', () => {
+    // Deliberate: an always-notarize class in an INCOMPARABLE currency still
+    // resolves, because the class never needed the comparison.
+    expect(notaryRequirement(POLICY, {
+      commodityClass: 'pharma', declaredValue: { amount: 10, currency: 'MXN' },
+    }).required).toBe(true);
+    expect(notaryRequirement(POLICY, { commodityClass: 'pharma' }).required).toBe(true);
   });
-  it('an ordinary load below threshold is not notarized', () => {
-    expect(requiresNotary(POLICY, { declaredValue: { amount: 2400, currency: 'CAD' } })).toBe(false);
+
+  it('a comparable value resolves at, above, and below the threshold', () => {
+    expect(notaryRequirement(POLICY, { declaredValue: { amount: 2400, currency: 'CAD' } }).required).toBe(false);
+    expect(notaryRequirement(POLICY, { declaredValue: { amount: 25000, currency: 'CAD' } }).required).toBe(true);
+    expect(notaryRequirement(POLICY, { declaredValue: { amount: 90000, currency: 'CAD' } }).required).toBe(true);
+  });
+
+  it('every branch carries a reason a dispatcher can act on', () => {
+    for (const load of [
+      {}, { declaredValue: { amount: 50000, currency: 'MXN' } },
+      { declaredValue: { amount: 2400, currency: 'CAD' } }, { commodityClass: 'pharma' },
+    ]) {
+      expect(notaryRequirement(POLICY, load).reason.length).toBeGreaterThan(10);
+    }
+  });
+
+  describe('the boolean convenience refuses rather than picking a side', () => {
+    it('answers where the comparison is defined', () => {
+      expect(requiresNotary(POLICY, { declaredValue: { amount: 90000, currency: 'CAD' } })).toBe(true);
+      expect(requiresNotary(POLICY, { declaredValue: { amount: 2400, currency: 'CAD' } })).toBe(false);
+      expect(requiresNotary(POLICY, { commodityClass: 'pharma' })).toBe(true);
+    });
+
+    it('THROWS where it is not, instead of defaulting either way', () => {
+      // A caller that wants a boolean must have established the basis first.
+      // One that has not gets an error naming what is missing.
+      expect(() => requiresNotary(POLICY, {})).toThrow(/undetermined/);
+      expect(() => requiresNotary(POLICY, { declaredValue: { amount: 50000, currency: 'MXN' } }))
+        .toThrow(/rate and a date/);
+    });
+  });
+});
+
+describe('tampering with a committed reading is caught, not only omission and addition', () => {
+  it('one MUTATED value in an otherwise complete set fails the root', () => {
+    // Same leaf COUNT, same interval, same devices — only the value moved. A
+    // count check alone would pass this; the root is what catches it.
+    const full = run(FROM, TO, 5, i => (i >= 36 && i <= 48 ? 9.4 : 5.0));
+    const commitment = commit(full, FROM, TO, TO);
+    const laundered = full.map(r => (r.value > 8.0 ? { ...r, value: 5.0 } : r));
+    expect(laundered.length).toBe(full.length);
+
+    const v = notarizeCondition({
+      readings: laundered, commitment, predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('unproven');
+    if (v.status === 'unproven') {
+      expect(v.reason).toBe('readings_do_not_match_commitment');
+      // The count matched, so the remedy must NOT claim readings were dropped.
+      expect(v.remedy).toContain('Supply exactly the committed set');
+    }
+  });
+
+  it('and the pin: that same laundered set is otherwise a clean held', () => {
+    // Without this the test above proves nothing — an unproven verdict could be
+    // coming from a gap, a late post, or any other refusal. Re-commit to the
+    // LAUNDERED set and the identical call holds. So the only thing standing
+    // between a curated story and a proof is the root comparison.
+    const full = run(FROM, TO, 5, i => (i >= 36 && i <= 48 ? 9.4 : 5.0));
+    const laundered = full.map(r => (r.value > 8.0 ? { ...r, value: 5.0 } : r));
+    const v = notarizeCondition({
+      readings: laundered, commitment: commit(laundered, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('held');
+  });
+});
+
+describe('the low side breaches on the same terms as the high side', () => {
+  it('a sustained under-minimum run is a breach and reports the low extremum', () => {
+    // The asymmetry to prevent: an envelope that catches heat and sleeps
+    // through a freeze. A reefer failing cold spoils the load just as surely.
+    const readings = run(FROM, TO, 5, i => (i >= 36 && i <= 44 ? 0.4 : 5.0));
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('breached');
+    if (v.status === 'breached') {
+      expect(v.excursions[0].extremum).toBe(0.4);
+      expect(v.renderedClaim).toContain('BREACHED');
+    }
+  });
+});
+
+describe('the rendered claim never states more than the evidence carries', () => {
+  const clean = () => run(FROM, TO, 5, () => 5.0);
+
+  it('an internal anchor says so, in the claim itself', () => {
+    // `internal` means "our own append-only log", which a disputing party has no
+    // reason to accept. The verdict is still held; the claim must not read as
+    // though a third party observed it.
+    const readings = clean();
+    const c = commit(readings, FROM, TO, TO);
+    const v = notarizeCondition({
+      readings, commitment: { ...c, anchor: { kind: 'internal', logId: 'l-1' } },
+      predicate: REEFER, from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('held');
+    expect(v.renderedClaim).toContain('anchored only in our own log');
+    if (v.status === 'held') expect(v.anchorStrength).toBe('internal');
+  });
+
+  it('an unattested device is named in the claim, and the proof does not launder it', () => {
+    // A cryptographic proof over readings from an unplugged probe is a
+    // perfectly provable lie. Device trust travels beside the verdict, never
+    // folded into it.
+    const readings = clean();
+    const unattested: DeviceTrust = {
+      deviceId: 'probe-9', attestation: 'unattested', lastCalibratedAt: null,
+      note: 'carrier-supplied logger, no attestation',
+    };
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: unattested, now: NOW, prove,
+    });
+    expect(v.status).toBe('held');
+    expect(v.renderedClaim).toContain('device unattested');
+    expect(v.renderedClaim).toContain('it does not prove the sensor was truthful');
+    if (v.status === 'held') expect(v.deviceTrust.attestation).toBe('unattested');
+  });
+
+  it('the claim states the coverage it was computed over', () => {
+    const readings = clean();
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.renderedClaim).toMatch(/\d+\.\d% of the interval/);
+  });
+
+  it('an unproven claim says CANNOT BE EVALUATED rather than reading as a pass', () => {
+    const head = run(FROM, '2026-08-30T01:00:00.000Z', 5, () => 5.0);
+    const tail = run('2026-08-30T05:00:00.000Z', TO, 5, () => 5.0);
+    const readings = [...head, ...tail];
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.renderedClaim).toContain('CANNOT BE EVALUATED');
+    expect(v.renderedClaim).not.toContain('held');
   });
 });

@@ -195,22 +195,78 @@ export interface NotaryPolicy {
   notarizeOnDispute: boolean;
 }
 
+/**
+ * THREE STATES, BECAUSE THE BOOLEAN WAS THE BUG.
+ *
+ * Two reviews disagreed about `requiresNotary` returning false on a
+ * cross-currency value, and both were right about their half:
+ *
+ *   - Returning FALSE silently leaves a possibly high-value load
+ *     unnotarized, and the cost of that surfaces as a claim.
+ *   - Returning TRUE asserts the threshold was cleared when nothing
+ *     compared it, which is a silent conversion at an unstated rate.
+ *
+ * The disagreement was not about which answer is right. It was that a
+ * boolean has no room for the true one: 80,000 USD against a 50,000 CAD
+ * threshold is UNDETERMINED — comparing them needs a rate and a date this
+ * function does not have. That is the same collapse `NotaryVerdict` refuses
+ * with held/breached/unproven, appearing one layer down in the policy that
+ * decides whether to evaluate at all.
+ *
+ * So the caller decides, with the reason in hand, and neither failure is
+ * silent.
+ */
+export type NotaryRequirement =
+  | { required: true; reason: string }
+  | { required: false; reason: string }
+  | { required: 'undetermined'; reason: string; remedy: string };
+
+export function notaryRequirement(
+  policy: NotaryPolicy,
+  load: { declaredValue?: { amount: number; currency: string }; commodityClass?: string },
+): NotaryRequirement {
+  if (load.commodityClass && policy.alwaysNotarize.includes(load.commodityClass)) {
+    return { required: true, reason: `commodity class ${load.commodityClass} is always notarized` };
+  }
+  const v = load.declaredValue;
+  if (!v) {
+    return {
+      required: 'undetermined',
+      reason: 'no declared value. An unknown value is not a value below the threshold.',
+      remedy: 'obtain the declared value, or notarize by default if the lane warrants it.',
+    };
+  }
+  if (v.currency !== policy.valueThreshold.currency) {
+    return {
+      required: 'undetermined',
+      reason:
+        `${v.amount} ${v.currency} cannot be compared with a threshold in ` +
+        `${policy.valueThreshold.currency} without a rate and a date.`,
+      remedy:
+        `restate the declared value in ${policy.valueThreshold.currency}, or convert at a ` +
+        'stated rate and date and record both. Converting silently is a commensurability ' +
+        'failure with money attached.',
+    };
+  }
+  return v.amount >= policy.valueThreshold.amount
+    ? { required: true, reason: `${v.amount} ${v.currency} is at or above the threshold` }
+    : { required: false, reason: `${v.amount} ${v.currency} is below the threshold` };
+}
+
+/**
+ * Boolean convenience for the comparable case ONLY.
+ *
+ * THROWS on undetermined rather than picking a side. A caller that wants a
+ * boolean must have established the basis first; one that has not gets an
+ * error naming what is missing, not a default that hides it.
+ */
 export function requiresNotary(
   policy: NotaryPolicy,
   load: { declaredValue?: { amount: number; currency: string }; commodityClass?: string },
 ): boolean {
-  if (load.commodityClass && policy.alwaysNotarize.includes(load.commodityClass)) return true;
-  const v = load.declaredValue;
-  // Unknown value is not "below threshold" — it is unknown, and the cheap
-  // direction is to notarize rather than to decide a load is small because
-  // nobody said how large it was.
-  if (!v) return true;
-  // CROSS-CURRENCY REFUSES TOWARD NOTARIZING. Comparing 50,000 MXN against a
-  // 25,000 CAD threshold needs a rate and a date, and this function has
-  // neither — converting at an unstated rate is the commensurability failure
-  // with money attached. Returning false would silently leave a high-value
-  // load unnotarized; the safe direction on an incomparable basis is to
-  // notarize and let the cost be compute rather than a claim.
-  if (v.currency !== policy.valueThreshold.currency) return true;
-  return v.amount >= policy.valueThreshold.amount;
+  const r = notaryRequirement(policy, load);
+  if (r.required === 'undetermined') {
+    throw new Error(`notary policy undetermined: ${r.reason} ${r.remedy}`);
+  }
+  return r.required;
 }
