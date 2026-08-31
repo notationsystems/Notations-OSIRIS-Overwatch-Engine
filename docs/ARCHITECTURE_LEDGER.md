@@ -6472,3 +6472,86 @@ governor in, and named as a claim about the future rather than a fact. The next
 item is the route that renders it, and the thing to get right there is that
 BLOCKED and REFUSED must not look alike on screen either, having been so
 carefully kept apart in the data.
+
+
+## Phase 82 — the queue on a screen, and the column that is empty for a reason
+
+Phase 81 ended by naming its own gap: *a module, not a page — the same
+"built but not load-bearing" state phase 77 left the governor in.* This closes
+it. `/queue` is the third page in the tree, after the map and the docs, and the
+first one that shows the pricing engine to anybody.
+
+### The rendering requirement was set before the rendering
+
+Phase 81's last sentence was that BLOCKED and REFUSED *"must not look alike on
+screen either, having been so carefully kept apart in the data"*. Written
+before the page existed, so it is a pre-registration rather than a description
+of what got built:
+
+- **BLOCKED** is amber, states a FIELD, and its action is *add it*.
+- **REFUSED** is red, states a CLAUSE, and its action is a *decision*.
+- **PRICED** is green, and carries confidence, band and `n` beside the number.
+
+### The fixture cannot produce a blocked load, and the screen says so
+
+`WorldLoad` types `laneId` and `equipment` as required, so the generator
+**cannot** emit an incomplete booking. The BLOCKED column is therefore empty on
+this data, and the temptation was to invent a few incomplete loads so the
+column would demonstrate its own feature.
+
+That is the one thing this project does not do. An invented blocked load would
+make the screen demonstrate a capability by lying about the book, on the
+surface whose entire purpose is that its three lists are honest. So the column
+renders its warrant instead:
+
+> **EMPTY — AND WHY.** No load in this book is missing a required field, because
+> the simulated world types lane and equipment as mandatory and cannot generate
+> an incomplete booking. This column is empty as a property of the fixture, not
+> of the business — a real book blocks loads here.
+
+Which is class 7 answered at the place it is hardest to answer: not *is this
+collection empty*, but *whose property is the emptiness* — the fixture's, or the
+world's. Those are different claims and a blank column asserts neither.
+
+### The product does not know about the fixture
+
+Phase 67 adopted a `pricing.ts` taking `LaneObservation` rather than `WorldLoad`
+because the latter *"makes the fixture generator a dependency of the product"*.
+`operationsQueue` inherits that rule and knows nothing about `freightWorld`; the
+adapter lives in `worldQueueDemo.ts`, which can be deleted the day a real book
+arrives without touching the product. The pending set is also split from the
+history, so no load prices itself from its own record.
+
+### What the screen showed that the tests did not
+
+Rendered against the world: **10 priced, 0 blocked, 4 refused, of 14 pending**
+— and every one of the ten is `INDICATIVE`. Not one is `CONFIDENT`.
+
+That is phase 67's finding, arriving unprompted on a screen built four phases
+later for a different purpose. Phase 67 measured it and stated it as a number
+(*"not one lane/equipment pair prices confidently once the history has to be
+current"*); here it simply looks like what it is — a column of amber
+INDICATIVE tags with no green among them, which reads at a glance as *this book
+is too thin to price with confidence anywhere*. The refusals say the same thing
+in words: two of the four are `STALE HISTORY` on lanes with observations
+outside the 270-day window.
+
+A finding that survives being re-derived by a different mechanism for a
+different reason is a finding rather than an artifact of how it was measured.
+
+### And a bug I did not fix, because it was not one
+
+The rendered flight payload showed prices as `$$1,234`, which looks exactly
+like a double-prefix bug in the formatter. The formatter is correct: React's
+RSC stream escapes a leading `$` as `$$`, and the server-rendered HTML — which
+is what a reader sees — carries `$1,234`. Checked before changing anything.
+Editing the formatter would have introduced the defect the symptom suggested.
+
+### Measured after
+
+- **90 test files, 1289 passed, 6 skipped** (from 89 / 1283), read from the
+  runner. Six new pins on the demo wiring, including determinism, so the screen
+  does not change under the reader between reloads.
+- Build compiles; `/queue` is a static route. Lint clean on all three new files.
+- Verified by running the server and reading the served HTML, not only by the
+  suite — the phase-38 lesson that a rendering defect is found by rendering.
