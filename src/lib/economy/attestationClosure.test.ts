@@ -193,12 +193,17 @@ describe('every number-bearing type in the layer is accounted for', () => {
     // which carry the world's `representative` stamp; the quote's own honesty
     // lives in its confidence tier and its refusals, which is what the type is
     // shaped around.
-    LaneStats: 'quantiles and counts over our own settled loads on one lane',
-    DensityReport: 'counts of lane/equipment pairs above and below the pricing floors',
+    LaneStat: 'quantiles and counts over our own settled loads on one lane, with every denominator named',
+    LaneObservation: 'one settled load of ours; what it asserts is attested by the record that produced it',
+    DensityReport: 'counts of lane/equipment pairs above and below the pricing floors, all-time and in-window',
+    DensityTier: 'counts of pairs in one population',
+    CapitalProfile: 'an amount and a duration for one load; atRate derives a run-rate requirement',
+    QuoteComponents: 'the arithmetic of one quote, each term named',
+    WinCurvePoint: 'offered and won counts in one margin bucket',
+    WinCurve: 'bucketed win rates, refused entirely when the book records only wins',
+    PricingPolicy: 'floors, a window, a margin and a financing cost — the rule that shapes a quote',
     QuotePolicy: 'a target margin and a band width — the rule that shapes a quote, not a measurement',
-    Quote: 'the quote carries its own confidence tier, n, carrier count and spread; stats travels with it',
-    QuoteOutcome: 'one recorded quote and whether it was won',
-    WinCurveVerdict: 'bucketed win rates, refused entirely when the book records only wins',
+    QuoteResult: 'the quote carries its own confidence tier, n, carrier count, spread and staleness',
     InclusionProof: 'a leaf index and tree size into our own log',
     ConsistencyProof: 'two sizes of our own log',
     // Claimable artifacts, carrier trust, claim economics, transparency log.

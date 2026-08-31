@@ -262,6 +262,11 @@ an ordinal that contradicts this table.
 | 36 | 66 | A receipt issuer taking the record alongside the index, so a mismatch ships and fails at the customer rather than at the issuer |
 | 37 | 66 | A concentration rule keyed on a COUNT: `distinctCarriers > 1` passes 15-of-17 on one carrier |
 | 38 | 66 | A win rate computed over a book that records only wins — 100% by construction at every margin, with the caveat in prose where it gets dropped when the number is copied |
+| 39 | 67 | Expected-value double-discounting: a mean already taken over all loads, multiplied again by the incidence rate — $137 reported as $44, and $44 is plausible |
+| 40 | 67 | Span reported as depth: "from 37 loads over 676 days" rendered as confidence when 676 days is staleness, and the lane could not price confidently at all |
+| 41 | 67 | A density report counting all-time while the quoter refused anything stale — one question, two populations, and the report was the flattering half |
+| 42 | 67 | A per-load amount and a run-rate requirement folded into one capital figure, in two different wrong ways |
+| 43 | 67 | A test asserting a band comparison across two variables at once, so it failed for a correct reason |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

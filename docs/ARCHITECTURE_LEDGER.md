@@ -4984,3 +4984,90 @@ it is stronger: **at 8.7 loads/week the record can price 18 pairs and cannot pri
 ### Measured after
 
 - **83 test files, 1205 passed, 6 skipped.** 47 log/claimable pins, 13 pricing pins.
+
+## Phase 67 — the pricing merge, and the quote I called CONFIDENT that wasn't
+
+Two versions of `pricing.ts` reconciled. The supplied one carries three things
+mine lacked, and one of them invalidates a number I reported last round.
+
+### Adopted, and mine was worse for their absence
+
+| adopted | what it fixes |
+|---|---|
+| `maxAgeDays` recency window | mine had no age filter at all. Rates and carrier performance decay; a median over two-year-old loads is a fact about a market that no longer exists |
+| `n` vs `nUsed`, with drops itemised | mine reported one number and left the difference to be inferred |
+| `financingCostPct` in the gross-up | mine omitted factoring cost entirely, leaving it to finance to notice |
+| `LaneObservation` as the input type | mine took `WorldLoad`, making the fixture generator a dependency of the product |
+
+### Defended, with a measurement
+
+`accessorialExposure = meanAccessorial × accessorialRate` **double-discounts**.
+`meanAccessorial` already averages over ALL loads including the zeros, so it *is*
+the expected accessorial per load; multiplying by the incidence applies the
+discount a second time. Measured on TOR-DET van_53, n=37, $5,070 billed:
+
+```
+TRUE expected per load           $137.03   (total / n)
+incidence                            32%
+mean AMONG loads that incur one  $422.50
+perLoad x incidence               $44.44   <- understates 3.1x
+```
+
+`$44` is plausible, which is why it ships. Both figures are now carried and
+named, because they answer different questions: one belongs in a quote, the
+other in an argument about a specific detention bill.
+
+The win-curve refusal is also defended — the supplied version floors on quote
+COUNT only, so a book of settled loads reports 100% at every margin. That
+diagnosis was already made in the accompanying write-up; the disagreement is only
+about whether the guard lives in prose or in the engine.
+
+### Both capital formulas were hybrids
+
+One computed `carrierCost × (paymentTermsDays / 30)` — at 45-day terms, 1.5× the
+carrier cost for a single load, which is not an amount anyone finances. Mine
+added an arbitrary 15% plus a term adder. A load ties up ONE carrier cost for the
+days it is outstanding: an amount and a duration. What scales with the term is
+the WORKING CAPITAL to sustain a run rate, which needs the rate and is now
+derived from it — and `atRate(0)` throws rather than returning zero, because
+working capital at zero loads per week is an undefined question, not free.
+
+### The finding: applying the window removed every confident quote
+
+`laneStat` now separates `windowDays` (how much history) from `stalenessDays`
+(how old the freshest observation is). Those are routinely confused, and the
+confusion was in my own output: last round I reported
+
+> `$927 on TOR-DET van_53 — CONFIDENT, from 37 settled loads across 15 carriers
+> over 676 days`
+
+as depth. **676 days is not depth, it is staleness**, and with a 270-day window
+that lane cannot produce a confident quote at all. Measured across the book:
+
+```
+ALL-TIME    confident 18   indicative  5   unpriceable 183   of 206
+IN-WINDOW   confident  0   indicative 20   unpriceable 186   of 206
+```
+
+**Not one lane/equipment pair prices confidently once the history has to be
+current.** All 18 were confident only by counting loads up to two years old.
+
+And `laneDensity` had the same defect on the other side: it counted all-time
+while `quoteLane` refused anything stale — a density report and a quoter
+answering one question over two populations, with the report always the
+flattering half. It now reports both, so the gap is visible rather than
+something I noticed by accident.
+
+This is the lane-concentration argument at full strength. At ~8.7 loads/week
+across 206 pairs, no pair accumulates 20 loads inside 270 days, and the remedy is
+**fewer lanes or more volume — not a longer window.**
+
+### And a test that failed for a correct reason
+
+The band pin compared the full lane against a 6-load slice and asserted the
+slice's band was wider. The slice can have a NARROWER IQR, so the test conflated
+confidence with spread. Split into two pins that hold one variable fixed each.
+
+### Measured after
+
+- **83 test files, 1216 passed, 6 skipped.** 24 pricing pins.
