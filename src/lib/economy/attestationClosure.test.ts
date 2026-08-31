@@ -189,6 +189,18 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // The simulated world's own records. Every number in them is drawn from a
+    // seeded PRNG, so none is a measurement of anything; the world carries ONE
+    // attestation at `FreightWorld.meta.attestation`, stamped `representative`,
+    // and `isAdmissible` is false for everything derived from any of them. A
+    // per-row evidence class would say the same thing 520 times and imply the
+    // rows could differ, which is the one thing they cannot do.
+    WorldFacility: 'a generated facility; coordinates and reliability are drawn, not observed — the world carries one attestation for all of them',
+    WorldCarrier: 'a generated carrier; quote bias and cover limits are drawn, not observed',
+    WorldShipper: 'a generated shipper; payment terms are drawn, not observed',
+    WorldLane: 'a generated lane; distanceKm is a great-circle figure scaled by a road factor, not a routed measurement',
+    WorldLoad: 'a generated load; every rate, dwell and instant is drawn from the seeded PRNG',
+    WorldOptions: 'the generator inputs — seed and load count; configuration, not measurement',
     TopologyValidity: 'extrapolationDays measures how far past the topology period WE reached — a property of our corpus coverage that qualifies a claim rather than being one',
   };
 

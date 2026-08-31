@@ -4538,3 +4538,171 @@ reconnaissance workflow has been stopped. Nothing in this repository enforces
 that a commit contains only reviewed changes, and that is now the owed item:
 the suite run and the commit must be over the same bytes, and today they were
 not.
+
+## Phase 63 — the simulated world, and four detectors that found what was not there
+
+Round 15's spatial backend closed one refusal by supplying a **missing actor**.
+This round found two more of the same shape, and then found that the runner
+built to check the result had the defect it was built to catch.
+
+### The three missing actors
+
+| refusal | what was missing | what it looked like |
+|---|---|---|
+| `NO_SPATIAL_BACKEND` | a registered engine | every route call refused |
+| `unproven/proof_generation_failed` x241 | a `prove` callback | notary reached neither `held` nor `breached` |
+| `undetermined` on cargo cover x437 | a cover limit on the carrier record | one check with an effective range of one value |
+
+Each is a policy refusing correctly with nothing behind it to accept. Supplying
+`simulated.ts`, `simulatedProver.ts` and a cargo-cover field is what the three
+abstractions were built to take, and none of the refusals was loosened to do it.
+
+The prover is not an echo. It **re-derives** the verdict from the committed
+readings and throws `PROVER_DISAGREES` when its own result differs from the bit
+it was asked to attest — the only thing a prover is actually for. And it never
+passes for real: `ProofRef.system` must read `'sp1'` for the notary to treat a
+verdict as proven, so the honesty lives in the vkey and the proofId, both of
+which carry `SIMULATED` literally, and in `isSimulatedProof()`.
+
+### Five defects measured in the supplied fixture design
+
+The generator arrived as a standalone file with a run report claiming nine
+plants recovered. Reconstructed verbatim and measured:
+
+| # | claim | measurement |
+|---|---|---|
+| 1 | "5,570 transitions, zero illegal — every chain legal" | **4,392 of 5,570 (78.9%)** name a state absent from `LoadState`. Nine distinct pairs, `booked → assigned` among them. The chain was walked against the fixture's own private table |
+| 2 | top divergence offender `CX-014, n=61, +11.5%` | **a merged population.** Meridian was created at index 11 (`CX-012`) and renamed onto index 13's id. 18 carriers, **17 distinct ids**, `CX-012` issued to nobody, n=61 against ~27 expected |
+| 3 | "the same seed produces a byte-identical fixture" | two calls differ in exactly one field: `generatedAt: new Date()`. Fourth clock-read in this programme |
+| 4 | "plants now bind to IDs that exist" — *stated as already fixed* | the fallback is still in the code. **3 of 16 seeds misbind**; at seed 8 the double-brokering and telemetry-gap plants both land on `L-0520`, and a runner asking "is this flag present anywhere" reports both found |
+| 5 | PLANT-2 confounds PLANT-8, treated as inherent | **manufactured.** The slipping receiver was injected after the lane was chosen, so **75 of 488 loads** delivered to a facility outside their lane's destination city, and it appeared on **29 distinct lanes** including Chicago→Cleveland |
+
+Defect 4 is the instructive one: **a defect described in a comment as fixed, in
+the same file as the code that causes it.** The evidence for "fixed" was one
+green run at one seed.
+
+### The headline conclusion was wrong, and its remedy was the opposite of right
+
+The supplied report concluded: *"seasonality on this lane is UNMEASURABLE from
+this data… a planted signal we know exists cannot be recovered at this n against
+this noise."*
+
+Measured on that same data, partitioned by the plant's own definition:
+
+```
+winter (Dec-Mar, excl. the confounding receiver)  n=13  mean 255  median 101
+other                                             n=29  mean  80  median   0
+```
+
+The effect is there. Three misdenominations hid it, each sufficient alone:
+
+- **partition** — the plant fires Dec–Mar; calendar quarters split that across
+  Q1 and Q4, so Q4 is two-thirds out of season by construction;
+- **estimator** — detention is bimodal (near zero, or 240–900 minutes). A mean
+  follows whichever cell caught an outlier; at n≈10 one load moves it ~50 min;
+- **time basis** — the plant is keyed on pickup, the quarter on delivery.
+
+The instinct to refuse the quarterly mean was right. The **reason** was wrong,
+and the reason is load-bearing: *"unmeasurable at this n"* prescribes collecting
+more data; *"misdenominated estimator"* prescribes fixing the query. Opposite
+remedies from the same refusal.
+
+This is the commensurability profile with the tell intact — **197 > 92 is
+plausible, so it shipped and got quoted as a verdict.**
+
+### Then the runner I built to check that had the same defect
+
+First run of `worldRun.ts`, before the prover was wired: all 243 notarizable
+loads came back `unproven`, and the detectors for **PLANT-7 and PLANT-9 both
+reported RECOVERED**. Both asked only *"is this load in the unproven set"*. They
+were correct set-membership tests over a set containing the whole population.
+
+Containment is not detection. `assessDetector` now requires the named set to
+contain the planted entity **and** to be under a discrimination ceiling of
+`max(5, 5% of population)`.
+
+That immediately produced a false negative worth keeping: PLANT-4 read MISS at
+31 of 520. The detector was not blunt, it was **denominated wrong** — an
+insurance lapse is a fact about a **carrier**, and every load that carrier moved
+after the expiry refuses. Asked as "which carrier is being refused", the answer
+is one row.
+
+### And the first fixture could not demonstrate its own finding
+
+With the seasonal plant on a clean lane, **both** the naive quarterly mean and
+the plant-basis median recovered it — a fixture that cannot separate a sound
+estimator from an unsound one. The confound is the point; the predecessor's
+error was manufacturing it by delivering loads to the wrong city, not by having
+one. The seasonal lane now ends at the slipping receiver's city: coherent
+**and** confounded. A pin that asserted the opposite has been corrected in place
+with the reason.
+
+Measured after the change:
+
+```
+NAIVE   Q1 n=13 mean 473 | Q2 n=26 mean 197 | Q3 n=19 mean 195 | Q4 n=18 mean 186
+        recovers: NO   (winter Q4 at 186 sits BELOW summer Q2 at 197)
+PLANT   in season  n=17  median 401  >120min 88%
+        out        n=59  median   0  >120min 36%
+        recovers: YES
+```
+
+### Two causal errors the guards caught while building
+
+- **A border wait that postdated arrival.** Arrival was a flat estimate not
+  including the crossing, so on a short cross-border lane the truck re-entered
+  transit after being recorded at the destination. The monotonicity assertion
+  fired. The predecessor design has the same inconsistency and no guard.
+- **Millisecond timestamps.** `canonicalAt` refused every commitment: the
+  circuit encodes `at` as u64 **seconds**, and a reference hashing milliseconds
+  produces a root the circuit can never reproduce. Rounding at the source is
+  what the refusal asked for.
+
+### The architecture correction, built rather than drawn
+
+`VERIFICATION` sat on the critical path between decision and execution. Two
+different things were collapsed into it, and separated they are:
+
+```
+DECISION → AUTHORIZATION → EXECUTION → PHYSICAL ECONOMY
+                 │              │              │
+          deterministic         └→ NOTARIZATION  OBSERVATION
+          blocking, always         threshold-gated,     │
+          microseconds             off the path         ▼
+                                   (zkVM / SP1)      EVIDENCE → CANONICAL STATE
+```
+
+`authorization.ts` is the blocking half: pure, no I/O, no clock, no crypto,
+three-valued, and it carries the invariant explicitly rather than leaving it in
+a diagram — **Recommendation ≠ Authorization ≠ Execution**. A principal without
+binding authority is `refused` however clean every other check comes back, and
+`assertExecutable` throws when a clearance for one load is used to execute
+another (*a bypass with a receipt*).
+
+What the separation is worth is now a number rather than an argument:
+**2,049 ms mean, 483.5 s total over 236 loads.** That is what a dispatcher would
+wait per booking with the prover on the critical path.
+
+Two smaller corrections adopted: the feedback arrow closes into **EVIDENCE**,
+not canonical state — an observation is evidence and canonical state is derived
+from it, so writing state directly bypasses the provenance chain. And the
+`AUTHORITY / POLICY` box that was missing is `actingAuthority` on every request.
+
+On the `TERMINAL OPERATOR` ambiguity, the tree answers it: **Payload Terminal is
+the console, not a third vertical.** Every route is classified in
+`ROUTE_DISPOSITION`, none of them is a port or intermodal-yard operation, and
+the branding sweep named the operator surface. It belongs beside the agentic
+layer. Nothing here forecloses a terminal-operations vertical later; it just is
+not what exists.
+
+### Measured after
+
+- **79 test files, 1134 passed, 6 skipped.**
+- 27 pins on the world, 41 on the run, gate and prover.
+- All **nine** plants recovered, each by a detector under the discrimination
+  ceiling, checked against the world's own `boundTo` and never against an id
+  written into a report.
+- Notary: **held 233, breached 1, unproven 2** — the two unproven carrying
+  distinct reasons, so the two plants that land there have different detectors.
+- Authorization: **342 authorized, 111 refused, 67 undetermined**, with the
+  cover check now reaching refuse *and* undetermined rather than one value.

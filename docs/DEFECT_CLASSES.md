@@ -240,6 +240,11 @@ an ordinal that contradicts this table.
 | 14 | 54 | A test asserting the absence of the feature it was named for, and a "central" test that could not catch its own bug |
 | 15 | 55 | A numeric type alias hid a type from the accounting guard that had just been widened to see it |
 | 16 | 57 | An instance recorded in the wrong state of a distinction I had argued to preserve, from a summary, with the source in the scratchpad |
+| 17 | 63 | A generator's transition chain walked its own private state table: 4,392 of 5,570 hops name a state the engine's `TRANSITIONS` refuses, reported as "zero illegal" |
+| 18 | 63 | An identity renamed onto another's id: 18 carriers, 17 distinct, and the divergence scan's top offender was two carriers merged into one row |
+| 19 | 63 | A defect described in a comment as already fixed, in the same file as the code causing it — the fallback misbinds on 3 of 16 seeds and did not fire at the one that was run |
+| 20 | 63 | A detector whose named set was the whole population reported RECOVERED for two different plants: containment read as detection |
+| 21 | 63 | A fixture that could not demonstrate its own finding — with the confound removed, a sound and an unsound estimator gave the same answer |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,
