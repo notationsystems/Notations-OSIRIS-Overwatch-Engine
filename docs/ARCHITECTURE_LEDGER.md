@@ -5698,3 +5698,97 @@ decision, not mine to take silently in either direction.
 - Lint on `osint/whois/route.ts`: 10 errors → 6. The two new files are clean.
 - Five surfaces from the phase-70 retraction remain: `middleware.ts`,
   `api/news`, `api/astra`, `api/region-dossier`, `public/robots.txt`.
+
+
+## Phase 72 — the visitor-address log that page counting left behind
+
+Second of the six surfaces from the phase-70 retraction. `src/middleware.ts`
+runs ahead of every page request, and sent Umami two events:
+
+```ts
+const ipEvent = fetch('http://umami-umami-1:3000/api/send', {
+  headers: { …, 'x-forwarded-for': ip },
+  body: JSON.stringify({
+    payload: { ...basePayload, name: "Network Log", data: { IP: ip } },
+```
+
+**The two uses of that value are two different acts, and they are two lines
+apart.** `x-forwarded-for` is the documented way to give a self-hosted Umami
+the real client address from behind a proxy: it salts and hashes it into a
+rotating visitor id, derives a country, and does not retain the address. Used
+and discarded. `data: {}` is CUSTOM EVENT PROPERTIES — Umami stores those
+verbatim and renders them back. An address placed there is retained, per
+visitor, for as long as the analytics database exists.
+
+So a firm about to hold carrier, driver and customer records was accumulating a
+visitor-IP log as a side effect of counting page views, under a field name
+that reads like infrastructure telemetry. This is the codebase whose miss log
+carries a vocabulary gate precisely so that query text about a person is
+counted and its string discarded.
+
+### The population was right and the markers were narrow. Again.
+
+`collectionPolicySurface` Part A scans every source file outside the route
+files, and `src/middleware.ts` was in that population — one of 167 — for the
+whole of phases 68 through 71. It passed every run.
+
+Every marker in Part A names an upstream OSINT host or a scanning tool, and
+that is the second time this exact shortfall has been recorded: phase 69 said
+the same sentence about `WorldRemote`, which called nothing. This one calls
+something, but it calls the firm's OWN analytics collector. There is no
+third-party host to name and no tool to blacklist. **The prohibited thing is
+not who is contacted, it is what is enclosed.**
+
+I have now written "the population was right, the markers were narrow" three
+times in five phases. The lesson is not that another marker was needed. It is
+that a marker set answers *what does this file mention*, and every defect in
+this sequence has been a question about *what does this file emit*. So this
+phase, like 71, is checked behaviourally.
+
+### The fix
+
+`src/lib/telemetryPayload.ts` builds the posts; `buildTelemetryPosts` takes the
+client address as an argument and can only put it in a HEADER. The test asserts
+of the output that no body contains it — and, as the discriminating half, that
+the header still does. Without that second assertion the check would also pass
+for a payload that had dropped the address entirely, deleting the permitted use
+along with the forbidden one and reporting success.
+
+Two further things went with it:
+
+- **`screen: "1920x1080"` and `language: "en-US"`** were declared on every
+  request. Middleware runs on the server and can observe neither. They are not
+  defaults; they are measurements never taken, reported as though they had
+  been — the one thing this codebase refuses everywhere else, sitting in
+  outbound analytics since the fork.
+- **The hard-coded site id.** `process.env.UMAMI_WEBSITE_ID ||
+  "cd8f216c-fc3f-45f5-ba1a-e10309a61d18"` meant any fork or second deployment
+  silently posted its traffic into one specific person's analytics account,
+  invisibly to both parties. Telemetry is now silent unless both
+  `UMAMI_WEBSITE_ID` and `UMAMI_ENDPOINT` are set.
+
+`UMAMI_WEBSITE_ID` was also read by the code and **undocumented** in
+`.env.example` — the exact inverse of the phase-70 defect, in the file phase 70
+had just rewritten to claim every key in it is one the code reads. Phase 70
+checked one direction of that correspondence and not the other. Both variables
+are now documented, with the header/body distinction written down beside them.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| the `Network Log` event returns, with `data: { IP }` | *never puts the address in any body* |
+| `screen`/`language` return | *fabricates no measurement it could not have taken* |
+| the hard-coded site-id fallback returns | *emits nothing without a website id* |
+
+Each fires one assertion, and the header assertion keeps passing throughout —
+so the checks distinguish "stopped retaining the address" from "stopped sending
+anything".
+
+### Measured after
+
+- **1244 passed, 6 skipped** (from 1236 / 6). Eight new pins, all behavioural.
+- Documented env variables: 7 → 9, all nine read by the code, and now every
+  variable the code reads is documented.
+- Four surfaces from the retraction remain: `api/news`, `api/astra`,
+  `api/region-dossier`, `public/robots.txt`.

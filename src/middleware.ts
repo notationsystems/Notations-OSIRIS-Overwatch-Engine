@@ -1,38 +1,49 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest, NextFetchEvent } from 'next/server';
+import { buildTelemetryPosts } from '@/lib/telemetryPayload';
 
+/**
+ * Payload — page telemetry.
+ *
+ * This file previously sent Umami a second event named `"Network Log"`
+ * carrying `data: { IP: ip }`. Umami stores custom event properties verbatim,
+ * so that accumulated a retained visitor-address log on every page view. The
+ * payload construction now lives in `@/lib/telemetryPayload`, where a test can
+ * assert of the OUTPUT that the address never reaches a body — see its header
+ * for why the address in a HEADER is a different act from the address in a
+ * body, and why a check that merely looks for the word cannot tell them apart.
+ *
+ * Telemetry is silent unless both `UMAMI_WEBSITE_ID` and `UMAMI_ENDPOINT` are
+ * set. The previous hard-coded site-id fallback meant any fork posted its
+ * traffic into one specific analytics account.
+ */
 export function middleware(request: NextRequest, event: NextFetchEvent) {
-  const url = request.nextUrl.pathname;
-  
-  const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '127.0.0.1';
-  const userAgent = request.headers.get('user-agent') || 'Unknown Payload Terminal Client';
-  
-  const basePayload = {
+  const posts = buildTelemetryPosts({
+    url: request.nextUrl.pathname,
     hostname: request.nextUrl.hostname,
-    language: "en-US",
-    referrer: request.headers.get('referer') || "",
-    screen: "1920x1080",
-    title: "Payload Terminal",
-    url: url,
-    website: process.env.UMAMI_WEBSITE_ID || "cd8f216c-fc3f-45f5-ba1a-e10309a61d18"
-  };
+    referrer: request.headers.get('referer') || '',
+    userAgent: request.headers.get('user-agent') || 'Unknown Payload Terminal Client',
+    clientIp:
+      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('x-forwarded-for') ||
+      '127.0.0.1',
+    websiteId: process.env.UMAMI_WEBSITE_ID,
+    endpoint: process.env.UMAMI_ENDPOINT,
+  });
 
-  const pageView = fetch('http://umami-umami-1:3000/api/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': userAgent, 'x-forwarded-for': ip },
-    body: JSON.stringify({ payload: basePayload, type: "event" })
-  }).catch(() => {});
-
-  const ipEvent = fetch('http://umami-umami-1:3000/api/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': userAgent, 'x-forwarded-for': ip },
-    body: JSON.stringify({
-      payload: { ...basePayload, name: "Network Log", data: { IP: ip } },
-      type: "event"
-    })
-  }).catch(() => {});
-
-  event.waitUntil(Promise.all([pageView, ipEvent]));
+  if (posts.length) {
+    event.waitUntil(
+      Promise.all(
+        posts.map((post) =>
+          fetch(post.endpoint, {
+            method: 'POST',
+            headers: post.headers,
+            body: post.body,
+          }).catch(() => {}),
+        ),
+      ),
+    );
+  }
 
   return NextResponse.next();
 }
