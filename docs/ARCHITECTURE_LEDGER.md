@@ -6385,3 +6385,90 @@ now a thing the suite checks.
   added; both new files clean.
 - The governor is load-bearing: an OpenSky call over cap is now refused by this
   instrument rather than by OpenSky.
+
+
+## Phase 81 — the operations queue: three kinds of not-priced, kept apart
+
+The first item in this session's brief, reached last: the morning view a broker
+opens before anything else. Until now the tree had two pages — the map and the
+docs — and the pricing engine had no screen at all.
+
+### The distinction the screen exists to make
+
+The three lists are not a grouping of one outcome. They are three different
+kinds of not-priced, and separating them is the entire product:
+
+| list | what happened | where the operator goes |
+|---|---|---|
+| **PRICED** | a number, with its confidence tier and band | to the customer |
+| **BLOCKED** | the pricer was never asked — an input it requires is absent | to the LOAD, for one field, thirty seconds |
+| **REFUSED** | the pricer was asked and declined with a clause | to a DECISION: price it another way, or build the history |
+
+Collapsing BLOCKED into REFUSED is the specific error this module prevents.
+*"We cannot price this lane"* sends an operator to look at the lane; *"this load
+has no equipment type"* sends them to look at the load. Both render as an
+unpriced row on every freight tool I have seen, and the difference between them
+is the difference between a morning of work and a morning of shrugging.
+
+It is the same distinction the pricer already makes internally between
+`stale_history` and `no_cost_data` — a lane with forty loads outside the window
+is not a lane with no history — carried up one level, to the load.
+
+### Conservation, because the operator believes they have seen the book
+
+Every pending load lands in exactly one list, and `census.conserved` is DERIVED
+from the lists rather than counted alongside them. A queue that silently drops a
+load is worse than no queue: nothing on the page looks wrong, and the belief the
+screen creates — *I have seen my book this morning* — is false. That is row
+accounting from round 26, applied to the surface a person actually reads.
+
+The plant is the one that matters: a blocked load quietly `continue`d past the
+list fails the conservation pin, not merely a count.
+
+### Nothing on this screen is admissible
+
+The queue carries the attestation of the observations it was built from. Built
+on the simulated world it rests on representative evidence, so `admissible` is
+false and the screen has to say so. A morning view that looks authoritative
+while resting on a fixture is the most expensive possible form of that defect —
+it is the one screen whose output becomes a price someone quotes.
+
+### A standing guard caught it on the way in
+
+The full suite failed where the module's own tests passed:
+`attestationClosure` named `PendingLoad` and `QueueCensus` as number-bearing
+types that had declared nothing. That check requires every such type in the
+layer to declare its attestation, be classified as not-a-claim-about-the-world
+with a reason, or be recorded as an open debt — *silence is the one option
+removed*.
+
+Both are about our own book — a load we have taken and not yet quoted, and the
+counts of the three lists it can land in — so both are registered as
+not-a-world-claim with that reason. Worth recording that the guard fired on new
+code written by someone who had read it, and that the module's own nine tests
+all passed while it did. **A green file is not a green suite**, which is the
+local-green rule stated one level down.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| BLOCKED collapsed into REFUSED | 4 pins, including the discriminating pair |
+| a blocked load silently dropped | the conservation pin AND the missing-fields pin |
+| only the first missing field named | the one-trip-not-three pin |
+| fixture-derived output claims `admissible: true` | the admissibility pin |
+
+### Measured after
+
+- **89 test files, 1283 passed, 6 skipped** (from 88 / 1274), read from the
+  runner.
+- Lint clean on both new files.
+
+### What this is not, yet
+
+A module, not a page. `buildOperationsQueue` returns the three lists and nothing
+renders them — the same "built but not load-bearing" state phase 77 left the
+governor in, and named as a claim about the future rather than a fact. The next
+item is the route that renders it, and the thing to get right there is that
+BLOCKED and REFUSED must not look alike on screen either, having been so
+carefully kept apart in the data.

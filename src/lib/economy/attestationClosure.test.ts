@@ -204,6 +204,12 @@ describe('every number-bearing type in the layer is accounted for', () => {
     PricingPolicy: 'floors, a window, a margin and a financing cost — the rule that shapes a quote',
     QuotePolicy: 'a target margin and a band width — the rule that shapes a quote, not a measurement',
     QuoteResult: 'the quote carries its own confidence tier, n, carrier count, spread and staleness',
+    // The operations queue (phase 81). Both are about OUR OWN book: a load we
+    // have taken and have not yet quoted, and the counts of the three lists it
+    // can land in. Neither asserts anything about the world — the quote inside
+    // a PricedEntry does, and QuoteResult above is where that is accounted for.
+    PendingLoad: 'one load of ours awaiting a quote; its fields are our own booking record',
+    QueueCensus: 'counts of our own three lists, derived from the lists so a load cannot be dropped',
     InclusionProof: 'a leaf index and tree size into our own log',
     ConsistencyProof: 'two sizes of our own log',
     // Claimable artifacts, carrier trust, claim economics, transparency log.
