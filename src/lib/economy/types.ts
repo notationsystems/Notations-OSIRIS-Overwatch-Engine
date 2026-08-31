@@ -17,6 +17,14 @@
 
 /* ── Provenance ── */
 
+/** ISO 8601 instant, e.g. "2026-08-31T14:05:00Z". A named alias because a
+ *  bare `string` in a timestamp position is how a date and a knownAt get
+ *  swapped without the compiler noticing. */
+export type ISODateTime = string;
+
+/** Lowercase hex digest. */
+export type Hash = string;
+
 export interface Provenance {
   /** Stable id of the source, e.g. "usgs-mcs-2025". */
   sourceId: string;
