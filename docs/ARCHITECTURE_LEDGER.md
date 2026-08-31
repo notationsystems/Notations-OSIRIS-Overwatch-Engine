@@ -5382,3 +5382,122 @@ errors removed, none added, against an unchanged substrate baseline.
   phase removed capability and added markers, not assertions.
 - Production build compiles; typecheck clean.
 - Panels: 12 → 11. The sequence walk now checks 16,105 states, derived.
+
+
+## Phase 70 — the configuration that outlived the capability
+
+A-0 deleted the RECON scanner routes and the `/api/scanner` proxy in phase 46.
+`.env.example` went on telling every operator who stood the system up:
+
+```
+#  As of this revision the application code only actually reads SCANNER_URL
+#  and SCANNER_KEY.
+#
+#  RECON SCANNER BACKEND  ── the ONLY keys the current code consumes ──
+#  Powers the RECON toolkit (quick/ssl/headers/rdns/subdomains/tech/whois/
+#  geoloc/vuln scans). Requires running the separate OSIRIS scanner backend.
+SCANNER_URL=
+SCANNER_KEY=
+```
+
+Measured: `SCANNER_URL` and `SCANNER_KEY` are read by **zero** source files.
+So the sentence is false twice over — they are not the only keys the code
+reads, they are not keys the code reads at all — and it is the emphatic
+sentence, set off in its own banner, that a person configuring the system acts
+on first.
+
+The same file also configured `ETHERSCAN_API_KEY` and `HELIUS_API_KEY` under
+a **CHAIN INTEL** heading describing "wallet forensics (BTC/ETH/SOL balance,
+transaction history, counterparties, OFAC SDN screening, risk scoring)" and
+naming `/api/osint/crypto?probe=1` — a route A-0 deleted on the reasoning that
+*tracing an individual's wallet is not a freight firm's business*. Both keys:
+zero readers. And it documented `OSIRIS_TELEGRAM_CHANNELS` as the channel list
+"to scrape for the Telegram OSINT map layer" — a layer phase 46 established
+was advertised and **never built**, with `war_monitor` and `osintdefender` as
+the worked example.
+
+`DOCKER.md` carried the same thing in a table headed *What the code actually
+reads today*, and its TL;DR told the reader keys "only matter for the optional
+RECON scanner backend".
+
+### The part that makes it a defect rather than staleness
+
+**README.md already said the opposite.** Line 240, since the A-0 rewrite:
+
+> `SCANNER_URL` / `SCANNER_KEY` are **gone**. They configured a port-scanning
+> backend…
+
+One fact, three documents, and they disagreed for twenty-four phases. That is
+class 6 exactly — a hand-maintained restatement drifting from the thing it
+describes — with the aggravation that the drifted copies are the *operational*
+ones. Nobody configures a deployment out of the README's prose section; they
+copy `.env.example`.
+
+### Why the gate that exists for this went green
+
+The shipped-description gate has classified `DOCKER.md` as `outward-facing`
+and scanned it since phase 48. It passed, because its markers are PHRASES:
+`port scann`, `vulnerability scann`, `\bshodan\b`. The file says "RECON
+scanner backend" and lists "vuln" — neither matches. A gate against
+advertising a prohibited capability, defeated by the vocabulary the document
+happened to use.
+
+And `.env.example` was never classified at all. `candidateArtifacts()`, the
+function whose whole job is to stop the list falling behind the tree, globs
+uppercase `.md` files at the root and `public/` manifests. An env template is
+neither, so the artifact that CONFIGURES the capability was outside the
+enumeration built to prevent exactly that.
+
+### The fix
+
+- `.env.example` rewritten: the scanner block, the chain-intel block and the
+  Telegram block deleted; the false claim replaced with the true one (every
+  key here is read by the code, and all are optional); `OSIRIS_PORT` →
+  `PAYLOAD_PORT`, with the compat note.
+- `DOCKER.md`: the table replaced with what is actually true, saying plainly
+  that it outlived the capability by twenty-four phases rather than quietly
+  dropping the rows. Its `ports:` documentation also described
+  `${OSIRIS_PORT:-3000}` while the compose file reads
+  `${PAYLOAD_PORT:-${OSIRIS_PORT:-3000}}` — the same class, one line down.
+- `.env.example` classified `outward-facing`, and `candidateArtifacts()` now
+  discovers `.env.example|.template|.sample`. **Templates only, never `.env`
+  itself** — that file is gitignored, holds real secrets, and is not a
+  description of anything shipped.
+- Two markers. One is keyed on the **assignment** — `^\s*SCANNER_(URL|KEY)\s*=`
+  — because CONFIGURING a capability is a stronger claim than describing one,
+  and because keying on the word would forbid the removal notes that README
+  and DOCKER.md now carry. A prohibition nobody can state is not a
+  prohibition. The second names the toolkit as a product feature.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| `SCANNER_URL=`/`SCANNER_KEY=` appended to `.env.example` | `.env.example: advertises port-scanning backend configuration` |
+| a `RECON scanner backend` table row appended to `DOCKER.md` | `DOCKER.md: advertises a RECON scanning toolkit as a product feature` |
+| an unclassified `.env.template` created | `classifies every description-bearing artifact it can find` → `.env.template` |
+
+Each fires one assertion, and the removal notes in README and DOCKER.md keep
+passing — which is the discriminating case, not an afterthought.
+
+### Measured after
+
+- **84 test files, 1225 passed, 6 skipped.**
+- Env variables documented: 13 → 9, and all 9 have a reader in `src/`.
+- Description artifacts classified: 9 → 10; the candidate scan now covers
+  three file shapes instead of two.
+
+### The directive is now closed
+
+Three phases, three commits: the resolver service (68), the browser recon
+engine (69), and the configuration that outlived the capability (70). What is
+left is not person-targeting or host-scanning, and is recorded as deliberate:
+the `general-purpose` feeds A-1 retired behind `routeGate`, and the eight
+`infrastructure-conditional` routes A-0 kept with the organisational-
+attribution constraint written into each one's source.
+
+One thing found and NOT resolved, named so it is a decision: `ip-sweep-devices`,
+`ip-sweep-pulse` and `ip-sweep-connections` remain registered as map sources.
+Whether anything still fills them is not established. The A-0 note about
+WorldRemote is the standing warning against guessing from a name, so this is
+written as a question rather than an answer.

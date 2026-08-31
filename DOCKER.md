@@ -6,8 +6,7 @@ app, and configuring the optional API keys.
 
 > **TL;DR:** Payload Terminal runs fully **without any API keys**. All core feeds
 > (aviation, satellites, fires, earthquakes, weather, news, CVEs) use public
-> keyless sources. Keys only matter for the optional RECON scanner backend and
-> for raising rate limits on a few feeds.
+> keyless sources. Keys only matter for raising rate limits on a few feeds.
 
 ---
 
@@ -34,9 +33,10 @@ What the compose file does:
 - **`env_file: .env` (`required: false`)** — if a `.env` file exists its
   values are injected into the container; if it's missing, Payload Terminal still starts
   with the keyless feeds.
-- **`ports: ${OSIRIS_PORT:-3000}:3000`** — the web UI. The container always
-  listens on 3000; the published **host** port is `OSIRIS_PORT` (default
-  `3000`). Set `OSIRIS_PORT` in `.env` to remap it, e.g. `OSIRIS_PORT=3005`
+- **`ports: ${PAYLOAD_PORT:-${OSIRIS_PORT:-3000}}:3000`** — the web UI. The
+  container always listens on 3000; the published **host** port is
+  `PAYLOAD_PORT` (default `3000`), with `OSIRIS_PORT` honoured for one release.
+  Set `PAYLOAD_PORT` in `.env` to remap it, e.g. `PAYLOAD_PORT=3005`
   when 3000 is already in use — no need to edit the compose file.
 - **`restart: unless-stopped`** — survives reboots.
 
@@ -93,7 +93,7 @@ reads.
    contents of `docker-compose.yml`.
    *(or simply run `docker compose up -d` from the cloned directory).*
 3. Payload Terminal appears on the dashboard with its icon, reachable on host port
-   `3000` (or whatever `OSIRIS_PORT` you set in `.env`).
+   `3000` (or whatever `PAYLOAD_PORT` you set in `.env`).
 
 The app icon is the gold Eye-of-Horus mark in
 `public/casaos-icon.png` (512×512 PNG), referenced by the `icon:` URL in the
@@ -113,13 +113,14 @@ Copy `.env.template` to `.env` and fill in only what you need.
 
 ### What the code actually reads today
 
-| Variable | Purpose | Required for |
-|----------|---------|--------------|
-| `SCANNER_URL` | RECON scanner backend base URL (e.g. `http://scanner:7700`) | RECON toolkit (quick/ssl/headers/rdns/subdomains/tech/whois/geoloc/vuln) |
-| `SCANNER_KEY` | Shared secret; **must equal the backend's `OSIRIS_KEY`** | RECON toolkit |
+None are required. Payload Terminal reads only optional keys, each of which
+raises a rate limit on a public feed — see `.env.example`, where every entry
+is a variable the code actually consumes.
 
-Without `SCANNER_URL`/`SCANNER_KEY` the RECON endpoints return `503` and the
-rest of Payload Terminal works normally. Generate a key with `openssl rand -hex 32`.
+This section previously documented a `SCANNER_URL`/`SCANNER_KEY` pair for a
+RECON port-scanning backend. Those routes were deleted in ledger phase 46 and
+nothing has read either variable since; the table outlived the capability by
+twenty-four phases.
 
 ### Optional keys (reserved / for higher rate limits)
 

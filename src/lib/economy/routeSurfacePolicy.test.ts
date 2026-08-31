@@ -203,6 +203,14 @@ const DESCRIPTION_ARTIFACTS: Readonly<Record<string, ArtifactRole>> = {
   'public/site.webmanifest': 'outward-facing',
   'src/app/docs/DocsClient.tsx': 'outward-facing',
   'src/app/docs/apiCatalog.ts': 'outward-facing',
+  // The environment template is read by anyone standing the system up, and it
+  // is the most operational description there is: it does not describe a
+  // capability, it CONFIGURES one. It advertised `SCANNER_URL`/`SCANNER_KEY`
+  // for a RECON port-scanning backend, and wallet-forensics keys, for
+  // twenty-four phases after A-0 deleted both — while README.md said in plain
+  // text that those keys were gone. Two documents, one fact, and no check
+  // reading either (ledger phase 70).
+  '.env.example': 'outward-facing',
 };
 
 /**
@@ -217,6 +225,11 @@ function candidateArtifacts(): string[] {
   }
   for (const entry of readdirSync(join(process.cwd(), 'public'))) {
     if (entry.endsWith('.webmanifest') || entry === 'manifest.json') out.push(`public/${entry}`);
+  }
+  // Environment TEMPLATES only — never `.env` itself, which is gitignored,
+  // holds real secrets, and is not a description of anything shipped.
+  for (const entry of readdirSync(process.cwd())) {
+    if (/^\.env\.(example|template|sample)$/.test(entry)) out.push(entry);
   }
   return out.sort();
 }
@@ -285,6 +298,19 @@ describe('the shipped description advertises no prohibited capability', () => {
     { pattern: /phone (?:intel|research|lookup)/i, capability: 'phone research' },
     { pattern: /port scann|vulnerability scann|\bshodan\b/i, capability: 'port / vulnerability scanning' },
     { pattern: /telegram osint|scrap\w* .{0,20}telegram|telegram .{0,20}scrap/i, capability: 'Telegram person-post scraping' },
+    /**
+     * CONFIGURING a capability is a stronger claim than describing one, and it
+     * is the form the drift actually took: `.env.example` did not say the
+     * scanner existed, it SET the variables, under a heading calling them
+     * "the ONLY keys the current code consumes" — of a route deleted in
+     * phase 46 that no source file has read since.
+     *
+     * Keyed on the assignment rather than the word, so a document may still
+     * say a scanning backend was REMOVED. DOCKER.md and README.md both do,
+     * and a prohibition nobody can state is not a prohibition.
+     */
+    { pattern: /^\s*SCANNER_(?:URL|KEY)\s*=/m, capability: 'port-scanning backend configuration' },
+    { pattern: /RECON (?:toolkit|scanner backend)|scanner backend base URL/i, capability: 'a RECON scanning toolkit as a product feature' },
   ];
 
   it('does not name a prohibited capability as a feature', () => {
