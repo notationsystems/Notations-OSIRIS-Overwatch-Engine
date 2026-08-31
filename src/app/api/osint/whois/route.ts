@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { safeFetch, isRateLimited, getClientIp } from '@/lib/ssrf-guard';
-import { matchExact, type SanctionEntry } from '@/lib/sanctions';
+import { matchExact, PERSON_SCHEMAS, type SanctionEntry } from '@/lib/sanctions';
+import { projectRdapEntities, type ScreeningCandidate } from '@/lib/rdapProjection';
 
 /**
  * Payload — WHOIS / domain intelligence via RDAP (free, standardised).
@@ -46,6 +47,14 @@ export async function GET(req: Request) {
   try {
     const results: any = { domain, timestamp: new Date().toISOString() };
 
+    /**
+     * Values screened against the SDN but NEVER returned as themselves. The
+     * condition permits USING a registrant name for OFAC screening; it does
+     * not permit handing it back. Keeping them in a local rather than on
+     * `results` is what makes that structural instead of remembered.
+     */
+    const screening: ScreeningCandidate[] = [];
+
     // RDAP (Registration Data Access Protocol) — successor to WHOIS
     try {
       const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, {
@@ -54,6 +63,12 @@ export async function GET(req: Request) {
       });
       if (res.ok) {
         const data = await res.json();
+        // The person-handling lives in `rdapProjection` so it can be exercised
+        // against a planted individual registrant. See its header: a rule
+        // enforced by reading this file could only ask whether `fn` is
+        // TOUCHED, and screening requires touching it.
+        const projected = projectRdapEntities(data.entities);
+        screening.push(...projected.screening);
         results.rdap = {
           handle: data.handle,
           name: data.ldhName,
@@ -63,12 +78,7 @@ export async function GET(req: Request) {
             date: e.eventDate,
           })),
           nameservers: (data.nameservers || []).map((ns: any) => ns.ldhName),
-          entities: (data.entities || []).map((e: any) => ({
-            handle: e.handle,
-            roles: e.roles,
-            name: e.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3],
-            org: e.vcardArray?.[1]?.find((v: any) => v[0] === 'org')?.[3],
-          })).filter((e: any) => e.name || e.org),
+          entities: projected.entities,
         };
 
         // Extract key dates
@@ -113,20 +123,37 @@ export async function GET(req: Request) {
       results.security_score = { score, max: 7, grade: score >= 5 ? 'A' : score >= 3 ? 'B' : score >= 1 ? 'C' : 'F' };
     } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
 
-    // OFAC SDN cross-check on RDAP entity names/orgs.
+    /**
+     * OFAC SDN cross-check. Screening a registrant name is a use the condition
+     * ALLOWS — the route exists partly to surface a sanctioned registrant —
+     * and returning that name is a use it forbids. Those come apart here.
+     *
+     * A designated PERSON is filtered out of the entries, the same filter
+     * `osint/sanctions` applies to its own results and now from the same
+     * definition. What survives is by construction a designated NON-natural
+     * person, so echoing the value that matched it names an organisation
+     * rather than an individual — which is why `matched_value` can be
+     * returned for a surviving hit and never for a suppressed one.
+     *
+     * The suppressed count is reported rather than dropped. A caller who sees
+     * no hits is entitled to know whether that means nothing matched or
+     * something matched and was withheld: those are different answers.
+     */
     try {
-      const candidates = new Set<string>();
-      for (const ent of results.rdap?.entities ?? []) {
-        if (ent.name) candidates.add(ent.name);
-        if (ent.org) candidates.add(ent.org);
-      }
-      const hits: Array<{ matched_value: string; entries: SanctionEntry[] }> = [];
-      for (const value of candidates) {
+      const seen = new Set<string>();
+      const hits: Array<{ matched_value: string; matched_from: string; entries: SanctionEntry[] }> = [];
+      let withheldPersonClass = 0;
+      for (const { value, source } of screening) {
+        if (seen.has(value)) continue;
+        seen.add(value);
         const entries = await matchExact(value);
-        if (entries.length) hits.push({ matched_value: value, entries });
+        if (!entries.length) continue;
+        const servable = entries.filter((m) => !PERSON_SCHEMAS.has(m.schema));
+        withheldPersonClass += entries.length - servable.length;
+        if (servable.length) hits.push({ matched_value: value, matched_from: source, entries: servable });
       }
-      results.sanctions_match = hits.length
-        ? { source: 'OFAC SDN', hits }
+      results.sanctions_match = hits.length || withheldPersonClass
+        ? { source: 'OFAC SDN', hits, withheld_person_class: withheldPersonClass }
         : null;
     } catch (e) { console.warn('[Payload Terminal] Sanctions cross-check failed:', e instanceof Error ? e.message : e); }
 

@@ -31,6 +31,17 @@ export type Schema =
   | 'Security'
   | string;
 
+/**
+ * Schemas whose subject is a NATURAL PERSON. Never served by any route.
+ *
+ * Lifted out of `osint/sanctions/route.ts` in ledger phase 71, when a second
+ * route needed the same filter. Two routes each holding their own copy of
+ * "which schemas are people" is the shape that has gone wrong here every time
+ * it has been allowed: the copies drift, each stays internally consistent, and
+ * the one nobody re-read is the one that serves a person.
+ */
+export const PERSON_SCHEMAS: ReadonlySet<string> = new Set(['Person']);
+
 export interface SanctionEntry {
   id: string;
   schema: Schema;

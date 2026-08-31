@@ -142,6 +142,69 @@ describe('the collection policy holds at the route surface, not only at registra
     ].join(' ')).toEqual([]);
   });
 
+  /**
+   * A CONDITION THE CODE DOES NOT HONOUR IS A SENTENCE, NOT A CONSTRAINT
+   * (ledger phase 71).
+   *
+   * The test above checks that a conditional route STATES its condition. That
+   * is all it checks, and `osint/whois` passed it for twenty-five phases while
+   * doing the opposite of what its own paragraph says. Its header is not
+   * careless — it is the most careful one in the tree:
+   *
+   *   "WHOIS carries the sharpest edge of the conditional category, because a
+   *    domain registered by an individual has a natural person in the
+   *    registrant field. RDAP redacts most of it; where a registry does not,
+   *    the redaction is the registry's choice and NOT THIS ROUTE'S LICENCE TO
+   *    USE WHAT COMES BACK."
+   *
+   * Directly beneath it, the route read the vCard `fn` — the registrant's
+   * formatted name — into its response, and RETAINED entities that carried
+   * nothing else (`.filter((e) => e.name || e.org)`). It used what came back.
+   *
+   * So the prose was not wrong and the code was not unconsidered; they were
+   * written by the same hand and never checked against each other. A gate that
+   * verifies a promise is present, and never that it is kept, is the
+   * documentation-shaped form of this codebase's oldest class.
+   *
+   * Scoped to `infrastructure-conditional` deliberately. A freight route may
+   * hold a driver's or a broker contact's name — those are the firm's own
+   * business records. These eight routes are the ones whose licence to exist
+   * is a promise that their subject is never a natural person.
+   */
+  const PERSON_NAME_EXTRACTION: ReadonlyArray<{ pattern: RegExp; field: string }> = [
+    /**
+     * Keyed on a person name being PLACED INTO an emitted object — `name:`
+     * assigned from a vCard `fn` lookup, which is the exact shape the defect
+     * had — and NOT on the field being read. Screening a registrant against
+     * the SDN is a use the condition allows and it requires reading `fn`, so a
+     * marker that fired on the read would forbid the permitted use. What the
+     * route RETURNS is checked behaviourally in `rdapProjection.test.ts`,
+     * against a planted individual registrant; this is the cheap net over the
+     * seven sibling routes that have no such projection of their own.
+     */
+    { pattern: /\bname\s*:\s*[^,;\n]*['"]fn['"]/, field: "the vCard `fn` formatted name into its response" },
+    { pattern: /\b(?:firstName|lastName|givenName|familyName|given_name|family_name)\b/, field: 'a given/family name field' },
+    { pattern: /\b(?:full_?name|personName|contact_?name|registrant_?name)\b/i, field: 'a personal-name field' },
+  ];
+
+  it('honours the condition in code, not only in the comment', () => {
+    const findings: string[] = [];
+    for (const [route, disposition] of Object.entries(ROUTE_DISPOSITION)) {
+      if (disposition !== 'infrastructure-conditional') continue;
+      const source = readFileSync(join(API_ROOT, route, 'route.ts'), 'utf8');
+      for (const { pattern, field } of PERSON_NAME_EXTRACTION) {
+        if (pattern.test(source)) findings.push(`${route}: extracts ${field}`);
+      }
+    }
+    expect(findings, [
+      'A route permitted only on the condition that its subject is never a natural person',
+      'extracts a natural-person name field. The condition is written in its own source and',
+      'the test above confirms the sentence is there — which is exactly how this survived:',
+      "a promise checked for presence and never for being kept. Screening a name against a",
+      'sanctions list is a use the condition allows; RETURNING it is not.',
+    ].join(' ')).toEqual([]);
+  });
+
   it('never serves a natural person from the sanctions route', () => {
     const source = readFileSync(join(API_ROOT, 'osint/sanctions/route.ts'), 'utf8');
     // The allowlist alone fails open for callers who name no schema, so the

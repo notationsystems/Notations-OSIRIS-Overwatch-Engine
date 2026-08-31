@@ -5569,3 +5569,132 @@ gates that did exactly that. The next phase is the six above, and the first
 question for each is not *how do I remove it* but *what record already
 describes it, and is that record true?* — because two of them already had one,
 and both were wrong.
+
+
+## Phase 71 — a condition checked for presence, never for being kept
+
+First of the six surfaces the phase-70 retraction named. `osint/whois` is
+permitted to exist on a condition written into its own source, and the gate
+that enforces conditional routes asserts that the condition is THERE. It was
+there. It was not kept.
+
+**The header is not careless — it is the most careful one in the tree.** It
+names the exact hazard, unprompted:
+
+> WHOIS carries the sharpest edge of the conditional category, because a
+> domain registered by an individual has a natural person in the registrant
+> field. RDAP redacts most of it; where a registry does not, the redaction is
+> the registry's choice and **not this route's licence to use what comes
+> back**.
+
+Eight lines below it, the route did this:
+
+```ts
+name: e.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3],
+org:  e.vcardArray?.[1]?.find((v: any) => v[0] === 'org')?.[3],
+})).filter((e: any) => e.name || e.org),
+```
+
+The vCard `fn` is the registrant's formatted name. It went into the response,
+and the filter RETAINED entities that carried nothing else — so an entity whose
+only identifier was a natural person's name was precisely the row that
+survived. It used what came back.
+
+Prose and code by the same hand, in the same file, never checked against each
+other. That is the documentation-shaped form of the class this project is
+built around, and the aggravation is that the paragraph proves the author saw
+the hazard clearly. Seeing it was not the missing part.
+
+### Why a source scan cannot close this, and what replaced it
+
+The first version of the new check scanned for the field being touched. It
+failed on the fixed route, and correctly: **screening a registrant against the
+OFAC list is a use the condition explicitly ALLOWS**, and screening requires
+reading `fn`. Any rule keyed on "does this file touch the field" must either
+forbid the permitted use or permit the forbidden one. It cannot separate them,
+because the difference is not in whether the value is read — it is in whether
+the value comes back.
+
+So the question is asked of the OUTPUT. The person-handling moved into
+`src/lib/rdapProjection.ts`, a pure function, and
+`rdapProjection.test.ts` runs it against a planted individual registrant and
+asserts the name appears nowhere in what the caller receives. The source-level
+marker stays as the cheap net over the seven sibling routes that have no such
+projection, narrowed to the shape the defect actually had — a person name
+placed INTO an emitted object (`name:` assigned from an `fn` lookup) rather
+than an `fn` lookup anywhere.
+
+### The third value, and the case a coarser fix gets wrong
+
+`org` is an organisation. `fn` is the entity's formatted name: the organisation
+for a legal entity, a natural person for an individual, **with nothing in RDAP
+to tell them apart**. So `fn` is not a name we have and not a name we lack — it
+is UNDETERMINED, and the licence decides undetermined against disclosure.
+
+The obvious cheap fix is to return `fn` only when `org` is absent, on the
+theory that an entity with an org is a company. It is wrong, and it is wrong on
+the commonest shape in real RDAP: a company registration carries `org` for the
+company AND `fn` for the human contact. That fix hands back the human's name,
+sitting next to the organisation's, and looks correct doing it. It is pinned as
+its own test.
+
+The withholding is COUNTED, not silent. An entity whose only identifier was a
+formatted name still appears, carrying the reason its name is missing — because
+a caller must be able to tell *a registrant exists and cannot be named here*
+from *no registrant was returned*. Dropping the row would narrow the population
+without saying so, which is the older defect wearing the newer one's clothes.
+That distinction is pinned separately, and plant 3 below shows the two failures
+are independent.
+
+### Screening kept, disclosure removed
+
+The route exists partly to surface a sanctioned registrant, so the name is
+still screened — withholding a value from the response and refusing to look at
+it are different things, and collapsing them would delete the reason the route
+is permitted at all. The raw values live in a local `screening` array that is
+never attached to the response, which makes the separation structural rather
+than remembered.
+
+SDN entries are then filtered to non-person schemas, the same filter
+`osint/sanctions` applies to its own results. What survives is by construction
+a designated NON-natural person, so echoing the value that matched it names an
+organisation rather than an individual — which is why `matched_value` is
+returned for a surviving hit and never for a suppressed one. Suppressed matches
+are counted into `withheld_person_class`: a caller who sees no hits is entitled
+to know whether nothing matched or something matched and was withheld.
+
+`PERSON_SCHEMAS` moved from `osint/sanctions/route.ts` into
+`src/lib/sanctions.ts` when the second route needed it. Two routes each holding
+their own copy of *which schemas are people* is the shape that has gone wrong
+here every time it has been allowed.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| the projection emits `formatted_name: formattedName` | 3 behavioural tests, including the discriminating pair — the screening list carries a value the projection does not |
+| the route re-emits `name: …'fn'…` into its response | the source marker, naming `osint/whois` |
+| the row is dropped instead of counted (`if (!org) continue`) | the two *which kind of nothing* pins, and NOT the disclosure pins |
+
+The third is the one worth noting: dropping the row and disclosing the name
+fail different assertions, so the check can tell which mistake was made.
+
+### Named, and deliberately not changed
+
+The route also fires an active HTTPS `HEAD` at the queried domain and harvests
+`server` and `x-powered-by` banners into a graded `security_score`. That is
+not a person-profiling question, and its subject is an organisational asset, so
+the condition does not decide it. It is recorded rather than settled because
+`tech` and `headers` were both items on the deleted RECON toolkit's menu
+(`quick/ssl/headers/rdns/subdomains/tech/whois/geoloc/vuln`), which makes
+"passive registry lookup" a poor description of what this route does. Whether
+active banner-grabbing is inside the kept route's licence is an operator
+decision, not mine to take silently in either direction.
+
+### Measured after
+
+- **85 test files, 1236 passed, 6 skipped** (from 84 / 1225 / 6). Eleven new
+  pins, ten of them behavioural.
+- Lint on `osint/whois/route.ts`: 10 errors → 6. The two new files are clean.
+- Five surfaces from the phase-70 retraction remain: `middleware.ts`,
+  `api/news`, `api/astra`, `api/region-dossier`, `public/robots.txt`.

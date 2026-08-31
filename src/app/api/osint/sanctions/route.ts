@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
-import { search, type Schema } from '@/lib/sanctions';
+import { search, type Schema, PERSON_SCHEMAS } from '@/lib/sanctions';
 
 /**
  * Payload — counterparty sanctions screening (OFAC SDN via the OpenSanctions
@@ -32,9 +32,6 @@ const ALLOWED_SCHEMAS: Schema[] = [
   'Airplane',
   'LegalEntity',
 ];
-
-/** Schemas whose subject is a natural person. Never served. */
-const PERSON_SCHEMAS: ReadonlySet<string> = new Set(['Person']);
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
