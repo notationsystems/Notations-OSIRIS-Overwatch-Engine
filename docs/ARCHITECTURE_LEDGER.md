@@ -5483,9 +5483,39 @@ passing — which is the discriminating case, not an afterthought.
 ### Measured after
 
 - **84 test files, 1225 passed, 6 skipped.**
-- Env variables documented: 13 → 9, and all 9 have a reader in `src/`.
+- Env variables documented: **11 → 7**, and all 7 have a reader in `src/`
+  (`CLOUDFLARE_API_TOKEN`, `FIRMS_API_KEY`, `OPENSKY_CLIENT_ID`,
+  `OPENSKY_CLIENT_SECRET`, `N2YO_API_KEY`, `AIS_API_KEY`, `PAYLOAD_PORT`).
+  Four removed: the two scanner keys and the two chain-intel keys.
 - Description artifacts classified: 9 → 10; the candidate scan now covers
   three file shapes instead of two.
+
+### Self-correction
+
+**This entry first said "13 → 9".** The true figures are 11 → 7. I counted
+with `grep -oE '^[A-Z_]+='`, which cannot match `N2YO_API_KEY` — the character
+class has no digits — and then wrote the wrong total into the ledger section
+that is *about* a hand-maintained number disagreeing with the world.
+
+Recorded rather than quietly edited, because the interesting part is not the
+typo. The number was produced by a pattern I did not check against its own
+population, which is the same act as the coverage table that `continue`d past
+the rows that mattered: a filter whose omissions are invisible because nothing
+counts what it dropped. The measurement is now enumerated rather than counted,
+so the figure and its members can be read against each other.
+
+### One thing looked at and deliberately not changed
+
+`src/app/api/geo/route.ts` is classified `'freight'` and calls `ip-api.com`.
+Read rather than assumed: it geolocates **the requesting client's own IP**,
+taken from `cf-connecting-ip` / `x-real-ip` / `x-forwarded-for`, to centre the
+map on the viewer, and it accepts no IP from the caller. The subject is the
+viewer, not a third party, so it is not the prohibited capability — but it is
+a route that resolves a person's approximate location to city and lat/lon with
+no condition stated in its source, while eight sibling routes carry one. Named
+here as a question for the operator, not answered by me: `whois`, `dns`, `ip`,
+`certs`, `bgp`, `mac`, `threats` and `sanctions` all say what they may not be
+used for, and this one says nothing.
 
 ### The directive is now closed
 
