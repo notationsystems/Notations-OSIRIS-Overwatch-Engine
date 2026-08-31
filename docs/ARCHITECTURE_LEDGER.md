@@ -6290,7 +6290,14 @@ remedy, so the documentation asserts the policy rather than contradicting it.
 
 ### Measured after
 
-- **1263 passed, 6 skipped**, 87 files. Build compiles.
+- **1264 passed, 6 skipped**, 87 files. Build compiles.
+
+  Recorded because it is the class: the line above first read **1263**, written
+  from arithmetic rather than from the runner, and the runner said 1264. Three
+  pins were added to 1261. A hand-computed number describing something the tree
+  already knows, wrong by one, in the document that exists to be trusted about
+  exactly such numbers — caught on the next run, one commit later, and corrected
+  here rather than silently.
 - One plant in this phase applied through `sed` and silently did nothing — the
   `|` in the payload collided with the substitution delimiter, and the run came
   back green. A plant that fails to apply reports exactly what a plant that
