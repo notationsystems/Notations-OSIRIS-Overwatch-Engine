@@ -7,7 +7,6 @@ import {
   ChevronDown, ChevronUp, MapPin, AlertTriangle,
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
-import AiOverview from './AiOverview';
 import { useHydrated } from '@/lib/ui/clientOnly';
 
 interface LiveAlertsProps {
@@ -167,7 +166,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
 
             {/* One-click AI overview of the current alert picture */}
             <div className={`flex-shrink-0 ${maximized ? 'px-6 pt-3' : 'px-3 pt-2'}`}>
-              <AiOverview mode="alerts" payload={data} accent="#FF4081" />
             </div>
 
             {/* Alert List - Internally Scrolling */}

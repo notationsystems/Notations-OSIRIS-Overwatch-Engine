@@ -281,6 +281,12 @@ an ordinal that contradicts this table.
 | 55 | 69 | A pre-registered instruction, aimed at a REGULATOR, telling a future adapter to identify under a name that had been retired and forbidding the one that had become correct |
 | 56 | 69 | A proxy that spends someone else's money on request, with no per-IP throttle, while `isRateLimited` sat unused in a module it already imported |
 | 57 | 69 | My own correction to the repository URL, taken from a git remote that resolves through a redirect: the right fix built on a premise that had gone stale since it was written |
+| 58 | 70 | A layer panel offering 19 toggles whose feeds had answered 503 since A-1 — a promise the product could not keep, indistinguishable from a quiet day |
+| 59 | 70 | An aggregate endpoint that would have reported `flights: 0` for a feed it no longer collects, because `allSettled` turns a missing source into a zero |
+| 60 | 70 | A capability gate filtering on a map nothing populated, over a set of layers that no longer contained a single gated one |
+| 61 | 70 | An escape hatch (`PAYLOAD_ROUTES_ENABLED`) that could still be set, still read, and could no longer enable anything |
+| 62 | 70 | Repairing three real defects in a component before measuring whether anything could reach it |
+| 63 | 70 | A deletion helper that took the enclosing effect, where the enclosing effect was the entire map initialisation — and a clean typecheck that confirmed only that the remainder was consistent, not that it was the program |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

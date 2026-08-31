@@ -81,62 +81,10 @@ export const API_GROUPS: ApiGroup[] = [
     ],
   },
   {
-    id: 'aviation-space',
-    title: 'Aviation & Space',
-    blurb: 'Aircraft, orbital objects, and heliophysics.',
-    endpoints: [
-      {
-        path: '/api/flights',
-        method: 'GET',
-        summary: 'Live ADS-B aircraft, bucketed by class.',
-        returns: ['commercial_flights', 'private_flights', 'private_jets', 'military_flights', 'source'],
-        notes:
-          'Keyless via adsb.lol. Each bucket is an array; sum them for a total. `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` are reserved for higher rate limits and are not required.',
-      },
-      {
-        path: '/api/satellites',
-        method: 'GET',
-        summary: 'Tracked orbital objects with TLE-derived positions.',
-        returns: ['satellites', 'total', 'category_counts', 'raw_count', 'timestamp'],
-        notes: 'Sourced from celestrak.org. `category_counts` breaks the set down by mission type.',
-      },
-      {
-        path: '/api/space-weather',
-        method: 'GET',
-        summary: 'Geomagnetic conditions and solar flare activity from NOAA SWPC.',
-        returns: [
-          'kp_index',
-          'kp_timestamp',
-          'storm_level',
-          'storm_color',
-          'solar_flares',
-          'alerts',
-          'timestamp',
-        ],
-        notes: '`storm_color` is a hex string the HUD renders directly, so clients need no severity lookup table.',
-      },
-    ],
-  },
-  {
     id: 'earth',
     title: 'Earth & Environment',
     blurb: 'Seismic, fire, atmospheric, and orbital-imagery feeds.',
     endpoints: [
-      {
-        path: '/api/earthquakes',
-        method: 'GET',
-        summary: 'Recent seismic events from the USGS feed.',
-        returns: ['earthquakes', 'total', 'timestamp'],
-        notes: 'M2.5+ over the trailing day. Each event carries `magnitude`, `place`, `depth`, `time`, `tsunami`, `alert`.',
-      },
-      {
-        path: '/api/fires',
-        method: 'GET',
-        summary: 'Active wildfire hotspots from NASA FIRMS.',
-        returns: ['fires', 'total', 'source', 'timestamp'],
-        env: ['FIRMS_API_KEY'],
-        notes: 'Uses the keyless FIRMS CSV by default; the key only matters if you switch to the per-area API.',
-      },
       {
         path: '/api/weather',
         method: 'GET',
@@ -148,75 +96,6 @@ export const API_GROUPS: ApiGroup[] = [
         method: 'GET',
         summary: 'Ground station air quality readings.',
         returns: ['stations', 'total', 'timestamp'],
-      },
-      {
-        path: '/api/radar',
-        method: 'GET',
-        summary: 'GPS interference and navigation outage reporting.',
-        returns: ['outages', 'total', 'source', 'timestamp'],
-      },
-      {
-        path: '/api/sentinel',
-        method: 'GET',
-        summary: 'Sentinel satellite imagery scenes covering a point.',
-        params: [
-          { name: 'lat', required: true, desc: 'Latitude of the point of interest.', example: '51.5072' },
-          { name: 'lng', required: true, desc: 'Longitude of the point of interest.', example: '-0.1276' },
-          { name: 'radius', desc: 'Search radius in kilometres.', example: '50' },
-          { name: 'days', desc: 'How far back to search, in days.', example: '30' },
-        ],
-        returns: ['scenes', 'timestamp'],
-      },
-    ],
-  },
-  {
-    id: 'geopolitical',
-    title: 'Geopolitical',
-    blurb: 'Conflict zones, frontlines, event streams, and country-level risk.',
-    endpoints: [
-      {
-        path: '/api/conflicts',
-        method: 'GET',
-        summary: 'Active conflict zones joined with live incident reporting.',
-        returns: [
-          'zones',
-          'activeWarzones',
-          'liveEvents',
-          'totalZones',
-          'totalLiveEvents',
-          'sources',
-          'refreshInterval',
-          'timestamp',
-        ],
-        notes: '`refreshInterval` is the server’s recommended client poll interval in milliseconds — honour it rather than hard-coding your own.',
-      },
-      {
-        path: '/api/frontlines',
-        method: 'GET',
-        summary: 'Frontline geometry for active theatres.',
-        returns: ['frontlines', 'timestamp'],
-      },
-      {
-        path: '/api/gdelt',
-        method: 'GET',
-        summary: 'Geocoded world events from the GDELT project.',
-        returns: ['events', 'total', 'source', 'timestamp'],
-      },
-      {
-        path: '/api/country-risk',
-        method: 'GET',
-        summary: 'Per-country risk scoring alongside market session state.',
-        returns: ['countries', 'exchanges', 'open_exchanges', 'total_exchanges', 'timestamp'],
-      },
-      {
-        path: '/api/region-dossier',
-        method: 'GET',
-        summary: 'Composite intelligence summary for a map location — the panel behind a map right-click.',
-        params: [
-          { name: 'lat', required: true, desc: 'Latitude of the region.', example: '48.3794' },
-          { name: 'lng', required: true, desc: 'Longitude of the region.', example: '31.1656' },
-        ],
-        returns: ['coordinates', '…dossier sections'],
       },
     ],
   },
@@ -232,28 +111,10 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['news', 'total', 'timestamp'],
       },
       {
-        path: '/api/live-news',
-        method: 'GET',
-        summary: '24/7 broadcast streams grouped by category.',
-        returns: ['feeds', 'categories', 'total', 'timestamp'],
-      },
-      {
         path: '/api/markets',
         method: 'GET',
         summary: 'Defence-sector equities and commodities.',
         returns: ['stocks', 'timestamp'],
-      },
-      {
-        path: '/api/crypto',
-        method: 'GET',
-        summary: 'Spot prices for the assets shown in the status ticker.',
-        returns: ['…price series'],
-      },
-      {
-        path: '/api/scm-suppliers',
-        method: 'GET',
-        summary: 'Supply-chain suppliers with criticality flags.',
-        returns: ['suppliers', 'total', 'critical_count', 'timestamp'],
       },
     ],
   },
@@ -262,34 +123,6 @@ export const API_GROUPS: ApiGroup[] = [
     title: 'Surveillance & Infrastructure',
     blurb: 'Camera networks, fixed infrastructure, maritime traffic, and tile/stream proxies.',
     endpoints: [
-      {
-        path: '/api/cctv',
-        method: 'GET',
-        summary: 'Public camera networks, optionally filtered by region or radius.',
-        params: [
-          { name: 'region', desc: 'Restrict to a named provider region.', example: 'london' },
-          { name: 'lat', desc: 'Latitude for a radius search.', example: '51.5072' },
-          { name: 'lng', desc: 'Longitude for a radius search.', example: '-0.1276' },
-          { name: 'radius', desc: 'Radius in kilometres. Requires `lat` and `lng`.', example: '25' },
-        ],
-        returns: ['cameras', 'regions', 'total', 'timestamp'],
-      },
-      {
-        path: '/api/cctv/stream-status',
-        method: 'GET',
-        summary: 'Probes whether a camera stream is reachable before the player commits to it.',
-        params: [{ name: 'url', required: true, desc: 'Stream URL to probe.' }],
-        returns: ['available', 'blocked', 'provider', 'reason'],
-        notes: '`blocked` distinguishes an upstream refusing our origin from a stream that is simply offline.',
-      },
-      {
-        path: '/api/cctv/proxy',
-        method: 'GET',
-        summary: 'Same-origin proxy for camera streams that set restrictive CORS headers.',
-        params: [{ name: 'url', required: true, desc: 'Upstream stream URL.' }],
-        returns: ['domain', 'failed', 'error'],
-        notes: 'Allow-listed by domain. Not a general-purpose open proxy.',
-      },
       {
         path: '/api/infrastructure',
         method: 'GET',
@@ -326,31 +159,6 @@ export const API_GROUPS: ApiGroup[] = [
         method: 'GET',
         summary: 'Geolocates the calling client by IP.',
         returns: ['status', 'query', 'city', 'regionName', 'country', 'lat', 'lon', 'isp', 'org'],
-      },
-    ],
-  },
-  {
-    id: 'cyber',
-    title: 'Cyber Threat',
-    blurb: 'Vulnerability, attack, and malware telemetry.',
-    endpoints: [
-      {
-        path: '/api/cyber-threats',
-        method: 'GET',
-        summary: 'Recent CVE disclosures with rollup statistics.',
-        returns: ['threats', 'stats'],
-      },
-      {
-        path: '/api/cyber-attacks',
-        method: 'GET',
-        summary: 'Observed attack events for the live threat map.',
-        returns: ['attacks', 'total'],
-      },
-      {
-        path: '/api/malware',
-        method: 'GET',
-        summary: 'Malware indicators from public trackers.',
-        returns: ['threats', 'total', 'source', 'timestamp'],
       },
     ],
   },
@@ -423,13 +231,6 @@ export const API_GROUPS: ApiGroup[] = [
     ],
   },
   {
-    id: 'recon',
-    title: 'Recon Scanner',
-    blurb: 'Active scanning, delegated to a separate backend so the web tier never runs scans itself.',
-    endpoints: [
-    ],
-  },
-  {
     id: 'graph',
     title: 'Entity Graph',
     blurb: 'Link analysis over entities surfaced elsewhere in the platform.',
@@ -452,48 +253,6 @@ export const API_GROUPS: ApiGroup[] = [
     blurb:
       'Gemini-backed correlation over feed data you supply. All three are POST, all three are rate limited to 5 requests per minute per IP.',
     endpoints: [
-      {
-        path: '/api/ai/analyze',
-        method: 'POST',
-        summary: 'Cross-feed correlation and threat assessment over an intelligence context.',
-        returns: ['…analysis'],
-        notes:
-          'Body is an `IntelligenceContext`. Exceeding the limit returns 429. Feed it straight from the read endpoints — the shape matches what they return.',
-        bodyExample: `{
-  "earthquakes": [],
-  "news": [],
-  "threats": [],
-  "cyberAlerts": [],
-  "timestamp": "2026-07-29T12:00:00Z"
-}`,
-      },
-      {
-        path: '/api/ai/briefing',
-        method: 'POST',
-        summary: 'Structured threat briefing in the style of a daily intelligence product.',
-        returns: ['…briefing'],
-        notes: 'Same `IntelligenceContext` body and same rate limit as `/api/ai/analyze`.',
-        bodyExample: `{
-  "earthquakes": [],
-  "news": [],
-  "threats": [],
-  "cyberAlerts": [],
-  "timestamp": "2026-07-29T12:00:00Z"
-}`,
-      },
-      {
-        path: '/api/ai/overview',
-        method: 'POST',
-        summary: 'Short headline highlights for the overview panel.',
-        returns: ['highlights', 'generatedAt'],
-        bodyExample: `{
-  "earthquakes": [],
-  "news": [],
-  "threats": [],
-  "cyberAlerts": [],
-  "timestamp": "2026-07-29T12:00:00Z"
-}`,
-      },
     ],
   },
   {

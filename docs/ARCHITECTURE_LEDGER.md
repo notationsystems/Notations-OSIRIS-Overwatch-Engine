@@ -5421,3 +5421,151 @@ changing a remote is the operator's action.
 **88 test files, 1,296 passed, 6 skipped. Typecheck clean. Production build
 compiles**, with the same four pre-existing dynamic `node:fs` import
 warnings the Phase 47 baseline recorded — checked, not assumed.
+
+## Phase 70 — the retirement, finished: routes, then everything that fed on them
+
+A-1 retired 31 general-purpose routes behind a 503 and kept the code, so a
+commodity vertical could flip one back on. Phase 69 recorded the price of
+that decision and put the question to the operator. The answer was to do it,
+and doing it turned out to be four moves, not one — because the routes were
+only the top of the thing.
+
+### 1. The env rename, through the landing strip that already existed
+
+Eight `SEA_DOG_*` variables became `PAYLOAD_*`. What made them look
+unrenameable was not that renaming was unsafe: `envCompat.ts` had held the
+right mechanism since the OSIRIS rename — new name wins, old name honoured
+for one release with a warning, `LEGACY_ENV_REMOVED_AFTER` naming the
+release that drops it. It was that nineteen production reads were plain
+`process.env.X` and never went through it. They do now, and `env()` exists
+so a read site is a drop-in replacement and nobody is tempted to skip the
+strip for brevity again.
+
+A refusal reports the **current** key name even when the old spelling
+enabled the flag. Handing back the deprecated name would be a remedy
+pointing at the exit being closed.
+
+Two tests were pinning the old spelling. `envCompat`'s own asserted that
+every legacy name starts with `OSIRIS_` — an assumption that there had been
+exactly one rename, where there have been two. The invariant that actually
+holds is that every current name is `PAYLOAD_` and every legacy name belongs
+to a retired brand, plus two conditions the old form never checked: no key
+maps to itself, and no legacy name is also a current name.
+
+### 2. The routes: 8,835 lines to one handler
+
+Thirty-one handlers that answer 503 are not thirty-one features held in
+reserve; they are one refusal spelled thirty-one times. They carried 58% of
+all API code, 104 of 312 `any`s, and a typecheck, lint and dependency
+burden on every change made near them.
+
+`[...retired]/route.ts` returns the identical `route_retired` payload for
+every name in a new `DELETED_ROUTES` set. A static segment always beats a
+catch-all in Next's router, so a live route is served by its own handler and
+never reaches it. The claim the deletion rests on — *a caller cannot tell* —
+is pinned over all 31 names against the same `routeRetiredPayload` the
+deleted handlers called, and against `requireRouteEnabled`, so the two doors
+to one refusal cannot drift apart.
+
+It also answers **which kind of nothing**: 503 for a retired route, 404 for
+a path that never existed (calling a typo "retired" invents a history for
+it), and 500 `route_handler_missing` for a classified route with no
+handler — a build defect that must not hide behind a policy message.
+
+**What the deletion exposed.** `PAYLOAD_ROUTES_ENABLED` is now vacuous:
+every retired route is deleted, so the switch has nothing to act on, and
+enabling one would report a route live that answers nothing. The gate now
+refuses to enable a deleted route, and the test pins the vacuity **out
+loud** — a loop over an empty list passes, and passing silently is exactly
+what it must not be allowed to do. The mechanism is kept for the next route
+retired without deletion.
+
+Conservation moved from two states to three: live, retired-and-present,
+deleted. Folding deleted into either of the others is how a count starts
+looking right while meaning something else.
+
+### 3. The UI that fed on them
+
+Deleting the routes made a defect visible that had been shipping since A-1:
+**the layer panel offered 19 toggles that had shown nothing for weeks.** A
+toggle for a feed that answers 503 is not a feature awaiting data; it is a
+promise the product cannot keep, and the operator has no way to tell it
+apart from a quiet day.
+
+Removed with their feeds: flights (four sub-layers), satellites (five),
+CCTV, fires, live news, GDELT incidents and events, malware, cyber attacks,
+and both Cloudflare Radar layers. Seventeen live layers remain — the
+economy layers, maritime, earthquakes, weather, infrastructure, balloons,
+radiation, cables, day/night, terrain, and the SDK entities.
+
+The cascade ran further than the layers:
+
+- **`AiOverview`** posted to `/api/ai/overview`. Deleted, with its two call
+  sites in the markets and alerts panels.
+- **The whole CCTV subsystem** — `CameraViewer`, `camera-feed`, `skyline`,
+  `youtube` — became unreachable, because `setActiveCamera` was called from
+  exactly one place: a click on the layer that no longer exists. This is
+  where I have to be plain: earlier in this same session I fixed three real
+  defects in `CameraViewer` and added a tested `cameraKey()` to prevent a
+  feed being shown under the wrong coordinates. That work was correct and
+  the code it corrected is gone. Measuring reachability before repairing
+  would have found it; I repaired first.
+- **The satellite subsystem** — the GPU pick layer, the orbit fetch, the
+  3D catalogue, `satellite-layer.ts` and `orbit.ts`. `orbit.ts` is a clean
+  tested SGP4/SDP4 wrapper and its only consumer was the deleted
+  `/api/satellites/orbit`. It is in git, at this commit's parent, if the
+  ocean-leg globe ever wants it.
+- **The flight-watch panel** and its telemetry, fed by buckets nothing
+  fills.
+- **Four orphaned library modules** — `airports`, `ai-engine`,
+  `gdeltEvents`, `countryCentroids` — 1,121 lines with no importer left.
+
+### 4. Two surfaces that would have lied about it
+
+**`/api/stats` counted six feeds; four were deleted.** Wrapped in
+`Promise.allSettled`, it would have gone on answering `flights: 0`. A zero
+there reads as *nothing is flying*; the truth is *this deployment does not
+collect that*. Counters with no source are now named in `not_collected`
+rather than reported as zero, and a live feed that fails returns `null`
+rather than 0 — an upstream timeout is not a feed reporting nothing.
+
+**The public API catalogue documented 24 endpoints that no longer exist**,
+and four of its groups emptied completely once they were pruned.
+
+**`LayerPanel`'s capability gate** hid layers whose credential was not
+configured. Every layer that declared a `requires` key was in the deleted
+set, and the only thing that ever populated `capabilities` was the
+Cloudflare probe — so the gate filtered nothing against a map that was
+always `{}`. Removed. The group-drop beside it stays: a group emptied by a
+future removal must not render as a heading with nothing under it.
+
+### An error worth recording
+
+The first attempt at the map surgery used a helper that, given a line,
+walked backwards to the enclosing `useEffect`. `createSatelliteLayer` is
+called inside the **map initialisation** effect, so "the enclosing effect"
+was the whole map setup: 1,725 lines, every live layer with it. Typecheck
+passed — nothing referenced what had gone — and a grep for the surviving
+layer ids is what caught it, all thirteen at zero.
+
+A clean typecheck after a deletion says the remainder is consistent. It
+says nothing about whether the remainder is the program. The check that
+found it was asking what should still be there, which is the only kind that
+can.
+
+### Measured after
+
+| | before phase 69 | after phase 70 |
+|---|---|---|
+| API route code | 15,526 lines | 6,610 lines |
+| `PayloadMap.tsx` | 2,938 lines | 2,062 lines |
+| `no-explicit-any` | 312 | 141 |
+| `no-unused-vars` | 63 | **0** |
+| `set-state-in-effect` | 10 | 0 |
+| layer toggles offered | 31 | 12 |
+| toggles that could return data | 12 | 12 |
+
+**77 test files, 1,138 passed. Typecheck clean. Production build compiles.**
+
+The last row is the one that matters. The count of layers that work did not
+change. What changed is that the panel no longer claims otherwise.

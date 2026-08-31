@@ -3,87 +3,65 @@ import { NextResponse } from 'next/server';
 export const maxDuration = 60;
 
 /**
- * Payload — Global Stats API
- * Lightweight aggregation endpoint.
- * Fetches metrics from all local APIs and returns ONLY the counts.
- * 
- * ARCHITECTURE NOTE (10k+ Concurrent Users):
- * This endpoint ensures the Next.js server serves ~100 bytes instead of 10MB+ 
- * of raw GeoJSON mapping data when 10,000 users boot the dashboard simultaneously.
- * The underlying API routes utilize their own 45-60s TTL caching, meaning the 
- * heavy external APIs (adsb.lol, USGS) are only hit once per minute, while this 
- * lightweight stats route safely serves 10k concurrent users instantly.
+ * Payload Terminal — aggregate counters.
+ *
+ * Serves ~100 bytes instead of megabytes of GeoJSON when many clients boot at
+ * once; the underlying routes keep their own cache TTLs, so the upstreams are
+ * hit once per interval however many callers ask.
+ *
+ * WHAT PHASE 70 CHANGED, and why it is not a smaller version of the same
+ * thing. This counted six feeds. Four of them — flights, satellites, cameras,
+ * GDELT incidents — were deleted with the general-purpose surface, and the
+ * `Promise.allSettled` around them meant the route would have kept answering
+ * with `flights: 0`. A zero here reads as *nothing is flying*. The truth is
+ * *this deployment does not collect that*, and those are different enough
+ * that a reader acting on the first would be acting on a fabrication.
+ *
+ * So a counter that has no source is absent from `stats` and named in
+ * `not_collected` instead. A caller sees which of the two it is getting
+ * without having to know what was retired.
  */
+
+/** Feeds retired with the general-purpose surface. Named, not zeroed. */
+const NOT_COLLECTED = ['flights', 'sats', 'cctv', 'incidents'] as const;
 
 export async function GET(req: Request) {
   try {
     const origin = new URL(req.url).origin;
 
-    // Fetch all internal APIs in parallel (they have their own Cache-Control TTLs)
-    const [flightsRes, satsRes, cctvRes, weatherRes, infraRes, gdeltRes] = await Promise.allSettled([
-      fetch(`${origin}/api/flights`, { signal: AbortSignal.timeout(20000), next: { revalidate: 45 } }),
-      fetch(`${origin}/api/satellites`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
-      fetch(`${origin}/api/cctv`, { signal: AbortSignal.timeout(20000), next: { revalidate: 3600 } }),
+    const [weatherRes, infraRes] = await Promise.allSettled([
       fetch(`${origin}/api/weather`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } }),
       fetch(`${origin}/api/infrastructure`, { signal: AbortSignal.timeout(20000), next: { revalidate: 86400 } }),
-      fetch(`${origin}/api/gdelt`, { signal: AbortSignal.timeout(20000), next: { revalidate: 300 } })
     ]);
 
-    let flights = 0;
-    let sats = 0;
-    let cctv = 0;
-    let weather = 0;
-    let nuclear = 0;
-    let incidents = 0;
+    /**
+     * `null` where the feed exists but did not answer, a number where it did.
+     * Collapsing an upstream failure to 0 would be the same lie one layer
+     * down: a live feed that timed out is not a live feed reporting nothing.
+     */
+    const countOf = async (
+      settled: PromiseSettledResult<Response>,
+      key: string,
+    ): Promise<number | null> => {
+      if (settled.status !== 'fulfilled' || !settled.value.ok) return null;
+      try {
+        const data = await settled.value.json();
+        return Array.isArray(data?.[key]) ? data[key].length : null;
+      } catch {
+        return null;
+      }
+    };
 
-    // Safely parse counts
-    if (flightsRes.status === 'fulfilled' && flightsRes.value.ok) {
-      const data = await flightsRes.value.json();
-      flights = (data.commercial_flights?.length || 0) + 
-                (data.private_flights?.length || 0) + 
-                (data.private_jets?.length || 0) + 
-                (data.military_flights?.length || 0);
-    }
-
-    if (satsRes.status === 'fulfilled' && satsRes.value.ok) {
-      const data = await satsRes.value.json();
-      sats = data.satellites?.length || 0;
-    }
-
-    if (cctvRes.status === 'fulfilled' && cctvRes.value.ok) {
-      const data = await cctvRes.value.json();
-      cctv = data.cameras?.length || 0;
-    }
-
-    if (weatherRes.status === 'fulfilled' && weatherRes.value.ok) {
-      const data = await weatherRes.value.json();
-      weather = data.events?.length || 0;
-    }
-
-    if (infraRes.status === 'fulfilled' && infraRes.value.ok) {
-      const data = await infraRes.value.json();
-      nuclear = data.infrastructure?.length || 0;
-    }
-
-    if (gdeltRes.status === 'fulfilled' && gdeltRes.value.ok) {
-        const data = await gdeltRes.value.json();
-        incidents = data.events?.length || 0;
-    }
+    const weather = await countOf(weatherRes, 'events');
+    const nuclear = await countOf(infraRes, 'infrastructure');
 
     return NextResponse.json({
-      stats: {
-        flights,
-        sats,
-        cctv,
-        weather,
-        nuclear,
-        incidents
-      },
-      timestamp: new Date().toISOString()
+      stats: { weather, nuclear },
+      not_collected: NOT_COLLECTED,
+      detail: 'A counter in not_collected has no source in this deployment; it is absent rather than zero. A null in stats means the feed exists and did not answer.',
+      timestamp: new Date().toISOString(),
     }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
-      }
+      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' },
     });
 
   } catch (error) {

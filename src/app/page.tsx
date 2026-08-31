@@ -3,14 +3,12 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cameraKey } from '@/lib/camera-feed';
 import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Database, Network, Radio , PenLine, Mountain } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import SearchBar from '@/components/SearchBar';
 import DirectionsBar, { type RouteResult, type LiveLocation } from '@/components/DirectionsBar';
 import NavigationView from '@/components/NavigationView';
-import FlightWatchPanel, { type WatchedFlight, type FlightTelemetry, type AircraftDetail, type Airport } from '@/components/FlightWatchPanel';
 import type { NavProgress } from '@/lib/navigation';
 import ScaleBar from '@/components/ScaleBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -21,7 +19,7 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import ArcGISPanel from '@/components/ArcGISPanel';
 import PayloadCommandBar from '@/components/PayloadCommandBar';
-import PayloadSpatialRail, { type SpatialLayerKey, type SpatialLayerState } from '@/components/PayloadSpatialRail';
+import PayloadSpatialRail, { type SpatialLayerState } from '@/components/PayloadSpatialRail';
 import { NO_SPATIAL_BACKEND, spatialAvailability } from '@/lib/spatial/registry';
 import {
   ALL_PANELS, CLOSED_PANELS, applyPanelCommand, slotOccupied,
@@ -30,7 +28,6 @@ import {
 const PayloadMap = dynamic(() => import('@/components/PayloadMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
-const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
 const DrawingToolbar = dynamic(() => import('@/components/DrawingToolbar'), { ssr: false });
 const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 // The measurement helpers are pure functions — importing them directly keeps
@@ -121,8 +118,6 @@ export default function Dashboard() {
   const [regionDossier, setRegionDossier] = useState<any>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [activeCamera, setActiveCamera] = useState<any>(null);
-  const [spaceWeather, setSpaceWeather] = useState<any>(null);
   // ── PANEL STATE, THROUGH ONE REGISTRY ──────────────────────────────────────
   //
   // These were eleven independent booleans, and every toggle hand-listed the
@@ -199,56 +194,6 @@ export default function Dashboard() {
     { route: RouteResult; label: string; key: number } | null
   >(null);
   const [navProgress, setNavProgress] = useState<NavProgress | null>(null);
-  const [watchedFlights, setWatchedFlights] = useState<WatchedFlight[]>([]);
-  const [aircraftAirports, setAircraftAirports] = useState<Record<string, Airport[]>>({});
-
-  // The popup lives in raw map HTML, so it hands aircraft over through a global.
-  useEffect(() => {
-    (window as unknown as { payloadWatchFlight?: (f: WatchedFlight) => void }).payloadWatchFlight = (f) => {
-      if (!f?.icao24) return;
-      setWatchedFlights((prev) =>
-        prev.some((w) => w.icao24 === f.icao24) ? prev : [...prev, f].slice(-6));
-    };
-  }, []);
-
-  const removeWatched = useCallback((icao24: string) => {
-    setWatchedFlights((prev) => prev.filter((w) => w.icao24 !== icao24));
-    setAircraftAirports((prev) => {
-      const next = { ...prev };
-      delete next[icao24];
-      return next;
-    });
-  }, []);
-
-  const handleAircraftDetail = useCallback((icao24: string, detail: AircraftDetail | null) => {
-    const ports = [detail?.origin, detail?.destination]
-      .filter((a): a is Airport => Boolean(a && Number.isFinite(a.lat) && Number.isFinite(a.lng)));
-    setAircraftAirports((prev) => (ports.length ? { ...prev, [icao24]: ports } : prev));
-  }, []);
-
-  // Telemetry for watched aircraft, refreshed from whatever the feed last gave us.
-  const watchTelemetry = useMemo(() => {
-    const out: Record<string, FlightTelemetry> = {};
-    if (!watchedFlights.length) return out;
-    const buckets = [
-      data?.commercial_flights, data?.private_flights,
-      data?.private_jets, data?.military_flights,
-    ];
-    const wanted = new Set(watchedFlights.map((w) => w.icao24));
-    for (const bucket of buckets) {
-      for (const f of bucket || []) {
-        if (f?.icao24 && wanted.has(f.icao24)) {
-          out[f.icao24] = {
-            lat: f.lat, lng: f.lng, alt: f.alt,
-            speed_knots: f.speed_knots, heading: f.heading,
-            grounded: f.grounded, squawk: f.squawk,
-          };
-        }
-      }
-    }
-    return out;
-  }, [watchedFlights, data]);
-
   // A navigation session owns its own position watch. The planner's watch dies
   // with the planner when guidance takes over the panel, so guidance cannot
   // depend on it — without this the banner sits on "waiting for a fix" forever.
@@ -290,26 +235,12 @@ export default function Dashboard() {
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState({
-    flights: false,
-    private: false,
-    jets: false,
-    military: false,
     maritime: true,
-    satellites: false,
-    sat_comms: false,
-    sat_military: false,
-    sat_navigation: false,
-    sat_earth: false,
-    sat_science: false,
     balloons: false,
-    cctv: true,
-    live_news: true,
     earthquakes: true,
-    fires: false,
     weather: false,
     radiation: false,
     infrastructure: false,
-    global_incidents: true,
     war_alerts: false,
     day_night: true,
     cables: true,
@@ -317,11 +248,6 @@ export default function Dashboard() {
     sdk_air: true,
     sdk_naval: true,
     terrain_3d: false,
-    malware: false,
-    cyber_attacks: false,
-    gdelt_events: false,
-    cf_outages: false,
-    cf_attacks: false,
     // Physical economy (copper vertical slice) — on by default: it is the
     // Overwatch Engine's primary research surface.
     econ_production: true,
@@ -387,10 +313,8 @@ export default function Dashboard() {
     );
   }, [data]);
 
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
-  const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
 
   // Splash screen
   useEffect(() => {
@@ -418,13 +342,6 @@ export default function Dashboard() {
         return next;
       });
     }
-
-    // Probe which credential-gated feeds this deployment has configured, so the
-    // layer panel can hide toggles that could never return data.
-    fetch('/api/cloudflare-radar?probe=1')
-      .then(r => (r.ok ? r.json() : null))
-      .then(p => { if (p) setCapabilities(c => ({ ...c, cloudflare: !!p.configured })); })
-      .catch(() => { /* leave the layer hidden */ });
 
     // Delay geolocation until map is ready (after splash screen clears)
     const geoTimer = setTimeout(() => {
@@ -518,12 +435,6 @@ export default function Dashboard() {
     if (entity?.type === 'econ_entity' && entity.id) {
       setEconSelected(entity.id);
       setShowEconomy(true);
-    }
-    if (entity?.type === 'cctv') setActiveCamera(entity);
-    if (entity?.type === 'live_news' && entity.url) {
-      setLiveFeedUrl(entity.url);
-      setLiveFeedName(entity.name);
-      setLiveFeedEmbedAllowed(entity.embed_allowed !== false);
     }
   }, []);
 
@@ -657,13 +568,6 @@ export default function Dashboard() {
     };
     const marketTimer = setTimeout(() => loadMarkets(), 800);
 
-    // Priority 2: Space Weather (needed for MarketsPanel)
-    const spaceTimer = setTimeout(async () => {
-      try {
-        const r = await fetch('/api/space-weather');
-        if (r.ok) setSpaceWeather(await r.json());
-      } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
-    }, 5000);
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
@@ -674,8 +578,7 @@ export default function Dashboard() {
     return () => {
       clearTimeout(marketTimer);
       marketRetries.forEach(clearTimeout);
-      clearTimeout(spaceTimer);
-      intervals.forEach(clearInterval);
+        intervals.forEach(clearInterval);
     };
   }, [fetchEndpoint]);
 
@@ -683,29 +586,6 @@ export default function Dashboard() {
   const layerFetchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
 
-    // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
-    }
-    // Satellites (any satellite sub-layer triggers fetch)
-    const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
-    if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
-      fetchEndpoint('/api/satellites');
-      layerFetchedRef.current.add('satellites');
-    }
-    // Fires
-    if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
-      layerFetchedRef.current.add('fires');
-    }
-    // CCTV
-    if (activeLayers.cctv && !layerFetchedRef.current.has('cctv')) {
-      fetchEndpoint(`/api/cctv?region=all&_t=${Date.now()}`);
-      layerFetchedRef.current.add('cctv');
-    }
     // Maritime
     if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
       fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
@@ -721,11 +601,6 @@ export default function Dashboard() {
       fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
       layerFetchedRef.current.add('radiation');
     }
-    // Live News
-    if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
-      fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds }));
-      layerFetchedRef.current.add('live_news');
-    }
     // Weather
     if (activeLayers.weather && !layerFetchedRef.current.has('weather')) {
       fetchEndpoint('/api/weather', d => ({ weather_events: d.events }));
@@ -735,11 +610,6 @@ export default function Dashboard() {
     if (activeLayers.infrastructure && !layerFetchedRef.current.has('infrastructure')) {
       fetchEndpoint('/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
       layerFetchedRef.current.add('infrastructure');
-    }
-    // Global Incidents (GDELT)
-    if (activeLayers.global_incidents && !layerFetchedRef.current.has('gdelt')) {
-      fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events }));
-      layerFetchedRef.current.add('gdelt');
     }
 
     // Submarine Cables
@@ -758,41 +628,9 @@ export default function Dashboard() {
     }
 
 
-    // Live Malware (abuse.ch)
-    if (activeLayers.malware && !layerFetchedRef.current.has('malware')) {
-      fetchEndpoint('/api/malware', d => ({ malware_threats: d.threats }));
-      layerFetchedRef.current.add('malware');
-    }
 
-    // Live Cyber Attacks (animated arcs)
-    if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-      layerFetchedRef.current.add('cyber_attacks');
-    }
 
-    /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
-       release the mark if nothing landed — otherwise one failed request leaves
-       the layer permanently empty. */
-    const loadLayerOnce = (key: string, url: string, transform: (d: any) => any) => {
-      if (layerFetchedRef.current.has(key)) return;
-      layerFetchedRef.current.add(key);
-      fetchEndpoint(url, transform).then(ok => {
-        if (!ok) layerFetchedRef.current.delete(key);
-      });
-    };
 
-    // GDELT 2.0 geocoded events
-    if ((activeLayers as any).gdelt_events) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?limit=600', d => ({ gdelt_events: d.events }));
-    }
-
-    // Cloudflare Radar — one request backs both layers
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
-      loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
-        cf_outages: d.outages ?? [],
-        cf_attack_origins: d.attack_origins ?? [],
-      }));
-    }
 
 
   }, [activeLayers]);
@@ -800,10 +638,6 @@ export default function Dashboard() {
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
-    }
-
     if (activeLayers.balloons) {
       intervals.push(setInterval(() => fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons })), 300000)); // 5m
     }
@@ -812,13 +646,6 @@ export default function Dashboard() {
     }
     if (activeLayers.maritime) {
       intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
-    }
-    if ((activeLayers as any).cyber_attacks) {
-      intervals.push(setInterval(() => {
-        layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-        layerFetchedRef.current.add('cyber_attacks');
-      }, 10000)); // 10s — rapid refresh
     }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
@@ -1172,7 +999,6 @@ export default function Dashboard() {
           onDrawCancel={() => { setDrawMode(null); setDrawProgress(null); }}
           onDrawComplete={handleDrawComplete}
           drawnPolygons={drawnPolygons}
-          aircraftAirports={aircraftAirports}
         />
       </ErrorBoundary>
 
@@ -1239,22 +1065,6 @@ export default function Dashboard() {
 
 
       {/* ── FLIGHT WATCH ── */}
-      {watchedFlights.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-          className="absolute top-3 z-[380] w-[min(92vw,290px)] pointer-events-auto
-                     max-h-[calc(100vh-180px)] overflow-y-auto styled-scrollbar"
-          style={{ left: isMobile ? '12px' : '120px' }}
-        >
-          <FlightWatchPanel
-            watched={watchedFlights}
-            telemetry={watchTelemetry}
-            onRemove={removeWatched}
-            onLocate={(lat, lng) => setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() })}
-            onDetail={handleAircraftDetail}
-          />
-        </motion.div>
-      )}
 
       {/* ── MAP VIEW CONTROLS ── */}
       <motion.div
@@ -1371,7 +1181,6 @@ export default function Dashboard() {
           <span className="opacity-60">ENTITIES</span>
         </span>
 
-        {spaceWeather && <span className="hidden lg:inline" title={`Geomagnetic Storm Index — Kp${spaceWeather.kp_index}`}>SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
         <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
         
@@ -1424,7 +1233,7 @@ export default function Dashboard() {
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />}
+      {showLayers && !isMobile && <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} />}
 
 
 
@@ -1519,7 +1328,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showMarkets && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <MarketsPanel data={mapData} spaceWeather={spaceWeather} />
+                <MarketsPanel data={mapData} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1664,9 +1473,6 @@ export default function Dashboard() {
                   <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-payload-pulse" />
                   <span className="text-[11px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
                   <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[10px] font-bold">LIVE STREAM</span>
-                  {!liveFeedEmbedAllowed && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px]">EXTERNAL ONLY</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <a
@@ -1684,48 +1490,21 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Body — iframe or external card */}
-              {liveFeedEmbedAllowed ? (
-                <div className="w-full aspect-video relative bg-black">
-                  <iframe
-                    src={liveFeedUrl}
-                    className="w-full h-full absolute inset-0"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="w-full aspect-video flex items-center justify-center bg-black/95">
-                  <div className="text-center px-8">
-                    <div className="w-14 h-14 rounded-full bg-[#39FF14]/10 border border-[#39FF14]/20 flex items-center justify-center mx-auto mb-4">
-                      <ExternalLink className="w-6 h-6 text-[#39FF14]" />
-                    </div>
-                    <p className="text-[12px] font-mono font-bold text-white tracking-widest mb-2">EMBED RESTRICTED</p>
-                    <p className="text-[10px] font-mono text-white/50 mb-6 max-w-xs">
-                      {liveFeedName} does not allow third-party embedding. Click below to open the live stream directly.
-                    </p>
-                    <a
-                      href={getYouTubeWatchUrl(liveFeedUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded border border-[#39FF14]/40 text-[#39FF14] font-mono text-[11px] hover:bg-[#39FF14]/10 transition-colors tracking-wider"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      OPEN LIVE STREAM
-                    </a>
-                  </div>
-                </div>
-              )}
+              <div className="w-full aspect-video relative bg-black">
+                <iframe
+                  src={liveFeedUrl}
+                  className="w-full h-full absolute inset-0"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+              </div>
 
-              {/* Footer — only show for embeddable feeds */}
-              {liveFeedEmbedAllowed && (
-                <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
-                  <span className="text-[10px] font-mono text-white/70 leading-relaxed">
-                    If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">Open in YouTube</strong> above.
-                  </span>
-                </div>
-              )}
+              <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
+                <span className="text-[10px] font-mono text-white/70 leading-relaxed">
+                  If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">Open in YouTube</strong> above.
+                </span>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1811,13 +1590,13 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />
+                      <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={payloadTheme} setTheme={setPayloadTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
                       </div>
                     </>
                   )}
-                  {mobilePanel === 'markets' && <MarketsPanel data={mapData} spaceWeather={spaceWeather} />}
+                  {mobilePanel === 'markets' && <MarketsPanel data={mapData} />}
                   {mobilePanel === 'intel' && <IntelFeed data={mapData} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
@@ -1913,22 +1692,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Camera Viewer ──
-          Presence lives here rather than inside the viewer. Held inside, the
-          exit animation could never play: the component returned null before
-          reaching its own AnimatePresence, so the whole subtree vanished at
-          once. Held here, the viewer also stops existing while no camera is
-          selected, which is what silences its once-a-second clock. */}
-      <AnimatePresence>
-        {activeCamera && (
-          <CameraViewer
-            key={cameraKey(activeCamera)}
-            camera={activeCamera}
-            onClose={() => setActiveCamera(null)}
-            onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
-          />
-        )}
-      </AnimatePresence>
 
       {/* ── Entity Graph Panel ── */}
       {/* Guidance belongs over the map, where the clicking happens. */}

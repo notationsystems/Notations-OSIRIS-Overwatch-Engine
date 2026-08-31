@@ -36,14 +36,12 @@ const COMPONENTS = join(process.cwd(), 'src/components');
  * a new instance of the defect A-3 deleted.
  */
 const ANY_PROPS_INHERITED: Readonly<Record<string, string>> = {
-  'PayloadMap.tsx': 'The map shell, taking a layer payload per general-purpose feed. Types arrive with the feeds themselves as each is retired or converted.',
-  'LiveAlerts.tsx': 'Aggregates alerts across every general-purpose feed; the union is only knowable once those feeds are retired (A-1).',
-  'LayerPanel.tsx': 'Toggles the general-purpose layers by id.',
+  'PayloadMap.tsx': 'The map shell, taking a layer payload per feed. Phase 70 retired 19 of its layers with their routes; the remaining debt is the live ones, and types arrive with each as it is converted.',
+  'LiveAlerts.tsx': 'Aggregates alerts across earthquakes and news — the two general-purpose feeds phase 70 kept. The union is now small enough to type, and that is the next entry to clear.',
+  'LayerPanel.tsx': 'Toggles layers by id. Phase 70 removed 19 dead toggles; 12 remain.',
   'MarketsPanel.tsx': 'Quote payload from /api/markets, still the base shape.',
   'IntelFeed.tsx': 'The inherited general-purpose event stream, carrying one shape per feed it aggregates.',
-  'CameraViewer.tsx': 'CCTV descriptor from the inherited camera registry.',
   'ArcGISPanel.tsx': 'ArcGIS layer descriptors, shaped by the remote service.',
-  'AiOverview.tsx': 'Free-form model output, which has no schema until the prompt contract has one.',
   'DrawingToolbar.tsx': 'The live entity store, swept for whatever falls inside each drawn polygon — arbitrary by construction, since it holds every enabled layer at once.',
 };
 
