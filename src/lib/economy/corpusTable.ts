@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — corpus table and export surface (operator addition to
+ * Payload Terminal — corpus table and export surface (operator addition to
  * the shipping order, placed before S-6).
  *
  * A PROJECTION over canonical state: no new number, no new consumer of
@@ -251,7 +251,7 @@ export function buildVintageGrid(state: EconomyState, subject: string, metric: s
 export function renderTableMarkdown(t: CorpusTable): string {
   const h = t.header;
   const lines: string[] = [
-    `# Sea Dog Terminal — corpus table`,
+    `# Payload Terminal — corpus table`,
     '',
     '```',
     `generated_at          ${h.generated_at}`,

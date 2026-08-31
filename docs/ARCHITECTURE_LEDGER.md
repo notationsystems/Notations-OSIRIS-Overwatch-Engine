@@ -5234,3 +5234,162 @@ build compiles.** 28 files changed, 708 insertions, 636 deletions.
   OSIRIS→Payload and listed five deliberate exclusions; Sea Dog is not
   among them, because the sweep did not know it existed. Taken as its own
   commit, on Phase 47's own principle that a rename lands alone.
+
+## Phase 69 — the credit governor, and the identity the rename broke
+
+Two pieces, from one message and one sweep. The operator sent six patterns
+observed in another project and asked which to lift. Measuring each against
+this tree changed the answer for four of them, and the sweep that produced
+the measurement found something worse than any of the six.
+
+### The six patterns, measured
+
+| # | pattern | verdict against this tree |
+|---|---|---|
+| 1 | world-stable heading projection | **already here, and better.** `PayloadMap.tsx:687` sets `icon-rotate: ['get','heading']` with `icon-rotation-alignment: 'map'` — MapLibre does this on the GPU, per frame, at any camera angle. A JS screen-space projection would be a slower reimplementation. And freight loads carry no position or heading field at all, so "the moment they carry direction" has not arrived. |
+| 2 | budget-governed feed proxies | **the one real gap.** Built. |
+| 3 | interpolation behind realtime | **the layers are retired.** Aircraft and vessels are `general-purpose`, 503 under A-1. Motion smoothing for markers that return no data is apparatus ahead of volume. |
+| 4 | SGP4 + GMST | **already here.** `src/lib/orbit.ts` wraps satellite.js's SGP4/SDP4 with `gstime`, and refuses on a non-zero `satrec.error` rather than propagating an orbit it can no longer model. |
+| 5 | layer registry with per-source provenance | **half here.** `sourceRegistry.ts` is exactly this shape for economy sources. The map side is hardcoded — 63 `activeLayers.` references in one 3,000-line file that also holds 134 of the remaining `any`s. Right refactor, wrong order: the types come first. |
+| 6 | the free-feed vendor list | **AISStream and FIRMS are the two with freight relevance**; the rest feed retired layers. The destination is `sourceRegistry` with `adapter: null`, which is what that field is for. Registering an account is not mine to do. |
+
+Four of six were already built or premature. That is the point of measuring
+before lifting: a pattern that is right in general can be redundant here.
+
+### The credit governor
+
+`ssrf-guard` decides whether a host is reachable, `outboundRate` how fast,
+`sourceCache` whether the answer is already held. None of them knows what a
+request *costs*, and a metered vendor bills anyway. `spendGovernor.ts` is
+the missing organ and nothing more.
+
+Four decisions, each of which could have gone the other way:
+
+**An unregistered provider is refused.** A governor that waves through what
+it does not recognise governs nothing — the first vendor somebody forgets to
+register is the one that runs up the bill. Registering *is* the act of
+deciding what a provider may spend, so a provider nobody has decided about
+has a budget of nothing.
+
+**Cost is declared in the budget's unit, and a mismatch refuses.** A cap of
+100,000 tokens and a call costing "1 request" are not comparable, and the
+arithmetic that pretends they are produces a number that looks fine. The
+same discipline the pricing engine needed for accessorials, one layer down.
+`usd_micros` is integer millionths of a dollar: money is never a float here.
+
+**Reserve, then settle.** For a per-request vendor the cost is known before
+the call; for a token-metered one it is known only from the response, so a
+governor that can only charge up front cannot govern one at all. The
+estimate is held, the truth replaces it, and a failed call releases it. An
+unsettled reservation keeps counting — the conservative direction — and is
+reported separately, so a leak reads as held credit rather than silently
+eating the budget. A settle *above* the cap is recorded, not rejected: the
+vendor already billed it, and refusing it would not unbill it. The overrun
+becomes visible for the next `reserve()` to refuse on, which is the only
+honest order of events.
+
+**The ledger says how durable it is, on every decision.** Counters in
+process memory reset when the process does, so a crash loop hands the whole
+monthly budget back on every restart while the vendor's meter keeps
+climbing. That is not a bug to paper over; it is a property of where the
+ledger lives. `durability: 'process_memory'` ships on every decision and
+every report row. A cap this module cannot enforce is never reported as one
+it did.
+
+Wired to `/api/proxy-tiles`, which was the one metered surface and had
+neither a throttle nor a cap — an open-to-CARTO proxy with no per-IP limit,
+though `isRateLimited` had been sitting in `ssrf-guard` the whole time. The
+route now reserves a tile before the fetch, settles on success, releases on
+failure or throw, and returns `X-Payload-Tile-Governance` so *ungoverned by
+decision* and *ungoverned because nobody looked* are tellable apart from
+outside the process. Spend and the decision tally are on `/api/health`.
+
+24 pins. The attestation-closure guard caught the three new types as
+unaccounted for on the first full run — working exactly as built — and they
+are now classified with reasons rather than waved through.
+
+### The identity the rename broke
+
+Sweeping for stale brands found 133 references to *Sea Dog Terminal*, a name
+this instrument carried for about a day between Payload Terminal and Payload
+Terminal. Phase 47 renamed OSIRIS→Payload and listed five deliberate
+exclusions, carefully; Sea Dog is not among them, because that sweep did not
+know it existed. An exclusion list that reads as complete and is not.
+
+Three findings came out of it, in increasing order of consequence.
+
+**The User-Agents were malformed, in twelve files.** Phase 47 replaced the
+single token `OSIRIS` with the two-word display name `Payload Terminal`
+*inside User-Agent product tokens*, where a space is a delimiter.
+`Payload Terminal/4.2` does not name a product at version 4.2 — it names a
+product `Payload` of unstated version followed by a second product
+`Terminal/4.2`. Nothing failed, because no upstream we call today parses the
+field strictly. The one that will is the SEC, whose document tier this
+project has already recorded as rejecting generic and malformed agents with
+a 403 that lengthens if you retry it.
+
+Phase 47 stated the right principle — *identifiers stay stable, display
+names follow the instrument* — and then applied the display name in the one
+place where the string is an identifier. It is the defect the sweep was
+written to catch, one level in.
+
+The versions were the second half: 1.0, 3.0, 3.5, 4.2, 4.3 and 0.1 across
+twelve files, corresponding to nothing. `src/lib/identity.ts` now holds one
+product token, one version pinned against `package.json`, and one repository
+URL, and `identity.test.ts` walks the whole source tree asserting no file
+hand-writes a malformed agent. It caught two on its first run that the
+manual sweep had missed — including one in this module's own documentation.
+
+**The docs pointed readers at somebody else's repository.**
+`github.com/simplifaisoul/osiris` was in two outbound User-Agent comments
+and, worse, four places on the public docs page: the GitHub link, the clone
+command, the "Report an issue" link. Phase 47 left repository URLs alone
+because "the repository genuinely still carries that name" — sound
+reasoning about a URL that was not this project's. The real remote is
+`notationsystems/Notations-OSIRIS-Overwatch-Engine`. The `cd` after the
+clone said `cd payload`, which is not what the clone creates either.
+
+**A stale instruction aimed at a regulator.** `sourceRegistry.ts` carried a
+pre-registered build note for the unbuilt EDGAR document-tier adapter,
+written under work order 3.6, saying: *the instrument is Sea Dog Terminal…
+the document-tier UA is `SeaDogTerminal/<version> OrgName role@org`; it must
+not go to a regulator under the retired Payload Terminal name.* The second
+rename made every clause of that false, and forbade by name the identity
+that had become correct. Nothing failed because nobody has built the
+adapter. That is the sharpest form of this project's recurring class: a
+correct-when-written instruction, aimed at the SEC, waiting.
+
+### What was deliberately not renamed
+
+Following Phase 47's own split — identifiers stay stable, display names
+follow the instrument:
+
+- **`SEA_DOG_*` environment variables** (8 names, 61 sites). These are the
+  deployment contract. `envCompat.ts` exists precisely for this and has the
+  right shape — new name wins, old name honoured for one release with a
+  warning, `LEGACY_ENV_REMOVED_AFTER` naming the release that drops it — but
+  none of the `SEA_DOG_*` reads go through it today. Migrating them is a
+  bounded piece of work (route every read through `readEnvWithLegacy`, add
+  eight entries) and it is a change to how the thing is deployed, so it is
+  the operator's call and not a side effect of an audit.
+- **`seaDogTerminal`** as a key in the `/api/health` response. A response
+  schema with external readers and its own pins.
+- **`Symbol.for('sea-dog-terminal.process-singletons')`.** A runtime
+  identity key: changing it across a rolling restart would orphan the
+  process-wide state it exists to share.
+- **`sea-dog-*` temp-directory prefixes in tests.** Scratch names with no
+  identity role; renaming them is churn.
+- **This ledger.** Renaming Sea Dog out of the phases that describe the Sea
+  Dog day would falsify the record, exactly as Phase 47 said of OSIRIS.
+
+`x-sea-dog-client` was renamed to `x-payload-client` **with** a landing
+strip — the legacy spelling is still read, never written. It appears in no
+route catalogue and no page of the docs, so the compat window is
+precautionary rather than owed; it costs one `??` and removes the question
+of whether anyone was ever told to send it.
+
+### Measured after
+
+**88 test files, 1,295 passed, 6 skipped. Typecheck clean. Production build
+compiles**, with the same four pre-existing dynamic `node:fs` import
+warnings the Phase 47 baseline recorded — checked, not assumed.

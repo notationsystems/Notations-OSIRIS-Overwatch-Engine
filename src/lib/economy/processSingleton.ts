@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — process-wide singletons that survive Next's module
+ * Payload Terminal — process-wide singletons that survive Next's module
  * duplication (deployment order, found in the running configuration).
  *
  * THE FINDING. Next.js runs the `instrumentation.ts` hook in a different

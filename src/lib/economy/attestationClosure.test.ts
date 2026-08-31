@@ -218,6 +218,16 @@ describe('every number-bearing type in the layer is accounted for', () => {
     PricingPolicy: 'floors, a window, a margin and a financing cost — the rule that shapes a quote',
     QuotePolicy: 'a target margin and a band width — the rule that shapes a quote, not a measurement',
     QuoteResult: 'the quote carries its own confidence tier, n, carrier count, spread and staleness',
+    // The credit governor. These are counts of OUR OWN spend against a
+    // vendor's meter — our arithmetic, not theirs, and the two can diverge:
+    // a ledger held in process memory hands the whole budget back on a
+    // restart while the meter keeps climbing. That divergence is not
+    // hidden in an evidence class, it is a named field. `durability` on
+    // every decision and every row is where this type states what it does
+    // not know, which is the same job an attestation does elsewhere.
+    ProviderSpend: 'our own count of spend against a vendor meter; `durability` states whether the count survives a restart',
+    SpendDecision: 'a permit or a refusal over our own ledger, carrying the ledger durability it rests on',
+    ProviderBudget: 'a cap, a period and the basis it came from — the rule, not a reading',
     InclusionProof: 'a leaf index and tree size into our own log',
     ConsistencyProof: 'two sizes of our own log',
     // Claimable artifacts, carrier trust, claim economics, transparency log.

@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — deployment configuration seams (shipping order S-3).
+ * Payload Terminal — deployment configuration seams (shipping order S-3).
  *
  * The rule: a missing REQUIRED configuration refuses loudly at startup
  * with the key named — never a silent degrade. A source that quietly
@@ -50,7 +50,7 @@ export function assertRequiredConfig(env: Record<string, string | undefined> = p
   const check = checkRequiredConfig(env);
   if (!check.ok) {
     throw new Error(
-      'Sea Dog Terminal refuses to start — required configuration missing:\n'
+      'Payload Terminal refuses to start — required configuration missing:\n'
       + check.missing.map(m => `  ${m.key}: ${m.reason}`).join('\n'),
     );
   }

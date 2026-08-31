@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — visual refusal discipline (final order F-5).
+ * Payload Terminal — visual refusal discipline (final order F-5).
  *
  * The map is more persuasive than the table and carries less: every
  * simplification that makes it intuitive strips an axis, invisibly.

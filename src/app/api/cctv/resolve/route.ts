@@ -3,6 +3,7 @@ import { safeFetch } from '@/lib/ssrf-guard';
 import { isSkylineUrl, parseSkylinePage } from '@/lib/skyline';
 import { extractYouTubeId, isYouTubeUrl, parseYouTubeUrl, youtubeEmbedUrl } from '@/lib/youtube';
 import { requireRouteEnabled } from '../../../../lib/routeGate';
+import { userAgent } from '@/lib/identity';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
@@ -101,7 +102,7 @@ export async function GET(req: Request) {
     const res = await safeFetch(url, {
       signal: AbortSignal.timeout(10_000),
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Payload Terminal/1.0; +https://github.com/simplifaisoul/osiris)',
+        'User-Agent': userAgent('camera resolution'),
         Accept: 'text/html,application/xhtml+xml',
       },
     });

@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — form-level stage-conversion constants (work order 3.5).
+ * Payload Terminal — form-level stage-conversion constants (work order 3.5).
  *
  * The scope gap round 25 recorded unbuilt: the corridor-grade machinery
  * converts gross COPPER CONCENTRATE via mirror-implied per-corridor grades,

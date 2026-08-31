@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — process observability (deployment order D-7).
+ * Payload Terminal — process observability (deployment order D-7).
  *
  * Corpus health covers DATA staleness. This covers PROCESS health: what
  * the process did, how often it failed, and what its outbound behaviour

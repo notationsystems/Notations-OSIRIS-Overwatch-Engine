@@ -12,7 +12,7 @@ import { GET as economyGet } from '@/app/api/economy/route';
 import { GET as refusalsGet } from '@/app/api/economy/refusals/route';
 import { GET as validateGet } from '@/app/api/economy/validate/route';
 import { POST as scenarioPost } from '@/app/api/economy/scenario/route';
-import { MACHINE_CLIENT_HEADER } from './machineClient';
+import { LEGACY_MACHINE_CLIENT_HEADER, MACHINE_CLIENT_HEADER, isMachineClient } from './machineClient';
 
 /**
  * Final order F-2 (the MCP tool surface) and F-4 (route-around telemetry)
@@ -460,5 +460,18 @@ describe('the documented tool count is derived, not remembered', () => {
       expect(all.length, `${doc} no longer states a tool count — the pin has gone vacuous`).toBeGreaterThan(0);
       for (const c of all) expect(Number(c), `${doc} states "${c}" read-only tools; the surface serves ${n}`).toBe(n);
     }
+  });
+});
+
+describe('the machine-client header rename keeps its landing strip', () => {
+  it('reads the legacy spelling as well as the current one, and neither by accident', () => {
+    const decl = (h: Record<string, string>) =>
+      isMachineClient(new Request('http://localhost/x', { headers: h }));
+    expect(decl({ [MACHINE_CLIENT_HEADER]: 'machine' })).toBe(true);
+    expect(decl({ [LEGACY_MACHINE_CLIENT_HEADER]: 'machine' })).toBe(true);
+    expect(decl({})).toBe(false);
+    // The VALUE still has to be right — a present header is not a declaration.
+    expect(decl({ [MACHINE_CLIENT_HEADER]: 'yes' })).toBe(false);
+    expect(decl({ [LEGACY_MACHINE_CLIENT_HEADER]: '' })).toBe(false);
   });
 });

@@ -7,7 +7,7 @@ import { isMachineClient } from '@/lib/economy/machineClient';
 import type { EconomyState } from '@/lib/economy/types';
 
 /**
- * Sea Dog Terminal — the corpus as a browsable, extractable table.
+ * Payload Terminal — the corpus as a browsable, extractable table.
  *
  *   GET /api/economy/table?commodity=copper[&metric=...][&subject=ent:...]
  *       [&format=json|md][&asOf=YYYY-MM-DD&knowledge=as_known_then]

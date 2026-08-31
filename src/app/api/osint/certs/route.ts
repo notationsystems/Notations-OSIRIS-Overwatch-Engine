@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
+import { userAgent } from '@/lib/identity';
 
 /**
  * Payload — Certificate Transparency lookup via crt.sh (free, no key).
@@ -33,7 +34,7 @@ export async function GET(req: Request) {
   try {
     const res = await fetch(`https://crt.sh/?q=%25.${encodeURIComponent(domain)}&output=json`, {
       signal: AbortSignal.timeout(10000),
-      headers: { 'User-Agent': 'Payload Terminal-OSINT/3.0' },
+      headers: { 'User-Agent': userAgent('certificate transparency') },
     });
 
     if (!res.ok) {

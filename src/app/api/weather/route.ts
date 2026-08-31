@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { userAgent } from '@/lib/identity';
 
 /**
  * Payload — Severe Weather & Anomalies API
@@ -152,7 +153,7 @@ export async function GET() {
       fetch('https://api.weather.gov/alerts/active?status=actual&message_type=alert', {
         headers: {
           Accept: 'application/geo+json',
-          'User-Agent': 'Payload Terminal Severe Weather Layer',
+          'User-Agent': userAgent('severe weather layer'),
         },
         signal: AbortSignal.timeout(10000),
       }),

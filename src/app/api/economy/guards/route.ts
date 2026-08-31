@@ -4,7 +4,7 @@ import { getEconomyState } from '@/lib/economy/store';
 import { attribution, buildVersion } from '@/lib/economy/attribution';
 
 /**
- * Sea Dog Terminal — RUNTIME guard evaluation (deployment order D-1).
+ * Payload Terminal — RUNTIME guard evaluation (deployment order D-1).
  *
  *   GET /api/economy/guards[?now=YYYY-MM-DD]
  *

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireRouteEnabled } from '../../../lib/routeGate';
+import { userAgent } from '@/lib/identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export async function GET() {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(12000),
       cache: 'no-store',
-      headers: { 'User-Agent': 'Payload Terminal/4.2', 'Accept': 'application/json' },
+      headers: { 'User-Agent': userAgent('radar'), 'Accept': 'application/json' },
     });
 
     console.log('[Payload Terminal] IODA response status:', res.status);

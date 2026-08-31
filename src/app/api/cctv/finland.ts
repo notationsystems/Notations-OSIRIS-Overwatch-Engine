@@ -1,4 +1,5 @@
 import { stealthFetch } from '@/lib/stealthFetch';
+import { userAgent } from '@/lib/identity';
 
 /**
  * Payload — Finland CCTV Cameras (Digitraffic / Fintraffic)
@@ -10,7 +11,7 @@ export async function fetchFinlandCameras(): Promise<any[]> {
   try {
     const res = await stealthFetch('https://tie.digitraffic.fi/api/weathercam/v1/stations', {
       signal: AbortSignal.timeout(12000),
-      headers: { 'Digitraffic-User': 'Payload Terminal/1.0' },
+      headers: { 'Digitraffic-User': userAgent() },
     });
     if (!res.ok) return [];
 

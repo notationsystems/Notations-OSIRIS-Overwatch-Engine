@@ -41,8 +41,9 @@ import comtradeDa from '@/data/economy/snapshots/comtrade-da.json';
 import { withHostRateLimit } from './outboundRate';
 import { processSingleton } from './processSingleton';
 import { readEnvWithLegacy } from './envCompat';
+import { userAgent } from '@/lib/identity';
 
-const UA = 'Payload Terminal-Overwatch/0.1 (internal research instrument)';
+const UA = userAgent('internal research instrument');
 
 function liveDisabled(): boolean {
   // VITEST is set by the vitest runner regardless of NODE_ENV; NODE_ENV alone

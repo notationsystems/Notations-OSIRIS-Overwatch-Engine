@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — the MCP tool surface (final order F-2).
+ * Payload Terminal — the MCP tool surface (final order F-2).
  *
  * The operator's pivot: external models attach to the substrate rather
  * than a reasoning layer being built inside it. That moves the

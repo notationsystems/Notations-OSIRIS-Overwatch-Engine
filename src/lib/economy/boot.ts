@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — boot behaviour and honest degradation (deployment
+ * Payload Terminal — boot behaviour and honest degradation (deployment
  * order D-2).
  *
  * INSPECTION FIRST, and it corrected two of the order's assumptions:

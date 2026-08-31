@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isSkylineUrl, parseSkylinePage } from './skyline';
+import { userAgent } from './identity';
 
 /** Trimmed from the real Yubatake page, which is what this parses in production. */
 const YUBATAKE = `<script>function onYouTubeIframeAPIReady(){player=new YT.Player('live',{playerVars:{autoplay:1,controls:1,hl:'en'},height:'100%',width:'100%',videoId:'GrEEoEmmrKs',host:'https://www.youtube-nocookie.com',events:{'onReady':onPlayerReady}});}</script>`;
@@ -64,7 +65,7 @@ const liveIt = process.env.RUN_LIVE_TESTS === '1' ? it : it.skip;
 describe('skyline resolution (live)', () => {
   liveIt('resolves the Yubatake page to a playable YouTube id', async () => {
     const res = await fetch('https://www.skylinewebcams.com/en/webcam/japan/gunma/yubatake/yubatake.html', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Payload Terminal/1.0)' },
+      headers: { 'User-Agent': userAgent('camera resolution') },
       signal: AbortSignal.timeout(15000),
     });
     expect(res.ok).toBe(true);

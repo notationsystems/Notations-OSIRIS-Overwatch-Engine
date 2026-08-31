@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { requireRouteEnabled } from '../../../lib/routeGate';
+import { userAgent } from '@/lib/identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function GET() {
       try {
         const res = await fetch(url, {
           signal: AbortSignal.timeout(15000),
-          headers: { 'User-Agent': 'Payload Terminal-Intelligence-Platform/3.5' },
+          headers: { 'User-Agent': userAgent('fire detections') },
         });
         if (res.ok) {
           const text = await res.text();

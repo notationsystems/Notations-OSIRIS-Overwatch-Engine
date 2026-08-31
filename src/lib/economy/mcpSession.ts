@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — MCP session log and route-around telemetry (final
+ * Payload Terminal — MCP session log and route-around telemetry (final
  * order F-4).
  *
  * You cannot prevent an external model from ignoring a refusal and

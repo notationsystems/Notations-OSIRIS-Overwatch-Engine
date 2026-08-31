@@ -178,7 +178,7 @@ export default function DocsClient() {
           </button>
 
           <a
-            href="https://github.com/simplifaisoul/osiris"
+            href="https://github.com/notationsystems/Notations-OSIRIS-Overwatch-Engine"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
@@ -373,8 +373,8 @@ print(len(data["commercial_flights"]), "commercial")`,
 
           <Section id="self-hosting" eyebrow="Guide" title="Self-Hosting">
             <p>Payload Terminal needs Node 20+ and no database. A local instance is three commands:</p>
-            <Pre label="Local development" lang="bash">{`git clone https://github.com/simplifaisoul/osiris.git
-cd payload
+            <Pre label="Local development" lang="bash">{`git clone https://github.com/notationsystems/Notations-OSIRIS-Overwatch-Engine.git
+cd Notations-OSIRIS-Overwatch-Engine
 npm install
 npm run dev        # http://localhost:3000`}</Pre>
             <p>For a production build, or to run the checks:</p>
@@ -596,10 +596,10 @@ docker compose up -d`}</Pre>
           {/* Footer */}
           <footer className="border-t border-white/[0.06] pt-6 pb-16 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] font-mono text-[var(--text-muted)]">
             {[
-              { href: 'https://github.com/simplifaisoul/osiris', label: 'GitHub' },
+              { href: 'https://github.com/notationsystems/Notations-OSIRIS-Overwatch-Engine', label: 'GitHub' },
               { href: 'https://discord.gg/EPaFD5FFKf', label: 'Discord' },
               { href: 'https://x.com/soulsimplifai', label: 'X' },
-              { href: 'https://github.com/simplifaisoul/osiris/issues', label: 'Report an issue' },
+              { href: 'https://github.com/notationsystems/Notations-OSIRIS-Overwatch-Engine/issues', label: 'Report an issue' },
             ].map(l => (
               <a
                 key={l.label}

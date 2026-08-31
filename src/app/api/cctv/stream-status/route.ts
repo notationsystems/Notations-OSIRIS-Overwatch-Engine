@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { safeFetch } from '@/lib/ssrf-guard';
 import { requireRouteEnabled } from '../../../../lib/routeGate';
+import { userAgent } from '@/lib/identity';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
     const res = await safeFetch(url, {
       signal: AbortSignal.timeout(8000),
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Payload Terminal/1.0; +https://github.com/simplifaisoul/osiris)',
+        'User-Agent': userAgent('stream status probe'),
         Accept: 'text/html,application/xhtml+xml',
       },
     });

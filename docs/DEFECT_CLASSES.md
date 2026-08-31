@@ -267,6 +267,19 @@ an ordinal that contradicts this table.
 | 41 | 67 | A density report counting all-time while the quoter refused anything stale — one question, two populations, and the report was the flattering half |
 | 42 | 67 | A per-load amount and a run-rate requirement folded into one capital figure, in two different wrong ways |
 | 43 | 67 | A test asserting a band comparison across two variables at once, so it failed for a correct reason |
+| 44 | 68 | `'use client'` on line 2, after an import: not a directive at all, working only because its importer was already a client component |
+| 45 | 68 | An `AnimatePresence` whose child returned null above it, so the exit animation was configured, read as working, and could never run |
+| 46 | 68 | A closed panel returning null while its 1 Hz interval kept ticking, because hooks run before the early return |
+| 47 | 68 | A cursor reset in an effect, leaving one frame where Enter selected nothing — a guard turning a crash into a silent no-op |
+| 48 | 68 | `?radius=` read from the query string, threaded into a function, and ignored: a caller asking for 10 and one asking for 5000 got identical results |
+| 49 | 68 | `demoMode` with no setter, gating 48 lines whose cleanup cleared a global nothing in the repository ever set |
+| 50 | 68 | A markdown renderer served on a live route with no pin, while its sibling on the same `format=md` switch had one |
+| 51 | 68 | My own pin asserting "no empty cell anywhere", which grepped a shape and claimed a property the flags column legitimately violates |
+| 52 | 69 | A branding sweep that enumerated five deliberate exclusions and did not know a second stale brand existed |
+| 53 | 69 | A two-word display name written into User-Agent product tokens, where a space is a delimiter: twelve files naming two products each |
+| 54 | 69 | Public documentation sending every reader to a different owner's repository, in the clone command and the issue link |
+| 55 | 69 | A pre-registered instruction, aimed at a REGULATOR, telling a future adapter to identify under a name that had been retired and forbidding the one that had become correct |
+| 56 | 69 | A proxy that spends someone else's money on request, with no per-IP throttle, while `isRateLimited` sat unused in a module it already imported |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

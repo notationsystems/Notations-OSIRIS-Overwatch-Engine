@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — response attribution (deployment order D-3).
+ * Payload Terminal — response attribution (deployment order D-3).
  *
  * A researcher who says "this number looks wrong" is unattributable
  * unless the response says which BUILD, which STATE and which KNOWLEDGE
