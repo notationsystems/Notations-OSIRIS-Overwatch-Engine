@@ -4023,3 +4023,92 @@ implied by its title. Verified by planting the clock read: 6b fails, alone.
 "held across 100.0% of the interval" off a single handoff. Custody is not an
 interval-density question, and a fraction that cannot mean what it says is worse
 than a zero that admits the question does not apply.
+
+---
+
+## Phase 57 — correcting phase 51: the matrix endpoint does not discard the restrictions, it has nowhere to put them
+
+Phases 51 and 52 recorded a reconnaissance finding as: openrouteservice
+"honours `profile_params.restrictions` on `/v2/directions` and `/v2/isochrones`
+and **discards them** on `/v2/matrix` — HTTP 200, well-formed matrix,
+restrictions never read." That was taken from a subagent report. The agents left
+the actual ORS source in the session scratchpad, so it was checkable, and
+checking it changes the characterization.
+
+### What the source says
+
+```
+IsochronesService.java:271-274
+    RouteRequestOptions options = isochronesRequest.getIsochronesOptions();
+    parameters = processRequestOptions(options, parameters);
+    if (options.hasProfileParams())
+        parameters.setProfileParams(convertParameters(options, parameters.getProfileType()));
+
+ApiService.java:227-230   (inside convertParameters)
+    if (options.getProfileParams().hasRestrictions()) {
+        RequestProfileParamsRestrictions restrictions = options.getProfileParams().getRestrictions();
+        validateRestrictionsForProfile(restrictions, profileType);
+        params = convertSpecificProfileParameters(profileType, restrictions);
+```
+
+The isochrone path takes `RouteRequestOptions` — the rich type — and converts
+the restrictions. Confirmed.
+
+```
+MatrixRequestHandler.java:106
+    processRequestOptions(matrixRequest.getMatrixOptions(), params);
+
+MatrixRequest.java:242
+    public MatrixRequestOptions getMatrixOptions() { … }
+
+MatrixRequestOptions.java — every field:
+    PARAM_DYNAMIC_SPEEDS = "dynamic_speeds"
+    private boolean dynamicSpeeds;
+    private boolean hasDynamicSpeeds = false;
+```
+
+`MatrixRequest.java` mentions restrictions or profile params **zero** times. The
+matrix endpoint takes a DIFFERENT, NARROWER options type carrying exactly one
+option.
+
+### Why the difference matters here of all places
+
+"Discards them" means accepted-and-ignored. That is `refuted` in this codebase's
+capability vocabulary — the dangerous state, positive evidence that a backend
+lies about a parameter it took.
+
+What the source shows is that there is **no field to accept**. That is
+`unhonoured` — the honest failure, where nothing is pretended and the caller can
+in principle see the parameter was never in play.
+
+Those are the two states phase 52 argued must not be collapsed, on the grounds
+that they "call for opposite responses". Having made that argument, I then
+recorded a real backend in the wrong one of them, from a summary, without
+opening the file that was sitting in the scratchpad. The distinction was easier
+to defend in the abstract than to apply.
+
+### The hazard survives the correction, and generalizes
+
+The vehicle PROFILE is still selected on the matrix endpoint. So a dispatcher
+asks for an HGV matrix, receives one, and it is truck-*profiled* without being
+truck-*dimensioned* — and cannot supply the dimensions even if they know to try.
+The endpoint name and the profile name both suggest a legality the answer does
+not carry.
+
+That is the original lesson at a second vendor by a second mechanism: **calling a
+truck endpoint proves nothing**. Valhalla accepted a height and applied nothing;
+this one has no height to accept. Both produce a plausible truck answer that is
+not truck-legal, which is why the capability is arbitrated per operation from a
+probe rather than read off the request.
+
+### What did not have to change
+
+Nothing in `src/`. The vendor-name guard in `spatial.test.ts` forbids naming an
+implementation in the spatial layer, so an incorrect vendor fact could only ever
+land in `docs/` and the ledger. The blast radius of getting this wrong was
+bounded by the architecture rather than by my being careful, which is the point
+of that guard and the second time this session it has paid.
+
+Phases 51 and 52 stand as to the SHAPE — capability is per operation, and a
+verdict without an operation cannot express a real backend. Their
+characterization of the mechanism is corrected here.

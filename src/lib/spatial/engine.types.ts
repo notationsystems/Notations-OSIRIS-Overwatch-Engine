@@ -173,11 +173,18 @@ export type CapabilityState =
  * not that the restriction was applied — so the probe must record a lane where the
  * result MEASURABLY changes across the threshold.
  *
- * KEYED BY (restriction × operation), because a backend is not uniform. Measured
- * in reconnaissance: a backend that honours truck restrictions on its directions
- * and isochrone endpoints and DISCARDS them on its matrix endpoint — HTTP 200,
- * well-formed matrix, no warning field, the restriction never read. Upstream and
- * open since 2018. The matrix is what a dispatcher calls for fleet assignment.
+ * KEYED BY (restriction × operation), because a backend is not uniform. Verified
+ * against a real routing engine's source: its directions and isochrone endpoints
+ * take a request type that carries dimensional restrictions and convert them,
+ * while its matrix endpoint takes a NARROWER options type with no field for them
+ * at all. The matrix is what a dispatcher calls for fleet assignment, and the
+ * vehicle profile is still selected there — so the answer is truck-PROFILED
+ * without being truck-DIMENSIONED, and the caller cannot supply the dimensions
+ * even knowing to try.
+ *
+ * (Recorded first as "accepted and discarded", which would be `refuted`. Reading
+ * the source showed there is no field to accept, which is `unhonoured` — the two
+ * states this file argues must not be collapsed. See ledger phase 57.)
  *
  * A verification keyed by restriction alone says "height: verified" and is true
  * of one endpoint and false of another, with the caller unable to tell which.
