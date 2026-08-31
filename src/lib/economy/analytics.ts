@@ -122,6 +122,32 @@ export function weakestInputClass(kinds: Iterable<Observation['valueKind']>): Ob
   return weakest;
 }
 
+/** Evidence classes of the named flows — the inputs a graph-derived row
+ *  stands on. Missing ids contribute nothing rather than a default: an id
+ *  that resolves to no flow is a gap in the graph, not a clean input. */
+function flowKindsOf(state: EconomyState, flowIds: Iterable<string>): Observation['valueKind'][] {
+  const byId = new Map(state.flows.map(f => [f.id, f]));
+  const out: Observation['valueKind'][] = [];
+  for (const id of flowIds) {
+    const f = byId.get(id);
+    if (f) out.push(f.valueKind);
+  }
+  return out;
+}
+
+/** Evidence classes of the named observations. Missing ids contribute
+ *  nothing rather than a default — an id resolving to no observation is a
+ *  gap, not a clean input. */
+function obsKindsOf(state: EconomyState, ids: Iterable<string>): Observation['valueKind'][] {
+  const byId = new Map(state.observations.map(o => [o.id, o]));
+  const out: Observation['valueKind'][] = [];
+  for (const id of ids) {
+    const o = byId.get(id);
+    if (o) out.push(o.valueKind);
+  }
+  return out;
+}
+
 /* ── Structural class profile ── */
 
 /**
@@ -330,6 +356,11 @@ export interface TrajectoryPoint {
   topName: string;
   topShare: number; // 0..1
   participants: number;
+  /** Weakest evidence class among THIS YEAR's observations. Per point, not
+   *  per series: a trajectory whose early years are representative and
+   *  whose late years are reported is two different kinds of number on one
+   *  line, and a single series-level label would hide the transition. */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 /**
@@ -370,6 +401,7 @@ export function concentrationTrajectory(
       topName: shares[0].name,
       topShare: shares[0].share,
       participants: obs.length,
+      weakestInputClass: weakestInputClass(obs.map(o => o.valueKind)),
     });
   }
   return wrap(
@@ -735,6 +767,16 @@ export interface CentralityRow {
   share: number | null;
   /** Flow ids whose tonnage could not be quantified at this node. */
   unquantifiedFlowIds?: string[];
+  /**
+   * Evidence class of the WEAKEST flow this row stands on — contamination
+   * direction, as everywhere else. Added after a measurement found this row
+   * type, BottleneckCandidate, TrajectoryPoint and AnomalySignal shipping
+   * numbers with no attestation at all while standing on representative
+   * flow rows. See attestation.ts: a field beside the number gets stripped
+   * exactly where the number becomes persuasive, and the bottleneck score
+   * paints a dot on the map.
+   */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 export function flowCentrality(state: EconomyState, graph: EconomyGraph): AnalyticalResult<CentralityRow[]> {
@@ -756,6 +798,8 @@ export function flowCentrality(state: EconomyState, graph: EconomyGraph): Analyt
         throughputKt: t.inKt + t.outKt,
         share: refused ? null : grand > 0 ? (t.inKt + t.outKt) / grand : 0,
         ...(refused ? { unquantifiedFlowIds: t.unquantifiedFlowIds } : {}),
+        weakestInputClass: weakestInputClass(
+          flowKindsOf(state, [...t.flowIds, ...t.unquantifiedFlowIds])),
       };
     })
     .sort((a, b) => b.throughputKt - a.throughputKt);
@@ -794,6 +838,10 @@ export interface BottleneckCandidate {
   flowIds: string[];
   capacityIds: string[];
   dependencyIds: string[];
+  /** Weakest evidence class across every flow, capacity and dependency the
+   *  score stands on. A candidate computed over representative topology is
+   *  a representative candidate, and the dot on the map has to say so. */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 /**
@@ -880,6 +928,23 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
       entityId, name: ent.name, kind: ent.kind,
       score: refused ? null : Math.min(1, score),
       components: { throughputShare, utilization, redundancy, dependencyLoad },
+      // Every input the score stands on: the flows through the node, the
+      // capacities it is measured against, and the dependencies that load
+      // it. One representative among them makes the candidate
+      // representative — the contamination direction, applied where the
+      // number reaches a map layer.
+      weakestInputClass: weakestInputClass([
+        ...flowKindsOf(state, [...t.flowIds, ...t.unquantifiedFlowIds]),
+        ...caps.map(c => c.valueKind),
+        // Dependency edges carry NO valueKind and are curation-class by
+        // construction (see structuralClassProfile's attributionEdges note),
+        // so each contributes 'representative'. The consequence is
+        // deliberate and is the honest one: a bottleneck standing on curated
+        // topology IS a representative finding, and most of them do. Hiding
+        // that by omitting dependencies from the combine would report the
+        // curated layer as though it were sourced.
+        ...deps.map((): Observation['valueKind'] => 'representative'),
+      ]),
       explanation,
       flowIds: [...t.flowIds, ...t.unquantifiedFlowIds],
       capacityIds: caps.map(c => c.id),
@@ -941,6 +1006,10 @@ export interface AnomalySignal {
   kind: 'rolling-deviation' | 'rate-of-change' | 'revision';
   period: string;
   value: number;
+  /** Weakest evidence class among the observations this signal was
+   *  computed from. An anomaly is what wakes someone up, and one
+   *  computed over representative inputs must say so before it does. */
+  weakestInputClass: Observation['valueKind'] | null;
   /** Standard deviations from the rolling mean, or period-over-period %Δ. */
   magnitude: number;
   observationIds: string[];
@@ -1011,6 +1080,7 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
       kind: 'revision', period: o.period.start.slice(0, 7), value: o.value,
       magnitude: Number((delta * 100).toFixed(1)),
       observationIds: [prev.id, o.id],
+      weakestInputClass: weakestInputClass([prev.valueKind, o.valueKind]),
       explanation: `${o.provenance.sourceId} revises ${o.period.start.slice(0, 4)} ${o.metric}: ${prev.value} → ${o.value} (${(delta * 100).toFixed(1)}%). Best estimate moved — knowable ${knownAtOf(o)}.`,
     });
   }
@@ -1049,6 +1119,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
             kind: 'rolling-deviation', period: point.period, value: point.value,
             magnitude: Number(z.toFixed(2)),
             observationIds: series.slice(i - window, i + 1).map(p => p.observationId),
+            weakestInputClass: weakestInputClass(
+              obsKindsOf(state, series.slice(i - window, i + 1).map(p => p.observationId))),
             explanation: `${point.period}: ${point.value} is ${z.toFixed(1)}σ from the trailing ${window}-period mean (${mean.toFixed(1)})`,
           });
         }
@@ -1064,6 +1136,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
             kind: 'rate-of-change', period: point.period, value: point.value,
             magnitude: Number((roc * 100).toFixed(1)),
             observationIds: [prev.observationId, point.observationId],
+            weakestInputClass: weakestInputClass(
+              obsKindsOf(state, [prev.observationId, point.observationId])),
             explanation: `${point.period}: ${(roc * 100).toFixed(1)}% change vs ${prev.period} (${prev.value} → ${point.value})`,
           });
         }
