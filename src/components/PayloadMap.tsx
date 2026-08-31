@@ -31,7 +31,6 @@ interface PayloadMapProps {
   projection?: 'mercator' | 'globe';
   mapStyle?: string;
   sweepData?: any;
-  scanTargets?: any[];
   demoMode?: boolean;
   theme?: 'core' | 'ghost';
   drawnPolygons?: Array<{ id: string; name: string; geojson: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.LineString>; color: string }>;
@@ -124,7 +123,7 @@ function greatCircleArc(from: [number, number], to: [number, number], segments =
   return coords;
 }
 
-function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
+function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -2235,19 +2234,6 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
   }, [mapReady, sweepData, setGeo]);
 
   // Scan Targets visualization
-  useEffect(() => {
-    if (!mapReady || !mapRef.current || !scanTargets) return;
-    const map = mapRef.current;
-    
-    const features = scanTargets.map(t => ({
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [t.lng, t.lat] },
-      properties: { ...t }
-    }));
-    
-    const src = map.getSource('scan-targets') as maplibregl.GeoJSONSource;
-    if (src) src.setData({ type: 'FeatureCollection', features });
-  }, [scanTargets, mapReady]);
 
   // Fly-to
   useEffect(() => {

@@ -12,7 +12,6 @@ const world = makeFreightWorld({ generatedAt: NOW });
 // which is a real refusal and not the one under test here.
 const ASOF = world.loads.map(l => l.actualDeliveryAt).sort().reverse()[0];
 const obs = observationsFrom(world.loads);
-const loads = obs;
 
 const densest = laneDensity(obs, ASOF).inWindow.densest[0];
 const q = (o: readonly LaneObservation[], laneId: string, equipment: string) =>

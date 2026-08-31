@@ -204,14 +204,24 @@ export interface SimulatedOptions {
   now: string;
 }
 
+/**
+ * The refusal reasons this backend can give.
+ *
+ * Was previously a `const mk = (r: '...' | '...') => r` whose only purpose was to
+ * be read back as `Parameters<typeof mk>[0]` — a value declared so a type could
+ * be spelled. Naming the union directly says the same thing and does not leave a
+ * function in the bundle that nothing calls.
+ */
+type SimulatedRefusal =
+  | 'operation_unsupported' | 'restriction_not_honoured' | 'outside_coverage'
+  | 'matrix_too_large' | 'no_route_exists' | 'restriction_unverified' | 'backend_unreachable';
+
 export function createSimulatedEngine(opts: SimulatedOptions): SpatialEngine {
   const { now } = opts;
 
-  const refuse = <T>(reason: Parameters<typeof mk>[0], remedy: string,
+  const refuse = <T>(reason: SimulatedRefusal, remedy: string,
                      requested: RestrictionKind[], unhonoured: RestrictionKind[]): SpatialResult<T> =>
     ({ status: 'refused', reason, remedy, requestedRestrictions: requested, unhonoured });
-  const mk = (r: 'operation_unsupported' | 'restriction_not_honoured' | 'outside_coverage'
-    | 'matrix_too_large' | 'no_route_exists' | 'restriction_unverified' | 'backend_unreachable') => r;
 
   return {
     capabilities: SIMULATED_CAPABILITIES,
@@ -311,14 +321,15 @@ export function createSimulatedEngine(opts: SimulatedOptions): SpatialEngine {
       return this.isochrone(req);
     },
 
-    async mapMatch(_req: MapMatchRequest): Promise<SpatialResult<MapMatch>> {
+    async mapMatch(request: MapMatchRequest): Promise<SpatialResult<MapMatch>> {
       // NOT SUPPORTED, and it refuses rather than returning the trace unchanged.
       // Echoing the input back as "matched" would be the most plausible lie this
       // module could tell: every point present, confidence unstated, nothing
       // actually snapped to anything.
       return refuse('operation_unsupported',
-        'The simulated backend has no road graph, so a trace cannot be snapped to one. '
-        + 'Returning the trace unchanged would be indistinguishable from a real match.',
+        `The simulated backend has no road graph, so the ${request.trace.length}-point trace `
+        + 'cannot be snapped to one. Returning it unchanged would be indistinguishable from a '
+        + 'real match.',
         [], []);
     },
 

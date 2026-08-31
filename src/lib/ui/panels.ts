@@ -14,7 +14,7 @@
 //   showAlerts        closed  drawing, markets          <- not spaceCam, not economy
 //   showDirections    closed  alerts, search, drawing, markets, spaceCam
 //   showDesktopSearch closed  alerts, drawing, markets, spaceCam
-//   showArcGIS        closed  remote                    <- and nothing else
+//   showArcGIS        closed  arcgis                    <- and nothing else
 //   showRemote        closed  alerts, arcgis, search, drawing, markets, spaceCam
 //   showDrawing       closed  alerts, markets, spaceCam
 //
@@ -45,7 +45,6 @@ export type PanelId =
   | 'directions'
   | 'search'
   | 'arcgis'
-  | 'remote'
   | 'spatial'
   | 'econGraph';
 
@@ -83,7 +82,6 @@ export const PANEL_SLOT: Record<PanelId, PanelSlot> = {
   drawing: 'right_rail',
   search: 'right_rail',
   arcgis: 'right_rail',
-  remote: 'right_rail',
   spatial: 'right_rail',
   directions: 'top_bar',
   econGraph: 'modal',

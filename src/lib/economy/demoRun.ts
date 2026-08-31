@@ -16,7 +16,7 @@ import { createSimulatedEngine, createSimulatedOptimizer } from '../spatial/simu
 import { SpatialRegistry, shortfallOf, type Arbitration } from '../spatial/registry';
 import type { RestrictionKind, SpatialResult, Route, Matrix } from '../spatial/engine.types';
 import {
-  DEMO_NOW, LOADS, PLACES, HANDOFFS, placeById, loadById,
+  DEMO_NOW, LOADS, HANDOFFS, placeById, loadById,
   reeferReadings, reeferReadingsClean, REEFER_ENVELOPE, REEFER_FROM, REEFER_TO,
   EXCEPTION_EVIDENCE, TALL_REEFER, STANDARD_DRYVAN, type DemoLoad,
 } from './freightFixture';

@@ -3,7 +3,7 @@ import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ROUTE_DISPOSITION, RETIRED_ROUTES, KEPT_DESPITE_GENERAL_PURPOSE,
-  routesEnabled, isRouteEnabled, requireRouteEnabled, ROUTE_RETIRED, ROUTE_RETIRED_STATUS,
+  routesEnabled, isRouteEnabled, requireRouteEnabled, ROUTE_RETIRED_STATUS,
 } from './routeGate';
 
 const API_ROOT = join(process.cwd(), 'src/app/api');

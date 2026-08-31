@@ -635,7 +635,11 @@ export async function writeVintageWithoutOverwrite(
 export function comparableVintage(raw: string): string {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const { elapsedTime: _elapsed, ...rest } = parsed;
+    // `elapsedTime` is dropped deliberately: it is the provider's own timing,
+    // not a fact about the world, and carrying it would put a number with no
+    // subject into a record that is otherwise all measurements.
+    const { elapsedTime: _dropped, ...rest } = parsed;
+    void _dropped;
     return JSON.stringify(rest);
   } catch {
     return raw; // not JSON: compare verbatim rather than guess

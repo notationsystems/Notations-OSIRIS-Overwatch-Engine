@@ -11,7 +11,7 @@ import {
   assertIntegerDimensions, RESTRICTION_CAPS, RESTRICTION_KINDS, SPATIAL_OPERATIONS,
   isProbeable, DISCRIMINATION_FLOOR_PCT,
   type RoutingOptimizer, type VehicleProfile, type RestrictionVerification,
-  type VrpRequest, type VrpSolution, type SpatialClaim, type Matrix, type Job,
+  type VrpSolution, type SpatialClaim, type Matrix, type Job,
 } from './engine.types';
 import { clearRegistry } from '../economy/models';
 import { isAdmissible } from '../economy/attestation';

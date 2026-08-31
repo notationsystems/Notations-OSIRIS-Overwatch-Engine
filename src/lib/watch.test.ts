@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { diffSweep, appendEvents, formatAgo, MAX_EVENTS, type WatchBaseline } from './watch';
+import { diffSweep, appendEvents, formatAgo, MAX_EVENTS } from './watch';
 import type { AoiReport } from './aoi';
 
 /** Build a sweep result holding the given callsigns in one layer. */

@@ -31,9 +31,14 @@ describe('exclusion is derived, so it cannot drift out of symmetry', () => {
 });
 
 describe('no reachable state stacks two panels on one anchor', () => {
-  // Exhaustive over every click sequence up to length 4 across all 12 panels:
-  // 12 + 144 + 1728 + 20736 = 22,620 sequences. The old logic failed this at
-  // length 2, in 24 distinct ways.
+  // Exhaustive over every click sequence up to length 4 across all panels. The
+  // old logic failed this at length 2, in 24 distinct ways.
+  //
+  // The count is asserted against the roster SIZE rather than a literal, so
+  // adding or removing a panel updates it arithmetically — but `ALL_PANELS
+  // .length` is itself pinned below, so the roster cannot change silently. A
+  // bare literal would have to be re-derived by hand on every roster change,
+  // and a purely derived count would pass for a roster of one.
   it('holds over every sequence of up to four toggles', () => {
     let checked = 0;
     const walk = (state: PanelState, depth: number) => {
@@ -46,7 +51,15 @@ describe('no reachable state stacks two panels on one anchor', () => {
       }
     };
     walk({ ...CLOSED_PANELS, layers: true }, 4);
-    expect(checked).toBe(1 + 12 + 144 + 1728 + 20736);
+    const n = ALL_PANELS.length;
+    expect(checked).toBe(1 + n + n ** 2 + n ** 3 + n ** 4);
+    expect(checked).toBeGreaterThan(10_000);
+  });
+
+  it('pins the roster size, so the count above cannot drift silently', () => {
+    // 12 before the BLE panel was removed as a person-targeting surface.
+    expect(ALL_PANELS.length).toBe(11);
+    expect(new Set(ALL_PANELS).size).toBe(ALL_PANELS.length);
   });
 
   it('and the pin: the OLD cascades do fail this, so the test is not vacuous', () => {
@@ -58,8 +71,7 @@ describe('no reachable state stacks two panels on one anchor', () => {
       alerts: ['drawing', 'markets'],
       directions: ['alerts', 'search', 'drawing', 'markets', 'spaceCam'],
       search: ['alerts', 'drawing', 'markets', 'spaceCam'],
-      arcgis: ['remote'],
-      remote: ['alerts', 'arcgis', 'search', 'drawing', 'markets', 'spaceCam'],
+      arcgis: [],
       drawing: ['alerts', 'markets', 'spaceCam'],
     };
     const applyOld = (s: PanelState, panel: PanelId): PanelState => {
@@ -99,7 +111,7 @@ describe('the declaration matches where the panels actually render', () => {
       layers: 'showLayers', spaceCam: 'showSpaceCam', economy: 'showEconomy',
       markets: 'showMarkets', alerts: 'showAlerts', drawing: 'showDrawing',
       directions: 'showDirections', search: 'showDesktopSearch',
-      arcgis: 'showArcGIS', remote: 'showRemote', econGraph: 'showEconGraph',
+      arcgis: 'showArcGIS', econGraph: 'showEconGraph',
       spatial: 'showSpatial',
     };
     for (const id of ALL_PANELS) {

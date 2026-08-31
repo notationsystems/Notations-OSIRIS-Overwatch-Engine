@@ -41,9 +41,9 @@ describe('the Markov blanket is a boundary with two sides, both enforced', () =>
     // The silent-leak failure would be to return it, or to return undefined
     // (indistinguishable from an authorized empty region). It must throw.
     const view = project(snapshot(), DISPATCHER, '2026-08-31', 'V-1');
-    expect(() => view.get('carriers.identity' as any)).toThrowError(BlanketViolation);
+    expect(() => view.get('carriers.identity' as unknown as Parameters<typeof view.get>[0])).toThrowError(BlanketViolation);
     try {
-      view.get('carriers.identity' as any);
+      view.get('carriers.identity' as unknown as Parameters<typeof view.get>[0]);
     } catch (e) {
       expect((e as BlanketViolation).code).toBe(BLANKET_SENSORY_LEAK);
     }
@@ -92,7 +92,7 @@ describe('the Markov blanket is a boundary with two sides, both enforced', () =>
   });
 
   it('a view not produced by project() is not a view', () => {
-    const fake = { viewId: 'X', agentId: 'claude:dispatch', shown: new Set(), absent: new Set() } as any;
+    const fake = { viewId: 'X', agentId: 'claude:dispatch', shown: new Set(), absent: new Set() } as unknown as Parameters<typeof assertProjected>[0];
     expect(() => assertProjected(fake)).toThrowError(BlanketViolation);
     try {
       assertProjected(fake);
