@@ -13,6 +13,19 @@ import { measurementClassOf } from './types';
 import type { EconomyGraph } from './graph';
 import { nodeThroughput } from './graph';
 
+/**
+ * OPTIMIZATION: id -> entity index, built once per call instead of a linear
+ * `state.entities.find()` inside per-observation loops. Turns the analytics hot
+ * path from O(observations x entities) into O(observations + entities). Behaviour
+ * is identical; only the lookup cost changes. See docs/optimizations.
+ */
+function entityIndex(state: EconomyState): Map<string, EconomyState['entities'][number]> {
+  const m = new Map<string, EconomyState['entities'][number]>();
+  for (const e of state.entities) m.set(e.id, e);
+  return m;
+}
+
+
 /** knownAt with its conservative fallback: retrieval time bounds knowability. */
 export function knownAtOf(o: Observation): string {
   return o.knownAt ?? o.provenance.retrievedAt.slice(0, 10);
@@ -284,11 +297,12 @@ export function observationsAt(
   asOf?: string,
 ): Observation[] {
   const cutoff = asOf ?? '9999-12-31';
+  const idx = entityIndex(state);
   const best = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.metric !== metric || o.period.end > cutoff) continue;
     if (o.partnerEntityId) continue; // bilateral mirror evidence, not an aggregate
-    const ent = state.entities.find(e => e.id === o.entityId);
+    const ent = idx.get(o.entityId);
     if (ent?.kind !== kind) continue;
     const prev = best.get(o.entityId);
     if (!prev || o.period.end > prev.period.end || (o.period.end === prev.period.end && outranks(o, prev))) {
@@ -317,11 +331,12 @@ export function concentration(
     throw new Error(`concentration() rejects ${cls} metric "${metric}" — physical measurements only`);
   }
   const obs = observationsAt(state, metric, kind, asOf);
+  const idx = entityIndex(state);
   const total = obs.reduce((s, o) => s + o.value, 0);
   const shares: ConcentrationShare[] = obs
     .map(o => ({
       entityId: o.entityId,
-      name: state.entities.find(e => e.id === o.entityId)?.name ?? o.entityId,
+      name: idx.get(o.entityId)?.name ?? o.entityId,
       value: o.value,
       share: total > 0 ? o.value / total : 0,
     }))
@@ -380,6 +395,7 @@ export function concentrationTrajectory(
   }
   const points: TrajectoryPoint[] = [];
   const usedObs = new Set<string>();
+  const idx = entityIndex(state);
   for (const year of [...years].sort()) {
     // Only observations FROM that year — a year where most reporters are
     // stale carry-forwards would fabricate a concentration figure.
@@ -389,7 +405,7 @@ export function concentrationTrajectory(
     const total = obs.reduce((s, o) => s + o.value, 0);
     if (total <= 0) continue;
     const shares = obs.map(o => ({
-      name: state.entities.find(e => e.id === o.entityId)?.name ?? o.entityId,
+      name: idx.get(o.entityId)?.name ?? o.entityId,
       share: o.value / total,
     })).sort((a, b) => b.share - a.share);
     const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
@@ -422,11 +438,16 @@ export function capacityConcentration(
   stage: 'smelting' | 'refining' | 'production',
 ): AnalyticalResult<Concentration> {
   const caps = state.capacities.filter(c => c.stage === stage);
+  const idx = entityIndex(state);
+  const countryByCode = new Map<string, EconomyState['entities'][number]>();
+  for (const e of state.entities) {
+    if (e.kind === 'country' && e.countryCode) countryByCode.set(e.countryCode, e);
+  }
   const byCountry = new Map<string, { name: string; value: number; entityId: string }>();
   for (const c of caps) {
-    const ent = state.entities.find(e => e.id === c.entityId);
+    const ent = idx.get(c.entityId);
     const code = ent?.countryCode ?? 'unknown';
-    const country = state.entities.find(e => e.kind === 'country' && e.countryCode === code);
+    const country = countryByCode.get(code);
     const key = country?.id ?? `ent:country:${code}`;
     if (!byCountry.has(key)) byCountry.set(key, { name: country?.name ?? ent?.country ?? code, value: 0, entityId: key });
     byCountry.get(key)!.value += c.value;
