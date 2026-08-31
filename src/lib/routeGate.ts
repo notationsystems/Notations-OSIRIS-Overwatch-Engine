@@ -153,7 +153,32 @@ export function isRouteEnabled(route: string): boolean {
   return routesEnabled().has(route);
 }
 
-export const ROUTE_RETIRED = 'ROUTE_RETIRED';
+/**
+ * The refusal code, as a named constant with the supplied wire value. The
+ * tree names refusal codes in SHOUT_SNAKE; the WIRE carries `route_retired`
+ * because that is what a consumer was specified to match on. Name and value
+ * are different questions and both are honoured.
+ */
+export const ROUTE_RETIRED = 'route_retired';
+
+/**
+ * 503, not 404 — AND THIS IS A PRODUCT DECISION, surfaced rather than taken
+ * silently.
+ *
+ * The supplied spec said 404. The argument against: the route EXISTS and is
+ * deliberately off, and 404 says it was never there — two different kinds of
+ * nothing collapsed into one, which is the failure this codebase refuses
+ * everywhere else. 503 with a remedy says "off by design, here is how to turn
+ * it on".
+ *
+ * The argument FOR 404 is surface concealment: don't advertise what you have.
+ * It is weak here, because these are inert general-purpose feeds rather than
+ * secrets, and the remedy names the route anyway — so 404 would conceal
+ * nothing while lying about the reason.
+ *
+ * One constant, one line, if the call goes the other way.
+ */
+export const ROUTE_RETIRED_STATUS = 503;
 
 export interface RouteRetiredPayload {
   readonly error: typeof ROUTE_RETIRED;
@@ -193,5 +218,5 @@ export function routeRetiredPayload(route: string): RouteRetiredPayload {
 export function requireRouteEnabled(route: string): Response | null {
   if (isRouteEnabled(route)) return null;
   return new Response(JSON.stringify(routeRetiredPayload(route)),
-    { status: 503, headers: { 'content-type': 'application/json' } });
+    { status: ROUTE_RETIRED_STATUS, headers: { 'content-type': 'application/json' } });
 }

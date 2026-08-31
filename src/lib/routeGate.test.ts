@@ -3,7 +3,7 @@ import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ROUTE_DISPOSITION, RETIRED_ROUTES, KEPT_DESPITE_GENERAL_PURPOSE,
-  routesEnabled, isRouteEnabled, requireRouteEnabled, ROUTE_RETIRED,
+  routesEnabled, isRouteEnabled, requireRouteEnabled, ROUTE_RETIRED, ROUTE_RETIRED_STATUS,
 } from './routeGate';
 
 const API_ROOT = join(process.cwd(), 'src/app/api');
@@ -120,9 +120,9 @@ describe('the refusal says which kind of nothing it is', () => {
     const res = requireRouteEnabled(retired);
     expect(res).not.toBeNull();
     // 404 would say the route was never there. It exists and is off by design.
-    expect(res!.status).toBe(503);
+    expect(res!.status).toBe(ROUTE_RETIRED_STATUS);
     const body = await res!.json();
-    expect(body.error).toBe(ROUTE_RETIRED);
+    expect(body.error).toBe('route_retired'); // the supplied wire value
     expect(body.detail).toContain('not missing');
     expect(body.remedy).toContain('PAYLOAD_ROUTES_ENABLED');
     expect(body.remedy).toContain(retired);
@@ -198,5 +198,38 @@ describe('every retired route actually consults the gate', () => {
       }
     }
     expect(gated, 'a live route that calls the gate is retired in effect').toEqual([]);
+  });
+});
+
+/**
+ * The supplied suite's cases, kept — they assert things worth asserting and
+ * two of them were not covered above.
+ */
+describe('supplied route-allowlist expectations', () => {
+  it('keeps the economy substrate live', () => {
+    for (const r of ['economy', 'economy/search', 'economy/table']) {
+      expect(isRouteEnabled(r)).toBe(true);
+    }
+  });
+
+  it('retires every general-purpose route by default', () => {
+    for (const r of RETIRED_ROUTES) expect(isRouteEnabled(r)).toBe(false);
+  });
+
+  it('an enabled route passes through (null = proceed)', () => {
+    expect(requireRouteEnabled('economy')).toBeNull();
+  });
+
+  it('retired and enabled do not overlap, and retirement is not vacuous', () => {
+    const enabled = routesEnabled();
+    for (const r of RETIRED_ROUTES) expect(enabled.has(r)).toBe(false);
+    expect(RETIRED_ROUTES.length).toBeGreaterThan(15);
+  });
+
+  it('the remedy names the route that would re-enable it', async () => {
+    const res = requireRouteEnabled('cctv');
+    expect(res).not.toBeNull();
+    const body = await res!.json();
+    expect(body.remedy).toContain('cctv');
   });
 });
