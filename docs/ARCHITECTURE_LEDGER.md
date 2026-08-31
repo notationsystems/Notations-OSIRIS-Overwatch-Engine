@@ -5245,3 +5245,140 @@ which is the class's whole point, and the reason this section exists.
   test referenced the removed surface; the 9 new tests are the gate.
 - 609 files removed, 63,759 deletions.
 - Route dispositions: 67 → 66. Compose services: 3 → 2.
+
+
+## Phase 69 — MARAUDER V8, and the gate that was one phase old
+
+Phase 68 widened the collection-policy gate to the execution surface and said,
+in its own closing section, that the widened gate was already narrower than it
+appeared. This is that sentence being cashed.
+
+**What was in the shipped UI.** `src/components/WorldRemote.tsx`, 545 lines,
+titled in its own banner:
+
+```
+   M A R A U D E R   V 8
+   Browser-based BLE Recon Engine
+```
+
+Reached from the desktop tool rail (a Bluetooth button captioned *"World
+Remote — control nearby Bluetooth devices (TVs, speakers, AC)"*) and from the
+mobile tab bar as `REMOTE`. Behind that caption:
+
+| function | what it did |
+|---|---|
+| `probeNetwork` | port-scanned **localhost** — `fetch('http://127.0.0.1:${port}/', {mode:'no-cors'})` against a 400 ms abort, timing the rejection to infer the port is open, then logging `Port N OPEN → service` |
+| the same | enumerated the viewer's **private IP addresses** out of RTCPeerConnection ICE candidates |
+| `connect` | read each Bluetooth device's Manufacturer, Model and **Serial Number** (characteristic `0x2A25`), plus firmware and hardware revisions |
+| `getGPS` | took a fix with `enableHighAccuracy:true` and **bound it to every captured device** |
+| `vaultSave` | persisted the captures to IndexedDB (`marauder_v8`) across reloads |
+| `exportCSV` | wrote `Name, Type, Manufacturer, Model, Serial, …, Lat, Lng, GPS Acc, Captured` — coordinates at 6 decimals, ISO timestamps |
+| `classify` | bucketed devices as Phone, Watch, Wearable, **Heart Rate** |
+| `onPlaceOnMap` | pushed each device onto the world map as a `scan-targets` feature, popup `🎯 TARGET`, and flew the camera to it |
+
+A device serial number, bound to a precise location, timestamped, persisted and
+exportable, for the phones and watches of whoever was standing nearby. The
+map layer's own comment called them *"Geolocated individual scans"*.
+
+### Two records that were true and wrong
+
+**A-0 named this file and deferred it.** Phase 46, under *what this does not
+yet cover*:
+
+> `WorldRemote` plots BLE devices discovered by the browser. It has no API
+> route, so the route-enumeration gate cannot see it. Not acted on: it is
+> outside the order and outside this gate's reach, and it is named here so it
+> is a decision rather than an omission.
+
+Every clause is true. "Plots BLE devices discovered by the browser" is also
+what you would write if you had read the import list and not the file. It does
+not mention the serial numbers, the GPS binding, the vault, the CSV export, or
+the port scanner — and A-0's own disposition table states that host and port
+scanning was *"deleted — code, routes, UI and client libraries"*. The deferral
+was recorded honestly against a description that had drifted from the thing,
+which is class 6 arriving inside the record of a decision: the note was read
+by later phases (including mine) as "a Bluetooth remote control", and that
+reading is why it survived twenty-three more phases.
+
+**And phase 68's gate went green over it.** Part A scans every source file
+outside the route files, and `WorldRemote.tsx` was in its population — 175
+files, and this was one of them. It passed. Every marker in that scan names an
+upstream OSINT host or tool (`ip-api.com`, `stat.ripe.net`, `wd:Q5`, shodan,
+sherlock, the breach corpora), so all of them ask one question: **what is this
+server calling?** This scanner called nothing. It was built from `fetch`, a
+timer, `navigator.bluetooth` and `RTCPeerConnection` — the browser is an
+execution surface too, and a capability does not become permitted by running
+on the client.
+
+So the gate written to close "a mechanism narrower than it appears" was,
+within one phase, a mechanism narrower than it appeared. That is not an
+embarrassment to be written around; it is the class behaving exactly as the
+roster says it behaves, and the only useful response is another marker and
+another honest limit.
+
+### The disposition
+
+- `src/components/WorldRemote.tsx` deleted.
+- Its wiring out of `src/app/page.tsx`: the import, the `showRemote` binding
+  and setter, the desktop rail button and panel, the mobile `REMOTE` tab, its
+  drawer label, and the `scanTargets` state.
+- `remote` removed from the `PanelId` registry and `PANEL_SLOT`.
+- The map's whole scan-target sink in `PayloadMap.tsx`: the `scan-targets`
+  source, the three layers (`-glow`, `-dots`, `-label`), the `🎯 TARGET`
+  click popup, and the update effect. Left in place it would have rendered
+  nothing forever, which is the dead surface this codebase keeps finding.
+
+Three markers added to Part A, and they are stated as OBSERVABLES rather than
+intent: `navigator.bluetooth` (browser Bluetooth device capture),
+`(127.0.0.1|localhost):${` (localhost port probing), and
+`onicecandidate|createDataChannel` (WebRTC local-address enumeration).
+
+**The plant was the file itself.** `git show HEAD:…/WorldRemote.tsx` restored
+into the tree, gate re-run:
+
+```
+src/components/WorldRemote.tsx: browser Bluetooth device capture
+src/components/WorldRemote.tsx: localhost port probing
+src/components/WorldRemote.tsx: WebRTC local-address enumeration
+```
+
+Removed again, green. The check fails on the real defect, not on a synthetic
+one shaped to fit it.
+
+### What the work revealed that I did not anticipate
+
+**Deleting a panel broke a test that had nothing wrong with it.**
+`panels.test.ts` walks every click sequence up to length four and asserted
+`expect(checked).toBe(1 + 12 + 144 + 1728 + 20736)` — 22,621. With eleven
+panels the true count is 16,105, and the test failed naming a number.
+
+The count was a hand-maintained literal describing something the registry
+already knows, sitting inside a file whose own header is about mechanisms that
+restate rather than derive. The fix is `ALL_PANELS.length`, not a new
+hard-coded 16,105 — which would have been the same defect with a fresher
+value. The historical cascade pin below it also named `remote`; that reference
+is removed with a note, because a pin claiming to reproduce "the exclusion
+sets exactly as they were written" cannot name a panel that no longer exists.
+
+**The removal made the codebase measurably less complex, not more.** Lint on
+the touched files went from 262 problems (213 errors) to 257 (208) — five
+errors removed, none added, against an unchanged substrate baseline.
+
+### Still open, and named so it is a decision
+
+- `.env.example` and `DOCKER.md` still document `SCANNER_URL`/`SCANNER_KEY` as
+  "the ONLY keys the current code consumes", for a RECON port-scanning backend
+  A-0 deleted; `.env.example` also advertises wallet forensics. Nothing in
+  `src/` has read those variables since phase 46. This is advertising rather
+  than capability, and it is the next item.
+- `ip-sweep-devices`, `ip-sweep-pulse` and `ip-sweep-connections` remain as map
+  sources. Whether anything still fills them is not yet established, and
+  guessing would be the same mistake the A-0 deferral note made about this
+  file.
+
+### Measured after
+
+- **84 test files, 1225 passed, 6 skipped** — unchanged, as expected: this
+  phase removed capability and added markers, not assertions.
+- Production build compiles; typecheck clean.
+- Panels: 12 → 11. The sequence walk now checks 16,105 states, derived.

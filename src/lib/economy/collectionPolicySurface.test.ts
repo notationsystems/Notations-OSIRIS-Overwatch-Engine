@@ -99,6 +99,29 @@ const PROHIBITED_CAPABILITIES: ReadonlyArray<{ pattern: RegExp; capability: stri
   // People-search aggregators.
   { pattern: /\b(?:pipl|truecaller|spokeo|whitepages|fullcontact|clearbit)\b/i,
     capability: 'people-search aggregator' },
+
+  /**
+   * THE BROWSER IS AN EXECUTION SURFACE TOO (phase 69).
+   *
+   * Every marker above names an upstream OSINT host or tool, so all of them
+   * ask the same question: *what is this server calling?* `WorldRemote.tsx`
+   * called nothing. It scanned from inside the viewer's own browser, out of
+   * `fetch`, a timer and two Web APIs — and Part A, one phase old and written
+   * to close exactly this class, went green over it.
+   *
+   * The recon was: `fetch('http://127.0.0.1:${port}/')` timed against an abort
+   * to infer open ports; `navigator.bluetooth` to harvest nearby devices down
+   * to their SERIAL NUMBERS, bound to a high-accuracy GPS fix, persisted and
+   * exported as CSV; and RTCPeerConnection ICE candidates read for the
+   * viewer's private addresses. A capability does not become permitted by
+   * running on the client.
+   */
+  { pattern: /navigator\.bluetooth\b/,
+    capability: 'browser Bluetooth device capture' },
+  { pattern: /(?:127\.0\.0\.1|localhost):\$\{/,
+    capability: 'localhost port probing' },
+  { pattern: /\bonicecandidate\b|\bcreateDataChannel\b/,
+    capability: 'WebRTC local-address enumeration' },
 ];
 
 /**

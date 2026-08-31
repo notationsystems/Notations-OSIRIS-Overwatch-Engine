@@ -31,7 +31,6 @@ interface PayloadMapProps {
   projection?: 'mercator' | 'globe';
   mapStyle?: string;
   sweepData?: any;
-  scanTargets?: any[];
   demoMode?: boolean;
   theme?: 'core' | 'ghost';
   drawnPolygons?: Array<{ id: string; name: string; geojson: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.LineString>; color: string }>;
@@ -124,7 +123,7 @@ function greatCircleArc(from: [number, number], to: [number, number], segments =
   return coords;
 }
 
-function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, scanTargets = [], demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
+function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -300,7 +299,7 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'scan-targets', 'sdk-entities', 'sdk-links', 'malware-nodes', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks', 'econ-entities', 'econ-flows'];
+      const sources = ['flights','military','jets','private-fl','satellites','earthquakes','gdelt','day-night','cctv','fires','weather','infrastructure','maritime','maritime-choke','maritime-ships','live-news','conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'ip-sweep-devices', 'ip-sweep-pulse', 'ip-sweep-connections', 'sdk-entities', 'sdk-links', 'malware-nodes', 'network-mesh', 'cyber-arcs', 'cyber-heads', 'cyber-impacts', 'gdelt-events', 'cf-outages', 'cf-attacks', 'econ-entities', 'econ-flows'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── PHYSICAL ECONOMY (copper vertical slice) ──
@@ -710,21 +709,6 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
         'text-color': ['get', 'color'], 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9,
       }});
 
-      // ══ SCAN TARGETS — Geolocated individual scans ══
-      map.addLayer({ id: 'scan-targets-glow', type: 'circle', source: 'scan-targets', paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,12, 5,25, 10,40],
-        'circle-color': '#D32F2F', 'circle-opacity': 0.15, 'circle-blur': 1,
-      }});
-      map.addLayer({ id: 'scan-targets-dots', type: 'circle', source: 'scan-targets', paint: {
-        'circle-radius': ['interpolate',['linear'],['zoom'], 1,5, 5,8, 10,12],
-        'circle-color': '#D32F2F', 'circle-opacity': 0.9,
-        'circle-stroke-width': 1.5, 'circle-stroke-color': '#ECEFF1', 'circle-stroke-opacity': 0.7,
-      }});
-      map.addLayer({ id: 'scan-targets-label', type: 'symbol', source: 'scan-targets', layout: {
-        'text-field': ['get', 'id'], 'text-size': 11, 'text-font': ['Open Sans Bold'],
-        'text-offset': [0, 2], 'text-max-width': 14, 'text-allow-overlap': false,
-      }, paint: { 'text-color': '#D32F2F', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9 }});
-
       // Flight layers (WebGL symbol — GPU rendered, handles 50K+ smooth)
       const flightLayers = [
         { id: 'fl-commercial', src: 'flights', icon: 'plane-cyan' },
@@ -1020,7 +1004,7 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
     // these, and to nothing else — the basemap is not a click target.
     const CLICKABLE_LAYERS = new Set(['conflict-icons','cctv-dots','eq-circles','fires-heat',
       'gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots',
-      'balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots',
+      'balloon-dots','rad-dots','ship-dots','sweep-device-dots',
       'sdk-sea','sdk-air','sdk-intel','malware-dots','cyber-heads','gdelt-events-dots',
       'cf-outage-dots','cf-attack-dots','flight-dots','military-dots','jet-dots','private-dots']);
 
@@ -1327,25 +1311,11 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
     });
 
     // ── Generic hover for clickables ──
-    ['conflict-icons','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','scan-targets-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots'].forEach(layer => {
+    ['conflict-icons','cctv-dots','eq-circles','fires-heat','gdelt-dots','weather-dots','infra-dots','maritime-dots','choke-dots','news-dots','balloon-dots','rad-dots','ship-dots','sweep-device-dots','sdk-sea','sdk-sea-glow','sdk-sea-atmo','sdk-air','sdk-air-glow','sdk-air-atmo','sdk-intel','sdk-intel-glow','sdk-intel-atmo','malware-dots','cyber-heads','gdelt-events-dots','cf-outage-dots','cf-attack-dots'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
     });
 
-    // ── Scan Targets click ──
-    map.on('click', 'scan-targets-dots', (e: any) => {
-      const p = e.features?.[0]?.properties;
-      if (!p) return;
-      const coords = e.features[0].geometry.coordinates.slice();
-      popup(coords, `<div style="${pStyle}border:1px solid rgba(255,61,61,0.5);">
-        <div style="color:#FF3D3D;font-size:12px;font-weight:700;margin-bottom:6px;">🎯 TARGET: ${htmlEsc(p.id)}</div>
-        <div style="font-size:9px;color:#E8E6E0;margin-bottom:8px;">${htmlEsc(p.city || 'Unknown')}, ${htmlEsc(p.country || 'Unknown')} — ${htmlEsc(p.isp || 'Unknown ISP')}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;">
-          <div><span style="color:#5C5A54;">TYPE</span><br/><span style="color:#00E5FF;">${(p.type || 'UNKNOWN').toUpperCase()}</span></div>
-          <div><span style="color:#5C5A54;">COORDS</span><br/><span style="color:#E8E6E0;">${coords[1].toFixed(3)}°, ${coords[0].toFixed(3)}°</span></div>
-        </div>
-      </div>`);
-    });
 
     // ── SCM Suppliers ──
     map.on('click', 'scm-dots', e => {
@@ -2234,20 +2204,6 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
     return () => clearTimeout(timer);
   }, [mapReady, sweepData, setGeo]);
 
-  // Scan Targets visualization
-  useEffect(() => {
-    if (!mapReady || !mapRef.current || !scanTargets) return;
-    const map = mapRef.current;
-    
-    const features = scanTargets.map(t => ({
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [t.lng, t.lat] },
-      properties: { ...t }
-    }));
-    
-    const src = map.getSource('scan-targets') as maplibregl.GeoJSONSource;
-    if (src) src.setData({ type: 'FeatureCollection', features });
-  }, [scanTargets, mapReady]);
 
   // Fly-to
   useEffect(() => {

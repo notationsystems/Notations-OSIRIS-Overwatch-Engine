@@ -45,7 +45,6 @@ export type PanelId =
   | 'directions'
   | 'search'
   | 'arcgis'
-  | 'remote'
   | 'spatial'
   | 'econGraph';
 
@@ -83,7 +82,6 @@ export const PANEL_SLOT: Record<PanelId, PanelSlot> = {
   drawing: 'right_rail',
   search: 'right_rail',
   arcgis: 'right_rail',
-  remote: 'right_rail',
   spatial: 'right_rail',
   directions: 'top_bar',
   econGraph: 'modal',

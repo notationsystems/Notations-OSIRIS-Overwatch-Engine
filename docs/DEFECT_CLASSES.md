@@ -269,6 +269,7 @@ an ordinal that contradicts this table.
 | 43 | 67 | A test asserting a band comparison across two variables at once, so it failed for a correct reason |
 | 44 | 68 | The collection-policy gate read `src/app/api/**/route.ts` and was silent about a person-and-IP resolver running beside it as its own container, declared in the compose file for 68 phases |
 | 45 | 68 | The gate's person markers matched parameter NAMES, so a proxy whose params were `type` and `id` forwarded `type=person` as a VALUE and was classified `freight` |
+| 46 | 69 | Phase 68's own execution-surface scan: every marker named an upstream OSINT host or tool, so a port scanner and BLE capture engine built from `fetch`, a timer and two browser Web APIs sat inside its population and passed |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

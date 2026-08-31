@@ -31,9 +31,14 @@ describe('exclusion is derived, so it cannot drift out of symmetry', () => {
 });
 
 describe('no reachable state stacks two panels on one anchor', () => {
-  // Exhaustive over every click sequence up to length 4 across all 12 panels:
-  // 12 + 144 + 1728 + 20736 = 22,620 sequences. The old logic failed this at
-  // length 2, in 24 distinct ways.
+  // Exhaustive over every click sequence up to length 4 across every panel in
+  // the registry. The old logic failed this at length 2, in 24 distinct ways.
+  //
+  // The expected count is DERIVED from ALL_PANELS rather than written down.
+  // It used to read `1 + 12 + 144 + 1728 + 20736`, and deleting one panel in
+  // phase 69 turned that into a failure with nothing wrong: a hand-maintained
+  // number describing something the registry already knows, which is the class
+  // this file's own header is about.
   it('holds over every sequence of up to four toggles', () => {
     let checked = 0;
     const walk = (state: PanelState, depth: number) => {
@@ -46,11 +51,16 @@ describe('no reachable state stacks two panels on one anchor', () => {
       }
     };
     walk({ ...CLOSED_PANELS, layers: true }, 4);
-    expect(checked).toBe(1 + 12 + 144 + 1728 + 20736);
+    const n = ALL_PANELS.length;
+    expect(checked).toBe(1 + n + n ** 2 + n ** 3 + n ** 4);
   });
 
   it('and the pin: the OLD cascades do fail this, so the test is not vacuous', () => {
-    // The exclusion sets exactly as they were written inline in page.tsx.
+    // The exclusion sets exactly as they were written inline in page.tsx,
+    // minus `remote` and `arcgis`'s reference to it: the World Remote panel was
+    // deleted in phase 69 (BLE device capture and a localhost port scan), so the
+    // pin can no longer name it. The remaining pairs still overlap, which is all
+    // this pin claims.
     const OLD: Partial<Record<PanelId, PanelId[]>> = {
       spaceCam: ['alerts', 'markets'],
       economy: ['alerts', 'markets', 'spaceCam'],
@@ -58,8 +68,6 @@ describe('no reachable state stacks two panels on one anchor', () => {
       alerts: ['drawing', 'markets'],
       directions: ['alerts', 'search', 'drawing', 'markets', 'spaceCam'],
       search: ['alerts', 'drawing', 'markets', 'spaceCam'],
-      arcgis: ['remote'],
-      remote: ['alerts', 'arcgis', 'search', 'drawing', 'markets', 'spaceCam'],
       drawing: ['alerts', 'markets', 'spaceCam'],
     };
     const applyOld = (s: PanelState, panel: PanelId): PanelState => {
@@ -99,7 +107,7 @@ describe('the declaration matches where the panels actually render', () => {
       layers: 'showLayers', spaceCam: 'showSpaceCam', economy: 'showEconomy',
       markets: 'showMarkets', alerts: 'showAlerts', drawing: 'showDrawing',
       directions: 'showDirections', search: 'showDesktopSearch',
-      arcgis: 'showArcGIS', remote: 'showRemote', econGraph: 'showEconGraph',
+      arcgis: 'showArcGIS', econGraph: 'showEconGraph',
       spatial: 'showSpatial',
     };
     for (const id of ALL_PANELS) {
