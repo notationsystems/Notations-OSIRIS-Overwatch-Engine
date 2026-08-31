@@ -3242,3 +3242,161 @@ comment syntaxes — HTML in Markdown, JSX in TSX.
 a published image's OCI labels, are outside the tree and cannot be gated from
 inside it. Those remain an operator responsibility, named here so they are a
 decision rather than an oversight.
+
+
+## Phase 49 — identity properties, landed before the freight schema sets
+
+Five independent reviews converged on one deadline: certain properties are
+part of a record's IDENTITY, and an identity property cannot be retrofitted
+onto data that already exists. They go in before the primitives or they never
+go in honestly. This phase lands them.
+
+### The measurement that started it
+
+`admissible`/`weakestInputClass` was computed **correctly** — and as a field
+BESIDE the number rather than a property INSIDE its identity. Measured across
+`analytics.ts`:
+
+| Result type | Carried attestation |
+|---|---|
+| `Concentration`, `capacityConcentration`, `OperatorConcentration` | yes — three call sites where someone remembered |
+| `CentralityRow`, `BottleneckCandidate`, `TrajectoryPoint`, `AnomalySignal` | **no field at all** |
+
+Four of seven, and the four unmarked ones are the persuasive ones. The
+bottleneck score drives a map layer (`bottleneckScore >= 0.45` paints a dot),
+and it stands on a graph built from 23 `representative`-class flow rows. **The
+honest label was stripped exactly where the number becomes a red dot on
+screen.** Nothing failed; three sites were right and four were silent.
+
+### Attestation, closed under computation
+
+`attestation.ts`. The combine is a monoid — weakest evidence class wins,
+associative and commutative — and `computeAttested()` runs it AT the point of
+computation, so a mean over nine measured inputs and one representative comes
+out representative because the combine ran, not because anyone remembered.
+`Attested<T>` carries a module-private brand, so no caller can hand a value a
+stronger attestation than its inputs earned. `combineAttestations([])`
+REFUSES: a derived quantity over no inputs is vacuity, not cleanliness.
+
+The four leaking analytics now carry `weakestInputClass` computed from their
+real inputs, and making the field required meant the compiler refused every
+construction site until it was wired.
+
+**Dependency edges contribute `representative`.** They carry no `valueKind`
+and are curation-class by construction. The consequence is deliberate: a
+bottleneck standing on curated topology IS a representative finding, and the
+test asserts some candidates come out contaminated rather than asserting they
+come out clean. Omitting dependencies from the combine would have reported the
+curated layer as sourced.
+
+### The interest axis — a second dimension
+
+Provenance answers where a number came from; source class answers how hard the
+evidence is. Neither answers what stake the source had in saying it, and in
+freight almost every operational number is stated by an interested party: a
+quote is a negotiating position, a self-reported on-time rate flatters the
+carrier.
+
+`Interest` is therefore a SECOND axis, not a position on the evidence lattice,
+and it deliberately does **not** feed `isAdmissible()`. Discounting an
+interested figure by a fixed factor would invent a correction nobody measured
+— the same fabrication as defaulting a missing value. It routes to
+MEASUREMENT: a carrier whose self-reported reliability persistently exceeds
+observed outcome is the interest axis made computable, and that residual is
+the verdict. `unknown` ranks below `disinterested`, because an unrecorded
+stake is not an absent one.
+
+### Three merge outcomes, three edge types
+
+The inherited topology was built for a MONOTONIC corpus — later record is a
+correction, disagreement is a bug to find. Freight is not that world, and
+copying it uncritically would encode a chemist's epistemics as a freight one.
+
+| Outcome | Freight instance | Why collapsing it is a category error |
+|---|---|---|
+| `supersedes` | one carrier requoting a lane on a new day, keyed on `knownAt` | nobody is wrong; landing it in a conflicts table invents a dispute |
+| `under_determined` | two carriers quoting the same lane | two prices, both true; the market has no single value |
+| `contradicts` | a certificate against the insurer | genuinely incompatible — and carries its resolvability |
+
+The contradiction edge carries `resolvable` vs `world_under_determined`,
+because they license opposite actions: go and establish which is wrong, versus
+report the spread because picking a winner manufactures precision the evidence
+lacks. Escalating the second as the first is the quiet-alert failure one layer
+in, and `isEscalatable()` is where that is enforced.
+
+`classifyRelation()` REFUSES rather than defaulting. The failure guarded is not
+a missing reason but **someone picking the nearest relation to make a row
+ingestible**, so resolvability is required from the caller: whether a
+disagreement is a bug or the world's own under-determination is a domain claim
+that two numbers cannot settle.
+
+### Computation identity, and replays that declare themselves
+
+Two findings, one mechanism.
+
+"The system computes and verifies" smuggles a solver's assumptions in as
+ground truth — when an optimizer checks a model's "$700 saving", the optimizer
+is itself a model with assumptions and an evidence boundary. So solvers,
+statistical fits and hard-coded heuristics register exactly as a language
+model does, and `predict()` refuses an unregistered predictor. The failure
+mode named in the refusal is not the route solver, which is obviously a model
+and will get registered: it is **the hard-coded `+2 days` buffer in a quoting
+path**, a predictive model with assumptions and no id, whose errors the
+residual can attribute to nothing.
+
+And the hindsight replay answers a different question than it appears to.
+`AS KNOWN` filters records by `knownAt` while the analytics consuming them are
+TODAY's, so a revised threshold makes the replay reconstruct a number nobody
+ever saw, under a banner implying otherwise — directly against the thesis that
+eighteen months later you can say what a bid rested on. `replayVerdict()`
+returns `faithful`, `recomputation` or `unreplayable`, and only a faithful
+replay may be presented as history. The registry entry carries its own
+`knownAt`, because a model is a claim about how the world works and it became
+knowable on a date like any other claim.
+
+### The Markov blanket, enforced on both sides
+
+Naming the model boundary a blanket makes its COMPLETENESS the property under
+test — an interface can have a side door and still typecheck. The sensory side
+(what a model may read) gets the heavier machinery because it is the silent
+half: an egress leak writes something and writes leave traces, while a model
+that saw more than its authorization leaves no evidence at all. `project()` is
+the only construction site for an `AuthorizedView`, and every projection
+records what was shown.
+
+### Self-application: the guard's own premise went stale
+
+The reviews also warned that a repaired invariant leaves a stale guard result
+standing while a test pins it — two mechanisms agreeing on a false state with
+the suite green. No persisted guard results exist in this tree (guards
+recompute from state each run), but the same class lives in the EXEMPTION
+LISTS, and `contextSeverance.test.ts` had no reverse-check while
+`panelTyping.test.ts` did — an inconsistency introduced in this same session.
+
+Added, and it fired on its first run: `processSingleton.ts` was still listed
+in `CONTEXT_LOCAL_BY_DESIGN` arguing why its module state was safe to sever,
+while the scanner no longer flags it at all — its registry is anchored on
+`globalThis`, so there is no module-level container to find. **A live argument
+for a hazard that is gone.** Removed. Every exemption must now name a file
+that exists AND still be flagged, or it leaves the list.
+
+**773 tests green, typecheck clean.**
+
+### Deliberately not built
+
+The reviews flagged four items as overhead for a system with no genuine second
+party holding the same contract: the doctrine generator, the vendored-core
+discipline, byte-identical cross-repo artifacts, and closed-form physics
+validation. Payload has no such counterparty. Recorded so their absence is a
+decision.
+
+### Sequenced after the pivot
+
+The aggregate declaration (an aggregate must not enter the same record type as
+its constituents), the bound type (a half-open interval is neither a value nor
+an absence), and the correlated-observation flag (three quotes from one
+carrier on one lane are one observation, not three) follow the freight pivot
+rather than leading it. And the predictions about what the freight corpus will
+do to this contract get pinned BEFORE any of it is ingested — the substrate
+learned what a commodity flow looks like, and freight will find every clause
+that was really about mines.

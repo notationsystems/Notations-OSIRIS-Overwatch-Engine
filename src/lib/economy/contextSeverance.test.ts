@@ -37,7 +37,6 @@ const ECONOMY_DIR = join(process.cwd(), 'src/lib/economy');
  * is a claim someone has to defend in review — which is the point.
  */
 const CONTEXT_LOCAL_BY_DESIGN: Record<string, string> = {
-  'processSingleton.ts': 'The registry itself. It is anchored on globalThis by definition; it cannot reach through itself.',
   'envCompat.ts':
     'The `warned` set de-duplicates a deprecation warning and nothing reads it. ' +
     'Severed, each module context warns once about the same legacy variable name — ' +
@@ -93,6 +92,43 @@ describe('context severance: mutable module state is shared or argued for', () =
       'CONTEXT_LOCAL_BY_DESIGN with the argument for why severance is harmless:\n' +
       unaccounted.map(f => `  ${f.file}:${f.line}  ${f.decl}`).join('\n'),
     ).toEqual([]);
+  });
+
+  /**
+   * THE EXEMPTION LIST IS A PREMISE, AND A PREMISE GOES STALE.
+   *
+   * `CONTEXT_LOCAL_BY_DESIGN` records why a file's module state is safe to
+   * sever. If that file is later repaired — the state wrapped in
+   * processSingleton, or deleted outright — the entry stays, and a reader
+   * of the list believes an exemption is load-bearing when it exempts
+   * nothing. Worse, the guard reports green either way, so the list and the
+   * tree quietly disagree with the suite agreeing with both.
+   *
+   * That is the defect class this file names, pointed at this file's own
+   * premise: recompute it every run rather than trusting what was true when
+   * it was written. Every entry must name a file that exists AND still be
+   * flagged by the scanner, or it is removed.
+   */
+  it('every exemption still earns its place — a repaired file leaves the list', () => {
+    const flagged = new Set(scan().map(f => f.file));
+    const present = new Set(readdirSync(ECONOMY_DIR));
+    const stale: string[] = [];
+    for (const file of Object.keys(CONTEXT_LOCAL_BY_DESIGN)) {
+      if (!present.has(file)) { stale.push(`${file} (no such file)`); continue; }
+      if (!flagged.has(file)) stale.push(`${file} (no module-level mutable state any more)`);
+    }
+    expect(stale, [
+      'These entries no longer exempt anything. An exemption list that keeps paid-off entries',
+      'stops measuring the debt, and an entry for a file that was repaired or deleted reads as',
+      'a live argument for a hazard that is gone. Remove them.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('every exemption carries an argument, not a placeholder', () => {
+    for (const [file, reason] of Object.entries(CONTEXT_LOCAL_BY_DESIGN)) {
+      expect(reason.length, `${file} needs the reason severance is harmless, not a note`)
+        .toBeGreaterThan(40);
+    }
   });
 
   it('the scanner is not vacuous: it finds planted severable state and ignores constants', () => {
