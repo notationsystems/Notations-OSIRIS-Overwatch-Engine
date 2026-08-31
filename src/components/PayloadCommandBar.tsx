@@ -5,6 +5,7 @@ import { Activity, Command, Database, Layers3, Map, Search, ShieldCheck } from '
 
 interface Props {
   backendStatus: 'connecting' | 'connected' | 'error';
+  /** Features fetched in this session. Not a world count, not the render sample. */
   entityCount: number;
   showLayers: boolean;
   showMarkets: boolean;
@@ -89,8 +90,12 @@ export default function PayloadCommandBar({
           <div className="ml-auto flex shrink-0 items-center gap-2 rounded-xl border border-white/[0.06] bg-black/20 px-2.5 py-2">
             <Map className="h-3.5 w-3.5 text-white/30" />
             <div className="hidden sm:block">
-              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-white/25">World state</div>
-              <div className="text-[10px] font-mono tabular-nums text-white/75">{entityCount.toLocaleString()} entities</div>
+              {/* `Loaded`, not `World state`. The number is what THIS browser
+                  has fetched across the active layers — not a census of the
+                  world, and not the sampled render set. A label that overstates
+                  its own number is the cheapest kind of overclaim. */}
+              <div className="text-[8px] font-mono uppercase tracking-[0.18em] text-white/25">Loaded</div>
+              <div className="text-[10px] font-mono tabular-nums text-white/75">{entityCount.toLocaleString()} features</div>
             </div>
             <span className={`h-1.5 w-1.5 rounded-full ${
               backendStatus === 'connected' ? 'bg-[var(--alert-green)] shadow-[0_0_8px_var(--alert-green)]' :

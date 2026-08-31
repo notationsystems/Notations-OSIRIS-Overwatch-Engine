@@ -20,6 +20,13 @@ import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
 import WorldRemote from '@/components/WorldRemote';
 import ArcGISPanel from '@/components/ArcGISPanel';
+import PayloadCommandBar from '@/components/PayloadCommandBar';
+import PayloadSpatialRail, { type SpatialLayerKey, type SpatialLayerState } from '@/components/PayloadSpatialRail';
+import { NO_SPATIAL_BACKEND, spatialAvailability } from '@/lib/spatial/registry';
+import {
+  ALL_PANELS, CLOSED_PANELS, applyPanelCommand, slotOccupied,
+  type PanelId, type PanelState,
+} from '@/lib/ui/panels';
 const PayloadMap = dynamic(() => import('@/components/PayloadMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
@@ -115,18 +122,65 @@ export default function Dashboard() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeCamera, setActiveCamera] = useState<any>(null);
   const [spaceWeather, setSpaceWeather] = useState<any>(null);
-  const [showLayers, setShowLayers] = useState(true);
-  const [showMarkets, setShowMarkets] = useState(false);
-  const [showEconomy, setShowEconomy] = useState(false);
+  // ── PANEL STATE, THROUGH ONE REGISTRY ──────────────────────────────────────
+  //
+  // These were eleven independent booleans, and every toggle hand-listed the
+  // panels it closed. Extracted and simulated, the nine handlers disagreed:
+  // 19 asymmetric pairs and 24 two-click sequences that left two panels stacked
+  // on the identical `right-12 top-1/2` anchor, so which one you saw depended
+  // on click order. See `src/lib/ui/panels.ts` for the measurement.
+  //
+  // Exclusion is now DERIVED from the slot a panel renders into. The aliases
+  // below keep every existing read and write site working unchanged, so this is
+  // a change of mechanism, not of behaviour — except where the behaviour was
+  // the defect.
+  const [panels, setPanels] = useState<PanelState>({ ...CLOSED_PANELS, layers: true });
+
+  const togglePanel = useCallback(
+    (panel: PanelId) => setPanels(st => applyPanelCommand(st, { kind: 'toggle', panel })), []);
+
+  /** Stable per-panel setters, so referential identity survives re-renders. */
+  const setPanel = useMemo(() => {
+    const make = (panel: PanelId) => (v: boolean | ((prev: boolean) => boolean)) =>
+      setPanels(st => applyPanelCommand(st, {
+        kind: (typeof v === 'function' ? v(st[panel]) : v) ? 'open' : 'close',
+        panel,
+      }));
+    return Object.fromEntries(ALL_PANELS.map(id => [id, make(id)])) as
+      Record<PanelId, (v: boolean | ((prev: boolean) => boolean)) => void>;
+  }, []);
+
+  const showLayers = panels.layers;
+  const showMarkets = panels.markets;
+  const showEconomy = panels.economy;
+  const showEconGraph = panels.econGraph;
+  const showAlerts = panels.alerts;
+  const showSpaceCam = panels.spaceCam;
+  const showDrawing = panels.drawing;
+  const showDesktopSearch = panels.search;
+  const showDirections = panels.directions;
+  const showRemote = panels.remote;
+  const showArcGIS = panels.arcgis;
+  const showSpatial = panels.spatial;
+
+  const setShowLayers = setPanel.layers;
+  const setShowMarkets = setPanel.markets;
+  const setShowEconomy = setPanel.economy;
+  const setShowEconGraph = setPanel.econGraph;
+  const setShowAlerts = setPanel.alerts;
+  const setShowSpaceCam = setPanel.spaceCam;
+  const setShowDrawing = setPanel.drawing;
+  const setShowDesktopSearch = setPanel.search;
+  const setShowDirections = setPanel.directions;
+  const setShowRemote = setPanel.remote;
+  const setShowArcGIS = setPanel.arcgis;
+  const setShowSpatial = setPanel.spatial;
+
   const [econSelected, setEconSelected] = useState<string | null>(null);
   /** Temporal playback: evaluation date override (null = present state). */
   const [econAsOf, setEconAsOf] = useState<string | null>(null);
   /** Playback epistemics: hindsight reconstruction vs as-known-then. */
   const [econKnowledge, setEconKnowledge] = useState<'best_known' | 'as_known_then'>('best_known');
-  const [showEconGraph, setShowEconGraph] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
-  const [showSpaceCam, setShowSpaceCam] = useState(false);
-  const [showDrawing, setShowDrawing] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode | null>(null);
   const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
   const [drawCommand, setDrawCommand] = useState<{ action: 'undo' | 'finish' | 'cancel'; seq: number } | null>(null);
@@ -138,8 +192,6 @@ export default function Dashboard() {
   const [watchEvents, setWatchEvents] = useState<WatchEvent[]>([]);
   const watchBaselines = useRef<Record<string, WatchBaseline>>({});
   const [selectedPolygon, setSelectedPolygon] = useState<string | null>(null);
-  const [showDesktopSearch, setShowDesktopSearch] = useState(false);
-  const [showDirections, setShowDirections] = useState(false);
   const [activeRoute, setActiveRoute] = useState<
     (RouteResult & {
       from: { lat: number; lng: number };
@@ -222,8 +274,6 @@ export default function Dashboard() {
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [navSession]);
-  const [showRemote, setShowRemote] = useState(false);
-  const [showArcGIS, setShowArcGIS] = useState(false);
   const [arcgisLayers, setArcgisLayers] = useState<Array<{ id: string; title: string; url: string; geojson: any; color: string; visible: boolean; opacity: number }>>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number; bounds?: { west: number; south: number; east: number; north: number } } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -288,6 +338,62 @@ export default function Dashboard() {
     econ_bottlenecks: true,
   });
   // Server-side capability flags — gate layers that need credentials.
+  // ── SPATIAL STATE RAIL ─────────────────────────────────────────────────────
+  //
+  // The rail presents SEMANTIC operations — Route, OD Matrix, Isochrone,
+  // Service Area — never a vendor. Which of them the terminal can actually
+  // answer is the spatial registry's answer, not this component's, and today
+  // it is none of them: no backend is configured, so every operation refuses
+  // rather than falling back to great-circle distance.
+  //
+  // Passing the engine explicitly rather than reading a module-level singleton
+  // keeps the fact visible at the call site: this page is wired to
+  // NO_SPATIAL_BACKEND, and swapping it is a one-line change here.
+  const spatialCompute = useMemo(() => {
+    const byOp = new Map(spatialAvailability(NO_SPATIAL_BACKEND).map(a => [a.operation, a]));
+    return ([
+      ['route', 'route'], ['matrix', 'matrix'],
+      ['isochrone', 'isochrone'], ['service_area', 'serviceArea'],
+    ] as const).map(([uiKey, op]) => ({
+      operation: uiKey,
+      available: byOp.get(op)?.available ?? false,
+      reason: byOp.get(op)?.reason ?? 'Operation not declared by the registry.',
+    }));
+  }, []);
+
+  // The five layers of the freight spatial corpus. THE CORPUS IS NOT BUILT, so
+  // every one is declared unavailable with a null count. `null` is not `0`:
+  // zero facilities would be a measurement, and nothing has been measured.
+  const NO_CORPUS = 'No spatial corpus is loaded. PostGIS/pgRouting is the intended ' +
+    'backing and is not yet configured — this is a fact about the installation, not a ' +
+    'claim that the network is empty.';
+  const spatialLayers = useMemo<SpatialLayerState[]>(() => ([
+    { key: 'network', label: 'Network' },
+    { key: 'facilities', label: 'Facilities' },
+    { key: 'corridors', label: 'Corridors' },
+    { key: 'restrictions', label: 'Restrictions' },
+    { key: 'temporal', label: 'Temporal state' },
+  ] as const).map(l => ({
+    ...l, count: null, active: false, available: false, unavailableReason: NO_CORPUS,
+  })), [NO_CORPUS]);
+
+  /**
+   * Features actually loaded, summed over the fetched layer arrays.
+   *
+   * NOT `sdk_entities.length` — that array is SAMPLED (every Nth flight, ~60
+   * per domain) for rendering, so its length is a property of the sampler. And
+   * not "entities in the world": this counts what this browser has fetched.
+   * The label in the command bar says `loaded`, which is what the number is.
+   */
+  const loadedFeatureCount = useMemo(() => {
+    const d = data as Record<string, unknown> | null;
+    if (!d) return 0;
+    return Object.entries(d).reduce(
+      (n, [key, v]) => (key === 'sdk_entities' || !Array.isArray(v) ? n : n + v.length),
+      0,
+    );
+  }, [data]);
+
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
@@ -368,14 +474,14 @@ export default function Dashboard() {
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen();
       }
-      if (e.key === 'l') setShowLayers(p => !p);
-      if (e.key === 'm') setShowMarkets(p => !p);
-      if (e.key === 's') { setShowDesktopSearch(p => !p); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); }
+      if (e.key === 'l') togglePanel('layers');
+      if (e.key === 'm') togglePanel('markets');
+      if (e.key === 's') togglePanel('search');
       if (e.key === 'r') setFlyToLocation({ lat: 20, lng: 0, ts: Date.now() });
       if (e.key === 'g') setMapProjection(p => p === 'globe' ? 'mercator' : 'globe');
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        setShowDesktopSearch(true); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false);
+        setShowDesktopSearch(true);
       }
     };
     const fsHandler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -1291,6 +1397,31 @@ export default function Dashboard() {
 
 
 
+      {/* ── COMMAND BAR ──────────────────────────────────────────────────────
+          One control surface over the same panel registry the right tool strip
+          drives, so the two can never disagree about what is open.
+
+          It YIELDS the top slot rather than competing for it: the route planner
+          renders at `absolute top-3` and this bar at `absolute top-3 left-1/2`
+          with a higher z-index, so mounting both would put the command bar over
+          the destination field. `slotOccupied` is the registry answering that,
+          not a hand-listed condition that goes stale when a panel moves. */}
+      {!isMobile && !slotOccupied(panels, 'top_bar') && !navSession && (
+        <PayloadCommandBar
+          backendStatus={backendStatus}
+          entityCount={loadedFeatureCount}
+          showLayers={showLayers}
+          showMarkets={showMarkets}
+          showEconomy={showEconomy}
+          showAlerts={showAlerts}
+          onSearch={() => togglePanel('search')}
+          onLayers={() => togglePanel('layers')}
+          onMarkets={() => togglePanel('markets')}
+          onEconomy={() => togglePanel('economy')}
+          onAlerts={() => togglePanel('alerts')}
+        />
+      )}
+
       {/* ── NEW SIDEBAR (Root Level) ── */}
       {showLayers && !isMobile && <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />}
 
@@ -1300,7 +1431,7 @@ export default function Dashboard() {
       {!isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
 
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(false); setShowMarkets(false); setShowSpaceCam(v => !v); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Live from Space — 24/7 video downlink from the ISS" aria-label="Live from Space" aria-expanded={showSpaceCam}>
+          <button onClick={() => togglePanel('spaceCam')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Live from Space — 24/7 video downlink from the ISS" aria-label="Live from Space" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
             {showSpaceCam && (
               <span
@@ -1320,7 +1451,30 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowEconomy(!showEconomy); setShowAlerts(false); setShowSpaceCam(false); setShowMarkets(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showEconomy ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Physical Economy — copper flows, concentration, bottlenecks" aria-label="Physical Economy" aria-expanded={showEconomy}>
+          <button onClick={() => togglePanel('spatial')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpatial ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="Spatial State — network, facilities, corridors, restrictions" aria-label="Spatial State" aria-expanded={showSpatial}>
+            <Network className={`w-4 h-4 ${showSpatial ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
+            {showSpatial && (
+              <span aria-hidden="true" className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]" />
+            )}
+          </button>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[9px] font-mono tracking-wider text-white/80 bg-black/80 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">SPATIAL</span>
+          <AnimatePresence>
+            {showSpatial && (
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2">
+                <PayloadSpatialRail
+                  layers={spatialLayers}
+                  compute={spatialCompute}
+                  onToggle={(_key: SpatialLayerKey) => { /* no corpus: every layer is declared unavailable, so this cannot fire */ }}
+                  onInspect={() => togglePanel('search')}
+                  onClose={() => setShowSpatial(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="relative group">
+          <button onClick={() => togglePanel('economy')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showEconomy ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Physical Economy — copper flows, concentration, bottlenecks" aria-label="Physical Economy" aria-expanded={showEconomy}>
             <Mountain className={`w-4 h-4 ${showEconomy ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showEconomy && (
               <span
@@ -1351,7 +1505,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowMarkets(!showMarkets); setShowAlerts(false); setShowSpaceCam(false); setShowEconomy(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
+          <button onClick={() => togglePanel('markets')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
             <BarChart3 className={`w-4 h-4 ${showMarkets ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showMarkets && (
               <span
@@ -1371,7 +1525,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(!showAlerts); setShowMarkets(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="Live Alerts — earthquakes, conflicts, breaking news" aria-label="Live Alerts" aria-expanded={showAlerts}>
+          <button onClick={() => togglePanel('alerts')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="Live Alerts — earthquakes, conflicts, breaking news" aria-label="Live Alerts" aria-expanded={showAlerts}>
             <AlertTriangle className={`w-4 h-4 ${showAlerts ? 'text-[#FF3D3D]' : 'text-white/60'}`} />
             {showAlerts && (
               <span
@@ -1391,7 +1545,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDrawing(!showDrawing); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDrawing ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Draw — measure areas of interest on the map" aria-label="Draw" aria-expanded={showDrawing}>
+          <button onClick={() => togglePanel('drawing')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDrawing ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Draw — measure areas of interest on the map" aria-label="Draw" aria-expanded={showDrawing}>
             <PenLine className={`w-4 h-4 ${showDrawing ? 'text-[#00E5FF]' : 'text-white/60'}`} />
             {showDrawing && (
               <span
@@ -1404,7 +1558,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDirections(!showDirections); if (showDirections) { setActiveRoute(null); } setShowDesktopSearch(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDirections ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Directions — turn-by-turn routing" aria-label="Directions" aria-expanded={showDirections}>
+          <button onClick={() => { if (showDirections) setActiveRoute(null); togglePanel('directions'); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDirections ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Directions — turn-by-turn routing" aria-label="Directions" aria-expanded={showDirections}>
             <Route className={`w-4 h-4 ${showDirections ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showDirections && (
               <span
@@ -1417,7 +1571,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDesktopSearch(!showDesktopSearch); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDesktopSearch ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Search — find locations, cities, coordinates" aria-label="Search" aria-expanded={showDesktopSearch}>
+          <button onClick={() => togglePanel('search')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDesktopSearch ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Search — find locations, cities, coordinates" aria-label="Search" aria-expanded={showDesktopSearch}>
             <Search className={`w-4 h-4 ${showDesktopSearch ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showDesktopSearch && (
               <span
@@ -1451,7 +1605,7 @@ export default function Dashboard() {
 
         {/* ── ARCGIS INTEL ── */}
         <div className="relative group">
-          <button onClick={() => { setShowArcGIS(!showArcGIS); setShowRemote(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — search & import geospatial intel layers" aria-label="ArcGIS" aria-expanded={showArcGIS}>
+          <button onClick={() => togglePanel('arcgis')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — search & import geospatial intel layers" aria-label="ArcGIS" aria-expanded={showArcGIS}>
             <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showArcGIS && (
               <span
@@ -1485,7 +1639,7 @@ export default function Dashboard() {
 
         {/* ── WORLD REMOTE ── */}
         <div className="relative group">
-          <button onClick={() => { setShowRemote(!showRemote); setShowArcGIS(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); setShowDesktopSearch(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showRemote ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="World Remote — control nearby Bluetooth devices (TVs, speakers, AC)" aria-label="World Remote" aria-expanded={showRemote}>
+          <button onClick={() => togglePanel('remote')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showRemote ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="World Remote — control nearby Bluetooth devices (TVs, speakers, AC)" aria-label="World Remote" aria-expanded={showRemote}>
             <Bluetooth className={`w-4 h-4 ${showRemote ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
             {showRemote && (
               <span

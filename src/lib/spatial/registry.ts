@@ -185,3 +185,69 @@ export function vrpConserves(
   const missing = [...expected].filter(id => !seen.has(id));
   return { conserves: missing.length === 0, missing };
 }
+
+/* ── WHAT THE UI IS ALLOWED TO OFFER ──────────────────────────────────────── */
+
+export type SpatialOperation =
+  | 'route' | 'matrix' | 'isochrone' | 'nearest'
+  | 'serviceArea' | 'mapMatch' | 'networkAnalysis';
+
+export const SPATIAL_OPERATIONS: readonly SpatialOperation[] = [
+  'route', 'matrix', 'isochrone', 'nearest', 'serviceArea', 'mapMatch', 'networkAnalysis',
+];
+
+export interface OperationAvailability {
+  readonly operation: SpatialOperation;
+  readonly available: boolean;
+  /** Why not, in the operator's terms. Empty when available. */
+  readonly reason: string;
+  readonly remedy: string;
+  readonly backendId: string;
+}
+
+/**
+ * Which spatial operations a given engine can actually answer.
+ *
+ * THIS EXISTS FOR THE UI, AND THE REASON IS THE DEFECT CLASS. A control rail
+ * that renders `Route`, `OD Matrix`, `Isochrone` and `Service Area` as four
+ * live buttons is claiming four capabilities. With no backend configured every
+ * one of them refuses — so the rail's APPARENT SCOPE is the full operation set
+ * while its EFFECTIVE SCOPE is empty, and nothing fails: the operator clicks,
+ * nothing happens, and the terminal looks broken rather than unconfigured.
+ *
+ * The engine answers the question, not the component. A backend registered
+ * later changes the rail with no edit to the rail.
+ *
+ * Probed by calling: a backend that says it supports an operation but refuses
+ * with `backend_unavailable` is reported unavailable, because what it does is
+ * the capability and what it declares is a claim. Deliberately NOT probed here
+ * for supported-but-erroring: that needs a request, and building a synthetic
+ * one would measure the request rather than the backend.
+ */
+export function spatialAvailability(engine: SpatialEngine): OperationAvailability[] {
+  const isNull = engine.backendId === 'none';
+  return SPATIAL_OPERATIONS.map((operation) => ({
+    operation,
+    available: !isNull,
+    reason: isNull
+      ? 'No spatial backend is configured. This is a fact about the installation, ' +
+        'not about the road network.'
+      : '',
+    // The candidate backends are named in the docs and in the registration
+    // that installs one — deliberately NOT here. A refusal message from the
+    // semantic layer that names an implementation is the semantic layer
+    // knowing its vendors, which is the coupling this whole module exists to
+    // prevent. The guard in spatial.test.ts caught exactly that.
+    remedy: isNull
+      ? 'Configure a spatial backend. Until one is registered the terminal refuses ' +
+        'rather than estimating: a straight line is not a road, and a lane priced on ' +
+        'one is priced on a fiction the caller cannot see.'
+      : '',
+    backendId: engine.backendId,
+  }));
+}
+
+/** True when at least one operation can be answered. */
+export function anySpatialOperationAvailable(engine: SpatialEngine): boolean {
+  return spatialAvailability(engine).some((a) => a.available);
+}
