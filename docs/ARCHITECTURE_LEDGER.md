@@ -6148,3 +6148,80 @@ and doing that in the same commit that introduces the cap would mean the first
 enforcement in this instrument's history shipped without its own report.
 
 - **87 test files, 1261 passed, 6 skipped** (from 85 / 1246). Fifteen new pins.
+
+
+## Phase 78 — the deployment guide installed the platform this project deleted
+
+The completeness sweep from phase 70 finally returned its results, and this was
+in them. It is the widest gap the route-surface work has left.
+
+`DOCKER.md` is the shipped self-hosting guide. Its documented steps were:
+
+```bash
+git clone https://github.com/simplifaisoul/osiris.git     # the un-forked upstream
+docker pull ghcr.io/simplifaisoul/osiris:latest           # its published image
+docker run -d --name payload ... ghcr.io/simplifaisoul/osiris:latest
+```
+
+**An operator who follows this guide stands up the original reconnaissance
+platform — every person-targeting and host-scanning route A-0 deleted, still in
+it — running under the container name `payload`.** The routes were removed from
+the tree, and the tree was not what the guide installed. Three phases of
+deletion (68, 69, 73–75) and every gate protecting them are bypassed by reading
+the project's own documentation.
+
+`docker-compose.yml` repeated the instruction in the comment above its `build:`
+block, and its CasaOS store metadata named the upstream author as this
+application's author and fetched the app-store tile's icon, thumbnail and
+screenshots from that repository **at runtime**, on every store render.
+
+### Attribution is not the same act as installation
+
+Phase 46 deliberately kept the upstream credit in `README.md`: *the fork's
+origin is a fact, and the MIT licence is honoured.* That decision stands and
+must keep standing — removing the credit to satisfy a scanner would trade a
+licence obligation for a green test.
+
+So the line the gate draws is between the two acts. **Attribution NAMES the
+origin; an instruction RUNS it.** The three new patterns match only executable
+forms — a registry pull, a clone command, a runtime asset fetch — and the
+control case is pinned: README's prose link passes, and the same line rewritten
+as `git clone` fails by name.
+
+### Two more drifts in the same file, found while fixing it
+
+- `cp .env.template .env` — the documented first step. There is no
+  `.env.template`; the repository ships `.env.example`. The guide's opening
+  move fails on a fresh clone.
+- `# optional: configure keys / scanner backend` at line 19, in a file whose
+  line 120 explains that `SCANNER_URL`/`SCANNER_KEY` were removed with the
+  scanner. The same document removes the capability and instructs configuring
+  it, a hundred lines apart. Phase 70 rewrote the second passage and did not
+  read the first.
+- The registry section said images publish on every push to `master`; the
+  workflow's trigger was corrected to `main` in S-1, and `DEPLOYMENT.md`
+  records that correction.
+
+### And a hand-written image name the CI never published under
+
+`docs/DEPLOYMENT.md` names `ghcr.io/notationsystems/sea-dog-payload-terminal-v0`
+in two places. The workflow publishes `${{ github.repository }}`, which for this
+repository is `notationsystems/payload-terminal-v0` — the `sea-dog-` name is
+from the Sea Dog Terminal era and no image was ever pushed under it. A literal
+restating what a mechanism derives, disagreeing with it, in the document an
+operator reads to deploy: class 6, in the same commit as class 5. Corrected to
+what CI actually produces.
+
+### Measured after
+
+- **1261 passed, 6 skipped**, 87 files — unchanged; this phase moved documents
+  and added markers.
+- Executable upstream references in shipped artifacts: 8 → 0. Prose attribution:
+  1, deliberately unchanged.
+- Three plants, plus a control proving the gate separates the two acts.
+
+### On the sweep that found it
+
+Six of its 83 agents died on a session limit, including the completeness critic.
+So this is not an exhaustive result and must not be recorded as one — the same
+caution phase 70 failed to apply to the same sweep's earlier, emptier output.

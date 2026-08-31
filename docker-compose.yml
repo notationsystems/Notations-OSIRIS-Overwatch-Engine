@@ -3,7 +3,7 @@ services:
   payload:
     # Builds locally from the Dockerfile so you always run the cloned code.
     # To use the prebuilt image instead, replace the `build:` block below with
-    # `image: ghcr.io/simplifaisoul/osiris:latest`.
+    # `image: ghcr.io/notationsystems/payload-terminal-v0:latest`.
     build:
       context: .
       dockerfile: Dockerfile
@@ -57,8 +57,8 @@ x-casaos:
     - amd64
     - arm64
   main: payload
-  author: simplifaisoul
-  developer: simplifaisoul
+  author: notationsystems
+  developer: notationsystems
   category: Productivity
   description:
     en_us: >-
@@ -73,10 +73,10 @@ x-casaos:
     en_us: Freight and physical-commerce operating system
   title:
     en_us: Payload
-  icon: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/casaos-icon.png
-  thumbnail: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/og-image.png
+  icon: https://raw.githubusercontent.com/notationsystems/Payload-Terminal-V0/main/public/casaos-icon.png
+  thumbnail: https://raw.githubusercontent.com/notationsystems/Payload-Terminal-V0/main/public/og-image.png
   screenshot_link:
-    - https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/og-image.png
+    - https://raw.githubusercontent.com/notationsystems/Payload-Terminal-V0/main/public/og-image.png
   scheme: http
   hostname: ""
   port_map: "3000"

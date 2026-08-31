@@ -6,7 +6,7 @@ Nothing is deployed today. What exists:
 
 - A `Dockerfile` and a `docker-publish` workflow (inherited with the
   substrate) publishing multi-arch images to
-  `ghcr.io/notationsystems/sea-dog-payload-terminal-v0` on pushes to
+  `ghcr.io/notationsystems/payload-terminal-v0` on pushes to
   `main` and on `v*.*.*` tags. The workflow's branch trigger referenced a
   `master` that never existed; corrected to `main` in S-1.
 - `next build && next start` serves the full instrument from any host
@@ -17,7 +17,7 @@ Nothing is deployed today. What exists:
   access decision below). One command on any Docker host:
 
   ```
-  docker run -p 3000:3000 ghcr.io/notationsystems/sea-dog-payload-terminal-v0:0.1.0
+  docker run -p 3000:3000 ghcr.io/notationsystems/payload-terminal-v0:0.1.0
   ```
 
   **PIN THE VERSION TAG, do not deploy `:latest`.** `latest` is published

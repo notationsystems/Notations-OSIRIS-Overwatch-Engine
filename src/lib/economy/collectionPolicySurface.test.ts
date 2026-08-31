@@ -443,6 +443,32 @@ describe('no route admits a natural person or a host as its subject', () => {
 const RETIRED_IDENTITY: ReadonlyArray<{ pattern: RegExp; what: string }> = [
   { pattern: /osirisai\.live/i, what: 'the pre-fork production domain' },
   { pattern: /Osiris Global Intelligence/i, what: 'the pre-fork platform name' },
+  /**
+   * DEPLOYING the upstream project, as distinct from CREDITING it (phase 78).
+   *
+   * `DOCKER.md` — the shipped self-hosting guide — told an operator to clone
+   * the un-forked upstream repository and to `docker pull` its image, under
+   * the container name `payload`. Following the documented steps stands up the
+   * original reconnaissance platform, with every person-targeting and
+   * host-scanning route A-0 deleted, still in it. The compose file repeated
+   * the instruction, and the CasaOS store tile fetched its icon and screenshots
+   * from that repository at runtime.
+   *
+   * Every deletion this project has made is bypassed by an operator who
+   * follows its own deployment guide, which makes this the widest gap the
+   * route-surface work has left — the routes were removed from the tree and
+   * the tree was not what the guide installed.
+   *
+   * THE LINE, and why these patterns are shaped the way they are: attribution
+   * NAMES the origin, an instruction RUNS it. Phase 46 deliberately kept the
+   * upstream credit in `README.md` — the fork's origin is a fact and the MIT
+   * licence is honoured — so a prose link must stay legal. These match only
+   * the executable forms: a registry pull, a clone command, a runtime asset
+   * fetch.
+   */
+  { pattern: /ghcr\.io\/simplifaisoul/i, what: 'a pull of the upstream OSINT image' },
+  { pattern: /git\s+clone\s+\S*github\.com\/simplifaisoul/i, what: 'a clone of the upstream OSINT repository' },
+  { pattern: /raw\.githubusercontent\.com\/simplifaisoul/i, what: 'a runtime asset fetch from the upstream OSINT repository' },
 ];
 
 /** A wider net than the capability scan: identity travels in prose and config. */

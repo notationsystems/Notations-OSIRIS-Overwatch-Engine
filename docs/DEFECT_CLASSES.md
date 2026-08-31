@@ -276,6 +276,7 @@ an ordinal that contradicts this table.
 | 50 | 73 | Phase 46 searched for the advertised Telegram layer, found nothing, recorded "never built — nothing to delete", and built a gate against ADVERTISING it; the scraper was live in `api/news` the whole time, so the prohibition covered saying it and nothing covered doing it |
 | 51 | 74 | The same fact was prohibited in one route and served from another: phase 68 removed head-of-state person nodes from the intelligence layer while `region-dossier` kept returning the office-holder for any clicked coordinate |
 | 52 | 76 | Phase 47 swept the pre-fork identity and recorded a LIST of what it had left; five tracked files kept the retired domain and none was on the list — asserting it to crawlers, to docs readers and to the operator's terminal |
+| 53 | 78 | The deletions were correct about the tree and silent about what the tree's own guide installed: `DOCKER.md` told operators to clone and pull the un-forked upstream image, so following the documentation stands up every route A-0 removed, under the name `payload` |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

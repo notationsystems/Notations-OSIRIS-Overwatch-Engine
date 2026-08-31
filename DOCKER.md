@@ -13,11 +13,11 @@ app, and configuring the optional API keys.
 ## 1. Docker Compose (recommended)
 
 ```bash
-git clone https://github.com/simplifaisoul/osiris.git
-cd payload
+git clone https://github.com/notationsystems/Payload-Terminal-V0.git
+cd Payload-Terminal-V0
 
-# optional: configure keys / scanner backend
-cp .env.template .env        # then edit .env
+# optional: configure API keys
+cp .env.example .env        # then edit .env
 
 docker compose up -d
 ```
@@ -28,7 +28,7 @@ What the compose file does:
 
 - **`build:`** — compose builds the image locally from the `Dockerfile`, so
   you always run the code you just cloned. To run the prebuilt registry image
-  instead, add `image: ghcr.io/simplifaisoul/osiris:latest` to the `payload`
+  instead, add `image: ghcr.io/notationsystems/payload-terminal-v0:latest` to the `payload`
   service and drop the `build:` block.
 - **`env_file: .env` (`required: false`)** — if a `.env` file exists its
   values are injected into the container; if it's missing, Payload Terminal still starts
@@ -51,14 +51,14 @@ docker compose down             # stop & remove
 ### Pull the prebuilt image from GHCR
 
 A prebuilt image for `linux/amd64` and `linux/arm64` is published to the GitHub
-Container Registry on every push to `master` and every `v*.*.*` tag, so you can
+Container Registry on every push to `main` and every `v*.*.*` tag, so you can
 run Payload Terminal without building anything:
 
 ```bash
-docker pull ghcr.io/simplifaisoul/osiris:latest   # or a pinned tag, e.g. :0.1.0
+docker pull ghcr.io/notationsystems/payload-terminal-v0:latest   # or a pinned tag, e.g. :0.1.0
 docker run -d --name payload \
   -p 3005:3000 --env-file .env --restart unless-stopped \
-  ghcr.io/simplifaisoul/osiris:latest
+  ghcr.io/notationsystems/payload-terminal-v0:latest
 ```
 
 The package is public — no `docker login` is required to pull it.
@@ -103,7 +103,7 @@ metadata.
 > relative `build:` context may not resolve there. If importing the YAML
 > directly, either build/tag `payload:latest` first
 > (`docker build -t payload:latest /path/to/payload`) or replace the `build:`
-> block with `image: ghcr.io/simplifaisoul/osiris:latest`.
+> block with `image: ghcr.io/notationsystems/payload-terminal-v0:latest`.
 
 ---
 
