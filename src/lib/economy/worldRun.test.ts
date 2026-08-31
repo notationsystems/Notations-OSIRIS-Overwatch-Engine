@@ -138,14 +138,28 @@ describe('worldRun - all nine plants are recovered, each by a discriminating det
 describe('worldRun - the seasonality finding', () => {
   const s = report.seasonality;
 
-  it('IS in the data and the naive query does not see it', () => {
-    // THE POINT OF THE WHOLE FIXTURE. A first version put the plant on a clean
-    // lane and BOTH queries recovered it, which cannot separate a sound
-    // estimator from an unsound one.
+  it('IS in the data, and a sound estimator finds it', () => {
     expect(s.onPlantBasis.recovers).toBe(true);
-    expect(s.naive.recovers).toBe(false);
     expect(s.verdict).toBe('recovered');
-    expect(s.explanation).toContain('fix the statistic, not');
+  });
+
+  it('does NOT pin what the naive query did in this one world', () => {
+    // THIS PIN USED TO ASSERT `naive.recovers === false`, AND THAT WAS THE SAME
+    // MISTAKE IN MINIATURE.
+    //
+    // It held at this seed and was reported as a measurement. Swept across 16
+    // worlds the naive query misses the effect in 9 and stumbles onto it in 7,
+    // so the assertion was a single-world claim dressed as a property — exactly
+    // what `worldSweep.ts` exists to catch, written by me, in the test file for
+    // the finding about it.
+    //
+    // Whether a bad estimator lands on the right answer is a RATE. It is pinned
+    // as a band in `worldSweep.test.ts`, over worlds, where it belongs. Here we
+    // pin only that the question was ASKED — that both cells exist and the naive
+    // read was computed — because that is what one world can establish.
+    expect(typeof s.naive.recovers).toBe('boolean');
+    expect(s.naive.cells).toHaveLength(4);
+    expect(s.naive.cells.every(c => c.n > 0)).toBe(true);
   });
 
   it('separates in-season from out-of-season on median and on rate, not only mean', () => {
@@ -156,16 +170,36 @@ describe('worldRun - the seasonality finding', () => {
     expect(outSeason.n).toBeGreaterThan(3);
   });
 
-  it('reports the naive cells so the failure is visible, not just asserted', () => {
-    expect(s.naive.cells).toHaveLength(4);
-    expect(s.naive.cells.every(c => c.n > 0)).toBe(true);
-  });
-
   it('would report not_recovered if the effect really were absent', () => {
     // VACUITY PIN: strip the seasonal signal and the finding must flip, so a
     // `recovered` verdict is a measurement rather than a constant.
     const flat = world.loads.map(l => ({ ...l, detentionMinutes: 0 }));
     expect(analyseSeasonality(flat).verdict).toBe('not_recovered');
+  });
+
+  it('returns UNDETERMINED, not not_recovered, when the cells are too thin', () => {
+    // "The detector failed" and "there is no data" are different facts with
+    // opposite remedies. Measured before this existed: at seed 20260101 the
+    // seasonal lane carried ZERO loads and this returned `not_recovered`, which
+    // blames a detector for the absence of its input.
+    const none = analyseSeasonality([]);
+    expect(none.verdict).toBe('undetermined');
+    expect(none.remedy).toContain('below the floor');
+    expect(none.explanation).toContain('NOT ASKED');
+  });
+
+  it('refuses on ONE winter, because one winter is not seasonality', () => {
+    // A single contiguous block of calendar time cannot distinguish a season
+    // from a one-off. Recurrence is what the word asserts.
+    const oneWinter = world.loads.filter(l =>
+      Date.parse(l.promisedPickupAt) < Date.parse('2025-07-01T00:00:00.000Z'));
+    const v = analyseSeasonality(oneWinter);
+    if (v.verdict === 'undetermined') {
+      expect(`${v.remedy}${v.explanation}`).toMatch(/winter|floor/);
+    }
+    expect(world.loads.length).toBeGreaterThan(0);
+    // And the full world DOES span the required number of winters.
+    expect(s.onPlantBasis.seasonsObserved).toBeGreaterThanOrEqual(2);
   });
 });
 

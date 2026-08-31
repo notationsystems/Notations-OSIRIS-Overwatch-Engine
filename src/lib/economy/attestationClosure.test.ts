@@ -189,6 +189,13 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // The seed sweep's own accounting. These count WORLDS AND SEEDS — how often
+    // a finding held across a set this process generated — not anything measured
+    // outside it. A rate over 16 simulated worlds is a property of the sweep.
+    PlantStability: 'counts of worlds a plant recovered in; about the sweep, not the world',
+    FindingStability: 'counts of worlds a finding held in, and the band it must fall inside',
+    SweepReport: 'counts of worlds built and refused',
+    SeasonalityFinding: 'cell sizes and estimator outputs over records already stamped representative by the world that produced them',
     // The simulated world's own records. Every number in them is drawn from a
     // seeded PRNG, so none is a measurement of anything; the world carries ONE
     // attestation at `FreightWorld.meta.attestation`, stamped `representative`,

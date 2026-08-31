@@ -14,6 +14,7 @@
 
 import {
   makeFreightWorld, SEASONAL_LANE, SEASONAL_MONTHS,
+  MIN_FACILITY_N, MIN_LANE_N, MIN_SEASON_CELL_N, MIN_SEASONS_OBSERVED,
   type FreightWorld, type WorldLoad,
 } from './freightWorld';
 import { applyTransition, detectionLatencySeconds } from './lifecycle';
@@ -175,9 +176,26 @@ export interface SeasonalityFinding {
     basis: string;
     inSeason: { n: number; mean: number | null; median: number | null; rateAbove120: number | null };
     outSeason: { n: number; mean: number | null; median: number | null; rateAbove120: number | null };
+    /**
+     * How many DISTINCT winters the in-season cell spans. One winter cannot
+     * distinguish a season from a one-off, however cleanly the medians separate.
+     */
+    seasonsObserved: number;
     recovers: boolean;
   };
-  verdict: 'recovered' | 'not_recovered';
+  /**
+   * THREE-VALUED, and the third value is the one that was missing.
+   *
+   * `undetermined` means the cells were too thin to ask the question. Measured
+   * at seed 20260101 before this existed: the seasonal lane carried ZERO loads
+   * and this returned `not_recovered`, which says THE DETECTOR FAILED when the
+   * truth is THERE IS NO DATA. Those have opposite remedies — one says fix the
+   * estimator, the other says get loads on the lane — and collapsing them is the
+   * same defect as reporting an empty result as a clean one.
+   */
+  verdict: 'recovered' | 'not_recovered' | 'undetermined';
+  /** For `undetermined` only: what would make the question answerable. */
+  remedy?: string;
   explanation: string;
 }
 
@@ -314,8 +332,7 @@ export function runWorld(world: FreightWorld, now: string): WorldRunReport {
     e.detention.push(l.detentionMinutes);
     perFacility.set(l.destFacilityId, e);
   }
-  const MIN_N = 15;
-  const facRows = [...perFacility].filter(([, e]) => e.late.length >= MIN_N);
+  const facRows = [...perFacility].filter(([, e]) => e.late.length >= MIN_FACILITY_N);
   const byLateRate = facRows
     .map(([facilityId, e]) => ({ facilityId, n: e.late.length, lateRate: mean(e.late)! }))
     .sort((a, b) => b.lateRate - a.lateRate);
@@ -424,9 +441,23 @@ export function runWorld(world: FreightWorld, now: string): WorldRunReport {
   const plants: PlantOutcome[] = [
     outcome('PLANT-1', divergence.length ? [divergence[0].carrierId] : [],
       divergence.length ? `top by rate variance, ${pct(divergence[0].variancePct, 1)} over ${divergence[0].n} loads` : 'no carriers'),
-    outcome('PLANT-2', [byLateRate[0]?.facilityId, byDetention[0]?.facilityId].filter(Boolean) as string[],
-      `worst by late rate ${byLateRate[0]?.facilityId ?? 'n/a'} (${pct(byLateRate[0]?.lateRate ?? null)}), ` +
-      `worst by mean detention ${byDetention[0]?.facilityId ?? 'n/a'} (${num(byDetention[0]?.meanDetention ?? null)} min)`),
+    (() => {
+      // The ranking drops facilities under MIN_N, so a plant below that floor is
+      // never a candidate. That is the corpus being too thin, not the detector
+      // being wrong, and charging it to the detector reads as a false negative.
+      const slip = plantOf('PLANT-2').boundTo[0];
+      const seen = perFacility.get(slip)?.late.length ?? 0;
+      if (seen < MIN_FACILITY_N) {
+        return {
+          plant: 'PLANT-2', boundTo: [slip], detected: [], status: 'not_attempted' as const,
+          note: `${slip} received ${seen} loads, below the ranking floor of ${MIN_FACILITY_N}, so it ` +
+            'was never a candidate. The detector was not asked about it.',
+        };
+      }
+      return outcome('PLANT-2', [byLateRate[0]?.facilityId, byDetention[0]?.facilityId].filter(Boolean) as string[],
+        `worst by late rate ${byLateRate[0]?.facilityId ?? 'n/a'} (${pct(byLateRate[0]?.lateRate ?? null)}), ` +
+        `worst by mean detention ${byDetention[0]?.facilityId ?? 'n/a'} (${num(byDetention[0]?.meanDetention ?? null)} min)`);
+    })(),
     outcome('PLANT-3', duplicates.flatMap(d => [d.a, d.b]),
       duplicates.length ? `${duplicates[0].metresApart} m apart, same normalized address` : 'no duplicate found'),
     outcome('PLANT-4', insRefused,
@@ -442,8 +473,13 @@ export function runWorld(world: FreightWorld, now: string): WorldRunReport {
       `unproven/telemetry_gap_exceeds_max x${(unprovenByReason.get('telemetry_gap_exceeds_max') ?? []).length}`),
     { plant: 'PLANT-8', boundTo: plantOf('PLANT-8').boundTo,
       detected: seasonality.verdict === 'recovered' ? [SEASONAL_LANE] : [],
-      status: seasonality.verdict === 'recovered' ? 'recovered' : 'missed',
-      note: seasonality.explanation },
+      // `not_attempted` when the question could not be asked. A detector that
+      // had no input did not fail; saying it did is how an unrun check gets
+      // charged to the detector instead of to the corpus.
+      status: seasonality.verdict === 'recovered' ? 'recovered'
+        : seasonality.verdict === 'undetermined' ? 'not_attempted' : 'missed',
+      note: seasonality.verdict === 'undetermined'
+        ? `${seasonality.remedy} ${seasonality.explanation}` : seasonality.explanation },
     outcome('PLANT-9', unprovenByReason.get('commitment_posted_after_the_fact') ?? [],
       `unproven/commitment_posted_after_the_fact x${(unprovenByReason.get('commitment_posted_after_the_fact') ?? []).length}`),
   ];
@@ -516,8 +552,28 @@ export function analyseSeasonality(loads: readonly WorldLoad[]): SeasonalityFind
     n: ls.length, mean: mean(det(ls)), median: median(det(ls)), rateAbove120: rateAbove(det(ls), 120),
   });
   const inC = cell(inL), outC = cell(outL);
+
+  // A winter spans the year boundary: December and the January after it are ONE
+  // season, so key on the year the December belongs to.
+  const seasonsObserved = new Set(inL.map(l => {
+    const d = new Date(l.promisedPickupAt);
+    return d.getUTCMonth() === 11 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+  })).size;
+
+  // ASK WHETHER THE QUESTION CAN BE ASKED, BEFORE ANSWERING IT.
+  const tooThin =
+    lane.length < MIN_LANE_N ? `lane ${SEASONAL_LANE} carries ${lane.length} loads, below the floor of ${MIN_LANE_N}` :
+    inC.n < MIN_SEASON_CELL_N ? `${inC.n} in-season loads, below the floor of ${MIN_SEASON_CELL_N}` :
+    outC.n < MIN_SEASON_CELL_N ? `${outC.n} out-of-season loads, below the floor of ${MIN_SEASON_CELL_N}` :
+    seasonsObserved < MIN_SEASONS_OBSERVED
+      ? `the in-season loads span ${seasonsObserved} winter(s), below the floor of ` +
+        `${MIN_SEASONS_OBSERVED}. A single winter cannot distinguish a SEASON from a one-off — ` +
+        'a strike, a closure, one bad month — however cleanly the medians separate. ' +
+        'Recurrence is the thing the word asserts, and it is not in this data'
+      : null;
+
   const plantRecovers =
-    inC.n > 3 && outC.n > 3 &&
+    tooThin === null &&
     inC.median !== null && outC.median !== null && inC.median > outC.median &&
     inC.rateAbove120 !== null && outC.rateAbove120 !== null && inC.rateAbove120 > outC.rateAbove120;
 
@@ -533,17 +589,30 @@ export function analyseSeasonality(loads: readonly WorldLoad[]): SeasonalityFind
       : 'Not recovered on either basis. The effect may be too small against the appointment ' +
         'noise it competes with, which is a fact about this detector at this n, not about the world.';
 
-  return {
+  const base = {
     lane: SEASONAL_LANE,
     plantMonths: SEASONAL_MONTHS,
     naive: { basis: 'calendar quarter of DELIVERY, arithmetic mean', cells, recovers: naiveRecovers },
     onPlantBasis: {
       basis: `months ${SEASONAL_MONTHS.join(',')} of PICKUP, median and rate above 120 min`,
-      inSeason: inC, outSeason: outC, recovers: plantRecovers,
+      inSeason: inC, outSeason: outC, seasonsObserved, recovers: plantRecovers,
     },
-    verdict: plantRecovers ? 'recovered' : 'not_recovered',
-    explanation,
   };
+
+  if (tooThin !== null) {
+    return {
+      ...base,
+      verdict: 'undetermined',
+      remedy: `${tooThin}. Route freight onto the lane, or widen the interval, before asking.`,
+      explanation:
+        'NOT ASKED, rather than asked and answered no. There is no population here to ' +
+        'separate a seasonal term from, so neither "recovered" nor "not recovered" is a ' +
+        'reading this data supports. Reporting the second would blame a detector for the ' +
+        'absence of its input.',
+    };
+  }
+
+  return { ...base, verdict: plantRecovers ? 'recovered' : 'not_recovered', explanation };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -613,8 +682,10 @@ export function renderWorldRun(r: WorldRunReport): string {
   const ins = r.seasonality.onPlantBasis.inSeason, outs = r.seasonality.onPlantBasis.outSeason;
   L.push(`    in season   n=${String(ins.n).padStart(3)}  mean ${num(ins.mean)}  median ${num(ins.median)}  >120min ${pct(ins.rateAbove120)}`);
   L.push(`    out         n=${String(outs.n).padStart(3)}  mean ${num(outs.mean)}  median ${num(outs.median)}  >120min ${pct(outs.rateAbove120)}`);
+  L.push(`    winters observed: ${r.seasonality.onPlantBasis.seasonsObserved} — one cannot tell a season from a one-off`);
   L.push(`    recovers the plant: ${r.seasonality.onPlantBasis.recovers ? 'YES' : 'NO'}`);
   L.push(`  VERDICT: ${r.seasonality.verdict.toUpperCase()}`);
+  if (r.seasonality.remedy) L.push(`  REMEDY:  ${r.seasonality.remedy}`);
   for (const line of wrap(r.seasonality.explanation, 74)) L.push(`  ${line}`);
 
   h('8. ECONOMICS');

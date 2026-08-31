@@ -245,6 +245,12 @@ an ordinal that contradicts this table.
 | 19 | 63 | A defect described in a comment as already fixed, in the same file as the code causing it — the fallback misbinds on 3 of 16 seeds and did not fire at the one that was run |
 | 20 | 63 | A detector whose named set was the whole population reported RECOVERED for two different plants: containment read as detection |
 | 21 | 63 | A fixture that could not demonstrate its own finding — with the confound removed, a sound and an unsound estimator gave the same answer |
+| 22 | 64 | A finding reported from one world: the estimator claim held at the seed that was run and in 7 of 16 worlds overall, with the single-world pin asserting it in the test file for the finding about it |
+| 23 | 64 | An analysis that reported "the detector failed" when its input was empty — `not_recovered` where the lane carried zero loads |
+| 24 | 64 | Two floors for one question: a generator guaranteeing 12 and an analysis requiring 15, so a planted signal was present and invisible |
+| 25 | 64 | A confound that became the measurement — at ≥74% of the lane, the noise source was larger than the entire planted term |
+| 26 | 64 | A parameter denominated wrong: a probability of forcing read as a target share, so 0.35 produced 62-75% |
+| 27 | 64 | An assertion that grepped for a word and claimed to test a condition — `not.toContain('SOMETIMES')` against text that explains what a SOMETIMES is |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

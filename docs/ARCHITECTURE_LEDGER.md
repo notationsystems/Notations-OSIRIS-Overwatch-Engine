@@ -4706,3 +4706,107 @@ not what exists.
   distinct reasons, so the two plants that land there have different detectors.
 - Authorization: **342 authorized, 111 refused, 67 undetermined**, with the
   cover check now reaching refuse *and* undetermined rather than one value.
+
+## Phase 64 — the sweep, and the finding I reported from one world
+
+The instruction was to work recursively. The recursive step over a run is not to
+run it again — it is to ask whether what the run showed is a property of the
+system or an accident of the world it drew. A single seed is a hypothesis, the
+same status as a single green suite.
+
+`worldSweep.ts` builds 16 worlds and reports, per plant and per headline claim,
+a RATE. Three readings, and the middle one is why the file exists:
+
+- **ALWAYS** — a property of the detector.
+- **SOMETIMES** — a detector that depends on luck. Invisible to any number of
+  single-world runs, and what "we ran it and it worked" means when the thing does
+  not, in general, work.
+- **NEVER** — a detector that does not work.
+
+### The first sweep corrected me immediately
+
+| item | first sweep |
+|---|---|
+| PLANT-1, 3, 4, 5, 6, 7, 9 | 16/16 |
+| PLANT-2 | **15/16** |
+| PLANT-8 | **15/16** |
+| **THE ESTIMATOR FINDING** | **7/16** |
+
+I had reported the estimator finding to the user as a measurement. It held at
+seed 20260831 and in **9 of 16 worlds it does not** — a single-world claim
+dressed as a property, which is exactly what phase 63 criticised in someone
+else's fixture. The pin in `worldRun.test.ts` asserting `naive.recovers ===
+false` was the same mistake, in the test file for the finding about it.
+
+### Four defects behind the two failing plants
+
+1. **Seed 20260101: the seasonal lane carried ZERO loads.** Facility roles were
+   drawn independently, so a city could end up unable to ship or unable to
+   receive, and every lane through it was unservable. PLANT-8 was **advertised in
+   the manifest and absent from the world** — the defect this file was written to
+   close, reached through a door `bindPlant` does not cover.
+2. **And the analysis reported that as `not_recovered`** — *the detector failed*,
+   when the truth is *there is no data*. Opposite remedies. Now three-valued:
+   `undetermined` with a remedy, and the plant reads `not_attempted`.
+3. **PLANT-2 below the ranking floor read as a miss.** The facility ranking drops
+   anything under `MIN_FACILITY_N`, so a plant beneath it was never a candidate.
+   Charging that to the detector is a false negative. The floors are now ONE
+   exported constant shared by generator and analysis, because a generator that
+   guarantees 12 and an analysis that requires 15 produce a signal that is
+   present and invisible.
+4. **The confound was the lane.** Measured: wherever the slipping receiver took
+   ≥74% of the seasonal lane, the out-of-season median rose from 0 to 202–274 min
+   and the plant was unrecoverable on any basis — its 240–900 minute slips are
+   larger than the entire seasonal term. A confound *interferes with* a
+   measurement; at three-quarters it **is** the measurement.
+
+### And the parameter was denominated wrong
+
+Lowering the forcing probability from 0.55 to 0.35 still produced 62–75%,
+because it set a PROBABILITY OF FORCING and the receiver then also won its share
+of the ordinary draw: `0.35 + 0.65/3 ≈ 0.57`. The number was plausible and it
+measured something other than its name — the materiality-gate failure, in the
+generator. Drawing from the complement makes `CONFOUND_SHARE` a target share.
+
+### Two structural corrections, not tunings
+
+**The season must be narrower than the partition used to look for it.** At four
+months Q1 held all of Jan/Feb/Mar and was always far above summer; only Q4's
+draw decided anything. At two months no calendar quarter is majority in-season,
+both winter quarters dilute the same way, and the property is pinned against the
+constants directly so it cannot be lost by editing the array.
+
+**One winter is not seasonality.** With a 12-month window the in-season cell is a
+single contiguous block of calendar time, so a strike or a closure is
+indistinguishable from a seasonal term. Every statistic still computes and the
+medians still separate — what cannot be established is RECURRENCE, which is what
+the word asserts. The world now spans two winters and the analysis refuses below
+`MIN_SEASONS_OBSERVED`.
+
+### Where I stopped, and why that is the finding
+
+After the fixes: **16/16 worlds build, all nine plants ALWAYS, the seasonal
+effect present ALWAYS**. The estimator finding sat at 9/16 and I stopped, because
+continuing would have been tuning a fixture until it agreed with me.
+
+Restated honestly it is a stronger claim than the one I made:
+
+> The plant is present in every world and a sound estimator finds it in every
+> world. Whether the NAIVE calendar-quarter mean also stumbles onto it depends on
+> the draw — 9 misses, 7 hits. A query whose correctness depends on the draw
+> gives you no way to tell, **from its own output**, which kind of world you are
+> in.
+
+So `SWEPT_FINDINGS` now carries a KIND. An `invariant` must be ALWAYS. A `rate`
+carries a BAND, and both ends fail: all-miss would be a fixture tuned until it
+agreed with me, all-hit a fixture that cannot separate a sound estimator from an
+unsound one. The kind is declared with the finding, never inferred from how it
+came out, so a failing invariant cannot be relabelled into a passing rate.
+
+### Measured after
+
+- **81 test files, 1145 passed, 6 skipped.**
+- 16/16 worlds build, 0 refused. Nine plants ALWAYS. Eight invariants ALWAYS.
+  One rate in band at 56%.
+- `RUN_OUTPUT.txt` and `SWEEP_OUTPUT.txt` are regenerated by the suite, so a
+  committed artifact cannot drift from the code that produced it unnoticed.

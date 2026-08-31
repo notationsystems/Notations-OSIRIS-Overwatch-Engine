@@ -301,16 +301,85 @@ export const SLIPPING_RECEIVER_CITY = 'DET';
  * loads to a facility in the wrong city, not by having it at all.
  */
 export const SEASONAL_LANE = 'TOR-DET';
-/** Months the seasonality plant fires in, by `promisedPickupAt`. Dec, Jan, Feb, Mar. */
-export const SEASONAL_MONTHS: readonly number[] = [11, 0, 1, 2];
+/**
+ * Months the seasonality plant fires in, by `promisedPickupAt`. December and
+ * January.
+ *
+ * TWO MONTHS, AND THE COUNT IS STRUCTURAL RATHER THAN TUNED.
+ *
+ * At four months (Dec-Mar) the demonstration was luck: Q1 held ALL THREE of
+ * Jan/Feb/Mar, so it was always far above the summer quarters, and whether the
+ * naive calendar-quarter read failed came down to Q4's draw — which held only
+ * December. Swept across 16 worlds the headline finding held in **7**. A fixture
+ * that demonstrates its own point 44% of the time demonstrates nothing; it is
+ * the single-world claim this whole file exists to refuse, made by me.
+ *
+ * The property that makes the demonstration reliable is not a magic number, it
+ * is this: NO CALENDAR QUARTER IS MAJORITY IN-SEASON. December sits in Q4 and
+ * January in Q1, so each winter quarter is one month of three, both are diluted
+ * the same way, and neither reliably clears a summer quarter. `freightWorld.
+ * test.ts` pins that property against the constants directly, so it cannot be
+ * lost by editing this array — which is the difference between a structural
+ * guarantee and a tuning that happened to work.
+ *
+ * It is also the more realistic case. A winter peak is weeks, not a third of a
+ * year, and the reason a quarterly mean misses it in real freight data is
+ * exactly this mismatch of scale.
+ */
+export const SEASONAL_MONTHS: readonly number[] = [11, 0];
+
+/**
+ * REPORTING FLOORS, shared by the generator and the analysis.
+ *
+ * One number, in one place, because a generator that guarantees 12 loads and an
+ * analysis that requires 15 produce a world whose planted signal is present and
+ * invisible — and the run reports it as a detector failure.
+ */
+export const MIN_FACILITY_N = 15;
+export const MIN_LANE_N = 60;
+export const MIN_SEASON_CELL_N = 12;
+
+/**
+ * ONE WINTER IS NOT SEASONALITY.
+ *
+ * The sharper question, reached by fixing the thin-cell one. With a 12-month
+ * window the in-season cell is a SINGLE CONTIGUOUS BLOCK of calendar time, so a
+ * one-off — a strike, a construction closure, one bad month at one receiver — is
+ * indistinguishable from a seasonal term. Every statistic still computes; the
+ * medians separate; the finding reads as recovered. What cannot be established
+ * from one winter is the thing the word "seasonal" asserts, which is RECURRENCE.
+ *
+ * So the world spans two winters and the analysis refuses below this count. It
+ * is the same discipline as the posting window in the notary: a fact that a
+ * measurement cannot establish is refused before the measurement, not argued
+ * about after it.
+ */
+export const MIN_SEASONS_OBSERVED = 2;
+
+/**
+ * The largest share of the seasonal lane the confounding receiver may take.
+ *
+ * Above this it stops interfering with the seasonal measurement and starts
+ * being it. Measured: at 74-80% the out-of-season median rose from 0 to
+ * 202-274 minutes and the plant was unrecoverable on any basis.
+ */
+export const MAX_CONFOUND_SHARE = 0.6;
+
+/**
+ * The TARGET share of the slipping receiver's city inbound freight that goes to
+ * it. A substantial minority: clearly a confound, clearly not the lane itself.
+ */
+export const CONFOUND_SHARE = 0.4;
 
 export interface WorldOptions {
   seed?: number;
   loadCount?: number;
   /** REQUIRED. This generator holds no clock. */
   generatedAt: string;
-  /** Start of the 12-month booking window. */
+  /** Start of the booking window. */
   windowStart?: string;
+  /** Length of the booking window in days. Must span MIN_SEASONS_OBSERVED winters. */
+  windowDays?: number;
 }
 
 export interface FreightWorld {
@@ -355,8 +424,13 @@ const SPINE = ['TOR-DET', 'TOR-MTL', 'MIS-CHI', 'HAM-BUF', 'WIN-DET', 'TOR-CHI']
 
 export function makeFreightWorld(opts: WorldOptions): FreightWorld {
   const seed = opts.seed ?? 20260831;
-  const loadCount = opts.loadCount ?? 520;
-  const windowStart = opts.windowStart ?? '2025-09-01T00:00:00.000Z';
+  // 900 over 24 months. The in-season fraction is fixed at 2/12 by the plant, so
+  // a longer window alone does NOT thicken the cell — only more loads do. Both
+  // are needed and for different reasons: the count for n, the span for
+  // recurrence.
+  const loadCount = opts.loadCount ?? 900;
+  const windowStart = opts.windowStart ?? '2024-09-01T00:00:00.000Z';
+  const windowDays = opts.windowDays ?? 720;
   const t0 = Date.parse(windowStart);
   if (!Number.isFinite(t0)) throw new Error(`freightWorld: unparseable windowStart ${windowStart}`);
   if (!Number.isFinite(Date.parse(opts.generatedAt))) {
@@ -382,6 +456,24 @@ export function makeFreightWorld(opts: WorldOptions): FreightWorld {
         freeTimeMinutes: pick(r, [90, 120, 120, 180]),
       });
     }
+  }
+
+  // EVERY CITY CAN BOTH SHIP AND RECEIVE.
+  //
+  // Roles were drawn independently per facility, so a city could come out with
+  // no shipper-capable or no receiver-capable facility and every lane through it
+  // would be unservable. Measured at seed 20260101: the seasonal lane carried
+  // ZERO loads, and PLANT-8 was advertised in the manifest while absent from the
+  // world — the same defect this file was written to close, reached through a
+  // door the load-bound `bindPlant` check does not cover.
+  //
+  // Forcing coverage is not tuning: a city in a real book has both ends. The
+  // population assertions below are kept anyway, because "guaranteed by
+  // construction" is a claim that rots the moment the construction changes.
+  for (const c of CITIES) {
+    const here = facilities.filter(f => f.cityCode === c.code);
+    if (!here.some(f => f.role !== 'receiver')) here[0].role = 'both';
+    if (!here.some(f => f.role !== 'shipper')) here[here.length - 1].role = 'both';
   }
 
   // PLANT-2 — chronic appointment slippage, at a receiver in ONE city.
@@ -485,15 +577,35 @@ export function makeFreightWorld(opts: WorldOptions): FreightWorld {
 
     const originF = pick(r, origins);
     // PLANT-2 lives in ONE city and only takes freight bound there.
-    let destF = pick(r, dests);
-    if (lane.dest === SLIPPING_RECEIVER_CITY && r() < 0.55) destF = slipping;
+    // A CONFOUND INTERFERES WITH A MEASUREMENT; SOMETHING THAT CONSTITUTES IT IS
+    // NOT A CONFOUND, IT IS THE SIGNAL.
+    //
+    // At a 0.55 forcing probability the slipping receiver took 74-80% of the
+    // seasonal lane, and its 240-900 minute appointment slips are LARGER THAN
+    // THE ENTIRE SEASONAL TERM (120-260). Measured: wherever its share reached
+    // 74% the out-of-season median rose from 0 to 202-274 min and the plant was
+    // unrecoverable on any basis.
+    //
+    // AND THE PARAMETER WAS DENOMINATED WRONG, which is why lowering it to 0.35
+    // still produced 62-75%. It set a PROBABILITY OF FORCING, and the receiver
+    // then also won its share of the ordinary draw among DET's receivers:
+    // 0.35 + 0.65/3 ~= 0.57. The number was plausible and it measured something
+    // other than what its name said — the same failure the materiality gate
+    // exists to catch, in the generator.
+    //
+    // Drawing from the OTHERS on the complement makes the constant a TARGET
+    // SHARE, so it means what it is named. The ceiling below is kept anyway.
+    const others = dests.filter(f => f.facilityId !== slipping.facilityId);
+    const destF = (lane.dest === SLIPPING_RECEIVER_CITY && others.length)
+      ? (r() < CONFOUND_SHARE ? slipping : pick(r, others))
+      : pick(r, dests);
 
     const shipper = pick(r, shippers);
     const carrier = pick(r, carriers);
     const equipment = pick(r, EQUIPMENT);
     const commodity = pick(r, COMMODITY);
 
-    const bookedAt = sec(t0 + between(r, 0, 360) * DAY);
+    const bookedAt = sec(t0 + between(r, 0, windowDays) * DAY);
     const estimatedTransitHours = Math.round(lane.distanceKm / 82 + (lane.crossBorder ? 2.5 : 0.5));
     const promisedPickupAt = sec(bookedAt + between(r, 12, 72) * HOUR);
     const promisedDeliveryAt = sec(promisedPickupAt + estimatedTransitHours * HOUR + between(r, 2, 10) * HOUR);
@@ -679,6 +791,64 @@ export function makeFreightWorld(opts: WorldOptions): FreightWorld {
   taken.add(p9.loadId);
   p9.commitmentPostedAt = iso(Date.parse(p9.actualDeliveryAt) + 3 * DAY);
   p9.flags.push('commitment_retroactive');
+
+  // STRUCTURAL PLANTS NEED A POPULATION TOO.
+  //
+  // `bindPlant` refuses when no LOAD qualifies. PLANT-2 and PLANT-8 bind to a
+  // facility and a lane, so they passed that check while carrying no freight at
+  // all. A plant the manifest advertises and the world does not contain makes
+  // every detector run over it look like a failure of the detector.
+  //
+  // The floors are the reporting floors the analysis actually uses, so a plant
+  // that binds is a plant the analysis can see — not merely one that exists.
+  const seasonalLoads = loads.filter(l => l.laneId === SEASONAL_LANE);
+  if (seasonalLoads.length < MIN_LANE_N) {
+    throw new PlantNotBound('PLANT-8', `>= ${MIN_LANE_N} loads on lane ${SEASONAL_LANE}`, seasonalLoads.length);
+  }
+  for (const months of [SEASONAL_MONTHS, null] as const) {
+    const sel = months
+      ? seasonalLoads.filter(l => months.includes(new Date(l.promisedPickupAt).getUTCMonth()))
+      : seasonalLoads.filter(l => !SEASONAL_MONTHS.includes(new Date(l.promisedPickupAt).getUTCMonth()));
+    if (sel.length < MIN_SEASON_CELL_N) {
+      throw new PlantNotBound(
+        'PLANT-8', `>= ${MIN_SEASON_CELL_N} loads ${months ? 'in' : 'out of'} season on ${SEASONAL_LANE}`,
+        seasonalLoads.length);
+    }
+  }
+  {
+    const inSeason = seasonalLoads.filter(l =>
+      SEASONAL_MONTHS.includes(new Date(l.promisedPickupAt).getUTCMonth()));
+    // A winter spans a year boundary, so December and the January after it are
+    // ONE season. Key on the year the December belongs to.
+    const seasons = new Set(inSeason.map(l => {
+      const d = new Date(l.promisedPickupAt);
+      return d.getUTCMonth() === 11 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+    }));
+    if (seasons.size < MIN_SEASONS_OBSERVED) {
+      throw new PlantNotBound(
+        'PLANT-8',
+        `>= ${MIN_SEASONS_OBSERVED} distinct winters on ${SEASONAL_LANE} (found ${seasons.size})`,
+        inSeason.length);
+    }
+  }
+
+  {
+    const onLane = seasonalLoads.filter(l => l.destFacilityId === slipping.facilityId).length;
+    const share = seasonalLoads.length ? onLane / seasonalLoads.length : 0;
+    if (share > MAX_CONFOUND_SHARE) {
+      throw new PlantNotBound(
+        'PLANT-8',
+        `the confounding receiver takes ${(share * 100).toFixed(0)}% of ${SEASONAL_LANE}, above the ` +
+        `${(MAX_CONFOUND_SHARE * 100).toFixed(0)}% ceiling — at that share it is not a confound, it is the lane`,
+        seasonalLoads.length);
+    }
+  }
+
+  const slippingLoads = loads.filter(l => l.destFacilityId === slipping.facilityId);
+  if (slippingLoads.length < MIN_FACILITY_N) {
+    throw new PlantNotBound(
+      'PLANT-2', `>= ${MIN_FACILITY_N} loads into ${slipping.facilityId}`, slippingLoads.length);
+  }
 
   const plants: PlantRecord[] = [
     { id: 'PLANT-1', description: 'carrier quotes ~11% under market, invoices back up',
