@@ -228,7 +228,7 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/news',
         method: 'GET',
-        summary: 'Aggregated OSINT news items.',
+        summary: 'Published news scored for disruption relevance, with coordinates where a place is named.',
         returns: ['news', 'total', 'timestamp'],
       },
       {

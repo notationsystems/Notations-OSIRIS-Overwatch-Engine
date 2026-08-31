@@ -2,19 +2,36 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 /**
- * Payload — Military-Grade Intelligence API
- * Fetches Telegram OSINT feeds directly, with a failsafe fallback 
- * to traditional intelligence sources if Telegram blocks the IP.
+ * Payload — disruption signal from published news.
+ *
+ * A-1 retired the general-purpose feeds and kept two, this among them, on a
+ * stated freight justification: DISRUPTION EVENTS. A closed port, a strike, a
+ * corridor under fire are facts a broker prices against.
+ *
+ * WHAT THIS ROUTE USED TO DO, and why it no longer does (ledger phase 73). It
+ * scraped four named Telegram channels through that platform's web-preview
+ * endpoint — the one that renders posts to a client which is not a Telegram
+ * client — under a desktop-Chrome User-Agent it does not have, with a comment
+ * explaining the disguise: "a failsafe fallback ... if Telegram blocks the
+ * IP". Two things were wrong with that beyond the disguise itself.
+ *
+ * The endpoint is described here rather than spelled, because the capability
+ * marker that now forbids it is a literal and would match this paragraph. The
+ * phase-68 remedy for that collision was a written exemption; the cheaper one,
+ * where the prose does not need the token, is to not write the token.
+ *
+ * First, phase 46 recorded that Telegram post scraping "was advertised and
+ * never built ... Nothing to delete." It was built, it was live, and it was
+ * this file. The geoparsing the README advertised is `findCoords` below, and
+ * the map plots its output.
+ *
+ * Second, the freight justification never needed it. Published RSS — BBC, Al
+ * Jazeera, GDACS — carries disruption events, is what the route already fell
+ * back to, and is fetched under this instrument's own name. The Telegram path
+ * was the inheritance, not the capability.
  */
 
-const TELEGRAM_CHANNELS = [
-  'OSINTtechnical',
-  'Faytuks',
-  'Liveuamap',
-  'CyberKnow'
-];
-
-const FALLBACK_FEEDS = {
+const FEEDS = {
   BBC: 'https://feeds.bbci.co.uk/news/world/rss.xml',
   AlJazeera: 'https://www.aljazeera.com/xml/rss/all.xml',
   GDACS: 'https://www.gdacs.org/xml/rss.xml'
@@ -47,32 +64,6 @@ function findCoords(text: string): [number, number] | null {
   return null;
 }
 
-function parseTelegramHTML(html: string, channel: string): any[] {
-  const items: any[] = [];
-  const messageBlockRegex = /<div class="tgme_widget_message_wrap js-widget_message_wrap"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/gi;
-  let blockMatch;
-
-  while ((blockMatch = messageBlockRegex.exec(html)) !== null) {
-    const blockHtml = blockMatch[0];
-    const textRegex = /<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/i;
-    const textMatch = blockHtml.match(textRegex);
-    if (!textMatch) continue;
-    
-    const text = textMatch[1].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
-    if (!text || text.length < 10) continue;
-
-    const dateRegex = /<a class="tgme_widget_message_date" href="(https:\/\/t\.me\/[^"]+)".*?<time datetime="([^"]+)"/i;
-    const dateMatch = blockHtml.match(dateRegex);
-    const link = dateMatch ? dateMatch[1] : `https://t.me/${channel}`;
-    const pubDate = dateMatch ? dateMatch[2] : new Date().toISOString();
-
-    const title = text.split('\n')[0].substring(0, 100);
-
-    items.push({ title, description: text, link, pubDate, source: `t.me/${channel}` });
-  }
-  return items;
-}
-
 function parseRSSItems(xml: string, sourceName: string): any[] {
   const items: any[] = [];
   const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
@@ -101,40 +92,19 @@ function parseRSSItems(xml: string, sourceName: string): any[] {
 
 export async function GET() {
   try {
-    const feedPromises = TELEGRAM_CHANNELS.map(async (channel) => {
+    const feedPromises = Object.entries(FEEDS).map(async ([source, url]) => {
       try {
-        const res = await fetch(`https://t.me/s/${channel}`, { 
-          signal: AbortSignal.timeout(8000), 
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' } 
-        });
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
         if (!res.ok) return [];
-        const html = await res.text();
-        return parseTelegramHTML(html, channel).slice(-8);
+        const xml = await res.text();
+        return parseRSSItems(xml, source).slice(0, 8);
       } catch { return []; }
     });
 
     const feedResults = await Promise.allSettled(feedPromises);
     const allArticles: any[] = [];
-
     for (const result of feedResults) {
       if (result.status === 'fulfilled') allArticles.push(...result.value);
-    }
-
-    // FAILSAFE: If Telegram completely blocks the IP, fall back to traditional RSS
-    if (allArticles.length === 0) {
-      const fallbackPromises = Object.entries(FALLBACK_FEEDS).map(async ([source, url]) => {
-        try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (!res.ok) return [];
-          const xml = await res.text();
-          return parseRSSItems(xml, source).slice(0, 5);
-        } catch { return []; }
-      });
-      
-      const fallbackResults = await Promise.allSettled(fallbackPromises);
-      for (const result of fallbackResults) {
-        if (result.status === 'fulfilled') allArticles.push(...result.value);
-      }
     }
 
     const newsItems = allArticles.map(article => {
@@ -151,7 +121,16 @@ export async function GET() {
         risk_score: riskScore,
         coords: coords ? [coords[0], coords[1]] : null,
         coords_default: !coords,
-        machine_assessment: riskScore >= 8 ? "AI Analysis indicates elevated tactical priority based on OSINT stream patterns." : null,
+        /**
+         * Retained in the contract because `IntelFeed` renders it, and emitted
+         * as null because there is no assessment to report. It used to carry
+         * "AI Analysis indicates elevated tactical priority based on OSINT
+         * stream patterns" whenever `risk_score >= 8` — a fixed sentence, from
+         * no model, describing an analysis that never ran. Whether anything
+         * should fill this field is a separate decision from whether a canned
+         * string may pretend to.
+         */
+        machine_assessment: null,
       };
     });
 
@@ -167,6 +146,6 @@ export async function GET() {
       },
     });
   } catch (error) {
-    return NextResponse.json({ news: [], error: 'Failed to fetch intel' }, { status: 500 });
+    return NextResponse.json({ news: [], error: 'Failed to fetch disruption feed' }, { status: 500 });
   }
 }

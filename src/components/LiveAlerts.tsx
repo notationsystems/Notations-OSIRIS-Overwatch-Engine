@@ -64,7 +64,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
   // Build unified alert feed
   const alerts: any[] = [];
 
-  // OSINT Telegram News Feed (from /api/news)
+  // Disruption news feed (from /api/news)
   if (data.news) {
     data.news.forEach((a: any) => {
       alerts.push({

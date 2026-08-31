@@ -68,6 +68,19 @@ const PROHIBITED_MARKERS: ReadonlyArray<{ pattern: RegExp; capability: string }>
   // People-search aggregators.
   { pattern: /\b(?:pipl|truecaller|spokeo|whitepages|fullcontact|clearbit)\b/i,
     capability: 'people-search aggregator' },
+  /**
+   * Telegram channel post scraping (phase 73). `t.me/s/<channel>` is the web
+   * PREVIEW endpoint — the one that returns rendered posts to a client that is
+   * not a Telegram client, which is why the scraper wore a desktop-Chrome
+   * User-Agent it does not have.
+   *
+   * The description gate has forbidden ADVERTISING this since phase 46, on the
+   * strength of a record saying the capability "was advertised and never
+   * built". It was built, and it was live in `api/news` the whole time. The
+   * prohibition existed and only the doing of it was unchecked.
+   */
+  { pattern: /\bt\.me\/s\//,
+    capability: 'Telegram channel post scraping' },
 ];
 
 function routeIds(): string[] {

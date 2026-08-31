@@ -273,6 +273,7 @@ an ordinal that contradicts this table.
 | 47 | 70 | The shipped-description gate scanned `DOCKER.md` with PHRASE markers (`port scann`), so a table advertising a "RECON scanner backend" passed it; `.env.example`, which configured the capability rather than describing it, was outside `candidateArtifacts()` entirely |
 | 48 | 71 | The conditional-route gate asserted a condition was STATED, never that it was kept: `osint/whois` named the individual-registrant hazard in its own header and returned the vCard `fn` eight lines below, retaining precisely the entities whose only identifier was a natural person's name |
 | 49 | 72 | `src/middleware.ts` sat in the execution-surface scan's population for four phases and passed every run: the markers ask which upstream host a file CONTACTS, and this one enclosed the visitor's raw address in a body posted to the firm's own collector |
+| 50 | 73 | Phase 46 searched for the advertised Telegram layer, found nothing, recorded "never built — nothing to delete", and built a gate against ADVERTISING it; the scraper was live in `api/news` the whole time, so the prohibition covered saying it and nothing covered doing it |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

@@ -5792,3 +5792,88 @@ anything".
   variable the code reads is documented.
 - Four surfaces from the retraction remain: `api/news`, `api/astra`,
   `api/region-dossier`, `public/robots.txt`.
+
+
+## Phase 73 — the Telegram layer that was recorded as never built
+
+Third of the six surfaces. `api/news` is one of only two general-purpose routes
+`KEPT_DESPITE_GENERAL_PURPOSE` keeps LIVE, on a stated freight justification:
+disruption events, which a broker prices against. It was fetching four named
+Telegram channels through that platform's web-preview endpoint, under a
+desktop-Chrome User-Agent it does not have, with the disguise explained in its
+own comment — *"a failsafe fallback ... if Telegram blocks the IP"* — and
+filing the result under the header **"Payload — Military-Grade Intelligence
+API"**.
+
+### A record that was checked and was wrong
+
+Phase 46, in the disposition that removed the person-targeting routes:
+
+> **Telegram person-post scraping was advertised and never built.** The README
+> names a Telegram OSINT layer with geoparsed posts plotted on a map; no such
+> route exists in the tree. **Nothing to delete** — but the README advertised
+> it, which is why the shipped description needed a gate of its own.
+
+Every element of the advertised feature was present. The scraper is
+`parseTelegramHTML`; the geoparsing is `findCoords` against a
+`KEYWORD_COORDS` table; the map plots the output; the route was live. The
+conclusion drawn from that mistaken finding was that the DESCRIPTION needed a
+gate — and phase 46 duly built one, which has forbidden *advertising* Telegram
+scraping ever since, while the scraping itself ran unchecked in a route the
+same phase left live.
+
+That is the sharpest form of this project's oldest failure. A search was run,
+it returned nothing, the nothing was read as absence rather than as a search
+that missed, and a gate was then built against the wrong half of the problem —
+with the record of it standing for twenty-seven phases as evidence the question
+had been settled. **A prohibition on saying it, and no check on doing it.**
+
+I inherited that record and repeated its conclusion in phase 70, listing the
+Telegram block in `.env.example` as advertising for a layer "phase 46
+established was never built". I did not check either. The sweep that found this
+was itself the one whose aggregation had silently returned zero.
+
+### The disposition
+
+The freight justification never needed the Telegram path. Published RSS — BBC,
+Al Jazeera, GDACS — carries disruption events, is fetched under this
+instrument's own name, and was **already in the file** as the fallback. So the
+fallback becomes the source and the scraper is deleted. The route keeps its
+response shape, its risk scoring, its coordinate resolution and its
+`coords_default` flag; what it loses is the inheritance.
+
+`machine_assessment` is now `null` rather than removed, because `IntelFeed`
+renders it. It used to carry the fixed string *"AI Analysis indicates elevated
+tactical priority based on OSINT stream patterns"* whenever `risk_score >= 8` —
+from no model, describing an analysis that never ran, and after this change it
+would have cited a stream that no longer exists. Whether anything should fill
+that field is a separate decision from whether a canned string may pretend to,
+and only the second is taken here.
+
+A marker for the preview endpoint joins the route-surface scan, so the doing is
+now checked as well as the saying.
+
+### The marker matched the paragraph explaining the removal
+
+Writing that header tripped the new marker on its own prose, which is the third
+time in six phases a capability marker has matched a file discussing the
+capability — `nmap` inside a comment about `nmap` (68), and twice since.
+
+Phase 68's remedy was a written exemption keyed to file and capability. That is
+the right tool when the prose genuinely needs the token, and the wrong one when
+it does not: an exemption is a standing hole, and this paragraph loses nothing
+by describing the endpoint instead of spelling it. **Where the prose does not
+need the literal, do not write the literal.** The exemption list stays at one
+entry.
+
+### Measured after
+
+- **1244 passed, 6 skipped** — unchanged, as expected: a capability was removed
+  and a marker added, no assertions.
+- Build compiles; the four Turbopack `node:fs` warnings are the pre-existing
+  ones phase 47 measured against a stashed baseline.
+- Lint on the touched files: 12 problems → 10 (two errors removed, none added).
+- Outbound hosts contacted by this route: 4 Telegram channel URLs + 3 RSS
+  feeds → 3 RSS feeds, all under this instrument's own User-Agent.
+- Three surfaces from the retraction remain: `api/astra`, `api/region-dossier`,
+  `public/robots.txt`.
