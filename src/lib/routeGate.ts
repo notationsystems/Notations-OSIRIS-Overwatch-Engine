@@ -43,7 +43,6 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'air-quality': 'general-purpose',
   aircraft: 'general-purpose',
   arcgis: 'ops',
-  astra: 'general-purpose',
   cctv: 'general-purpose',
   'cctv/proxy': 'general-purpose',
   'cctv/resolve': 'general-purpose',

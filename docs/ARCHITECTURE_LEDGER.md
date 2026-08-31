@@ -5933,3 +5933,32 @@ writing the literal; keying on the identifier means the prose can say
   added.
 - Build compiles; typecheck clean.
 - Two surfaces from the retraction remain: `api/astra` and `public/robots.txt`.
+
+
+## Phase 75 — image geolocation, with nothing on either end of it
+
+Fifth of the six, and the shortest, because there is little to weigh.
+`api/astra` accepted an uploaded photograph, proxied it to an external
+inference server, and returned the predicted location.
+
+Measured before deciding:
+
+- **No consumer.** Nothing in `src/` referenced it except its own entry in the
+  disposition map. No UI, no docs-catalog entry, no test.
+- **No configuration.** It reads `ASTRA_GPU_URL`, which appears in no env
+  template and nowhere else in the tree, defaulting to `http://localhost:8000`.
+- **No freight use.** Retired behind `routeGate` as `general-purpose`, so off
+  by default and re-enablable by anyone who sets one variable.
+
+So: a capability with no caller, no backend and no purpose here, one env var
+away from live. "Where was this picture taken" is the `geoloc` item from the
+deleted RECON menu in its most general form, and its subject is whoever appears
+in — or took — the photograph. Deleted, and deregistered, which the
+stale-classification check would have insisted on anyway.
+
+The marker keys on the inference endpoint rather than the route name, so a
+second proxy to the same capability under a different name still fails.
+
+**Route count 67 → 66.** Build compiles, typecheck clean after the stale
+`.next/types` validator was regenerated — the only "failure" this phase, and an
+artifact rather than a fact.

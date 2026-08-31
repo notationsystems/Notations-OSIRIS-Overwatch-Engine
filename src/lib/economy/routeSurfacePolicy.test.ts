@@ -95,6 +95,15 @@ const PROHIBITED_MARKERS: ReadonlyArray<{ pattern: RegExp; capability: string }>
    */
   { pattern: /\bwdt:P(?:6|35)\b/,
     capability: 'resolving a head of state or government (a named natural person)' },
+  /**
+   * Inferring where a photograph was taken (phase 75). `api/astra` accepted an
+   * uploaded image and proxied it to an external inference server, returning
+   * the predicted location. "Where was this picture taken" is the `geoloc`
+   * item from the deleted RECON menu in its most general form, and its subject
+   * is whoever appears in, or took, the photograph.
+   */
+  { pattern: /\/geolocate\b/,
+    capability: 'inferring a location from an uploaded image' },
 ];
 
 function routeIds(): string[] {
