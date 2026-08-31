@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   legalFrom, isLegalTransition, applyTransition, resolveException,
   detectionLatencySeconds, readState, evaluateException, renderLead, downstreamImpact,
+  MIXED_CURRENCY,
 } from './lifecycle';
 import {
   ALL_LOAD_STATES, OPERATIONAL_STATES, TERMINAL_STATES, TRANSITIONS,
   STATE_CADENCE_SECONDS, ALL_SUPPRESSION_REASONS, IllegalTransition,
+  DEFAULT_EXCEPTION_POLICY, ALL_EXCEPTION_KINDS,
   type Transition, type ExceptionCandidate, type ExceptionPolicy,
   type DownstreamLoad, type SuppressionReason,
 } from './lifecycle.types';
@@ -177,14 +179,13 @@ describe('L4 — silence is not a state', () => {
 
 // ── L5 ───────────────────────────────────────────────────────────────────────
 describe('L5 — the exception gate returns its suppression', () => {
-  const POLICY: ExceptionPolicy = {
-    policyId: 'x@1', materialityFloorMinor: 10000, currency: 'CAD', maxPerLoadPerDay: 3,
-  };
+  const POLICY: ExceptionPolicy = { ...DEFAULT_EXCEPTION_POLICY, policyId: 'x@1', maxPerLoadPerDay: 3 };
   const c = (over: Partial<ExceptionCandidate> = {}): ExceptionCandidate => ({
-    loadId: 'L-1', kind: 'origin_delay',
+    loadId: 'L-1', kind: 'appointment_at_risk',
     evidence: [{ recordId: 'R-1', note: 'carrier ETA slipped 2h', attestation: CARRIER_SAYS }],
-    materialityMinor: 40000, currency: 'CAD',
-    actions: ['re-sequence the next pickup'], leadMinutes: 45, detectedAt: NOW, ...over,
+    materiality: { measure: 'minutes', value: 90 },
+    actions: [{ actionId: 'A-1', label: 're-sequence the next pickup', authority: 'proposal' }],
+    leadMinutes: 45, detectedAt: NOW, ...over,
   });
 
   it('all three conditions met → fires', () => {
@@ -196,7 +197,7 @@ describe('L5 — the exception gate returns its suppression', () => {
     const seen = new Map<SuppressionReason, string>();
     const cases: Array<[Partial<ExceptionCandidate>, number]> = [
       [{ evidence: [] }, 0],
-      [{ materialityMinor: 500 }, 0],
+      [{ materiality: { measure: 'minutes' as const, value: 5 } }, 0],
       [{ actions: [] }, 0],
       [{}, 3],
     ];
@@ -205,12 +206,16 @@ describe('L5 — the exception gate returns its suppression', () => {
       expect(v.status).toBe('suppressed');
       if (v.status === 'suppressed') seen.set(v.reason, v.explanation);
     }
+    // incommensurable_materiality is exercised in its own block below.
+    seen.set('incommensurable_materiality',
+      (evaluateException(c({ materiality: { measure: 'km', value: 500 } }), POLICY, 0) as
+        { explanation: string }).explanation);
     expect([...seen.keys()].sort()).toEqual([...ALL_SUPPRESSION_REASONS].sort());
     for (const [r, why] of seen) expect(why.length, `${r} has no explanation`).toBeGreaterThan(40);
   });
 
   it('an UNKNOWN materiality is suppressed as unknown, not treated as above the floor', () => {
-    const v = evaluateException(c({ materialityMinor: null }), POLICY, 0);
+    const v = evaluateException(c({ materiality: null }), POLICY, 0);
     expect(v.status).toBe('suppressed');
     if (v.status === 'suppressed') {
       expect(v.reason).toBe('below_materiality');
@@ -225,7 +230,7 @@ describe('L5 — the exception gate returns its suppression', () => {
     const v = evaluateException(c({ evidence: [] }), POLICY, 0);
     expect(v).toHaveProperty('reason');
     expect(v).toHaveProperty('loadId', 'L-1');
-    expect(v).toHaveProperty('kind', 'origin_delay');
+    expect(v).toHaveProperty('kind', 'appointment_at_risk');
   });
 
   it('the gate COMBINES the evidence classes rather than inventing one', () => {
@@ -273,15 +278,13 @@ describe('L6 — the lead is stated plainly, including when it is negative', () 
   });
 
   it('the negative lead reaches the FIRED claim — it is not hidden on the way out', () => {
-    const POLICY: ExceptionPolicy = {
-      policyId: 'x@1', materialityFloorMinor: 10000, currency: 'CAD', maxPerLoadPerDay: 3,
-    };
     const v = evaluateException({
-      loadId: 'L-9', kind: 'origin_delay',
+      loadId: 'L-9', kind: 'appointment_at_risk',
       evidence: [{ recordId: 'R-1', note: 'n', attestation: CARRIER_SAYS }],
-      materialityMinor: 40000, currency: 'CAD',
-      actions: ['call'], leadMinutes: -30, detectedAt: NOW,
-    }, POLICY, 0);
+      materiality: { measure: 'minutes', value: 90 },
+      actions: [{ actionId: 'A', label: 'call', authority: 'proposal' }],
+      leadMinutes: -30, detectedAt: NOW,
+    }, DEFAULT_EXCEPTION_POLICY, 0);
     expect(v.status).toBe('fired');
     if (v.status === 'fired') {
       expect(v.renderedClaim).toContain('BEHIND other reporting');
@@ -293,9 +296,9 @@ describe('L6 — the lead is stated plainly, including when it is negative', () 
 // ── L7 ───────────────────────────────────────────────────────────────────────
 describe('L7 — downstream impact, and three refusals to guess', () => {
   const LOADS: DownstreamLoad[] = [
-    { loadId: 'L-2', bufferMinutes: 30, hasAppointment: true, contribution: { minor: 40000, attestation: SHIPPER_CLAIMS } },
+    { loadId: 'L-2', bufferMinutes: 30, hasAppointment: true, contribution: { minor: 40000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
     { loadId: 'L-3', bufferMinutes: 0, hasAppointment: true, contribution: null },
-    { loadId: 'L-4', bufferMinutes: 0, hasAppointment: false, contribution: { minor: 30000, attestation: SHIPPER_CLAIMS } },
+    { loadId: 'L-4', bufferMinutes: 0, hasAppointment: false, contribution: { minor: 30000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
   ];
   const r = () => downstreamImpact(120, LOADS, 'CAD');
 
@@ -342,7 +345,7 @@ describe('L7 — downstream impact, and three refusals to guess', () => {
 
   it('an unknown buffer does not absorb, and says it assumed so', () => {
     const out = downstreamImpact(120, [
-      { loadId: 'L-5', bufferMinutes: null, hasAppointment: true, contribution: { minor: 10000, attestation: SHIPPER_CLAIMS } },
+      { loadId: 'L-5', bufferMinutes: null, hasAppointment: true, contribution: { minor: 10000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
     ], 'CAD');
     const l5 = out.assessed[0];
     expect(l5.delayMinutes).toBe(120);            // absorbed nothing
@@ -351,8 +354,8 @@ describe('L7 — downstream impact, and three refusals to guess', () => {
 
   it('a fully absorbed delay stops propagating', () => {
     const out = downstreamImpact(60, [
-      { loadId: 'A', bufferMinutes: 90, hasAppointment: true, contribution: { minor: 10000, attestation: SHIPPER_CLAIMS } },
-      { loadId: 'B', bufferMinutes: 0, hasAppointment: true, contribution: { minor: 99999, attestation: SHIPPER_CLAIMS } },
+      { loadId: 'A', bufferMinutes: 90, hasAppointment: true, contribution: { minor: 10000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
+      { loadId: 'B', bufferMinutes: 0, hasAppointment: true, contribution: { minor: 99999, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
     ], 'CAD');
     expect(out.assessed.find(a => a.loadId === 'A')!.delayMinutes).toBe(0);
     expect(out.assessed.find(a => a.loadId === 'A')!.breachesAppointment).toBe(false);
@@ -376,5 +379,105 @@ describe('L7 — downstream impact, and three refusals to guess', () => {
     // A shipper stating what a missed appointment costs them is stating the
     // basis of a claim. Calling that disinterested would launder it.
     expect(a.interest).toBe('negotiating_position');
+  });
+});
+
+
+describe('the materiality gate reads the MEASURE, not just the number', () => {
+  const P = DEFAULT_EXCEPTION_POLICY;
+  const cand = (over: Partial<ExceptionCandidate>): ExceptionCandidate => ({
+    loadId: 'L-1', kind: 'margin_erosion',
+    evidence: [{ recordId: 'R', note: 'n', attestation: CARRIER_SAYS }],
+    materiality: { measure: 'money_minor', value: 15000, currency: 'CAD' },
+    actions: [{ actionId: 'A', label: 'rebill', authority: 'proposal' }],
+    leadMinutes: 10, detectedAt: NOW, ...over,
+  });
+
+  it('the intended comparison still fires', () => {
+    expect(evaluateException(cand({}), P, 0).status).toBe('fired');
+  });
+
+  it('150 KM does not clear a $100 floor', () => {
+    // Demonstrated against the gate this replaces: it fired, because nothing
+    // read the measure the candidate was already carrying.
+    const v = evaluateException(cand({ materiality: { measure: 'km', value: 15000 } }), P, 0);
+    expect(v.status).toBe('suppressed');
+    if (v.status === 'suppressed') {
+      expect(v.reason).toBe('incommensurable_materiality');
+      expect(v.explanation).toContain('not the same quantity');
+    }
+  });
+
+  it('$25 does not fail a 30-MINUTE floor — the error runs both ways', () => {
+    const v = evaluateException(cand({
+      kind: 'appointment_at_risk',
+      materiality: { measure: 'money_minor', value: 2500, currency: 'CAD' },
+    }), P, 0);
+    expect(v.status).toBe('suppressed');
+    if (v.status === 'suppressed') expect(v.reason).toBe('incommensurable_materiality');
+  });
+
+  it('same measure, different CURRENCY is refused rather than converted', () => {
+    const v = evaluateException(cand({
+      materiality: { measure: 'money_minor', value: 15000, currency: 'USD' },
+    }), P, 0);
+    expect(v.status).toBe('suppressed');
+    if (v.status === 'suppressed') {
+      expect(v.reason).toBe('incommensurable_materiality');
+      expect(v.explanation).toContain('rate and a date');
+    }
+  });
+
+  it('every declared kind has a floor, and every floor states its measure', () => {
+    for (const k of ALL_EXCEPTION_KINDS) {
+      const f = P.floors[k];
+      expect(f, `${k} has no floor`).toBeDefined();
+      expect(f.measure, `${k} floor has no measure`).toBeTruthy();
+      if (f.measure === 'money_minor') expect(f.currency, `${k} money floor has no currency`).toBeTruthy();
+    }
+  });
+});
+
+describe('a lead that was never measured is not a lead of zero', () => {
+  it('null renders as UNKNOWN, distinctly from zero', () => {
+    expect(renderLead(null)).toContain('UNKNOWN');
+    expect(renderLead(0)).toContain('no lead');
+    expect(renderLead(null)).not.toBe(renderLead(0));
+  });
+});
+
+describe('a total across currencies is refused, not summed', () => {
+  it('mixed contributions throw rather than producing a unitless number', () => {
+    // SELF-APPLICATION: found by running the incommensurability class over the
+    // module that had just been fixed for it. The notary refuses a
+    // cross-currency COMPARISON; this was performing a cross-currency SUM.
+    expect(() => downstreamImpact(120, [
+      { loadId: 'A', bufferMinutes: 0, hasAppointment: true,
+        contribution: { minor: 40000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
+      { loadId: 'B', bufferMinutes: 0, hasAppointment: true,
+        contribution: { minor: 30000, currency: 'USD', attestation: SHIPPER_CLAIMS } },
+    ], 'CAD')).toThrow(new RegExp(MIXED_CURRENCY));
+  });
+
+  it('and the refusal names the offending currency and what to do', () => {
+    try {
+      downstreamImpact(120, [
+        { loadId: 'B', bufferMinutes: 0, hasAppointment: true,
+          contribution: { minor: 30000, currency: 'USD', attestation: SHIPPER_CLAIMS } },
+      ], 'CAD');
+      throw new Error('should have thrown');
+    } catch (e) {
+      const m = (e as Error).message;
+      expect(m).toContain('USD');
+      expect(m).toContain('Restate them in CAD');
+      expect(m).toContain('per currency');
+    }
+  });
+
+  it('a single-currency total is unaffected', () => {
+    expect(downstreamImpact(120, [
+      { loadId: 'A', bufferMinutes: 0, hasAppointment: true,
+        contribution: { minor: 40000, currency: 'CAD', attestation: SHIPPER_CLAIMS } },
+    ], 'CAD').totalAtRiskMinor).toBe(40000);
   });
 });

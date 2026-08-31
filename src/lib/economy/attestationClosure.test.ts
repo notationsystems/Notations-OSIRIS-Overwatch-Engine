@@ -180,6 +180,8 @@ describe('every number-bearing type in the layer is accounted for', () => {
     UnresolvedIdentifier: 'how many times WE failed to resolve a string',
     McsVintageSpec: 'configuration: which report years to read',
     ConditionPredicate: 'configured tolerances — the rule, not a reading',
+    Materiality: 'the stake behind one exception; attested by the verdict that combines its evidence, exactly as ConcentrationShare is attested by its parent',
+    MaterialityFloor: 'a configured threshold and the measure it is denominated in — the rule that decides what interrupts an operator',
     ExceptionPolicy: 'a materiality floor and a per-load daily cap — the rule that decides what interrupts an operator, not a measurement of anything',
     PostingWindow: 'configured grace thresholds in seconds — policy about when a commitment counts, not a measurement of anything',
     VerdictContext: 'postingOffsetSeconds is when WE published relative to an interval; the nested coverage is classified on its own',
@@ -237,6 +239,35 @@ describe('every number-bearing type in the layer is accounted for', () => {
     return [...found];
   };
 
+  /**
+   * Interfaces that CARRY an attestation, so a field typed as one is attested.
+   *
+   * The `Milli` lesson one level up. That fix taught the scanner to follow a
+   * numeric type ALIAS; this is the same narrowing on the other side of the
+   * check — `DownstreamLoad.contribution: Money | null` where `Money` holds the
+   * attestation. The body text has no 'attestation' in it, so a type whose
+   * evidence class travels inside a named sub-type went unaccounted the moment
+   * the sub-type was extracted.
+   *
+   * One level of indirection is enough for the shapes this layer actually uses,
+   * and a deeper chain would still be caught — as unaccounted, which is the
+   * safe direction.
+   */
+  const attestationCarrierTypes = (): string[] => {
+    const carriers: string[] = [];
+    for (const file of readdirSync(DIR)) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
+      const src = readFileSync(join(DIR, file), 'utf8');
+      for (const m of src.matchAll(/export interface (\w+)\s*(?:<[^>]*>)?\s*\{/g)) {
+        const start = m.index! + m[0].length;
+        const end = src.indexOf('\n}', start);
+        const body = src.slice(start, end < 0 ? src.length : end);
+        if (ATTESTATION_CARRIERS.some(c => body.includes(c))) carriers.push(m[1]);
+      }
+    }
+    return carriers;
+  };
+
   const numberBearing = (): { file: string; name: string; body: string }[] => {
     const out: { file: string; name: string; body: string }[] = [];
     const numeric = new RegExp(
@@ -254,6 +285,16 @@ describe('every number-bearing type in the layer is accounted for', () => {
     }
     return out;
   };
+
+  it('the scan follows an attestation carried inside a named sub-type', () => {
+    const carriers = attestationCarrierTypes();
+    expect(carriers, 'Money holds the attestation for a contribution').toContain('Money');
+    // The type that went unaccounted when the sub-type was extracted.
+    const dl = numberBearing().find(t => t.name === 'DownstreamLoad');
+    expect(dl, 'DownstreamLoad still carries a bare number').toBeDefined();
+    expect(dl!.body).not.toContain('attestation');   // not in its own body...
+    expect(dl!.body).toContain('Money');             // ...but reachable through Money
+  });
 
   it('the scan follows numeric type aliases, not just the literal `number`', () => {
     const aliases = numericAliases();
@@ -273,9 +314,13 @@ describe('every number-bearing type in the layer is accounted for', () => {
   });
 
   it('no number-bearing type is unaccounted for', () => {
+    const carriers = attestationCarrierTypes();
+    const carriesIndirectly = (body: string) =>
+      carriers.some(t => new RegExp(`:\\s*(?:readonly\\s+)?${t}\\b`).test(body));
     const unaccounted = numberBearing()
       .filter(({ name, body }) =>
         !ATTESTATION_CARRIERS.some(c => body.includes(c)) &&
+        !carriesIndirectly(body) &&
         !(name in NOT_A_WORLD_CLAIM) &&
         !(name in OWED))
       .map(({ file, name }) => `${file}: ${name}`);

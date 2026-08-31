@@ -174,19 +174,71 @@ export type StateReading =
  * everything is exactly as informative as one firing constantly and neither is
  * visible if suppression is a silent `return`.
  */
+/**
+ * WHAT A MATERIALITY NUMBER MEASURES.
+ *
+ * Carried because a threshold and a value must be denominated in the same
+ * thing before `<` means anything. A gate comparing 150 km against a $100
+ * floor fires; a gate comparing $25 against a 30-MINUTE floor suppresses.
+ * Both are defensible-looking and both are wrong, which is the incommensurability
+ * profile: the number is plausible, so it ships and gets quoted.
+ */
+export type MaterialityMeasure = 'minutes' | 'money_minor' | 'hours_dwell' | 'km';
+
+export interface Materiality {
+  measure: MaterialityMeasure;
+  value: number;
+  /** Required for `money_minor`, refused for anything else. */
+  currency?: string;
+}
+
+/** A threshold is a measure AND a number. A bare number cannot be compared. */
+export interface MaterialityFloor {
+  measure: MaterialityMeasure;
+  value: number;
+  currency?: string;
+}
+
+export type ExceptionKind =
+  | 'appointment_at_risk'
+  | 'silence_exceeds_cadence'
+  | 'dwell_exceeds_free_time'
+  | 'route_deviation'
+  | 'margin_erosion'
+  | 'carrier_unreachable'
+  | 'documents_missing';
+
+export const ALL_EXCEPTION_KINDS: readonly ExceptionKind[] = [
+  'appointment_at_risk', 'silence_exceeds_cadence', 'dwell_exceeds_free_time',
+  'route_deviation', 'margin_erosion', 'carrier_unreachable', 'documents_missing',
+];
+
+/**
+ * A proposed action. `authority: 'proposal'` is the whole field: an agent may
+ * generate one, and only a person or a gate disposes. There is no other value.
+ */
+export interface ExceptionAction {
+  actionId: string;
+  label: string;
+  authority: 'proposal';
+}
+
 export type SuppressionReason =
   | 'no_evidence'
   | 'below_materiality'
   | 'no_action_available'
-  | 'rate_limited';
+  | 'rate_limited'
+  /** The value and the floor are not denominated in the same thing. */
+  | 'incommensurable_materiality';
 
 export const ALL_SUPPRESSION_REASONS: readonly SuppressionReason[] = [
   'no_evidence', 'below_materiality', 'no_action_available', 'rate_limited',
+  'incommensurable_materiality',
 ];
 
 export interface ExceptionCandidate {
   loadId: string;
-  kind: string;
+  kind: ExceptionKind;
   /**
    * Records supporting it. An exception citing none is an assertion.
    *
@@ -197,41 +249,58 @@ export interface ExceptionCandidate {
    * gate that flattens them decides materiality on a class it invented.
    */
   evidence: readonly { recordId: string; note: string; attestation: Attestation }[];
-  /** What is at stake, in integer MINOR units (cents). Null = not established. */
-  materialityMinor: number | null;
-  currency: string;
+  /** What is at stake, WITH its measure. Null = not established. */
+  materiality: Materiality | null;
   /** What an operator could actually do. Empty means this is a notification. */
-  actions: readonly string[];
+  actions: readonly ExceptionAction[];
   /**
    * Minutes ahead of other reporting. NEGATIVE means behind, and that is stated
    * rather than hidden — it is the number that decides whether a copilot is
    * worth building.
+   *
+   * NULL is distinct from zero: an unknown lead is not a simultaneous one.
    */
-  leadMinutes: number;
+  leadMinutes: number | null;
   detectedAt: ISODateTime;
 }
 
 export interface ExceptionPolicy {
   policyId: string;
-  materialityFloorMinor: number;
-  currency: string;
+  /** Per KIND, and each floor states its own measure. */
+  floors: Readonly<Record<ExceptionKind, MaterialityFloor>>;
+  requireAction: boolean;
   /** Per-load daily cap. Past it the load needs a human, not more alerts. */
   maxPerLoadPerDay: number;
 }
+
+export const DEFAULT_EXCEPTION_POLICY: ExceptionPolicy = Object.freeze({
+  policyId: 'payload_exception_default@1.0.0',
+  floors: Object.freeze({
+    appointment_at_risk: { measure: 'minutes', value: 30 },
+    silence_exceeds_cadence: { measure: 'minutes', value: 120 },
+    dwell_exceeds_free_time: { measure: 'hours_dwell', value: 1 },
+    route_deviation: { measure: 'km', value: 50 },
+    margin_erosion: { measure: 'money_minor', value: 10000, currency: 'CAD' },
+    carrier_unreachable: { measure: 'minutes', value: 60 },
+    documents_missing: { measure: 'minutes', value: 240 },
+  }),
+  requireAction: true,
+  maxPerLoadPerDay: 6,
+}) as ExceptionPolicy;
 
 export type ExceptionVerdict =
   | {
       status: 'fired';
       loadId: string;
-      kind: string;
+      kind: ExceptionKind;
       attestation: Attestation;
-      leadMinutes: number;
+      leadMinutes: number | null;
       renderedClaim: string;
     }
   | {
       status: 'suppressed';
       loadId: string;
-      kind: string;
+      kind: ExceptionKind;
       reason: SuppressionReason;
       explanation: string;
     };
@@ -239,6 +308,22 @@ export type ExceptionVerdict =
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. Downstream impact — the computation the dispatcher has not done
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Money, INSEPARABLE from its currency and its evidence class.
+ *
+ * Found by self-application (§6 of the debug protocol) immediately after
+ * diagnosing the same class in the exception gate: `contribution` was
+ * `{ minor, attestation }` with the currency held once on the AGGREGATE, so a
+ * CAD figure and a USD figure summed into one integer and the result was
+ * stamped with a single currency. The notary refuses a cross-currency
+ * comparison; this summed across one.
+ */
+export interface Money {
+  minor: number;
+  currency: string;
+  attestation: Attestation;
+}
 
 export interface DownstreamLoad {
   loadId: string;
@@ -252,7 +337,7 @@ export interface DownstreamLoad {
    * unknown cost — there is no way to supply a number without saying where it
    * came from.
    */
-  contribution: { minor: number; attestation: Attestation } | null;
+  contribution: Money | null;
 }
 
 /** Why a load's dollar risk could not be assessed. Never silently zero. */

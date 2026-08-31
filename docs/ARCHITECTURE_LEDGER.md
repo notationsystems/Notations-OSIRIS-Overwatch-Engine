@@ -4278,3 +4278,101 @@ reading `'not bypassed'`. Built here with the message reading *"changed
 deliberately — not bypassed"* and the assertion checking that exact substring,
 plus `'changed deliberately'`, so the refusal's two halves are both pinned
 rather than one being assumed from the other.
+
+---
+
+## Phase 60 — the debug protocol, and the gate that never read the measure
+
+The protocol landed as `docs/DEBUG_PROTOCOL.md`, and the lifecycle v2 was
+reconciled under it. The protocol found its first defect in the same turn it
+arrived, which is the only real test of one.
+
+### §1 — the materiality gate compared quantities that are not comparable
+
+The gate as supplied:
+
+```ts
+materialityThresholds: { appointment_at_risk: 30 /* MINUTES */,
+                         margin_erosion:     100 /* DOLLARS */ }
+
+const threshold = policy.materialityThresholds[candidate.kind];
+if (candidate.materiality.value < threshold) suppress
+```
+
+The candidate CARRIED its measure — `'minutes_late' | 'dollars' | 'hours_dwell'
+| 'km_deviation'` — and the gate never read it. It also carried its own
+`threshold`, never read either. Demonstrated:
+
+```
+margin_erosion,      measure=km,       value=150  FIRES      ← 150 km clears a $100 floor
+appointment_at_risk, measure=dollars,  value=25   suppressed ← $25 fails a 30-MINUTE floor
+```
+
+Both are defensible-looking, both wrong, and the error runs in **both
+directions** — which is the incommensurability profile exactly. §1's first axis
+is Basis, and the two sides differed on it.
+
+A floor is now a `MaterialityFloor` — a measure AND a number — the gate refuses
+a mismatch with `incommensurable_materiality`, and a money floor additionally
+refuses a currency mismatch rather than converting at an unstated rate.
+
+### §6 — self-application found the same class in my own code, one file over
+
+Running the class over the instrument that diagnosed it, immediately:
+
+```ts
+totalAtRiskMinor = assessed.reduce((n, a) => n + (a.atRiskMinor ?? 0), 0)
+// contribution: { minor, attestation }   ← no currency
+// DownstreamImpact.currency               ← one field, on the aggregate
+```
+
+A CAD contribution and a USD contribution summed into one integer, and the
+result was stamped with whichever currency the caller passed. The notary refuses
+a cross-currency COMPARISON; this performed a cross-currency SUM, which is the
+same failure with an extra step. `Money` now carries `{ minor, currency,
+attestation }` and the total throws `MIXED_CURRENCY` naming the offending
+currency and both remedies.
+
+§6 says it usually finds something. It found something inside ten minutes of
+the section being written down.
+
+### The `Milli` lesson, on the other side of the check
+
+Extracting `Money` made `DownstreamLoad` UNACCOUNTED to the attestation scanner:
+the attestation now lives inside a named sub-type, and the scanner reads body
+text. Phase 55 taught it to follow a numeric type ALIAS; this is the same
+narrowing on the carrier side. It now derives which interfaces carry an
+attestation and treats a field typed as one as attested — so the class is
+closed, not the instance.
+
+### What was taken from the revision, and what was defended
+
+Taken: `foldTransitions` with supersession applied by dropping rather than
+editing; `validateChain` returning the first illegal hop instead of throwing
+mid-fold; **`readState` filtering transitions to `<= asOf`**, which mine did not
+— it would have read a state using transitions from the future; staleness as an
+injected policy rather than a module constant; per-kind exception thresholds;
+`ExceptionAction.authority: 'proposal'` with no other value; and a nullable
+lead, because an unmeasured lead is not a lead of zero.
+
+Defended: `bufferBasis: 'known' | 'assumed_zero'`, because the revision's
+comment said "unknown buffer is NOT zero buffer" while its arithmetic treated it
+as exactly that and recorded nothing; `unassessed` for a load with no
+appointment, which the revision gave `contributionAtRisk: 0`; carried rather
+than manufactured attestation; and conservation across `assessed` +
+`unassessed`.
+
+### Self-corrections this phase
+
+Two. A stale `kind: 'origin_delay'` assertion survived the migration to the
+enumerated `ExceptionKind` and failed on first run. And the archive finding
+below, which I caused and did not anticipate.
+
+### Not part of the merge: the suite writes archive vintages
+
+Running the test suite performed live Comtrade fetches and wrote three new
+capture files under `data-archive/comtrade/2026-08-31/`, which the S-2 manifest
+guard correctly flagged as unindexed. That is a property of the live ladder
+under test, not of this change, and it means **a test run mutates the archive**.
+Recorded here and handled as its own item rather than folded into this commit —
+§8: one cycle, one item.

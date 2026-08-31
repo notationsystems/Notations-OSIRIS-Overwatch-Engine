@@ -5,11 +5,13 @@
 import type {
   LoadState, Transition, StateReading, ExceptionCandidate, ExceptionPolicy,
   ExceptionVerdict, DownstreamLoad, DownstreamImpact, LoadImpact, UnassessedReason,
+  Materiality, MaterialityFloor,
 } from './lifecycle.types';
 import {
   TRANSITIONS, TERMINAL_STATES, STATE_CADENCE_SECONDS, IllegalTransition,
+  DEFAULT_EXCEPTION_POLICY,
 } from './lifecycle.types';
-import { attestationOf, combineAttestations, type Attestation } from './attestation';
+import { combineAttestations, type Attestation } from './attestation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Transitions
@@ -130,16 +132,46 @@ export function readState(transitions: readonly Transition[], now: string): Stat
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** How the lead reads, including when it is negative. */
-export function renderLead(leadMinutes: number): string {
+export function renderLead(leadMinutes: number | null): string {
+  // NULL IS NOT ZERO. An unknown lead is not a simultaneous one, and reporting
+  // it as "no lead" would claim a measurement nobody took.
+  if (leadMinutes === null) return 'lead over other reporting UNKNOWN — not measured';
   if (leadMinutes > 0) return `${leadMinutes} min AHEAD of other reporting`;
   if (leadMinutes === 0) return 'SIMULTANEOUS with other reporting — no lead';
   return `${Math.abs(leadMinutes)} min BEHIND other reporting — the operator likely already knows`;
 }
 
+/**
+ * Are these two quantities comparable at all?
+ *
+ * The gate that preceded this compared `materiality.value` against a per-kind
+ * threshold WITHOUT reading either side's measure. Demonstrated:
+ *
+ *   margin_erosion, measure=km,      value=150  FIRES  — 150 km clears a $100 floor
+ *   appointment_at_risk, measure=$,  value=25   suppressed — $25 fails a 30-MIN floor
+ *
+ * Both outcomes are defensible-looking and both are wrong, which is the
+ * incommensurability profile exactly: a plausible number ships and gets quoted.
+ * The candidate even CARRIED its measure; nothing read it.
+ */
+function commensurable(m: Materiality, floor: MaterialityFloor): string | null {
+  if (m.measure !== floor.measure) {
+    return `materiality is in ${m.measure}, the floor for this kind is in ${floor.measure}. ` +
+      'These are not the same quantity and comparing them produces a defensible-looking ' +
+      'verdict that is false in either direction.';
+  }
+  if (m.measure === 'money_minor' && m.currency !== floor.currency) {
+    return `materiality is ${m.currency}, the floor is ${floor.currency}. Comparing them ` +
+      'needs a rate and a date this gate does not have, and converting silently is the ' +
+      'commensurability failure with money attached.';
+  }
+  return null;
+}
+
 export function evaluateException(
   c: ExceptionCandidate,
-  policy: ExceptionPolicy,
-  firedTodayForLoad: number,
+  policy: ExceptionPolicy = DEFAULT_EXCEPTION_POLICY,
+  firedTodayForLoad = 0,
 ): ExceptionVerdict {
   const base = { loadId: c.loadId, kind: c.kind };
 
@@ -162,19 +194,32 @@ export function evaluateException(
     };
   }
 
-  if (c.materialityMinor === null || c.materialityMinor < policy.materialityFloorMinor) {
+  const floor = policy.floors[c.kind];
+  if (c.materiality === null) {
     return {
       ...base, status: 'suppressed', reason: 'below_materiality',
-      explanation: c.materialityMinor === null
-        ? 'What is at stake here has not been established, so it cannot clear the materiality ' +
-          'floor. Unknown is not above the floor, and it is not below it either — it is not a ' +
-          'basis for interrupting an operator.'
-        : `${c.materialityMinor} ${policy.currency} minor units is below the ` +
-          `${policy.materialityFloorMinor} floor. Real, and not worth interrupting an operator for.`,
+      explanation:
+        'What is at stake here has not been established, so it cannot clear the materiality ' +
+        'floor. Unknown is not above the floor, and it is not below it either — it is not a ' +
+        'basis for interrupting an operator.',
     };
   }
 
-  if (c.actions.length === 0) {
+  const mismatch = commensurable(c.materiality, floor);
+  if (mismatch !== null) {
+    return { ...base, status: 'suppressed', reason: 'incommensurable_materiality', explanation: mismatch };
+  }
+
+  if (c.materiality.value < floor.value) {
+    return {
+      ...base, status: 'suppressed', reason: 'below_materiality',
+      explanation:
+        `${c.materiality.value} ${c.materiality.measure} is below the ${floor.value} ` +
+        `${floor.measure} floor for ${c.kind}. Real, and not worth interrupting an operator for.`,
+    };
+  }
+
+  if (policy.requireAction && c.actions.length === 0) {
     return {
       ...base, status: 'suppressed', reason: 'no_action_available',
       explanation:
@@ -195,9 +240,11 @@ export function evaluateException(
     attestation,
     leadMinutes: c.leadMinutes,
     renderedClaim:
-      `${c.kind} on ${c.loadId}: ${c.evidence.length} supporting record(s), ` +
-      `${c.materialityMinor} ${policy.currency} minor units at stake, ` +
-      `${c.actions.length} action(s) available. ${renderLead(c.leadMinutes)}.`,
+      `${c.kind.replace(/_/g, ' ')} on ${c.loadId}: ${c.materiality.value} ` +
+      `${c.materiality.measure}${c.materiality.currency ? ` ${c.materiality.currency}` : ''} ` +
+      `against a ${floor.value} ${floor.measure} floor, ` +
+      `${c.actions.length} action(s) available (proposals only). ` +
+      `${renderLead(c.leadMinutes)}. Based on ${c.evidence.length} record(s).`,
   };
 }
 
@@ -222,11 +269,31 @@ export function evaluateException(
  * A fully absorbed delay stops propagating: once the chain reaches zero the
  * loads behind it are genuinely unaffected, and saying so is not a refusal.
  */
+export const MIXED_CURRENCY = 'MIXED_CURRENCY';
+
 export function downstreamImpact(
   originDelayMinutes: number,
   loads: readonly DownstreamLoad[],
   currency: string,
 ): DownstreamImpact {
+  // FOUND BY SELF-APPLICATION, immediately after diagnosing the same class in
+  // the gate above. `contribution` carried no currency and the aggregate held
+  // one, so a CAD figure and a USD figure summed into a single integer that was
+  // then stamped with whichever currency the caller passed. The notary refuses
+  // a cross-currency COMPARISON; this quietly performed a cross-currency SUM,
+  // which is the same failure with an extra step.
+  const foreign = loads
+    .map(l => l.contribution)
+    .filter((m): m is NonNullable<typeof m> => m !== null)
+    .filter(m => m.currency !== currency);
+  if (foreign.length > 0) {
+    throw new Error(
+      `${MIXED_CURRENCY}: ${foreign.length} contribution(s) in ` +
+      `${[...new Set(foreign.map(f => f.currency))].join(', ')} cannot be summed into a ` +
+      `${currency} total. Restate them in ${currency}, or compute a total per currency. ` +
+      'A sum across currencies is a number with no unit wearing the label of one.',
+    );
+  }
   const assessed: LoadImpact[] = [];
   const unassessed: DownstreamImpact['unassessed'] = [];
   const contributions: Attestation[] = [];
