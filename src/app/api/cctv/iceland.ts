@@ -55,7 +55,7 @@ export async function fetchIcelandCameras(): Promise<CctvCamera[]> {
     }
 
     return cameras;
-  } catch (e) {
+  } catch {
     // Silent fallback — don't crash the aggregator
     return [];
   }

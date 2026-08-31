@@ -23,7 +23,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { EconomyState, Observation } from './types';
+import type { EconomyState } from './types';
 import { knownAtOf, strongestAttestingClass, structuralClassProfile, type AttestationKind } from './analytics';
 
 export interface CorpusRow {

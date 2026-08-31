@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { stealthFetch } from '@/lib/stealthFetch';
 import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
@@ -118,32 +117,6 @@ const KNOWN_CONFLICTS = [
     bounds: { minLat: 3, maxLat: 15, minLng: 33, maxLng: 48 } },
 ];
 
-// Parse GDELT DOC pointdata CSV response into events
-function parsePointDataCSV(csv: string): ConflictEvent[] {
-  const events: ConflictEvent[] = [];
-  const lines = csv.trim().split('\n');
-  // CSV format: lat\tlng\tname\turl (tab-separated)
-  for (const line of lines) {
-    const parts = line.split('\t');
-    if (parts.length < 3) continue;
-    const lat = parseFloat(parts[0]);
-    const lng = parseFloat(parts[1]);
-    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
-    
-    const name = (parts[2] || 'Conflict Event').replace(/<[^>]*>/g, '').trim();
-    const url = parts[3] || '';
-    
-    events.push({
-      id: `gdelt-pt-${events.length}`,
-      lat, lng,
-      title: name.substring(0, 150),
-      url,
-      type: 'conflict',
-      timestamp: new Date().toISOString(),
-    });
-  }
-  return events;
-}
 
 async function fetchAllLiveConflictData(): Promise<{ events: ConflictEvent[]; eventsByRegion: Record<string, number> }> {
   const allEvents: ConflictEvent[] = [];
@@ -156,30 +129,11 @@ async function fetchAllLiveConflictData(): Promise<{ events: ConflictEvent[]; ev
   ];
 
   try {
-    const https = require('https');
-    const http = require('http');
-
-    const fetchRSS = (url: string): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const client = url.startsWith('https') ? https : http;
-        const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, family: 4 }, (res: any) => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-             return fetchRSS(url.startsWith('https') && res.headers.location.startsWith('/') ? `https://${new URL(url).host}${res.headers.location}` : res.headers.location).then(resolve).catch(reject);
-          }
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            return reject(new Error(`Status: ${res.statusCode}`));
-          }
-          let data = '';
-          res.on('data', (chunk: string) => data += chunk);
-          res.on('end', () => resolve(data));
-        });
-        req.on('error', reject);
-        req.setTimeout(5000, () => {
-          req.destroy();
-          reject(new Error('Timeout'));
-        });
-      });
-    };
+    // A 30-line hand-rolled HTTP client (`fetchRSS`, with redirect following and
+    // its own timeout) stood here, pulled in through `require('https')`. Its ONLY
+    // caller was itself — the recursive redirect branch — and the feed fetch
+    // below uses `fetch`. Removed: two CommonJS requires and a function nothing
+    // outside it invoked.
 
     const feedPromises = RSS_FEEDS.map(async (url) => {
       try {

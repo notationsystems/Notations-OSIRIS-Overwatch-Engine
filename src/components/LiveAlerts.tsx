@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronDown, ChevronUp, MapPin, ExternalLink, AlertTriangle,
+  ChevronDown, ChevronUp, MapPin, AlertTriangle,
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
 import AiOverview from './AiOverview';
+import { useHydrated } from '@/lib/ui/clientOnly';
 
 interface LiveAlertsProps {
   data: any;
@@ -111,9 +112,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
     }
   };
 
-  // Ensure portal only renders on client
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useHydrated();
 
   const content = (
     <motion.div

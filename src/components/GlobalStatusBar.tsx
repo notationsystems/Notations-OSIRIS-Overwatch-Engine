@@ -134,7 +134,6 @@ export default function GlobalStatusBar() {
   // docs links must stay reachable when CoinGecko/USGS are rate-limited or down.
   const hasTicker = crypto.length > 0 || quakes.length > 0;
 
-  const solPrice = crypto.find(c => c.symbol === 'SOL');
 
   return (
     <motion.div

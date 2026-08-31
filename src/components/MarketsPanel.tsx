@@ -10,6 +10,7 @@ import {
   DollarSign, ArrowUpDown, AlertTriangle,
 } from 'lucide-react';
 import AiOverview from './AiOverview';
+import { useHydrated } from '@/lib/ui/clientOnly';
 
 // Canvas charting has no business in the server bundle, and it only mounts
 // once a ticker is actually opened.
@@ -135,9 +136,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
   const markets = useMemo(() => data.markets || {}, [data.markets]);
   const age = useFeedAge(markets.timestamp);
 
-  // Ensure portal only renders on client
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useHydrated();
 
   // Fullscreen covers the map, so Escape has to get you out of it — closing
   // the chart first, since that is the nearer thing to dismiss.

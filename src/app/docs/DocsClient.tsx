@@ -6,6 +6,7 @@ import { API_GROUPS, ENDPOINT_COUNT, endpointId } from './apiCatalog';
 import { Callout, Code, CodeBlock, Pre, Section } from './docsPrimitives';
 import EndpointCard from './EndpointCard';
 import CommandPalette, { buildPaletteItems } from './CommandPalette';
+import { useOrigin } from '@/lib/ui/clientOnly';
 
 const GUIDE_SECTIONS = [
   { id: 'overview', title: 'Overview' },
@@ -22,20 +23,18 @@ const API_SECTIONS = [
 ];
 
 const ALL_SECTIONS = [...GUIDE_SECTIONS, ...API_SECTIONS];
-const FALLBACK_ORIGIN = 'https://osirisai.live';
 
 export default function DocsClient() {
   const [active, setActive] = useState('overview');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [origin, setOrigin] = useState(FALLBACK_ORIGIN);
   const mainRef = useRef<HTMLElement>(null);
 
   const paletteItems = useMemo(() => buildPaletteItems(ALL_SECTIONS), []);
 
   /* Snippets should reference the instance the reader is actually on. */
-  useEffect(() => setOrigin(window.location.origin), []);
+  const origin = useOrigin();
 
   /* Belt-and-braces scroll unlock: globals.css handles this via :has(),
      but release the lock imperatively for engines without :has() support. */
@@ -135,7 +134,7 @@ export default function DocsClient() {
         }}
       />
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} items={paletteItems} />}
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-[300] border-b border-white/[0.06] bg-[var(--bg-void)]/85 backdrop-blur-xl">

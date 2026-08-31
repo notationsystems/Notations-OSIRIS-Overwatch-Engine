@@ -5071,3 +5071,166 @@ confidence with spread. Split into two pins that hold one variable fixed each.
 ### Measured after
 
 - **83 test files, 1216 passed, 6 skipped.** 24 pricing pins.
+
+## Phase 68 — the audit, round 3: the React layer, measured
+
+Rounds 1 and 2 worked the library and the route surface. Round 3 works the
+components, which had never been read with the same instrument. The lint
+census is the measurement, and it splits into things that can be *wrong*
+and things that are merely *untyped*:
+
+| rule | before | after | class |
+|---|---|---|---|
+| `react-hooks/set-state-in-effect` | 10 | 0 | correctness |
+| `react-hooks/refs` | 1 | 0 | correctness |
+| `@typescript-eslint/no-unused-expressions` | 1 | 0 | correctness |
+| `@typescript-eslint/no-unused-vars` | 63 | 0 | dead weight |
+| `@typescript-eslint/no-explicit-any` | 316 | 312 | typing debt |
+| `react-hooks/exhaustive-deps` | 26 | 26 | not yet read |
+
+### `'use client'` was on line 2
+
+`PayloadMap.tsx` opened with an import, then `'use client';`. A directive
+prologue has to be the first statement in the module, so that string was
+not a directive at all — it was a bare expression, which is exactly what
+`no-unused-expressions` was reporting and what nobody had read. It worked
+only because the file's importer is itself a client component, so the
+subtree was client-rendered regardless. One import reordering away from
+mattering, and nothing would have failed. The repo-wide check for the same
+shape found no other instance.
+
+### Five effects that had a better form, and five that did not
+
+The rule fires on ten sites, and the honest answer differs per site. The
+split is not "silence the rule" or "obey the rule" — it is *which of these
+is a defect*:
+
+**Replaced, because a better idiom exists.** Three hydration guards
+(`useState(false)` + `useEffect(() => setMounted(true), [])`) became
+`useSyncExternalStore`, which is React's form for "a value with one
+snapshot on the server and another in the browser". They now live in
+`src/lib/ui/clientOnly.ts` as `useHydrated()` and `useOrigin()`, with the
+`subscribe` callback hoisted to a module constant — an inline
+`() => () => {}` is a fresh reference every render, so React tears down and
+re-subscribes every time.
+
+No test: the environment is `node`, the include glob is `*.test.ts`, and
+standing up jsdom and a React renderer to exercise four lines of hook is
+more apparatus than the thing it would guard. Recorded rather than
+silently skipped.
+
+**Two sites where the effect was hiding a real defect.**
+
+`CommandPalette` reset its cursor to 0 in an effect keyed on `query`. In
+the frame between the query changing and the effect running, the list has
+already re-ranked and the cursor still indexes the *previous* result set —
+so `results[cursor]` is `undefined`, and Enter pressed in that frame does
+nothing. The guard `if (results[cursor])` made it a silent no-op rather
+than a crash, which is worse: nothing reports it. Now adjusted during
+render (React's documented form for it), so the stale frame does not
+exist. The `open` reset went away entirely by mounting the palette only
+while open — which also deleted the `open` prop and the
+`if (!open) return null`.
+
+`CameraViewer` had three findings in one file, all closed by the same
+move:
+
+- Its `AnimatePresence` could never animate. `if (!camera) return null`
+  sat *above* it, so a closing viewer unmounted the presence container
+  along with its child. `exit={{ opacity: 0, scale: 0.95 }}` was
+  configured, read as working, and never ran.
+- Its uptime-style clock ticked at 1 Hz **while closed**. Hooks run before
+  the null return, so a component rendering nothing re-rendered every
+  second for the life of the session.
+- Switching cameras painted the previous camera's frame under the new
+  camera's coordinates for one render, because the reset lived in the
+  effect. On a surveillance panel that is a misattribution, not a
+  flicker — the panel asserts this image came from that place.
+
+Presence moved to the parent, keyed by `cameraKey()` in the tested
+`camera-feed` module: a different camera is now a different mount, so
+there is no previous frame to show, no clock while closed, and the exit
+animation plays. `camera` became non-null by construction.
+
+**Five kept, each with its reason written at the site.** URL and
+capability probing, `localStorage` restore, the tripwire sweep's append to
+an event log, and the progressive fetch ladder. These read external
+systems; writing state is what reading them *is*. The `localStorage` one
+is the sharpest: a lazy `useState` initialiser would run during the server
+render, where there is no storage, and the restored shapes would then
+differ from the empty server markup.
+
+The repo had exactly one `eslint-disable` before this. It now has six, and
+each names what makes the site legitimate rather than naming the rule.
+
+### `drawCbRef.current = …` during render
+
+`PayloadMap` refreshed its callback ref in the render body. Every read is
+inside a map event handler, which fires after commit, so the sync moved to
+an effect with no dependency array. A render React discards must not leave
+its callbacks behind in a ref.
+
+### Dead weight, with the interesting ones named
+
+63 unused bindings. Most were imports and `catch (e)` bindings (24 became
+optional-catch). The ones that were not cosmetic:
+
+- **`UptimeClock`** — a complete component with its own 1 Hz interval,
+  defined and never rendered. It had been *repaired* earlier in this same
+  session before anyone measured whether it was used.
+- **`/api/stats` fetched on every page load**, stored in `globalStats`,
+  and never read. One request per session for a value nothing displays.
+  The route stays: it is documented and catalogued for external callers.
+- **`demoMode`** — state with no setter, no URL parameter and no env
+  switch, so permanently `false`, threaded as a prop into `PayloadMap` to
+  gate a 48-line globe auto-spin that could never run. Its cleanup cleared
+  `window._globeSpinTimer`, a global **nothing in the repository sets**.
+  Deleted. What it did, so re-adding is cheap: 0.5°/s eastward, paused
+  while the user is dragging or zooming.
+- **`isFullscreen`** — a `fullscreenchange` listener existing only to
+  write state nothing reads. The `f` shortcut calls the DOM API directly
+  and is untouched.
+- **Six `setShowX` aliases** of `setPanel.*`, never called; `togglePanel`
+  is the real setter.
+- **`parsePointDataCSV`** — a 26-line GDELT CSV parser with no caller.
+- **`getRegionsForBounds(lat, lng, radius)`** — the `cctv` route read
+  `?radius=` (defaulting to 10, units unstated), passed it in, and the
+  function ignored it: selection is by fixed lat/lng boxes. A caller
+  asking for 10 and a caller asking for 5000 got identical results. The
+  parameter is gone rather than accepted and ignored; narrowing by
+  distance would mean filtering the returned cameras, which does not
+  exist. Latent rather than live — `cctv` is `general-purpose`, retired by
+  A-1 — which is why the fix is to make the code honest before any
+  re-enablement ships the lie.
+
+### A renderer served on a live route with no pin
+
+`renderTableMarkdown` and `renderGridMarkdown` are the two halves of
+`/api/economy/table?format=md`. The grid renderer was pinned. The table
+renderer — the one that carries the refusals — was imported by the test
+and never called. Now pinned.
+
+The first version of that pin asserted "no empty cell anywhere in the
+table body" and failed correctly: the `flags` column renders empty when a
+row has no flags, and that *is* the honest rendering. The assertion
+grepped a shape and claimed a property. Replaced with a per-column claim
+over the columns where a blank would read as a quantity or a settled fact
+— and the corrected version immediately caught an off-by-one in my own
+column indices before it could pass vacuously.
+
+### Measured after
+
+**85 test files, 1263 passed, 6 skipped. Typecheck clean. Production
+build compiles.** 28 files changed, 708 insertions, 636 deletions.
+
+### Not closed in this round
+
+- **312 `no-explicit-any`**, 134 of them in `PayloadMap.tsx`.
+- **26 `exhaustive-deps`** — not yet read one by one, and that rule has a
+  high false-positive rate against deliberate mount-once effects, so a
+  census is not a defect count.
+- **A second stale brand**, found while sweeping: 133 references to *Sea
+  Dog Terminal*, untouched by the Phase 47 rename. Phase 47 swept
+  OSIRIS→Payload and listed five deliberate exclusions; Sea Dog is not
+  among them, because the sweep did not know it existed. Taken as its own
+  commit, on Phase 47's own principle that a rename lands alone.

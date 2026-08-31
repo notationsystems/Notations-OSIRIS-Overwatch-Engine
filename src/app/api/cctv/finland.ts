@@ -42,7 +42,7 @@ export async function fetchFinlandCameras(): Promise<any[]> {
     }
 
     return cams;
-  } catch (e) {
+  } catch {
     return [];
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from './camera-feed';
+import { cameraKey, isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from './camera-feed';
 
 const SKY = 'https://www.skylinewebcams.com/en/webcam/japan/gunma/yubatake/yubatake.html';
 const WATCH = 'https://www.youtube.com/watch?v=UemFRPrl1hk';
@@ -167,5 +167,40 @@ describe('liveFeedAtSource', () => {
     expect(liveFeedAtSource(undefined)).toBeNull();
     expect(liveFeedAtSource({})).toBeNull();
     expect(liveFeedAtSource({ feed_url: JPG })).toBeNull();
+  });
+});
+
+describe('cameraKey', () => {
+  const A = { lat: 42.7, lng: 25.48, feed_url: 'https://x/a.jpg' };
+
+  it('is stable across renders of the same camera', () => {
+    expect(cameraKey(A)).toBe(cameraKey({ ...A }));
+  });
+
+  it('separates two feeds published from one mast', () => {
+    // Same coordinates is not the same camera. If this collapsed, the viewer
+    // would keep the first feed's image while switching to the second.
+    const B = { lat: 42.7, lng: 25.48, feed_url: 'https://x/b.jpg' };
+    expect(cameraKey(A)).not.toBe(cameraKey(B));
+  });
+
+  it('separates one feed url appearing at two places', () => {
+    const moved = { ...A, lat: 43.2 };
+    expect(cameraKey(A)).not.toBe(cameraKey(moved));
+  });
+
+  it('falls back through the url fields the viewer actually plays', () => {
+    const stream = { lat: 1, lng: 2, stream_url: 'https://x/s.m3u8' };
+    const external = { lat: 1, lng: 2, external_url: SKY };
+    expect(cameraKey(stream)).not.toBe(cameraKey(external));
+    expect(cameraKey({ lat: 1, lng: 2 })).toBe('1,2|');
+  });
+
+  it('gives the absent camera its own key rather than a collision', () => {
+    // 'none' must not be reachable from any real camera, or closing the
+    // viewer and opening a camera would look like the same mount.
+    expect(cameraKey(null)).toBe('none');
+    expect(cameraKey(undefined)).toBe('none');
+    expect(cameraKey({})).not.toBe('none');
   });
 });

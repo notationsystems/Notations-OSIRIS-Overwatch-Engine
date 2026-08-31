@@ -127,7 +127,7 @@ export async function GET() {
         return facility;
       });
     }
-  } catch (e) {
+  } catch {
     // Fallback to static list if API fails
   }
 

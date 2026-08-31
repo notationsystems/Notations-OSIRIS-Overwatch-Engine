@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, ExternalLink, RefreshCw, MapPin, Camera, CameraOff, Maximize2, PlayCircle } from 'lucide-react';
 import Hls from 'hls.js';
 import { isHostedOffPlatform, liveFeedAtSource, localEmbed, needsResolution, offPlatformView } from '@/lib/camera-feed';
 
 interface CameraViewerProps {
-  camera: any | null;
+  /** Non-null by construction: the parent mounts this only when a camera is selected. */
+  camera: any;
   onClose: () => void;
   onLocate?: (lat: number, lng: number) => void;
 }
@@ -28,7 +29,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     return () => clearInterval(iv);
   }, []);
 
-  const camId = camera ? `CAM-${Math.abs(camera.lat * 10000).toFixed(0).padStart(4, '0').slice(-4)}-${Math.abs(camera.lng * 10000).toFixed(0).padStart(4, '0').slice(-4)}` : 'UNKNOWN';
+  const camId = `CAM-${Math.abs(camera.lat * 10000).toFixed(0).padStart(4, '0').slice(-4)}-${Math.abs(camera.lng * 10000).toFixed(0).padStart(4, '0').slice(-4)}`;
 
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -83,8 +84,14 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
   const view = offPlatformView({ hostedOffPlatform, resolving, resolvedEmbed, offline });
   const externalOnly = view !== 'inline';
 
+  // Writes state because it reports the status of an external system it is
+  // driving — HLS attach, JPG fetch — and must re-run on retry without a
+  // remount, so `retryCount` is a dependency. The reset at the top is safe
+  // against showing one camera's frame under another's identity because the
+  // parent keys this component on the camera: a different camera is a
+  // different mount, not a re-render of this one.
   useEffect(() => {
-    if (!camera) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(false);
     setImageUrl(null);
@@ -146,7 +153,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
 
   // Auto-refresh for JPGs
   useEffect(() => {
-    if (streamType !== 'jpg' || (!camera?.feed_url && !camera?.stream_url)) return;
+    if (streamType !== 'jpg' || (!camera.feed_url && !camera.stream_url)) return;
     const targetUrl = camera.feed_url || camera.stream_url;
     if (!targetUrl) return;
 
@@ -157,10 +164,7 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
     return () => clearInterval(iv);
   }, [camera, streamType]);
 
-  if (!camera) return null;
-
   return (
-    <AnimatePresence>
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -412,6 +416,5 @@ export default function CameraViewer({ camera, onClose, onLocate }: CameraViewer
           </div>
         </div>
       </motion.div>
-    </AnimatePresence>
   );
 }

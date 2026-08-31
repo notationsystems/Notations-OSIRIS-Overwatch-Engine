@@ -166,7 +166,7 @@ export async function GET() {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ news: [], error: 'Failed to fetch intel' }, { status: 500 });
   }
 }

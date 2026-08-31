@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine, Mountain } from 'lucide-react';
+import { cameraKey } from '@/lib/camera-feed';
+import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Database, Network, Radio , PenLine, Mountain } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
 import SearchBar from '@/components/SearchBar';
@@ -62,20 +63,6 @@ function useIsMobile() {
   }, []);
   return isMobile;
 }
-const UptimeClock = () => {
-  const [uptime, setUptime] = useState('00:00:00');
-  const startTime = useRef(0);
-  if (startTime.current === 0) startTime.current = Date.now();
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const e = Math.floor((Date.now() - startTime.current) / 1000);
-      setUptime(`${String(Math.floor(e/3600)).padStart(2,'0')}:${String(Math.floor((e%3600)/60)).padStart(2,'0')}:${String(e%60).padStart(2,'0')}`);
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
-  return <span className="hidden lg:inline">UPTIME: <span className="text-[var(--gold-primary)]">{uptime}</span></span>;
-};
-
 const ZuluClock = () => {
   const [time, setTime] = useState('');
   useEffect(() => {
@@ -128,7 +115,6 @@ export default function Dashboard() {
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
-  const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -177,16 +163,10 @@ export default function Dashboard() {
   const showArcGIS = panels.arcgis;
   const showSpatial = panels.spatial;
 
-  const setShowLayers = setPanel.layers;
-  const setShowMarkets = setPanel.markets;
   const setShowEconomy = setPanel.economy;
   const setShowEconGraph = setPanel.econGraph;
-  const setShowAlerts = setPanel.alerts;
-  const setShowSpaceCam = setPanel.spaceCam;
-  const setShowDrawing = setPanel.drawing;
   const setShowDesktopSearch = setPanel.search;
   const setShowDirections = setPanel.directions;
-  const setShowArcGIS = setPanel.arcgis;
   const setShowSpatial = setPanel.spatial;
 
   const [econSelected, setEconSelected] = useState<string | null>(null);
@@ -289,12 +269,10 @@ export default function Dashboard() {
   }, [navSession]);
   const [arcgisLayers, setArcgisLayers] = useState<Array<{ id: string; title: string; url: string; geojson: any; color: string; visible: boolean; opacity: number }>>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number; bounds?: { west: number; south: number; east: number; north: number } } | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|null>(null);
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
-  const [demoMode, setDemoMode] = useState(false);
   const [payloadTheme, setPayloadTheme] = useState<'core'|'ghost'>('core');
 
   useEffect(() => {
@@ -302,7 +280,10 @@ export default function Dashboard() {
   }, [payloadTheme]);
 
   const isMobile = useIsMobile();
-  const startTime = useRef(Date.now());
+  // `const startTime = useRef(Date.now())` stood here, read by nothing. Its
+  // initialiser also ran Date.now() on EVERY render (the argument is evaluated
+  // each time even though only the first is kept), which is the impurity the
+  // linter flagged. Removed: unused, and impure while unused.
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
@@ -418,6 +399,10 @@ export default function Dashboard() {
   }, []);
 
   // On mount: geolocate by IP and fly to user's city (after splash/map init)
+  // Writes state from things only the browser knows — the query string the
+  // reader arrived on, and which credential-gated feeds this deployment has.
+  // Neither is derivable during render: the server renders the same HTML for
+  // every reader, so reading either one earlier would be a hydration mismatch.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -426,6 +411,7 @@ export default function Dashboard() {
     const layers = p.get('layers');
     if (layers) {
       const active = layers.split(',');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveLayers(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => { (next as any)[k] = active.includes(k); });
@@ -468,16 +454,6 @@ export default function Dashboard() {
     }, 1500);
   }, [activeLayers]);
 
-  // Global Stats Fetch
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(d => {
-        if (d.stats) setGlobalStats(d.stats);
-      })
-      .catch(console.error);
-  }, []);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -496,10 +472,8 @@ export default function Dashboard() {
         setShowDesktopSearch(true);
       }
     };
-    const fsHandler = () => setIsFullscreen(!!document.fullscreenElement);
     window.addEventListener('keydown', handler);
-    document.addEventListener('fullscreenchange', fsHandler);
-    return () => { window.removeEventListener('keydown', handler); document.removeEventListener('fullscreenchange', fsHandler); };
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   // Mouse coords + reverse geocode (Zero-Render)
@@ -558,9 +532,14 @@ export default function Dashboard() {
   // this only turns a finished ring into a measured, named, coloured record.
   // Restore drawn areas on load. Work that vanishes on refresh is work the
   // operator will not trust the tool with.
+  // Not a lazy `useState` initialiser: that would run during the server
+  // render, where there is no localStorage, and the restored shapes would
+  // then differ from the empty server markup. The effect is the first moment
+  // the store is legible.
   useEffect(() => {
     try {
       const restored = deserializeShapes(localStorage.getItem(STORAGE_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (restored.length) setDrawnPolygons(restored);
     } catch { /* storage unavailable — start empty */ }
   }, []);
@@ -573,6 +552,9 @@ export default function Dashboard() {
   // Re-sweep every watched AOI whenever live data refreshes and record what
   // changed. Keyed off the store so this runs once per
   // refresh instead of once per render.
+  // Appends to a log rather than deriving a value, and carries a baseline in a
+  // ref across runs — history, not a function of the current props. There is
+  // no render-phase form of "what changed since last time".
   useEffect(() => {
     if (watched.size === 0) return;
     const now = Date.now();
@@ -587,6 +569,7 @@ export default function Dashboard() {
       watchBaselines.current[shape.id] = baseline;
       fresh.push(...events);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (fresh.length) setWatchEvents(log => appendEvents(log, fresh));
   }, [data, watched, drawnPolygons]);
 
@@ -652,10 +635,14 @@ export default function Dashboard() {
   }, []);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
+  // Every state write here is the arrival of a network response, staged so the
+  // panels that need data first get it first. Fetching is the effect's whole
+  // purpose; the writes are how the answers get in.
   useEffect(() => {
     // Priority 1: Core feeds (always needed for panels)
     const eqUrl = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson';
     const eqTransform = (data: any) => ({ earthquakes: (data.features || []).map((f: any) => ({ id: f.id, lat: f.geometry?.coordinates?.[1] || 0, lng: f.geometry?.coordinates?.[0] || 0, depth: f.geometry?.coordinates?.[2] || 0, magnitude: f.properties?.mag, place: f.properties?.place, time: f.properties?.time, url: f.properties?.url, tsunami: f.properties?.tsunami, type: f.properties?.type, felt: f.properties?.felt, alert: f.properties?.alert })) });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEndpoint(eqUrl, eqTransform);
     fetchEndpoint('/api/news');
     /* A cold start can time out every upstream quote and return an all-empty
@@ -765,7 +752,7 @@ export default function Dashboard() {
              const cablesData = await res.json();
              mergeData({ submarine_cables: cablesData.features });
           }
-        } catch (e) { console.warn('Cables fetch failed'); }
+        } catch { console.warn('Cables fetch failed'); }
       })();
       layerFetchedRef.current.add('cables');
     }
@@ -1167,7 +1154,6 @@ export default function Dashboard() {
           onRightClick={handleRightClick} 
           onViewStateChange={setMapView} 
           flyToLocation={flyToLocation}
-          demoMode={demoMode}
           theme={payloadTheme}
           arcgisLayers={arcgisLayers.filter(l => l.visible).map(l => ({ id: l.id, title: l.title, geojson: l.geojson, color: l.color, opacity: l.opacity }))}
           onMapCenter={setMapCenter}
@@ -1479,7 +1465,7 @@ export default function Dashboard() {
                 <PayloadSpatialRail
                   layers={spatialLayers}
                   compute={spatialCompute}
-                  onToggle={(_key: SpatialLayerKey) => { /* no corpus: every layer is declared unavailable, so this cannot fire */ }}
+                  onToggle={() => { /* no corpus: every layer is declared unavailable, so this cannot fire */ }}
                   onInspect={() => togglePanel('search')}
                   onClose={() => setShowSpatial(false)}
                 />
@@ -1927,12 +1913,22 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Camera Viewer ── */}
-      <CameraViewer
-        camera={activeCamera}
-        onClose={() => setActiveCamera(null)}
-        onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
-      />
+      {/* ── Camera Viewer ──
+          Presence lives here rather than inside the viewer. Held inside, the
+          exit animation could never play: the component returned null before
+          reaching its own AnimatePresence, so the whole subtree vanished at
+          once. Held here, the viewer also stops existing while no camera is
+          selected, which is what silences its once-a-second clock. */}
+      <AnimatePresence>
+        {activeCamera && (
+          <CameraViewer
+            key={cameraKey(activeCamera)}
+            camera={activeCamera}
+            onClose={() => setActiveCamera(null)}
+            onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Entity Graph Panel ── */}
       {/* Guidance belongs over the map, where the clicking happens. */}

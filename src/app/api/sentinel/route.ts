@@ -105,7 +105,7 @@ export async function GET(req: Request) {
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
     });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: 'Sentinel lookup failed', scenes: [] }, { status: 500 });
   }
 }

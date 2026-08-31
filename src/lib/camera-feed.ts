@@ -114,3 +114,29 @@ export function offPlatformView(state: {
   // confident label is worse than no picture.
   return state.offline ? 'offline' : 'inline';
 }
+
+/**
+ * A React key that changes exactly when the viewer is looking at a different
+ * camera.
+ *
+ * The viewer holds per-feed state — the current JPG url, the loading and error
+ * flags, an attached HLS instance. Re-rendering it with a new camera would
+ * paint the previous camera's frame under the new camera's coordinates until
+ * the setup effect ran. That is a misattribution, not a flicker: the panel
+ * would be asserting that this image came from that place. Keying on identity
+ * makes a different camera a different mount, so there is no previous frame to
+ * show.
+ *
+ * Coordinates alone are not the identity — two feeds can be published from one
+ * mast — so the feed url takes part. `null` and `undefined` both collapse to
+ * the empty string, which is correct here: a camera with no feed url and a
+ * camera whose feed url is missing are the same thing to the viewer.
+ */
+export function cameraKey(
+  camera: (ResolvableCamera & { lat?: number; lng?: number }) | null | undefined,
+): string {
+  if (!camera) return 'none';
+  const at = `${camera.lat ?? ''},${camera.lng ?? ''}`;
+  const feed = camera.feed_url ?? camera.stream_url ?? camera.external_url ?? '';
+  return `${at}|${feed}`;
+}

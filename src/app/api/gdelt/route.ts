@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { stealthFetch } from '@/lib/stealthFetch';
 import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 60;

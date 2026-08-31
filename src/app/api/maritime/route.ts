@@ -105,7 +105,7 @@ function connectAisStream() {
 
   try {
     ws = new WebSocket("wss://stream.aisstream.io/v0/stream");
-  } catch (e) {
+  } catch {
     globalForAis.isAisConnecting = false;
     return;
   }
@@ -191,7 +191,7 @@ function connectAisStream() {
         const firstKey = shipsCache.keys().next().value;
         if (firstKey) shipsCache.delete(firstKey);
       }
-    } catch (e) {
+    } catch {
       // ignore parse errors
     }
   });
@@ -210,7 +210,10 @@ function connectAisStream() {
 connectAisStream();
 
 // --- SCM Integration: VesselAPI Hybrid Fallback (Satellite AIS) ---
-let lastVesselApiFetch = 0;
+// `lastVesselApiFetch` was declared here and never read or written anywhere in
+// the file — a rate-limit timestamp that limited nothing. Removed rather than
+// changed to `const`, which would have made the linter quiet about a throttle
+// that does not exist.
 async function fetchVesselApiFallback() {
   // Mock data removed per user request. We only rely on real live stream data.
 }

@@ -1,6 +1,6 @@
-import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 'use client';
 
+import { buildGeometry, closeRing, drawReducer, initialDrawState, measure, type DrawAction, type DrawMode, type DrawProgress, type DrawResult, type DrawState } from '@/lib/draw';
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
@@ -31,7 +31,6 @@ interface PayloadMapProps {
   projection?: 'mercator' | 'globe';
   mapStyle?: string;
   sweepData?: any;
-  demoMode?: boolean;
   theme?: 'core' | 'ghost';
   drawnPolygons?: Array<{ id: string; name: string; geojson: GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.LineString>; color: string }>;
   arcgisLayers?: Array<{ id: string; title: string; geojson: any; color?: string; opacity?: number }>;
@@ -123,7 +122,7 @@ function greatCircleArc(from: [number, number], to: [number, number], segments =
   return coords;
 }
 
-function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, demoMode = false, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
+function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, aircraftAirports = {} }: PayloadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -175,54 +174,6 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
     ctx.fill();
     map.addImage(id, { width: size, height: size, data: new Uint8Array(ctx.getImageData(0, 0, size, size).data) });
   }, []);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-    const map = mapRef.current;
-
-    // ── DEMO MODE SPINNING ──
-    let spinReq: number | undefined = undefined;
-    let isSpinning = false;
-    
-    const startSpinning = () => {
-      if (!map) return;
-      isSpinning = true;
-      let lastTime = performance.now();
-      
-      const frame = (time: number) => {
-        if (!isSpinning) return;
-        
-        // Only spin if the user is not actively dragging or zooming the map
-        if (!map.isMoving() && !map.isZooming()) {
-          const dt = time - lastTime;
-          const center = map.getCenter();
-          // Adjust spin speed: 0.5 degrees per second
-          center.lng += (0.5 * dt) / 1000;
-          map.setCenter(center);
-        }
-        
-        lastTime = time;
-        spinReq = requestAnimationFrame(frame);
-      };
-      
-      spinReq = requestAnimationFrame(frame);
-    };
-
-    if (demoMode) {
-      startSpinning();
-    } else {
-      isSpinning = false;
-      if (spinReq) cancelAnimationFrame(spinReq);
-    }
-
-    return () => {
-      isSpinning = false;
-      if (spinReq) cancelAnimationFrame(spinReq);
-      if (typeof window !== 'undefined' && (window as any)._globeSpinTimer) {
-        clearInterval((window as any)._globeSpinTimer);
-      }
-    };
-  }, [mapReady, demoMode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -279,7 +230,6 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       // Theme colors
       const isGhost = theme === 'ghost';
       const phantomPurple = '#B388FF';
-      const phantomDark = '#1A0040';
       const cameraColor = isGhost ? '#B388FF' : '#00E676';
       const flightCom = isGhost ? phantomPurple : '#00E5FF';
       const flightPriv = isGhost ? phantomPurple : '#FFD700';
@@ -2097,7 +2047,7 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
           }));
 
         setGeo('conflict-zones', [...zoneFeatures, ...eventFeatures]);
-      } catch (e) {
+      } catch {
         // Fallback: if API fails, use minimal known zones
         const FALLBACK_ZONES = [
           { label: 'UKRAINE WAR', severity: 'war', lat: 48.5, lng: 31.2, description: 'Ongoing Russian invasion of Ukraine.', sourceUrl: 'https://liveuamap.com/' },
@@ -2795,7 +2745,15 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
   const drawCbRef = useRef({ onDrawComplete, onDrawProgress, onDrawCancel });
   /** Set by the drawing effect so on-screen buttons can dispatch into it. */
   const drawApplyRef = useRef<((a: DrawAction) => void) | null>(null);
-  drawCbRef.current = { onDrawComplete, onDrawProgress, onDrawCancel };
+
+  // Synced after commit rather than during render. The map handlers below are
+  // installed once and read `.current` only when the user acts, so having the
+  // latest callbacks by the time an event fires is the whole requirement — and
+  // a render React discards must not leave its callbacks behind in a ref.
+  // No dependency array: every commit republishes, which is the point.
+  useEffect(() => {
+    drawCbRef.current = { onDrawComplete, onDrawProgress, onDrawCancel };
+  });
 
   // ── DRAWING MODE ──
   // A four-mode state machine over one set of map handlers.

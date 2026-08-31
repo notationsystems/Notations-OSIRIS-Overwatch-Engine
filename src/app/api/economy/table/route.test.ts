@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -109,6 +109,49 @@ describe('corpus table export (shipping-order addition, pre-registered criteria)
     expect(bestKnown.rows.find(r => r.record_id === 'obs:test-plant:late-vintage')).toBeDefined();
     const unplanted = buildCorpusTable(state, { metric: 'production' }, { asOf, knowledge: 'as_known_then' });
     expect(table.header.withheld).toBe(unplanted.header.withheld + 1);
+  });
+
+  // `renderGridMarkdown` was pinned below and `renderTableMarkdown` was not,
+  // though the same `?format=md` switch serves both. The renderer that carries
+  // the refusals is the one that most needs the pin: a null that renders as an
+  // empty cell reads as a small number, and the whole point of the column is
+  // that it is not one.
+  it('the markdown export renders a refused value as a refusal, never as a blank or a zero', () => {
+    const planted = plant(state, { id: 'obs:test-plant:incomplete', basis: undefined });
+    const table = buildCorpusTable(planted, { metric: 'production', subject: 'ent:country:cl' });
+    const md = renderTableMarkdown(table);
+
+    // The header block carries the accounting, not just the rows that survived.
+    expect(md).toContain(`row_count             ${table.header.row_count}`);
+    expect(md).toContain(`withheld              ${table.header.withheld}`);
+    expect(md).toContain(table.header.baseline_fingerprint);
+
+    // A basis-less row says so in the cell — 'NULL(flagged)', never '' or '0'.
+    expect(md).toContain('| NULL(flagged) |');
+
+    // Per column, not per cell. `flags` renders empty when a row has none,
+    // and that IS the honest rendering — an empty flag list means no flags.
+    // The columns that must never be blank are the ones where a blank would
+    // be read as a quantity or a settled fact.
+    const body = md.split('\n').filter(l => l.startsWith('| ') && !l.startsWith('| subject |') && !l.startsWith('|---'));
+    expect(body.length).toBe(table.rows.length);
+    // subject 0 | metric 1 | value 2 | unit 3 | basis 4 | value_kind 5 |
+    // source 6 | period 7 | known_at 8 | attestation 9 | flags 10
+    const NEVER_BLANK = { value: 2, unit: 3, basis: 4, value_kind: 5, source: 6, period: 7, known_at: 8, attestation: 9 };
+    for (const line of body) {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      for (const [name, idx] of Object.entries(NEVER_BLANK)) {
+        expect(cells[idx], `${name} blank in: ${line}`).not.toBe('');
+      }
+    }
+
+    // Every row's claim ships beneath the table: the sentence is the export,
+    // the number alone is not.
+    for (const r of table.rows) expect(md).toContain(`- ${r.claim}`);
+
+    // A refused value renders as a refusal, not as an absence.
+    const refused = table.rows.filter(r => r.value === null);
+    if (refused.length > 0) expect(md).toContain('null (refused)');
   });
 
   // ── Criterion 4: baseline_fingerprint matches the state that produced the

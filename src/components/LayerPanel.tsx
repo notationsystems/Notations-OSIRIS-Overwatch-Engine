@@ -4,8 +4,8 @@ import { memo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
-  CloudLightning, Ship, Network, Database, Ghost,
-  Flame, Tv, Radio, Mountain, Anchor, Megaphone
+  CloudLightning, Ship, Network, Ghost,
+  Mountain, Megaphone
 } from 'lucide-react';
 
 interface LayerPanelProps {
