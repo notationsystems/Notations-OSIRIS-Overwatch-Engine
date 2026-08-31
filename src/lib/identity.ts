@@ -49,8 +49,22 @@ export const VERSION = '0.1.0';
  * Phase 47 left repository URLs alone on the reasoning that the repository
  * genuinely still carried the old name; that reasoning was sound and the URL
  * it protected was not this project's.
+ *
+ * The first correction then inherited a premise that had itself gone stale.
+ * `Notations-OSIRIS-Overwatch-Engine` is the name the git remote still uses
+ * and GitHub still redirects, so it resolves and nothing fails — but the
+ * organisation's repository list does not contain it. The repository was
+ * renamed to `Payload-Terminal-V0`, and a redirect is not a name. For a URL
+ * handed to a regulator in a User-Agent, and printed in a clone command a
+ * reader will run, the canonical one is the only correct one.
+ *
+ * What a test can actually check offline is the part that stays checkable:
+ * that this is neither of the two values already known to be wrong, and that
+ * the clone command in the docs names the directory this URL produces. The
+ * canonical name itself is only knowable from GitHub, so it is not pinned —
+ * saying so is better than a test that appears to hold it and does not.
  */
-export const REPO_URL = 'https://github.com/notationsystems/Notations-OSIRIS-Overwatch-Engine';
+export const REPO_URL = 'https://github.com/notationsystems/Payload-Terminal-V0';
 
 /**
  * The User-Agent for an outbound request.

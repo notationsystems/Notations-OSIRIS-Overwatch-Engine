@@ -5388,8 +5388,35 @@ route catalogue and no page of the docs, so the compat window is
 precautionary rather than owed; it costs one `??` and removes the question
 of whether anyone was ever told to send it.
 
+### The correction that arrived from the push itself
+
+The first fix put `notations-osiris-overwatch-engine` into the User-Agents
+and the public clone command, taken from the git remote. The push printed
+GitHub's own rename notice, and the organisation's repository listing does
+not contain that name at all: the repository is **`Payload-Terminal-V0`**.
+The old name resolves through a redirect, so nothing failed and nothing
+would have — and a redirect is not a name. For a URL handed to a regulator
+inside a User-Agent, and printed in a clone command a reader will run, the
+canonical one is the only correct one.
+
+The correction inherited a stale premise from the thing it was correcting.
+Phase 47's reasoning — *the repository genuinely still carries that name* —
+was true when written and had since stopped being true, and reading it as
+current is how a second wrong URL replaced the first.
+
+Two known-wrong values are now pinned out by name. The canonical name is
+NOT pinned: it is only knowable from GitHub, and a test that appeared to
+hold it while checking a local string would be worse than no test. What is
+pinned is the half that stays checkable from inside the tree — that the
+`cd` after the clone command names the directory the clone actually
+creates, which is the `cd payload` defect closed permanently.
+
+The git remote still uses the old URL. It is left alone: it redirects, it
+is local configuration rather than anything this repository ships, and
+changing a remote is the operator's action.
+
 ### Measured after
 
-**88 test files, 1,295 passed, 6 skipped. Typecheck clean. Production build
+**88 test files, 1,296 passed, 6 skipped. Typecheck clean. Production build
 compiles**, with the same four pre-existing dynamic `node:fs` import
 warnings the Phase 47 baseline recorded — checked, not assumed.

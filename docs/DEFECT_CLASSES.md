@@ -280,6 +280,7 @@ an ordinal that contradicts this table.
 | 54 | 69 | Public documentation sending every reader to a different owner's repository, in the clone command and the issue link |
 | 55 | 69 | A pre-registered instruction, aimed at a REGULATOR, telling a future adapter to identify under a name that had been retired and forbidding the one that had become correct |
 | 56 | 69 | A proxy that spends someone else's money on request, with no per-IP throttle, while `isRateLimited` sat unused in a module it already imported |
+| 57 | 69 | My own correction to the repository URL, taken from a git remote that resolves through a redirect: the right fix built on a premise that had gone stale since it was written |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

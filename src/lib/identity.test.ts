@@ -49,10 +49,26 @@ describe('the product token', () => {
 
   it('names the repository this source is actually in', () => {
     // A URL handed to upstream operators and printed in the public docs has
-    // to resolve to THIS project. The value it replaced was a different
-    // owner's repository.
+    // to resolve to THIS project. Both previous values are pinned out by
+    // name: one was a different owner's repository, the other was this
+    // repository's former name, which GitHub still redirects — and a
+    // redirect is not a name.
     expect(REPO_URL).toContain('notationsystems');
     expect(REPO_URL).not.toContain('simplifaisoul');
+    expect(REPO_URL).not.toContain('Notations-OSIRIS-Overwatch-Engine');
+  });
+
+  it('the docs clone command names the directory the clone actually creates', () => {
+    // The `cd` after a `git clone` said `cd payload`, which is not what any
+    // clone of this repository produces. That is checkable forever from
+    // inside the tree, so it is checked, and it is the half of the URL
+    // problem a test can hold.
+    const docs = readFileSync(join(SRC, 'app/docs/DocsClient.tsx'), 'utf8');
+    const clone = docs.match(/git clone (\S+)\.git\s*\ncd (\S+)/);
+    expect(clone, 'the docs no longer contain a clone-then-cd block').not.toBeNull();
+    const [, cloneUrl, cd] = clone!;
+    expect(cloneUrl).toBe(REPO_URL);
+    expect(cd).toBe(REPO_URL.split('/').pop());
   });
 });
 
