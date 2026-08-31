@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createGeminiClient, rotateApiKey } from '@/lib/ai-engine';
+import { requireRouteEnabled } from '../../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -243,6 +244,9 @@ async function geminiOverview(mode: Mode, digest: Digest, keys: string[]): Promi
 /* ─────────────────────────── Handler ─────────────────────────── */
 
 export async function POST(request: NextRequest) {
+  const retired = requireRouteEnabled('ai/overview');
+  if (retired) return retired;
+
   let body: { mode?: Mode; payload?: any };
   try {
     body = await request.json();

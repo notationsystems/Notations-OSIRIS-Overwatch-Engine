@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 // Sentinel-1 SAR Satellite — STAC Catalog via Element84 Earth Search + Copernicus fallback
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('sentinel');
+  if (retired) return retired;
+
   const { searchParams } = new URL(req.url);
   const lat = parseFloat(searchParams.get('lat') || '0');
   const lng = parseFloat(searchParams.get('lng') || '0');

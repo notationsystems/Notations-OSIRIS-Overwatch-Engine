@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Region Dossier API
@@ -7,6 +8,9 @@ import { NextResponse } from 'next/server';
  */
 
 export async function GET(request: Request) {
+  const retired = requireRouteEnabled('region-dossier');
+  if (retired) return retired;
+
   const { searchParams } = new URL(request.url);
   const lat = parseFloat(searchParams.get('lat') || '0');
   const lng = parseFloat(searchParams.get('lng') || '0');

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — SCM Supplier Risk Overlay
@@ -29,6 +30,9 @@ const SUPPLIERS = [
 ];
 
 export async function GET() {
+  const retired = requireRouteEnabled('scm-suppliers');
+  if (retired) return retired;
+
   const dynamicSuppliers = [...SUPPLIERS].map(s => ({ ...s, risk_level: 'NORMAL', active_threats: [] as string[] }));
 
   // Fast distance approximation (km)

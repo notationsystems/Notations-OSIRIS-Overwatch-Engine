@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Ukraine Frontline API
@@ -7,6 +8,9 @@ import { NextResponse } from 'next/server';
  */
 
 export async function GET() {
+  const retired = requireRouteEnabled('frontlines');
+  if (retired) return retired;
+
   try {
     const url = 'https://deepstatemap.live/api/history/last';
     const res = await fetch(url, {

@@ -116,6 +116,7 @@ const SATNOGS_API = 'https://db.satnogs.org/api/tle/?format=json';
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 const CACHE_DIR = join(process.cwd(), '.next', 'cache');
 const CACHE_FILE = join(CACHE_DIR, 'satellites-tle-cache.json');
@@ -189,6 +190,9 @@ async function fetchCelesTrakGroup(url: string): Promise<{ name: string; line1: 
 }
 
 export async function GET() {
+  const retired = requireRouteEnabled('satellites');
+  if (retired) return retired;
+
   try {
     const nowTime = Date.now();
     let allSats: any[] = globalCachedSats;

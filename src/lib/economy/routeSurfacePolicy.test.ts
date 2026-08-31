@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+// Single source of truth: the disposition map lives in production
+// (src/lib/routeGate.ts) so classifying a route and deciding whether it
+// is live are the same act. This test asserts it stays complete.
+import { ROUTE_DISPOSITION } from '../routeGate';
 
 /**
  * THE COLLECTION POLICY, ENFORCED AT THE ROUTE SURFACE (ledger phase 39).
@@ -37,89 +41,6 @@ import { join } from 'node:path';
  */
 
 const API_ROOT = join(process.cwd(), 'src/app/api');
-
-/** Every route's subject, declared. There is no default. */
-type Disposition =
-  /** Freight, commerce, or the physical-economy substrate. The instrument. */
-  | 'freight'
-  /** Infrastructure attributed to an ORGANISATION. Conditional: the route
-   *  must state the constraint in its own source. */
-  | 'infrastructure-conditional'
-  /** Inert general-purpose feeds inherited from the base. No person
-   *  subject, no scanning. Slated for retirement behind a flag (A-1);
-   *  permitted meanwhile, and never in the operator's default shell. */
-  | 'general-purpose'
-  /** Operations: health, stats, tiles, webhooks, the app's own plumbing. */
-  | 'ops';
-
-const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
-  'ai/analyze': 'general-purpose',
-  'ai/briefing': 'general-purpose',
-  'ai/overview': 'general-purpose',
-  'air-quality': 'general-purpose',
-  aircraft: 'general-purpose',
-  arcgis: 'ops',
-  astra: 'general-purpose',
-  cctv: 'general-purpose',
-  'cctv/proxy': 'general-purpose',
-  'cctv/resolve': 'general-purpose',
-  'cctv/stream-status': 'general-purpose',
-  'chain/daily': 'freight',
-  'cloudflare-radar': 'general-purpose',
-  conflicts: 'general-purpose',
-  'country-risk': 'general-purpose',
-  crypto: 'general-purpose',
-  'cyber-attacks': 'general-purpose',
-  'cyber-threats': 'general-purpose',
-  directions: 'freight',
-  earthquakes: 'general-purpose',
-  economy: 'freight',
-  'economy/entity': 'freight',
-  'economy/guards': 'freight',
-  'economy/refusals': 'freight',
-  'economy/scenario': 'freight',
-  'economy/search': 'freight',
-  'economy/table': 'freight',
-  'economy/validate': 'freight',
-  'entity/expand': 'freight',
-  fires: 'general-purpose',
-  'flight-route': 'general-purpose',
-  flights: 'general-purpose',
-  frontlines: 'general-purpose',
-  gdelt: 'general-purpose',
-  'gdelt-events': 'general-purpose',
-  geo: 'freight',
-  geosearch: 'freight',
-  'github-webhook': 'ops',
-  health: 'ops',
-  infrastructure: 'freight',
-  'live-news': 'general-purpose',
-  malware: 'general-purpose',
-  maritime: 'freight',
-  markets: 'freight',
-  'markets/history': 'freight',
-  news: 'general-purpose',
-  'osint/bgp': 'infrastructure-conditional',
-  'osint/certs': 'infrastructure-conditional',
-  'osint/dns': 'infrastructure-conditional',
-  'osint/ip': 'infrastructure-conditional',
-  'osint/mac': 'infrastructure-conditional',
-  'osint/sanctions': 'infrastructure-conditional',
-  'osint/threats': 'infrastructure-conditional',
-  'osint/whois': 'infrastructure-conditional',
-  'proxy-tiles': 'ops',
-  radar: 'general-purpose',
-  'region-dossier': 'general-purpose',
-  satellites: 'general-purpose',
-  'satellites/orbit': 'general-purpose',
-  'scm-suppliers': 'general-purpose',
-  'sdk/ingest': 'ops',
-  'sdk/stream': 'ops',
-  sentinel: 'general-purpose',
-  'space-weather': 'general-purpose',
-  stats: 'ops',
-  weather: 'freight',
-};
 
 /**
  * The capabilities the collection policy prohibits, detected in source

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { safeFetch } from '@/lib/ssrf-guard';
 import { isSkylineUrl, parseSkylinePage } from '@/lib/skyline';
 import { extractYouTubeId, isYouTubeUrl, parseYouTubeUrl, youtubeEmbedUrl } from '@/lib/youtube';
+import { requireRouteEnabled } from '../../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
@@ -78,6 +79,9 @@ function isResolvable(url: string): boolean {
 }
 
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('cctv/resolve');
+  if (retired) return retired;
+
   const url = new URL(req.url).searchParams.get('url');
 
   if (!url || !isResolvable(url)) {

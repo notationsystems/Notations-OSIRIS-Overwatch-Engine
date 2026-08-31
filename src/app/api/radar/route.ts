@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,9 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
 };
 
 export async function GET() {
+  const retired = requireRouteEnabled('radar');
+  if (retired) return retired;
+
   try {
     const now = Math.floor(Date.now() / 1000);
     const from = now - 86400; // Last 24 hours

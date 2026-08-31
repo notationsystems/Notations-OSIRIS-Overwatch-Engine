@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 60;
 
@@ -295,6 +296,9 @@ function ingestAc(raw: any[], into: any[], seen: Set<string>) {
 }
 
 export async function GET() {
+  const retired = requireRouteEnabled('flights');
+  if (retired) return retired;
+
   const now = Date.now();
 
   if (cachedData && now - lastFetchTime < CACHE_TTL) {

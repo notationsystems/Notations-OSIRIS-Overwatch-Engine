@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { centroidFor } from '@/lib/countryCentroids';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -150,6 +151,9 @@ function mapAttackOrigins(result: RadarResult): RadarAttackOrigin[] {
 }
 
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('cloudflare-radar');
+  if (retired) return retired;
+
   const { searchParams } = new URL(req.url);
 
   // Capability probe — lets the UI decide whether to show the layer without

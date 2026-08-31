@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Earthquake Data API
@@ -8,6 +9,9 @@ import { NextResponse } from 'next/server';
  */
 
 export async function GET() {
+  const retired = requireRouteEnabled('earthquakes');
+  if (retired) return retired;
+
   try {
     const url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson';
     const res = await fetch(url, {

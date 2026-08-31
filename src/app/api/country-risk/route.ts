@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 // Country Intelligence Index — composite risk from earthquakes, conflicts, instability
 // Inspired by WorldMonitor's 12-signal risk scoring
@@ -58,6 +59,9 @@ function isExchangeOpen(ex: typeof EXCHANGES[0]): boolean {
 }
 
 export async function GET() {
+  const retired = requireRouteEnabled('country-risk');
+  if (retired) return retired;
+
   try {
     const exchangeStatus = EXCHANGES.map(ex => ({
       name: ex.name, country: ex.country, open: isExchangeOpen(ex),

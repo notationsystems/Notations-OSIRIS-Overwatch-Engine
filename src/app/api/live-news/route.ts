@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Live News Feeds v3
@@ -39,6 +40,9 @@ const LIVE_FEEDS = [
 ];
 
 export async function GET() {
+  const retired = requireRouteEnabled('live-news');
+  if (retired) return retired;
+
   return NextResponse.json({
     feeds: LIVE_FEEDS,
     total: LIVE_FEEDS.length,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,9 @@ let cacheTime = 0;
 const CACHE_TTL = 10_000; // 10s — rapid refresh for live feel
 
 export async function GET() {
+  const retired = requireRouteEnabled('cyber-attacks');
+  if (retired) return retired;
+
   const now = Date.now();
   if (cachedAttacks && now - cacheTime < CACHE_TTL) {
     return NextResponse.json(cachedAttacks, {

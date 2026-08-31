@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import https from 'https';
 import http from 'http';
+import { requireRouteEnabled } from '../../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
@@ -84,6 +85,9 @@ function proxyFetch(url: string, referer: string | null): Promise<{ status: numb
 }
 
 export async function GET(request: NextRequest) {
+  const retired = requireRouteEnabled('cctv/proxy');
+  if (retired) return retired;
+
   const url = request.nextUrl.searchParams.get('url');
 
   if (!url) {

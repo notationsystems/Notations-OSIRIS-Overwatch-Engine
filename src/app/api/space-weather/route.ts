@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Space Weather API
@@ -9,6 +10,9 @@ import { NextResponse } from 'next/server';
  */
 
 export async function GET() {
+  const retired = requireRouteEnabled('space-weather');
+  if (retired) return retired;
+
   try {
     const [kpRes, alertsRes, flareRes] = await Promise.allSettled([
       fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json', {

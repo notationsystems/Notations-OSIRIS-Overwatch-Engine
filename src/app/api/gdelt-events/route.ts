@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchGdeltEvents } from '@/lib/gdeltEvents';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 60;
 
@@ -23,6 +24,9 @@ function parseQuads(raw: string | null): number[] {
 }
 
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('gdelt-events');
+  if (retired) return retired;
+
   const { searchParams } = new URL(req.url);
 
   const quads = parseQuads(searchParams.get('quad'));

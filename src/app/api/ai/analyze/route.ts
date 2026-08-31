@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isRouteEnabled, routeRetiredPayload } from '../../../../lib/routeGate';
 import {
   createGeminiClient,
   rotateApiKey,
@@ -99,6 +100,10 @@ interface ErrorResponse {
 export async function POST(
   request: NextRequest
 ): Promise<NextResponse<AnalyzeResponse | ErrorResponse>> {
+  if (!isRouteEnabled('ai/analyze')) {
+    return NextResponse.json(routeRetiredPayload('ai/analyze'), { status: 503 }) as never;
+  }
+
   // Extract client IP
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

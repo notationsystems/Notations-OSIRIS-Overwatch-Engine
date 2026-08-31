@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 300; // Allow Vercel/Next.js to run this route for up to 5 minutes if needed
 
 export async function POST(req: NextRequest) {
+  const retired = requireRouteEnabled('astra');
+  if (retired) return retired;
+
   try {
     const formData = await req.formData();
     const image = formData.get('image') as File | null;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,9 @@ function decodeEntities(s: string): string {
 }
 
 export async function GET() {
+  const retired = requireRouteEnabled('gdelt');
+  if (retired) return retired;
+
   try {
     const res = await fetch('https://www.gdacs.org/xml/rss.xml', { signal: AbortSignal.timeout(15000),
       next: { revalidate: 300 }, // Cache 5 min

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { safeFetch } from '@/lib/ssrf-guard';
+import { requireRouteEnabled } from '../../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +8,9 @@ export const dynamic = 'force-dynamic';
 const RTSP_BLOCKED = /temporarily limited|Top up/i;
 
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('cctv/stream-status');
+  if (retired) return retired;
+
   const url = new URL(req.url).searchParams.get('url');
 
   // Check the host, not the string. "https://evil.com/?x=rtsp.me/embed"

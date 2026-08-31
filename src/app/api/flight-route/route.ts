@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { lookupAirport, lookupAirportAsync, type Airport } from '@/lib/airports';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 15;
 
@@ -220,6 +221,9 @@ async function fromAirplanesLive(icao24: string, callsign: string): Promise<{ or
 
 // ── Handler ────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  const retired = requireRouteEnabled('flight-route');
+  if (retired) return retired;
+
   const sp = new URL(req.url).searchParams;
   const callsign  = (sp.get('callsign') || '').trim().toUpperCase();
   const icao24    = (sp.get('icao24')   || '').trim().toLowerCase();

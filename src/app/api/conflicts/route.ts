@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -271,6 +272,9 @@ async function fetchAllLiveConflictData(): Promise<{ events: ConflictEvent[]; ev
 }
 
 export async function GET() {
+  const retired = requireRouteEnabled('conflicts');
+  if (retired) return retired;
+
   try {
     // Fetch live conflict data from GDELT
     const { events: liveEvents, eventsByRegion } = await fetchAllLiveConflictData();

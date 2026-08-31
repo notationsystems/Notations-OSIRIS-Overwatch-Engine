@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { httpJson, optional } from '@/lib/httpJson';
 import { cachedSource } from '@/lib/sourceCache';
 import { nearestAirport, type Airport } from '@/lib/airports';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const maxDuration = 20;
 
@@ -205,6 +206,9 @@ async function fetchTrace(icao24: string, full: boolean): Promise<TraceFile> {
 }
 
 export async function GET(request: Request) {
+  const retired = requireRouteEnabled('aircraft');
+  if (retired) return retired;
+
   try {
     const { searchParams } = new URL(request.url);
     const icao24 = (searchParams.get('icao24') || '').trim().toLowerCase();

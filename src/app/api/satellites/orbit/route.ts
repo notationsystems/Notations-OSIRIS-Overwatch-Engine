@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { orbitPath, orbitalPeriodMinutes, splitAtAntimeridian } from '@/lib/orbit';
+import { requireRouteEnabled } from '../../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,9 @@ function catalogue(): Map<string, Tle> {
 }
 
 export async function GET(req: Request) {
+  const retired = requireRouteEnabled('satellites/orbit');
+  if (retired) return retired;
+
   const id = new URL(req.url).searchParams.get('id')?.trim();
   if (!id || !/^\d{1,6}$/.test(id)) {
     return NextResponse.json({ error: 'numeric NORAD id required' }, { status: 400 });

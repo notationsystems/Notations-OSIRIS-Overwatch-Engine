@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,9 @@ export const dynamic = 'force-dynamic';
  */
 
 export async function GET() {
+  const retired = requireRouteEnabled('fires');
+  if (retired) return retired;
+
   try {
     let fires: any[] = [];
     let source = '';

@@ -34,6 +34,7 @@ import {
   fetchAfricaLiveCameras,
   fetchEuropeLiveCameras,
 } from './world-live';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
  * Payload — Worldwide CCTV Camera API v2
@@ -556,6 +557,9 @@ function getRegionsForBounds(lat: number, lng: number, radius: number): string[]
 }
 
 export async function GET(request: Request) {
+  const retired = requireRouteEnabled('cctv');
+  if (retired) return retired;
+
   try {
     const { searchParams } = new URL(request.url);
     const region = searchParams.get('region');

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { requireRouteEnabled } from '../../../lib/routeGate';
 
 // Cyber threat intelligence from public feeds
 // Inspired by WorldMonitor's infrastructure tracking
 
 export async function GET() {
+  const retired = requireRouteEnabled('cyber-threats');
+  if (retired) return retired;
+
   try {
     const results: any = { threats: [], stats: {}, timestamp: new Date().toISOString() };
 
