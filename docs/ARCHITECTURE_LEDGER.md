@@ -6225,3 +6225,75 @@ what CI actually produces.
 Six of its 83 agents died on a session limit, including the completeness critic.
 So this is not an exhaustive result and must not be recorded as one — the same
 caution phase 70 failed to apply to the same sweep's earlier, emptier output.
+
+
+## Phase 79 — the documentation offered the request the route exists to refuse
+
+Second finding from the same sweep. `osint/sanctions` is one of the most
+carefully guarded routes in the tree: `schema=Person` is refused with a 400 that
+names the remedy, and person-class results are filtered out of every response
+even when the caller names no schema, because the allowlist alone fails open for
+a caller who names nothing. Phase 46 rescoped it, phase 71 lifted its person-set
+into `lib/sanctions`, and a policy test pins both halves.
+
+The shipped API catalogue documented that route's `query` parameter as:
+
+> **Name of a person**, organisation, or vessel.
+
+and its `schema` example as `'Person | Organization | Vessel'` — **`Person`
+first**. `sampleUrl()` takes the first pipe-separated value of each example, so
+the public docs page rendered:
+
+```
+/api/osint/sanctions?query=value&schema=Person&limit=10
+```
+
+as the copy-pasteable way to use the endpoint. That is precisely the request the
+route was hardened to refuse, offered to the reader as the intended usage, on
+the page a reader consults *because* they do not already know the policy.
+
+Nothing was broken and nothing failed. The route was right, the description was
+wrong, and the description is what a reader believes.
+
+### Why the existing scan passed it
+
+`apiCatalog.ts` was already classified `outward-facing` and already scanned. The
+markers name prohibited CAPABILITIES — breach corpora, enumeration tools, the
+preview endpoint, the Wikidata office-holder properties — and none of them is
+*"describes a natural person as a valid subject"*. The artifact was in the
+population and the question was not in the marker set, which is the fourth time
+this session that sentence has been the finding.
+
+### Derived, not restated
+
+The new check does not re-list the person schemas. It imports the set the route
+itself filters on, so the documentation is checked against the code's own
+definition rather than against a second copy of it — a second copy being exactly
+how these two drifted apart. Phase 71 lifted that set into `lib/sanctions` when
+a second route needed it; this is the third caller, and it needed no new
+literal.
+
+Two assertions, and the plants show they are not redundant:
+
+| plant | value check | rendered-URL check |
+|---|---|---|
+| `'Person \| Organization \| Vessel'` (the original defect) | fires | fires |
+| `'Organization \| Person \| Vessel'` | fires | **silent** |
+
+The second is the point. A person schema merely *listed* is caught by reading
+the values; a person schema listed FIRST is additionally rendered into the
+copy-pasteable URL. The rendered-URL check sees the concrete harm and the value
+check sees the wider class, and neither subsumes the other.
+
+The catalogue now also carries a `notes` line stating the refusal and its
+remedy, so the documentation asserts the policy rather than contradicting it.
+
+### Measured after
+
+- **1263 passed, 6 skipped**, 87 files. Build compiles.
+- One plant in this phase applied through `sed` and silently did nothing — the
+  `|` in the payload collided with the substitution delimiter, and the run came
+  back green. A plant that fails to apply reports exactly what a plant that
+  fails to fire reports, so it was re-run under `python` with an assertion that
+  the edit changed the file. **A green result from a plant is only evidence if
+  the plant is known to have landed.**

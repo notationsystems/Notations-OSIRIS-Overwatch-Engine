@@ -407,11 +407,16 @@ export const API_GROUPS: ApiGroup[] = [
         method: 'GET',
         summary: 'Searches the OpenSanctions mirror of the US OFAC SDN list.',
         params: [
-          { name: 'query', required: true, desc: 'Name of a person, organisation, or vessel.' },
-          { name: 'schema', desc: 'Entity type filter.', example: 'Person | Organization | Vessel' },
+          { name: 'query', required: true, desc: 'Name of an organisation, vessel or aircraft.' },
+          { name: 'schema', desc: 'Entity type filter.', example: 'Organization | Company | Vessel' },
           { name: 'limit', desc: 'Maximum results to return.', example: '10' },
         ],
         returns: ['schema', 'total', 'source', 'timestamp'],
+        notes:
+          'The person schema is NOT served: `schema=Person` is refused with a 400 naming the ' +
+          'remedy, and person-class results are filtered out of every response even when no ' +
+          'schema is given. A designated-individual check belongs with a compliance officer ' +
+          'querying the primary OFAC record, under an authority this application does not hold.',
       },
       {
         path: '/api/osint/threats',

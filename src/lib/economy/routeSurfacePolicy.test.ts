@@ -5,6 +5,8 @@ import { join } from 'node:path';
 // (src/lib/routeGate.ts) so classifying a route and deciding whether it
 // is live are the same act. This test asserts it stays complete.
 import { ROUTE_DISPOSITION } from '../routeGate';
+import { API_GROUPS, sampleUrl } from '../../app/docs/apiCatalog';
+import { PERSON_SCHEMAS } from '../sanctions';
 
 /**
  * THE COLLECTION POLICY, ENFORCED AT THE ROUTE SURFACE (ledger phase 39).
@@ -515,5 +517,75 @@ describe('the shipped description advertises no prohibited capability', () => {
     expect(flat).toMatch(/breach/i);
     expect(flat).toMatch(/scanning/i);
     expect(flat).toMatch(/never used to profile a person/i);
+  });
+});
+
+/**
+ * THE DOCUMENTATION ADVERTISED WHAT THE ROUTE REFUSES (ledger phase 79).
+ *
+ * `osint/sanctions` is careful. It refuses `schema=Person` with a 400 that
+ * names the remedy, and it filters person-class results out of every response
+ * even when the caller names no schema, because the allowlist alone fails open.
+ * Three phases hardened it.
+ *
+ * The shipped API catalogue documented the same route's `query` parameter as
+ * *"Name of a PERSON, organisation, or vessel"* and its `schema` example as
+ * `'Person | Organization | Vessel'` — with `Person` FIRST. And `sampleUrl()`
+ * takes the first pipe-separated value, so the public docs page rendered a
+ * copy-pasteable example reading `schema=Person`: the exact request the route
+ * exists to refuse, offered to the reader as the way to use it.
+ *
+ * Nothing was broken. The route was right, the docs were wrong, and the docs
+ * are what a reader believes. `apiCatalog.ts` was already classified
+ * outward-facing and already scanned — the markers name prohibited CAPABILITIES
+ * (breach corpora, enumeration tools) and none of them is "describes a person
+ * as a valid subject", so the scan passed it.
+ *
+ * DERIVED, NOT RESTATED. This does not re-list the person schemas; it imports
+ * the set the route itself filters on. A second copy of "which schemas are
+ * people" is how the two would drift apart again, and the first copy is what
+ * phase 71 lifted into `lib/sanctions` for exactly this reason.
+ */
+describe('the documentation does not advertise a subject the route refuses', () => {
+  const documented = API_GROUPS.flatMap((g) => g.endpoints);
+
+  it('finds endpoints to check (the gate must not pass by being empty)', () => {
+    expect(documented.length).toBeGreaterThan(20);
+  });
+
+  it('offers no person schema as a documented parameter value', () => {
+    const findings: string[] = [];
+    for (const ep of documented) {
+      for (const param of ep.params ?? []) {
+        for (const value of String(param.example ?? '').split('|').map((v) => v.trim())) {
+          if (value && PERSON_SCHEMAS.has(value)) {
+            findings.push(`${ep.path} documents ${param.name}=${value}`);
+          }
+        }
+      }
+    }
+    expect(findings, [
+      'The shipped catalogue offers a person schema as a parameter value for a route that',
+      'refuses it. The route is not wrong; the description is, and the description is what',
+      'a reader believes.',
+    ].join(' ')).toEqual([]);
+  });
+
+  /**
+   * The behavioural half, and the one that catches ORDERING. `sampleUrl()`
+   * takes the first pipe-separated value of each example, so a person schema
+   * merely listed first — rather than listed at all — is enough to put it in
+   * the copy-pasteable URL on the page. Checking the rendered string is the
+   * only form of the question that sees that.
+   */
+  it('renders no person schema into a copy-pasteable sample URL', () => {
+    const findings: string[] = [];
+    for (const ep of documented) {
+      const url = sampleUrl(ep, 'https://example.test');
+      for (const schema of PERSON_SCHEMAS) {
+        if (url.includes(`=${schema}`)) findings.push(`${ep.path} -> ${url}`);
+      }
+    }
+    expect(findings, 'a sample URL on the public docs page requests a refused subject').toEqual([]);
   });
 });
