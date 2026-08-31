@@ -189,6 +189,13 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // Email intake. The opportunity carries its own attestation (derived +
+    // negotiating_position); these are its parts.
+    Field: 'one stated value, or why it could not become one',
+    Opportunity: 'carries its own attestation; completeness counts fields WE could read',
+    RawEmail: 'the message as it arrived; what it asserts is the senders claim',
+    ExtractionReview: 'counts of fields two instances agreed on',
+    BoundaryDecision: 'which vendors a document passed through — a decision record, not a measurement',
     // The pricing engine. Every figure is computed from OUR OWN settled loads,
     // which carry the world's `representative` stamp; the quote's own honesty
     // lives in its confidence tier and its refusals, which is what the type is
