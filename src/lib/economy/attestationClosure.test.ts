@@ -180,6 +180,8 @@ describe('every number-bearing type in the layer is accounted for', () => {
     UnresolvedIdentifier: 'how many times WE failed to resolve a string',
     McsVintageSpec: 'configuration: which report years to read',
     ConditionPredicate: 'configured tolerances — the rule, not a reading',
+    PostingWindow: 'configured grace thresholds in seconds — policy about when a commitment counts, not a measurement of anything',
+    VerdictContext: 'postingOffsetSeconds is when WE published relative to an interval; the nested coverage is classified on its own',
     CustodyPredicate: 'configured tolerance — the rule, not a reading',
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
@@ -210,11 +212,34 @@ describe('every number-bearing type in the layer is accounted for', () => {
     AlertScorecard: 'precision and quiet-rate over the backtest',
     BacktestReport: 'precision, recall and median lead',
     Reading: 'a sensor value; the notary carries deviceTrust beside the VERDICT, not the reading',
+    Excursion: 'the extremum of a breach — a measured reading, reported without its own evidence class',
     IntervalCoverage: 'the fraction of an interval covered by committed readings',
+  };
+
+  /**
+   * Type aliases for `number`, DERIVED from the source rather than listed.
+   *
+   * Found the hard way: introducing `export type Milli = number` made
+   * `Excursion.extremumMilli: Milli` invisible to a scanner matching `: number`
+   * literally, so a number-bearing type silently left the accounting the moment
+   * it got a more precise name. A guard that only sees one spelling of a number
+   * is narrower than it reads — the class this file exists to catch, produced
+   * by an ordinary refactor.
+   */
+  const numericAliases = (): string[] => {
+    const found = new Set<string>(['number']);
+    for (const file of readdirSync(DIR)) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
+      const src = readFileSync(join(DIR, file), 'utf8');
+      for (const m of src.matchAll(/export type (\w+)\s*=\s*number\s*;/g)) found.add(m[1]);
+    }
+    return [...found];
   };
 
   const numberBearing = (): { file: string; name: string; body: string }[] => {
     const out: { file: string; name: string; body: string }[] = [];
+    const numeric = new RegExp(
+      `^\\s*(?:readonly\\s+)?\\w+\\??:\\s*(?:${numericAliases().join('|')})\\b`, 'm');
     for (const file of readdirSync(DIR)) {
       if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
       const src = readFileSync(join(DIR, file), 'utf8');
@@ -223,11 +248,20 @@ describe('every number-bearing type in the layer is accounted for', () => {
         const start = m.index! + m[0].length;
         const end = src.indexOf('\n}', start);
         const body = src.slice(start, end < 0 ? src.length : end);
-        if (/^\s*(?:readonly\s+)?\w+\??:\s*number\b/m.test(body)) out.push({ file, name: m[1], body });
+        if (numeric.test(body)) out.push({ file, name: m[1], body });
       }
     }
     return out;
   };
+
+  it('the scan follows numeric type aliases, not just the literal `number`', () => {
+    const aliases = numericAliases();
+    expect(aliases).toContain('number');
+    expect(aliases, 'Milli is declared `export type Milli = number` and must be followed')
+      .toContain('Milli');
+    // The type that went invisible when the alias was introduced.
+    expect(numberBearing().some(t => t.name === 'Excursion')).toBe(true);
+  });
 
   it('the scan sees the whole layer, not one file — the test is not vacuous', () => {
     const found = numberBearing();
@@ -252,9 +286,9 @@ describe('every number-bearing type in the layer is accounted for', () => {
   });
 
   it('THE RATCHET: the open-debt list may shrink, never grow', () => {
-    // 17 claims about the world that do not yet carry their evidence class.
+    // 18 claims about the world that do not yet carry their evidence class.
     // Raising this number requires deleting this comment, which is the point.
-    expect(Object.keys(OWED).length).toBeLessThanOrEqual(17);
+    expect(Object.keys(OWED).length).toBeLessThanOrEqual(18);
   });
 
   it('every classification carries a reason, so it can be argued with', () => {

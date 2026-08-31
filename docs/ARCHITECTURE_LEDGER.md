@@ -3843,3 +3843,104 @@ was the one test that rested on nothing.
   produces a `true`.
 - `inventory()` is asserted per (backend, operation), since one row per backend
   no longer describes the shape.
+
+---
+
+## Phase 55 — the pre-dating hole, measured; and an alias that hid a type from its own guard
+
+Notary v2 arrived with five corrections. Four are straightforwardly right and
+are landed as supplied. The first is the important one, and it was verified by
+probe before being accepted.
+
+### The in-time rule checked one direction
+
+`postedInTime()` asked only whether a commitment was posted too LATE:
+
+```ts
+return Date.parse(c.postedAt) - Date.parse(c.coversTo) <= POST_GRACE_SECONDS * 1000;
+```
+
+Probed against the shipped code, a commitment posted **2025-08-30** for readings
+covering **2026-08-30** — a full year before the data existed:
+
+```
+postedInTime(pre-dated by 1 year) = true
+notarizeCondition(pre-dated)      = held
+```
+
+The whole layer's load-bearing property is *"a commitment posted AT THE TIME the
+fact existed"*, and half of "at the time" was never checked. A commitment made
+before the fact existed cannot have been derived from observing it — it is
+evidence of fabrication rather than of honesty. It is also the CHEAPER of the two
+attacks: predating costs nothing, while backdating at least requires the readings
+to exist first. The guarantee was one-sided against the easier direction.
+
+`postingVerdict()` now returns `in_time | too_late | predates_interval` against a
+`PostingWindow` that is policy rather than a hidden constant, and the applied
+window travels on the verdict so a counterparty reading a refusal sees which
+threshold produced it. `earlyGrace` is measured from `coversFrom`, not
+`coversTo`: posting at the START of an interval is a legitimate pre-commitment to
+observe, and refusing that would refuse the honest pattern.
+
+Pinned by planting the one-sided check back: two tests fail, including the
+reachability sweep.
+
+### The omission reason was dropped, and is restored
+
+v2's `UnprovenReason` union omitted `readings_do_not_match_commitment` — the
+omission attack closed two commits earlier, and the entire reason the Merkle root
+is carried at all. Without that member `notarizeCondition` cannot express the
+refusal, so a curated subset of readings handed in with the commitment built from
+the full set returns `held` while the root travels as decoration.
+
+Worse in combination with v2's own good idea: `ALL_UNPROVEN_REASONS` exists so
+reachability can be asserted, and it would have certified a set missing its most
+important member. A completeness check over an incomplete enumeration reads as
+stronger evidence than no check at all.
+
+`IntervalCoverage.outOfOrder` was likewise dropped and is restored: sorting
+silently erases the only evidence that a device or upload path is misbehaving,
+and a device that reorders its own timestamps is a device whose timestamps are
+worth less.
+
+### Integers moved into the type, not just the guard
+
+`Reading.valueMilli` and `ConditionPredicate.bounds.{minMilli,maxMilli}` are
+integers in the TYPE now. Previously `assertMilli` caught a float at the leaf,
+which is a guard on the way out; a float could still be stored, compared, and
+reasoned about first. `toMilli()` converts and refuses at ingest, `assertMilli()`
+remains as the boundary check for anything that reached a leaf another way.
+
+`boundaryIsBreach` is now part of the predicate and part of its identity —
+whether a reading exactly ON the bound breaches is a contract term, not an
+implementation detail, and the circuit spec now takes it as an input rather than
+hardcoding a convention that would disagree only on the disputed reading.
+
+### The alias that hid a type from the accounting guard
+
+Migrating `Excursion.extremum: number` to `extremumMilli: Milli` made the type
+**invisible** to the attestation-accounting scanner widened in phase 50, which
+matched `: number` literally.
+
+A number-bearing type left the accounting silently the moment it got a more
+precise name. No test failed; the guard simply had one fewer type to check, and
+its "no number-bearing type is unaccounted for" would keep passing forever.
+
+The scanner now DERIVES numeric aliases from the source — every
+`export type X = number` in the layer — rather than knowing one spelling. Pinned
+by asserting `Milli` is discovered and `Excursion` is back in scope.
+
+Two more types were caught by the same guard on the way in, which is the guard
+doing its job on new code rather than on archaeology: `PostingWindow` and
+`VerdictContext` are classified not-a-world-claim (configured thresholds, and
+when we published relative to an interval), and `Excursion` joins the open-debt
+list at 18 — a measured extremum reported without its own evidence class.
+
+### A note on custody
+
+`notarizeCustody` reports a broken chain's magnitude in the shared
+`extremumMilli` slot, where it means **milli-seconds of gap** rather than
+thousandths of a channel unit. The shape is shared; the unit is not. Stated in
+the code rather than left for a reader to infer from a bare number — the same
+commensurability failure this codebase refuses everywhere else, and the honest
+fix is a per-verdict unit, recorded here as owed.

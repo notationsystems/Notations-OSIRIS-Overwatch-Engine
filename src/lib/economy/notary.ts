@@ -8,14 +8,23 @@ import { createHash } from 'crypto';
 import type {
   Commitment, ConditionPredicate, CustodyPredicate, NotaryVerdict,
   IntervalCoverage, DeviceTrust, ProofRef, Anchor, ConditionChannel,
+  Milli, PostingWindow, VerdictContext, Excursion,
 } from './notary.types';
-import { ANCHOR_STRENGTH } from './notary.types';
+import { ANCHOR_STRENGTH, DEFAULT_POSTING_WINDOW, assertMilli, toMilli, fromMilli } from './notary.types';
 
 export interface Reading {
   at: string;
   channel: ConditionChannel;
-  value: number;
+  /** INTEGER thousandths. Convert once at ingest with `toMilli`. */
+  valueMilli: Milli;
   deviceId: string;
+}
+
+/** Build a Reading from a human-scale value, refusing what the circuit cannot encode. */
+export function reading(
+  at: string, channel: ConditionChannel, value: number, deviceId: string,
+): Reading {
+  return { at, channel, valueMilli: toMilli(value), deviceId };
 }
 
 export interface Handoff {
@@ -34,27 +43,6 @@ export const LEAF_VERSION = 'payload.notary.leaf.v1';
  *  encoding happened to look like a concatenated hash pair could be presented as
  *  an internal node — a second-preimage shape that costs nothing to close. */
 export const NODE_VERSION = 'payload.notary.node.v1';
-
-export const MILLI_SCALE = 1000;
-
-/**
- * The circuit works in INTEGER MILLIDEGREES (`i32`), because it has no floats.
- * Hashing `21.35` here while the circuit hashes `21350` produces a root that
- * verifies against nothing, and it would do so silently — a stable-looking
- * commitment over a value the circuit cannot reproduce. Refuse at the boundary
- * instead.
- */
-export function assertMilli(value: number): number {
-  const milli = value * MILLI_SCALE;
-  if (!Number.isFinite(milli) || Math.abs(milli - Math.round(milli)) > 1e-9) {
-    throw new Error(
-      `notary: ${value} is not representable in integer millidegrees. The circuit has no ` +
-      'floats, so a reading it cannot encode must be refused here rather than committed to a ' +
-      'root that will verify against nothing.',
-    );
-  }
-  return Math.round(milli);
-}
 
 /**
  * Canonical instant, in unix SECONDS, matching the circuit's `at: u64`.
@@ -79,7 +67,8 @@ export function canonicalAt(at: string): number {
 }
 
 export function leafHash(r: Reading): string {
-  return sha(`${LEAF_VERSION}|${canonicalAt(r.at)}|${r.channel}|${assertMilli(r.value)}|${r.deviceId}`);
+  assertMilli(r.valueMilli, `leafHash(${r.channel}@${r.at})`);
+  return sha(`${LEAF_VERSION}|${canonicalAt(r.at)}|${r.channel}|${r.valueMilli}|${r.deviceId}`);
 }
 
 /**
@@ -108,11 +97,47 @@ export function merkleRoot(readings: Reading[]): { root: string; leafCount: numb
   return { root: level[0], leafCount: sorted.length };
 }
 
-/** Grace for clock skew and upload latency. Beyond this, the commitment is retroactive. */
-export const POST_GRACE_SECONDS = 15 * 60;
+/** Retained for the existing call sites; the window below is the real policy. */
+export const POST_GRACE_SECONDS = DEFAULT_POSTING_WINDOW.lateGraceSeconds;
 
-export function postedInTime(c: Commitment): boolean {
-  return Date.parse(c.postedAt) - Date.parse(c.coversTo) <= POST_GRACE_SECONDS * 1000;
+/** postedAt − coversTo, in seconds. Negative means posted before the interval closed. */
+export function postingOffsetSeconds(c: Commitment): number {
+  return (Date.parse(c.postedAt) - Date.parse(c.coversTo)) / 1000;
+}
+
+export type PostingVerdict = 'in_time' | 'too_late' | 'predates_interval';
+
+/**
+ * THE IN-TIME RULE, NOW SYMMETRIC.
+ *
+ * It checked only lateness. MEASURED against that version: a commitment posted
+ * 2025-08-30 for readings covering 2026-08-30 — a full year BEFORE the data
+ * existed — returned true, and the full pipeline returned `held`.
+ *
+ * A commitment made before the fact existed cannot have been derived from
+ * observing it. It is evidence of fabrication, not of honesty, and it is the
+ * cheaper attack of the two: predating costs nothing, whereas backdating at
+ * least requires the readings to exist first.
+ *
+ * `earlyGrace` is measured from `coversFrom`, not `coversTo`: posting at the
+ * START of the interval is legitimate (that is a pre-commitment to observe),
+ * posting before the interval begins is not.
+ */
+export function postingVerdict(
+  c: Commitment, window: PostingWindow = DEFAULT_POSTING_WINDOW,
+): PostingVerdict {
+  const posted = Date.parse(c.postedAt);
+  if (posted - Date.parse(c.coversTo) > window.lateGraceSeconds * 1000) return 'too_late';
+  if (Date.parse(c.coversFrom) - posted > window.earlyGraceSeconds * 1000) {
+    return 'predates_interval';
+  }
+  return 'in_time';
+}
+
+export function postedInTime(
+  c: Commitment, window: PostingWindow = DEFAULT_POSTING_WINDOW,
+): boolean {
+  return postingVerdict(c, window) === 'in_time';
 }
 
 export function computeCoverage(
@@ -154,8 +179,6 @@ export function computeCoverage(
   return { requestedFrom: from, requestedTo: to, covered: covered / span, gaps, outOfOrder };
 }
 
-export interface Excursion { from: string; to: string; extremum: number }
-
 /**
  * Pure predicate evaluation. No I/O, no clock — so the circuit can mirror it.
  *
@@ -174,30 +197,41 @@ export function evaluateCondition(
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
   const out: Excursion[] = [];
-  let open: { start: number; extremum: number } | null = null;
+  let open: { start: number; extremumMilli: Milli } | null = null;
 
-  const outside = (v: number) =>
-    (p.bounds.max !== undefined && v > p.bounds.max) ||
-    (p.bounds.min !== undefined && v < p.bounds.min);
+  const { minMilli, maxMilli } = p.bounds;
+  if (minMilli !== undefined) assertMilli(minMilli, `${p.predicateId}.bounds.minMilli`);
+  if (maxMilli !== undefined) assertMilli(maxMilli, `${p.predicateId}.bounds.maxMilli`);
+
+  // `boundaryIsBreach` is a CONTRACT TERM carried in the predicate's identity.
+  // Written as one comparison per end, in the same direction, so the two ends
+  // cannot drift apart — the asymmetry this function exists to prevent.
+  const overMax = (v: Milli) =>
+    maxMilli !== undefined && (p.boundaryIsBreach ? v >= maxMilli : v > maxMilli);
+  const underMin = (v: Milli) =>
+    minMilli !== undefined && (p.boundaryIsBreach ? v <= minMilli : v < minMilli);
+  const outside = (v: Milli) => overMax(v) || underMin(v);
 
   for (const r of rs) {
     const at = Date.parse(r.at);
-    if (outside(r.value)) {
-      if (!open) open = { start: at, extremum: r.value };
+    assertMilli(r.valueMilli, `evaluateCondition(${r.channel}@${r.at})`);
+    if (outside(r.valueMilli)) {
+      if (!open) open = { start: at, extremumMilli: r.valueMilli };
       else {
-        const worseHigh = p.bounds.max !== undefined && r.value > open.extremum;
-        const worseLow = p.bounds.min !== undefined && r.value < open.extremum;
-        if (worseHigh || worseLow) open.extremum = r.value;
+        // The extremum is the worst reading IN THE DIRECTION IT BREACHED.
+        const worseHigh = overMax(r.valueMilli) && r.valueMilli > open.extremumMilli;
+        const worseLow = underMin(r.valueMilli) && r.valueMilli < open.extremumMilli;
+        if (worseHigh || worseLow) open.extremumMilli = r.valueMilli;
       }
     } else if (open) {
       if ((at - open.start) / 1000 > p.toleranceSeconds) {
-        out.push({ from: new Date(open.start).toISOString(), to: r.at, extremum: open.extremum });
+        out.push({ from: new Date(open.start).toISOString(), to: r.at, extremumMilli: open.extremumMilli });
       }
       open = null;
     }
   }
   if (open && (t - open.start) / 1000 > p.toleranceSeconds) {
-    out.push({ from: new Date(open.start).toISOString(), to, extremum: open.extremum });
+    out.push({ from: new Date(open.start).toISOString(), to, extremumMilli: open.extremumMilli });
   }
   return { breached: out.length > 0, excursions: out };
 }
@@ -214,7 +248,7 @@ function renderCondition(
       'This proves the committed readings satisfy the predicate; it does not prove the sensor was truthful.';
   }
   if (status === 'breached') {
-    const worst = exc && exc.length ? ` worst excursion ${exc[0].extremum}` : '';
+    const worst = exc && exc.length ? ` worst excursion ${fromMilli(exc[0].extremumMilli)}` : '';
     return `${p.statement} — BREACHED, ${exc?.length ?? 0} excursion(s)${worst}, over ${pct} coverage (${anchorNote}; ${devNote}).`;
   }
   return `${p.statement} — CANNOT BE EVALUATED over the requested interval (${pct} covered).`;
@@ -229,6 +263,8 @@ export interface NotarizeInput {
   device: DeviceTrust;
   /** Injected so the engine holds no clock — a verdict must be reproducible. */
   now: string;
+  /** Policy, not a constant. Recorded on the verdict. */
+  postingWindow?: PostingWindow;
   prove?: (args: {
     root: string; predicateId: string; from: string; to: string;
     verdictBit: 'held' | 'breached';
@@ -237,23 +273,36 @@ export interface NotarizeInput {
 
 export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
   const { readings, commitment, predicate: p, from, to, device } = inp;
+  const window = inp.postingWindow ?? DEFAULT_POSTING_WINDOW;
   const coverage = computeCoverage(readings, from, to, p.maxGapSeconds);
+  // The applied window travels ON the verdict. A counterparty reading a refusal
+  // can see which threshold produced it instead of trusting a hidden default.
+  const ctx = (c: Commitment | null): VerdictContext => ({
+    postingWindow: window,
+    postingOffsetSeconds: c ? postingOffsetSeconds(c) : 0,
+    coverage,
+  });
 
   if (!commitment) {
     return {
       status: 'unproven', predicateId: p.predicateId, commitmentId: null,
       reason: 'no_commitment_for_interval',
       remedy: 'Post a commitment covering this interval at the time readings are taken. A commitment created now cannot evidence the past.',
-      coverage, renderedClaim: renderCondition('unproven', p, coverage, 'internal', device),
+      context: ctx(null), renderedClaim: renderCondition('unproven', p, coverage, 'internal', device),
     };
   }
 
-  if (!postedInTime(commitment)) {
+  const posting = postingVerdict(commitment, window);
+  if (posting !== 'in_time') {
     return {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-      reason: 'commitment_posted_after_the_fact',
-      remedy: `Commitment posted ${commitment.postedAt} for an interval ending ${commitment.coversTo}. Only commitments posted within ${POST_GRACE_SECONDS / 60} minutes of the covered interval can yield a held verdict.`,
-      coverage, renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      reason: posting === 'too_late'
+        ? 'commitment_posted_after_the_fact'
+        : 'commitment_predates_its_interval',
+      remedy: posting === 'too_late'
+        ? `Commitment posted ${commitment.postedAt} for an interval ending ${commitment.coversTo}. Only commitments posted within ${window.lateGraceSeconds / 60} minutes after the covered interval can yield a held verdict.`
+        : `Commitment posted ${commitment.postedAt}, which is more than ${window.earlyGraceSeconds / 60} minutes BEFORE the interval beginning ${commitment.coversFrom}. A commitment made before the fact existed cannot have been derived from observing it — it is evidence of fabrication rather than of honesty.`,
+      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -283,7 +332,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
         (recomputed.leafCount < commitment.leafCount
           ? 'Fewer readings were supplied than were committed — the set is incomplete, and a verdict over a subset is not a verdict over what was committed.'
           : 'Supply exactly the committed set. A verdict may only be computed over the readings the commitment covers.'),
-      coverage, renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -292,7 +341,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
       reason: 'telemetry_gap_exceeds_max',
       remedy: `${coverage.gaps.length} gap(s) exceed the ${p.maxGapSeconds}s maximum. Narrow the requested interval to a covered window, or accept a verdict scoped to the covered sub-intervals.`,
-      coverage, renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -311,7 +360,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
       reason: 'proof_generation_failed',
       remedy: 'No prover configured. The predicate evaluated locally, but an unproven evaluation is our claim, not verifiable evidence.',
-      coverage, renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -319,12 +368,12 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
   return breached
     ? {
         status: 'breached', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-        proof, anchorStrength, excursions, coverage, deviceTrust: device,
+        proof, anchorStrength, excursions, context: ctx(commitment), deviceTrust: device,
         renderedClaim: renderCondition('breached', p, coverage, anchorStrength, device, excursions),
       }
     : {
         status: 'held', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-        proof, anchorStrength, coverage, deviceTrust: device,
+        proof, anchorStrength, context: ctx(commitment), deviceTrust: device,
         renderedClaim: renderCondition('held', p, coverage, anchorStrength, device),
       };
 }
@@ -342,19 +391,25 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
 export function notarizeCustody(
   handoffs: Handoff[], p: CustodyPredicate, from: string, to: string,
   commitment: Commitment | null, now: string,
+  window: PostingWindow = DEFAULT_POSTING_WINDOW,
 ): NotaryVerdict {
   // Custody coverage is not an interval-density question, so it is NOT reported
   // as a fraction that would read as "100% covered" off one handoff.
   const coverage: IntervalCoverage = {
     requestedFrom: from, requestedTo: to, covered: 0, gaps: [],
   };
+  const ctx = (c: Commitment | null): VerdictContext => ({
+    postingWindow: window,
+    postingOffsetSeconds: c ? postingOffsetSeconds(c) : 0,
+    coverage,
+  });
 
   if (!commitment) {
     return {
       status: 'unproven', predicateId: p.predicateId, commitmentId: null,
       reason: 'no_commitment_for_interval',
       remedy: 'Commit each handoff at the moment it occurs.',
-      coverage, renderedClaim: `${p.statement} — no commitment for this interval.`,
+      context: ctx(null), renderedClaim: `${p.statement} — no commitment for this interval.`,
     };
   }
 
@@ -366,16 +421,23 @@ export function notarizeCustody(
         status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
         reason: 'missing_handoff_signature',
         remedy: `Handoff at ${unsigned.at} between ${unsigned.fromParty} and ${unsigned.toParty} lacks a signature from ${!unsigned.fromSignature ? unsigned.fromParty : unsigned.toParty}. Custody cannot be evidenced across an unsigned transfer.`,
-        coverage, renderedClaim: `${p.statement} — unsigned handoff at ${unsigned.at}.`,
+        context: ctx(commitment), renderedClaim: `${p.statement} — unsigned handoff at ${unsigned.at}.`,
       };
     }
   }
 
-  const breaks: Array<{ from: string; to: string; extremum: number }> = [];
+  // A custody break's magnitude is a GAP IN SECONDS, not a channel reading. It
+  // is carried in the same `extremumMilli` slot because the verdict shape is
+  // shared — so it is converted to thousandths of a second and the unit is
+  // stated here rather than left for a reader to infer from a bare number.
+  const breaks: Excursion[] = [];
   for (let i = 1; i < sorted.length; i++) {
     const gapS = (Date.parse(sorted[i].at) - Date.parse(sorted[i - 1].at)) / 1000;
     if (sorted[i - 1].toParty !== sorted[i].fromParty || gapS > p.maxHandoffGapSeconds) {
-      breaks.push({ from: sorted[i - 1].at, to: sorted[i].at, extremum: gapS });
+      breaks.push({
+        from: sorted[i - 1].at, to: sorted[i].at,
+        extremumMilli: Math.round(gapS * 1000),   // milli-SECONDS of gap
+      });
     }
   }
 
@@ -392,7 +454,7 @@ export function notarizeCustody(
   return breaks.length === 0
     ? {
         status: 'held', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-        proof: stub('held'), anchorStrength: commitment.anchor.kind, coverage, deviceTrust: device,
+        proof: stub('held'), anchorStrength: commitment.anchor.kind, context: ctx(commitment), deviceTrust: device,
         renderedClaim:
           `${p.statement} — held across ${sorted.length} RECORDED handoff(s). This does not ` +
           'establish that every handoff was recorded.',
@@ -400,7 +462,7 @@ export function notarizeCustody(
     : {
         status: 'breached', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
         proof: stub('breached'), anchorStrength: commitment.anchor.kind,
-        excursions: breaks, coverage, deviceTrust: device,
+        excursions: breaks, context: ctx(commitment), deviceTrust: device,
         renderedClaim: `${p.statement} — BROKEN at ${breaks.length} point(s).`,
       };
 }
