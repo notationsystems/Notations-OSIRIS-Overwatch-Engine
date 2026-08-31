@@ -6051,3 +6051,100 @@ prohibited CAPABILITIES and none of these names one — they describe the produc
 as a category. Whether a freight instrument may describe itself as an OSINT
 platform is the next item, and it is a naming decision with an operator in it,
 not a defect I should settle by sweeping.
+
+
+## Phase 77 — the credit budget that was only ever a comment
+
+`api/flights` carries ten lines explaining the OpenSky credit budget: 4,000 a
+day authenticated, 400 anonymous, and the observation that polling anonymously
+on the same 90-second TTL "burns the whole day's budget in about half an hour".
+The analysis is correct and unusually careful. There is a 429 backoff. There is
+a per-IP pool note.
+
+**Nothing counted.** The enforcement was a TTL chosen by hand so that the
+expected call rate stays under a number written in a comment. That is an
+ARGUMENT, not a mechanism: it holds while no second caller appears, no retry
+loop fires, and nobody edits the TTL without redoing the arithmetic. A quantity
+maintained in prose, describing something no mechanism tracks, is a shape this
+project has paid for repeatedly — most recently in phase 73, where a
+prohibition lived in a gate and the capability it prohibited ran unchecked.
+
+### What was taken from `gods-eye-view`, and what was not
+
+The operator pointed at that MIT-licensed project. Its `voiceCost.js` states a
+principle better than I would have:
+
+> ⚠️ VERIFY AT RELEASE — MODEL IDS AND PRICES ARE EXTERNAL FACTS THAT DRIFT ⚠️
+
+Each rate carries the date it was read and the page it was read from, and a
+release check re-reads them. That is `knownAt` under another name, and it is the
+missing half of every cap in this tree — including the one in the comment above,
+which names no date and no source.
+
+**What is different here, and it is the point.** A cap this module has never
+verified is not silently treated as fact. Every entry declares its provenance:
+`verified` (read from the provider's page, on a date, with the URL) or
+`restated` (copied from a comment by someone who did not check). Both are
+enforced identically; they differ only in what a caller may SAY about them.
+
+Every cap currently in the registry is `restated`, and `verifiedOn` is null,
+because that is the truth: they were lifted from `api/flights`'s comments during
+this phase and no vendor page was opened. Writing `verified` with today's date
+would have been one line and a lie, and it is precisely the lie that produces a
+number everyone trusts whose origin is a comment somebody wrote from memory.
+
+### Three values, and the middle one permits
+
+`charge()` returns `within` / `warned` / `refused`, never a boolean. A warn that
+blocked would cut the feed silently at 80%; a refusal that permitted would be a
+cap in name only. Both directions are pinned.
+
+A refused call does not record spend — it was never made, and charging for it
+would carry a phantom into the next window and make tomorrow's first request
+look like today's overrun.
+
+An undeclared provider is **refused, not assumed free**: an unknown provider is
+not an unmetered one, it is a call nobody costed, and treating it as free means
+the cap gets discovered by a vendor's 429 instead of by this function. Adding a
+provider is the whole registration, which is the route-disposition rule applied
+to spend.
+
+The clock is an argument. Phase 65 recorded a module that took `atPickup` as a
+parameter and then called `Date.now()` for the authority window; `at` is
+required here and is the only clock this module has.
+
+### The severance test was vacuous, and I caught it before it shipped
+
+The counter is anchored with `processSingleton`, because a module-level `Map`
+under Next.js is two counters that each under-count — instance 4 of the
+severance class, and a budget is the worst state to lose that way, since two
+half-counts never reach a cap one whole count would.
+
+The test I first wrote for that called `await import('./providerBudget')` and
+asserted the spend was shared. **That passes for a module-level `Map`**, because
+a second `import` of the same specifier returns the same instance. It was a
+vacuous example inside the test written to rule out severance — the class, in
+the check for the class, for the second time this session (phase 71's marker had
+the mirror-image problem). `vi.resetModules()` forces a real re-evaluation, and
+the plant below confirms it now discriminates.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| the cap stops being enforced | 4 assertions across three describes |
+| a refused call records phantom spend | the phantom-spend pin, and the warn/refuse pin |
+| the `warned` state is collapsed into `within` | the three-value discriminating pin |
+| an undeclared provider is treated as free | the refuse-don't-default pin |
+| the counter becomes a module-level `Map` | the severance pin — which the vacuous version would have passed |
+
+### NOT YET LOAD-BEARING, stated plainly
+
+`api/flights` does not call this module. The governor is built, tested and
+inert, and an inert mechanism is a claim about the future rather than a fact
+about the present. Wiring it is the next item, and it is deliberately separate:
+it changes the behaviour of a live route under a cap whose number is `restated`,
+and doing that in the same commit that introduces the cap would mean the first
+enforcement in this instrument's history shipped without its own report.
+
+- **87 test files, 1261 passed, 6 skipped** (from 85 / 1246). Fifteen new pins.
