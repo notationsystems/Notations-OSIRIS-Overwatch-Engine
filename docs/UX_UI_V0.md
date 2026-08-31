@@ -2,7 +2,7 @@
 
 ## Product surface
 
-Payload Terminal is an operator instrument for a provenance-preserving world state, not a conventional analytics dashboard. The interface must therefore make **state, evidence, uncertainty and action** legible before decoration.
+Payload Terminal is an operator instrument for a provenance-preserving world state, not a conventional analytics dashboard. The interface must make state, evidence, uncertainty and action legible before decoration.
 
 ## Spatial hierarchy
 
@@ -10,7 +10,28 @@ The terminal is organised into three persistent zones:
 
 1. **Command layer** — global search, primary operating surfaces, world-state status.
 2. **World workspace** — MapLibre is the spatial canvas; map controls remain secondary to the state itself.
-3. **Context layer** — evidence, markets, economy, exceptions, routing and selected-entity detail appear as bounded panels rather than competing dashboards.
+3. **Context layer** — evidence, spatial state, markets, economy, exceptions, routing and selected-entity detail appear as bounded panels rather than competing dashboards.
+
+## Spatial state surface
+
+Payload treats geography as an operational state surface rather than a map-only visualization. `PayloadSpatialRail` exposes five conceptual layers:
+
+- Network
+- Facilities
+- Corridors
+- Restrictions
+- Temporal network state
+
+Each layer may expose count, source and `asOf` context. Unknown values remain unknown; the UI never fabricates zeroes.
+
+Spatial computation is presented as a semantic operation rather than a vendor feature:
+
+- Route
+- OD Matrix
+- Isochrone
+- Service Area
+
+The UI may request these operations, but does not select or encode a backend implementation. Backend selection remains a domain/computation concern.
 
 ## Information hierarchy
 
@@ -26,35 +47,9 @@ Every important value should answer, where applicable:
 
 A missing value is rendered as unknown/null, never as a fabricated zero. Refusals are actionable states and should expose the missing prerequisite/remedy.
 
-## Command bar
-
-`PayloadCommandBar` establishes the first reusable command-surface primitive. It intentionally exposes the existing application state through callbacks rather than owning domain state. This preserves the existing page controller and keeps the UI layer from becoming a second source of truth.
-
-### Primary commands
-
-- Search
-- Layers
-- Markets
-- Economy
-- Exceptions
-
-### Persistent status
-
-- world-state entity count
-- backend connection state
-
 ## Visual language
 
-The existing Payload design tokens remain authoritative:
-
-- void/near-black workspace
-- restrained gold for primary state/action
-- cyan for information/telemetry
-- green for confirmed healthy state
-- red/orange for exceptions
-- JetBrains Mono for operational/HUD values
-- Inter for readable explanatory text
-- glass surfaces only where they preserve map visibility
+The existing Payload design tokens remain authoritative: void/near-black workspace; restrained gold for primary state/action; cyan for information/telemetry; green for confirmed healthy state; red/orange for exceptions; JetBrains Mono for operational/HUD values; Inter for readable explanatory text; and glass surfaces only where they preserve map visibility.
 
 Do not introduce a competing colour system or generic SaaS card aesthetic.
 
@@ -63,8 +58,9 @@ Do not introduce a competing colour system or generic SaaS card aesthetic.
 - Map remains the primary spatial context.
 - Panels open from explicit operator intent and should not permanently obscure the world state.
 - Selected entities should establish a clear focus state while preserving provenance context.
-- Search should become the universal entry point to entity/lane/port/carrier retrieval.
-- Keyboard and pointer interactions should converge on the same command model.
+- Search is the universal entry point to entity/lane/port/carrier retrieval.
+- Spatial compute commands describe intent; they do not expose vendor-specific backend names.
+- Keyboard and pointer interactions converge on the same command model.
 - Mobile uses the same information architecture with progressive disclosure, not a separate product model.
 
 ## Architecture constraint
@@ -77,6 +73,12 @@ The intended flow remains:
 
 The renderer is never authoritative.
 
-## Initial implementation
+## Spatial corpus direction
 
-Phase 1 establishes the command surface as a reusable component. Subsequent work should wire it into the existing page controller, then progressively refactor duplicated controls into the command model while retaining current functionality.
+The operational spatial substrate is expected to sit behind the terminal as a versioned corpus rather than being recreated in the UI. Candidate infrastructure includes PostGIS/pgRouting for persistent spatial state and graph computation, with ORS/VROOM and future accelerated solvers behind semantic interfaces. QGIS remains a research/inspection client.
+
+The corpus should preserve provenance and temporal epistemics so historical operations can distinguish the state that was true from the state that was knowable at the time.
+
+## Current implementation
+
+Phase 1 established reusable command and context primitives. Phase 2 adds the spatial-state control rail and formalises semantic spatial operations. Next work wires these surfaces into the existing page controller and validates interaction behaviour without changing domain authority.
