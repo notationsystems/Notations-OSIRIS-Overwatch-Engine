@@ -10,7 +10,7 @@ import type {
   IntervalCoverage, DeviceTrust, ProofRef, Anchor, ConditionChannel,
   Milli, PostingWindow, VerdictContext, Excursion,
 } from './notary.types';
-import { ANCHOR_STRENGTH, DEFAULT_POSTING_WINDOW, assertMilli, toMilli, fromMilli } from './notary.types';
+import { ANCHOR_STRENGTH, DEFAULT_POSTING_WINDOW, assertMilli, toMilli, renderExcursion } from './notary.types';
 
 export interface Reading {
   at: string;
@@ -241,13 +241,13 @@ export function evaluateCondition(
       }
     } else if (open) {
       if ((at - open.start) / 1000 > p.toleranceSeconds) {
-        out.push({ from: new Date(open.start).toISOString(), to: r.at, extremumMilli: open.extremumMilli });
+        out.push({ from: new Date(open.start).toISOString(), to: r.at, extremumMilli: open.extremumMilli, unit: 'channel_base' });
       }
       open = null;
     }
   }
   if (open && (t - open.start) / 1000 > p.toleranceSeconds) {
-    out.push({ from: new Date(open.start).toISOString(), to, extremumMilli: open.extremumMilli });
+    out.push({ from: new Date(open.start).toISOString(), to, extremumMilli: open.extremumMilli, unit: 'channel_base' });
   }
   return { breached: out.length > 0, excursions: out };
 }
@@ -264,7 +264,7 @@ function renderCondition(
       'This proves the committed readings satisfy the predicate; it does not prove the sensor was truthful.';
   }
   if (status === 'breached') {
-    const worst = exc && exc.length ? ` worst excursion ${fromMilli(exc[0].extremumMilli)}` : '';
+    const worst = exc && exc.length ? ` worst excursion ${renderExcursion(exc[0], p.channel)}` : '';
     return `${p.statement} — BREACHED, ${exc?.length ?? 0} excursion(s)${worst}, over ${pct} coverage (${anchorNote}; ${devNote}).`;
   }
   return `${p.statement} — CANNOT BE EVALUATED over the requested interval (${pct} covered).`;
@@ -439,17 +439,16 @@ export function notarizeCustody(
     }
   }
 
-  // A custody break's magnitude is a GAP IN SECONDS, not a channel reading. It
-  // is carried in the same `extremumMilli` slot because the verdict shape is
-  // shared — so it is converted to thousandths of a second and the unit is
-  // stated here rather than left for a reader to infer from a bare number.
+  // A custody break's magnitude is a GAP IN SECONDS, not a channel reading. The
+  // slot is shared with condition excursions, so the UNIT travels with the
+  // number rather than being inferred from which function produced it.
   const breaks: Excursion[] = [];
   for (let i = 1; i < sorted.length; i++) {
     const gapS = (Date.parse(sorted[i].at) - Date.parse(sorted[i - 1].at)) / 1000;
     if (sorted[i - 1].toParty !== sorted[i].fromParty || gapS > p.maxHandoffGapSeconds) {
       breaks.push({
         from: sorted[i - 1].at, to: sorted[i].at,
-        extremumMilli: Math.round(gapS * 1000),   // milli-SECONDS of gap
+        extremumMilli: Math.round(gapS * 1000), unit: 'seconds',
       });
     }
   }

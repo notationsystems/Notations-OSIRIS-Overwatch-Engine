@@ -8,7 +8,7 @@ import {
   POST_GRACE_SECONDS, type Reading, type Handoff,
 } from './notary';
 import {
-  requiresNotary, toMilli, fromMilli, assertMilli, ALL_UNPROVEN_REASONS,
+  requiresNotary, toMilli, fromMilli, assertMilli, renderExcursion, ALL_UNPROVEN_REASONS,
   DEFAULT_POSTING_WINDOW,
   type Commitment, type ConditionPredicate, type DeviceTrust, type NotaryPolicy,
   type ProofRef, type UnprovenReason,
@@ -603,5 +603,59 @@ describe('the six fixes that a revision reverted, pinned by behaviour', () => {
     const v = notarizeCustody(hs, P, FROM, TO, commit([], FROM, TO, TO), NOW);
     expect(v.context.coverage.covered).toBe(0);
     expect(v.renderedClaim).not.toContain('100.0%');
+  });
+});
+
+
+describe('the shared excursion slot carries its unit, because it carries two', () => {
+  const P = { predicateId: 'c@1', statement: 'custody', maxHandoffGapSeconds: 60, requireBothSignatures: true };
+
+  it('a condition breach reports thousandths of the CHANNEL base unit', () => {
+    const readings = run(FROM, TO, 5, i => (i >= 36 && i <= 44 ? 9.4 : 5.0));
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('breached');
+    if (v.status === 'breached') {
+      expect(v.excursions[0].unit).toBe('channel_base');
+      expect(fromMilli(v.excursions[0].extremumMilli)).toBe(9.4);
+    }
+  });
+
+  it('a custody break reports thousandths of a SECOND, in the same slot', () => {
+    const hs: Handoff[] = [
+      { at: FROM, fromParty: 'a', toParty: 'b', fromSignature: 's', toSignature: 's' },
+      { at: '2026-08-30T00:20:00.000Z', fromParty: 'b', toParty: 'c', fromSignature: 's', toSignature: 's' },
+    ];
+    const v = notarizeCustody(hs, P, FROM, TO, commit([], FROM, TO, TO), NOW);
+    expect(v.status).toBe('breached');
+    if (v.status === 'breached') {
+      expect(v.excursions[0].unit).toBe('seconds');
+      expect(fromMilli(v.excursions[0].extremumMilli)).toBe(1200);   // 20 minutes
+    }
+  });
+
+  it('THE DEFECT: the two numbers are indistinguishable without the unit', () => {
+    // 1200 seconds of custody gap and 1200 degrees are the same bare number in
+    // the same field. This is why `unit` is required rather than optional —
+    // an optional unit is one a producer can omit and a reader must then guess.
+    const gapMilli = 1200 * 1000;
+    const degMilli = toMilli(1200);
+    expect(gapMilli).toBe(degMilli);
+    // With the unit, they render differently and cannot be conflated.
+    expect(renderExcursion({ from: FROM, to: TO, extremumMilli: gapMilli, unit: 'seconds' }))
+      .toBe('1200s');
+    expect(renderExcursion({ from: FROM, to: TO, extremumMilli: degMilli, unit: 'channel_base' }, 'temperature_c'))
+      .toBe('1200 temperature_c');
+  });
+
+  it('the rendered claim names the channel, so a breach reads as a measurement', () => {
+    const readings = run(FROM, TO, 5, i => (i >= 36 && i <= 44 ? 9.4 : 5.0));
+    const v = notarizeCondition({
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.renderedClaim).toContain('9.4 temperature_c');
   });
 });

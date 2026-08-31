@@ -212,7 +212,7 @@ describe('every number-bearing type in the layer is accounted for', () => {
     AlertScorecard: 'precision and quiet-rate over the backtest',
     BacktestReport: 'precision, recall and median lead',
     Reading: 'a sensor value; the notary carries deviceTrust beside the VERDICT, not the reading',
-    Excursion: 'the extremum of a breach — a measured reading, reported without its own evidence class',
+    Excursion: 'the extremum of a breach — a measured reading; it now carries its UNIT but still not its evidence class, which is the part still owed',
     IntervalCoverage: 'the fraction of an interval covered by committed readings',
   };
 

@@ -206,10 +206,44 @@ export const ALL_UNPROVEN_REASONS: readonly UnprovenReason[] = [
   'proof_generation_failed',
 ] as const;
 
+/**
+ * WHAT `extremumMilli` COUNTS THOUSANDTHS OF.
+ *
+ * Required, not optional, and this is the whole point. The `breached` verdict
+ * carries one `excursions` array, and two different mechanisms fill it:
+ *
+ *   a CONDITION breach   → the worst reading, in thousandths of the channel's
+ *                          base unit (degrees C, % RH, g, degrees of tilt)
+ *   a CUSTODY break      → the size of the gap, in thousandths of a SECOND
+ *
+ * The shape is shared; the unit is not. A bare number in a shared slot is the
+ * commensurability failure this codebase refuses everywhere else — and it was
+ * already visible in the rendering, where `worst excursion 1200` (twenty
+ * minutes of custody gap) and `worst excursion 9.4` (degrees) print
+ * identically. A reader cannot tell, and neither can a downstream consumer.
+ *
+ * Recorded as owed when the shared slot was introduced; paid here.
+ */
+export type ExcursionUnit =
+  /** Thousandths of the predicate's channel base unit. The channel is on the
+   *  predicate, which the verdict names by `predicateId`. */
+  | 'channel_base'
+  /** Thousandths of a second. Used for a custody gap. */
+  | 'seconds';
+
 export interface Excursion {
   from: ISODateTime;
   to: ISODateTime;
   extremumMilli: Milli;
+  unit: ExcursionUnit;
+}
+
+/** Render an excursion's magnitude WITH its unit, so the number cannot be misread. */
+export function renderExcursion(e: Excursion, channel?: string): string {
+  const v = fromMilli(e.extremumMilli);
+  return e.unit === 'seconds'
+    ? `${v}s`
+    : `${v}${channel ? ` ${channel}` : ''}`;
 }
 
 export interface IntervalCoverage {
