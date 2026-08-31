@@ -3666,3 +3666,95 @@ now fails if any exported name is declared in two files in the directory. It is
 the same drift the ledger warns about for a substrate implemented twice in two
 languages, at the scale of one directory — and it was live for the length of one
 commit.
+
+---
+
+## Phase 53 — the registry, and the branch that could not be reached
+
+The arbitration and selection layer arrived as a complete file. Its structure
+is right: capability arbitration is separated from selection, selection is
+separated from the strict/degraded decision, and the comment on `select()`
+states the correct principle — *"Return the closest, and let the caller decide
+between `degraded` and `refused` — the registry never silently downgrades."*
+
+The code did not do that.
+
+### `degraded` was unreachable from every input
+
+```ts
+// select(): no backend assures everything →
+return { engine: null, best: scored[0].a, candidates: … };
+
+// route():
+if (sel.engine === null) { return { status: 'refused', … } }
+```
+
+`select()` returned `engine: null` whenever no backend assured *everything*, so
+`route()` refused before it could reach the degraded construction below. Traced
+over all four combinations of (fully-assured × strict):
+
+```
+fullyAssured=true   strict=true   -> ok      (early return, no shortfall)
+fullyAssured=true   strict=false  -> ok      (early return, no shortfall)
+fullyAssured=false  strict=true   -> refused (engine null)
+fullyAssured=false  strict=false  -> refused (engine null)
+
+DEGRADED reachable from any input?  false
+```
+
+So `strict: false` refused identically to `strict: true`. The documented
+planning estimate — the entire reason the option exists — did not exist. The
+mechanism's APPARENT SCOPE was two modes; its EFFECTIVE SCOPE was one, and
+nothing failed, because no test asked for the second.
+
+`select()` now returns the best candidate whenever one exists, with its
+arbitration, and `route()` decides. The two modes are pinned to differ by test,
+so they cannot collapse back into one.
+
+A second correction while in there: strict now refuses **before** calling the
+backend. Calling first spends a request only to discard the answer, and makes
+the refusal depend on whether the backend happened to be up — a legality
+decision that varies with network weather is not a legality decision.
+
+### Arbitration was per backend, under a per-operation signature
+
+`select(op, required)` took an operation and called `arbitrate(caps, required)`
+without it, against `restrictionsHonoured: ReadonlySet` and
+`verification: Record<string, …>` — both keyed by restriction alone.
+
+That is phase 51's finding reintroduced one layer up: `select('matrix',
+['height'])` would consult a verdict earned on `route` and hand back a
+car-legal matrix labelled truck-legal, which is the exact measured defect. Now
+`arbitrate(caps, operation, required)`, with the operation required.
+
+Also folded in: a verdict claiming `assured` whose probe does not discriminate
+is counted **refuted**, not unverified. The claim loses to the measurement,
+otherwise a backend self-certifies.
+
+### `inventory()` had a column that could never be non-empty
+
+```ts
+const all = [...e.capabilities.restrictionsHonoured];
+const a = arbitrate(e.capabilities, all);
+return { …, assured: a.assured, refuted: a.refuted };
+```
+
+Arbitrating over the set the backend already honours makes `unhonoured` empty
+**by construction**. Had the field been surfaced, it would have been a column of
+zeroes reading as a clean bill of health on every backend. Now arbitrated over
+the full restriction vocabulary, one row per (backend, operation).
+
+### Two overclaims in the rendering
+
+`spatialClaim` defaulted `computedAt` to `new Date().toISOString()`. A claim
+that stamps itself is not reproducible: two runs over identical inputs produce
+two different claims, so a replay can never be compared byte-for-byte, and the
+notary's in-time discipline has nothing stable to bind to. Injected now, for the
+same reason `notarizeCondition` takes `now` as a parameter.
+
+`renderRoute` produced `truck-legal for ` — with an empty list — whenever
+`legalityAssured` was true and nothing had been requested. A clearance nobody
+asked for and nothing checked, asserted by a `join` on an empty array. Nothing
+required now renders *"no restrictions requested, so no legality claim is
+made"*. It is the cheapest possible overclaim and it was one character of
+punctuation away from being invisible.
