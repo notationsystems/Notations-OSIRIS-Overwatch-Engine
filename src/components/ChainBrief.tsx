@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { Loader2, Sparkles, Bug, Flame, ShieldAlert, ExternalLink } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * OSIRIS — Daily chain-threat brief.
@@ -27,7 +28,7 @@ const usd = (n: number | null | undefined) => {
 };
 const shortAddr = (a: string) => (a && a.length > 20 ? `${a.slice(0, 10)}…${a.slice(-8)}` : a);
 
-function Head({ title, icon: Icon, color, right }: { title: string; icon: any; color: string; right?: string }) {
+function Head({ title, icon: Icon, color, right }: { title: string; icon: LucideIcon; color: string; right?: string }) {
   return (
     <div className="flex items-center gap-2 mt-3 mb-1.5 first:mt-0">
       <Icon className="w-3.5 h-3.5" style={{ color }} />
