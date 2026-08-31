@@ -165,7 +165,7 @@ anything).**
   over half its calls), and `COMTRADE_DA` (duplicate outbound load, and a
   `knownAt` that could differ between contexts for one record).
 
-- **A seventh, at a DATA seam rather than a module one (phase 38):** the
+- **Instance 7, at a DATA seam rather than a module one (phase 38):** the
   map projection dropped the `basis` axis, so F-5's "one basis per
   width-scaled layer" ran on a single `unspecified` bucket — one width
   ramp for gross-weight and contained-metal alike, and a mixed-basis
@@ -175,9 +175,9 @@ anything).**
 
 **Door.** Next.js runs the instrumentation hook in a DIFFERENT module
 context from route handlers, so module-level state is not shared — and,
-for the seventh instance, a projection that quietly omitted a field.
+for instance 7, a projection that quietly omitted a field.
 
-**Ninth instance (phase 40): the graph view answered every date the
+**Instance 8 (phase 40): the graph view answered every date the
 same way.** `selectTopology` / `topologyValidity` — phase 13's machinery,
 whose entire purpose is that a date outside every flow vintage yields
 null rather than today's structure wearing a historical label — had the
@@ -201,6 +201,52 @@ date" and not "the network is empty" — and it is now counted and named
 (`representable: {flowsInSelectedTopology, flowLinks, withheld, reason}`),
 with the recorded deferral as its remedy rather than a widening of the
 view.
+
+### The instance roster — ordered by phase, because the ordinal was drifting
+
+This table is the ONE place class-5 instances are counted, and the ordinal is
+DERIVED from phase order rather than asserted.
+
+It exists because the count had already drifted. `DEFECT_CLASSES.md` called the
+phase-40 graph view the "ninth instance" while `ARCHITECTURE_LEDGER.md` titled
+phase 48 "ninth instance" — two documents, two different ninths, and the
+ledger's chain (38→7th, 46→8th, 48→9th, 50→10th) simply skipped phase 40.
+
+That is class 6 — *the literal that agrees with itself and not with the world* —
+arriving in the registry that catalogues it, by exactly the mechanism the ledger
+names at phase 44: "a hand-maintained number describing something". A count
+maintained in two prose documents will disagree; the only question was when.
+
+Ordinals below are positions in this table. Adding an instance means adding a
+row, and `defectClasses.test.ts` fails if a row names a phase the ledger does
+not contain, if the ordinals are not contiguous, or if a ledger heading claims
+an ordinal that contradicts this table.
+
+| # | Phase | The mechanism, and what its effective scope really was |
+|---|-------|--------------------------------------------------------|
+| 1 | 37 | The boot report: log said `boot ready in 2805ms`, `/api/health` answered `booting` indefinitely |
+| 2 | 37 | The outbound rate limiter kept TWO per-host chains — a throttle defeated by a door it could not see |
+| 3 | 37 | State warming warmed a cache no request would read |
+| 4 | 37 | `sessionTelemetry` — the counters that ARE the frozen S-7 demand evidence |
+| 5 | 37 | `mcpSession` — route-around estimated over half its calls |
+| 6 | 37 | `COMTRADE_DA` — duplicate outbound load, and a `knownAt` differing between contexts |
+| 7 | 38 | A DATA seam, not a module one: the map projection dropped the `basis` axis |
+| 8 | 40 | The graph view answered every date the same way — `selectTopology` had the MAP as its effective scope |
+| 9 | 46 | The collection policy examined registration and was silent about the served route surface |
+| 10 | 48 | "The shipped description" was more than one file |
+| 11 | 50 | The door was an ENUMERATION: nine hand-written panel cascades, and three guards narrower than their titles |
+| 12 | 52 | `isDiscriminating` accepted a distance-only probe, contradicting its own file's stated property |
+| 13 | 53 | `degraded` was unreachable from every input; `strict:false` refused identically to `strict:true` |
+| 14 | 54 | A test asserting the absence of the feature it was named for, and a "central" test that could not catch its own bug |
+| 15 | 55 | A numeric type alias hid a type from the accounting guard that had just been widened to see it |
+| 16 | 57 | An instance recorded in the wrong state of a distinction I had argued to preserve, from a summary, with the source in the scratchpad |
+
+**What the roster shows that the prose did not.** Instances 12–16 are all in
+CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,
+and a ledger entry. The class started in runtime state and has moved into the
+apparatus built to catch it. That is not a coincidence and it is not irony: the
+guards are the newest code, they are written fastest, and they are the least
+often themselves checked.
 
 **Closed by.** `processSingleton` anchors process-wide state on
 `globalThis`; the map projection carries `basis` and the pin sits at the

@@ -2313,7 +2313,7 @@ All six reduce to one question no test asks on its own: *does the thing
 this mechanism affects, and the thing actually in use, have the same
 identity?*
 
-**A seventh instance, found by looking where the class said to look —
+**Instance 7, found by looking where the class said to look —
 and it was in my own F-5 work.** The class says: does the thing this
 mechanism affects, and the thing in use, have the same identity? So the
 UI was rendered rather than reasoned about — the F-5 map changes had
@@ -2379,7 +2379,7 @@ has become live, which is precisely what building the deferred allocation
 model (facility-level flows on a non-metal basis) would do.
 
 **The third surface, and the door the operator named: TEST PLACEMENT.**
-The operator's reading of the seventh instance — "class 6 arriving
+The operator's reading of instance 7 — "class 6 arriving
 through test placement" — is a door in its own right: a test that
 exercises a mechanism at the wrong ALTITUDE verifies the mechanism and
 is silent about the wiring. F-5 was correct, unit-tested at the function
@@ -2955,7 +2955,7 @@ research panel and entity inspector.
 
 ## Phase 46 — the policy examined registration and was silent about the route surface
 
-The eighth instance of the class named in phase 38, and the largest. Every
+Instance 9 of the class named in phase 38, and the largest. Every
 prior instance cost a partition of a measurement. This one shipped a
 person-targeting capability, publicly, under the firm's name.
 
@@ -3175,7 +3175,7 @@ Turbopack warnings are pre-existing dynamic `node:fs` imports, verified
 against a stashed baseline rather than assumed.
 
 
-## Phase 48 — ninth instance: "the shipped description" was more than one file
+## Phase 48 — instance 10: "the shipped description" was more than one file
 
 Recorded separately from phase 47 because it is an instance of the phase-38
 class, not a rename detail, and the register is where instances live.
@@ -3403,7 +3403,7 @@ that was really about mines.
 
 ---
 
-## Phase 50 — tenth instance: the door was an ENUMERATION, and so were the guards
+## Phase 50 — instance 11: the door was an ENUMERATION, and so were the guards
 
 Three findings this phase, all the same class, all found by measurement rather
 than by reading intentions. Recorded together because separating them would
@@ -4112,3 +4112,58 @@ of that guard and the second time this session it has paid.
 Phases 51 and 52 stand as to the SHAPE — capability is per operation, and a
 verdict without an operation cannot express a real backend. Their
 characterization of the mechanism is corrected here.
+
+---
+
+## Phase 58 — instance 16 was recorded twice, under two different numbers
+
+Auditing the class registry against the ledger found the two documents disagree
+about the instance count.
+
+`DEFECT_CLASSES.md` called the phase-40 graph view the **ninth instance**.
+`ARCHITECTURE_LEDGER.md` titled phase 48 **"ninth instance"**. Extracted
+mechanically, the ledger's chain runs 38→7th, 46→8th, 48→9th, 50→10th — and
+skips phase 40 entirely, which the class registry had counted.
+
+Neither document was checkable against the other, so each stayed internally
+consistent while the pair diverged. That is class 6 — *the literal that agrees
+with itself and not with the world* — arriving in the registry that catalogues
+it, by exactly the mechanism this ledger names at phase 44: **"a hand-maintained
+number describing something."** The registry documented the failure mode and
+then exhibited it, in the field whose only job is to count.
+
+### The fix is not a renumber
+
+Renumbering by hand puts the same literal back, one value higher. The ordinal is
+now a **row position in a table**, the table lives in one document, and the
+sixteen instances are ordered by phase — an order that is derivable rather than
+asserted, so "which was ninth" has an answer that cannot be held differently in
+two places.
+
+`defectClasses.test.ts` enforces it: ordinals contiguous from 1, phases
+non-decreasing, every rostered phase present in the ledger, every row carrying a
+description rather than a bare reference, and — the drift catcher — no ledger
+heading claiming an ordinal the roster contradicts. Verified by restoring the
+original phase-48 heading: that check alone fails.
+
+A seventh check forbids counting an instance in WORDS again in either document.
+It caught three survivors on first run, in the phase-38 prose.
+
+### What the roster shows that the prose could not
+
+Ordered by phase, instances 12–16 are all in CHECKING machinery: a probe
+arbiter, a selection branch, two tests, a scanner, and a ledger entry. The class
+began in runtime state — a boot report, a rate limiter, a warmed cache — and has
+moved into the apparatus built to catch it.
+
+That is worth stating plainly rather than as irony. The guards are the newest
+code in the tree, they are written fastest, they are usually written in the same
+sitting as the thing they guard, and they are the least often themselves
+checked. A guard is a claim about coverage, and this codebase's own rule is that
+a claim is measured, not asserted — which is why the last several rounds have
+each ended by planting a violation against the check just written.
+
+Instance 16 is this entry's own subject: recording a real backend in the wrong
+state of a distinction I had argued in the previous phase must be preserved,
+from a summary, with the primary source sitting unread in the session
+scratchpad.
