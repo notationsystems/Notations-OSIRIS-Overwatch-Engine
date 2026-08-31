@@ -105,9 +105,25 @@ function getYouTubeWatchUrl(url: string): string {
 }
 
 export default function Dashboard() {
-  const dataRef = useRef<any>({});
-  const [dataVersion, setDataVersion] = useState(0);
-  const data = dataRef.current;
+  // THE LAYER STORE IS STATE, NOT A REF READ AT RENDER.
+  //
+  // It was `const data = dataRef.current` beside a `dataVersion` counter — a
+  // half-finished pattern. Mutating a ref does not repaint, so every layer
+  // update relied on some OTHER state change happening to re-render at the
+  // right moment. Two of the four mutation sites (`sdk_entities`) bumped no
+  // counter at all, so that layer was permanently one data-cycle stale, and it
+  // could not bump one: its own effect depended on `dataVersion` and would have
+  // looped. Deriving it (below) removes the write and the staleness together.
+  //
+  // `dataRef` survives only as a MIRROR for async callbacks, which need the
+  // latest value without closing over a stale render. It is written in an
+  // effect, never during render.
+  const [data, setData] = useState<Record<string, any>>({});
+  const dataRef = useRef<Record<string, any>>(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+  const mergeData = useCallback((patch: Record<string, any>) => {
+    setData(prev => ({ ...prev, ...patch }));
+  }, []);
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
@@ -555,7 +571,7 @@ export default function Dashboard() {
 
   // ── Tripwires ──
   // Re-sweep every watched AOI whenever live data refreshes and record what
-  // changed. Keyed off dataVersion rather than `data` so this runs once per
+  // changed. Keyed off the store so this runs once per
   // refresh instead of once per render.
   useEffect(() => {
     if (watched.size === 0) return;
@@ -565,14 +581,14 @@ export default function Dashboard() {
       if (!watched.has(shape.id)) continue;
       const ring = queryRing(shape);
       if (!ring) continue;
-      const report = selectInPolygon(ring, dataRef.current as any);
+      const report = selectInPolygon(ring, data);
       const prev = watchBaselines.current[shape.id] ?? null;
       const { baseline, events } = diffSweep(shape.id, report, prev, now);
       watchBaselines.current[shape.id] = baseline;
       fresh.push(...events);
     }
     if (fresh.length) setWatchEvents(log => appendEvents(log, fresh));
-  }, [dataVersion, watched, drawnPolygons]);
+  }, [data, watched, drawnPolygons]);
 
   const toggleWatch = useCallback((id: string) => {
     setWatched(prev => {
@@ -623,8 +639,7 @@ export default function Dashboard() {
       if (res.ok) {
         const json = await res.json();
         const d = transform ? transform(json) : json;
-        dataRef.current = { ...dataRef.current, ...d };
-        setDataVersion(v => v + 1);
+        mergeData(d);
         setBackendStatus('connected');
         return true;
       }
@@ -748,8 +763,7 @@ export default function Dashboard() {
       const res = await fetch(`/data/submarine-cables.json?v=${ts}`);
           if (res.ok) {
              const cablesData = await res.json();
-             dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
-             setDataVersion(v => v + 1);
+             mergeData({ submarine_cables: cablesData.features });
           }
         } catch (e) { console.warn('Cables fetch failed'); }
       })();
@@ -857,12 +871,15 @@ export default function Dashboard() {
   // Produces node coordinates for the SDK network mesh visualization.
   // Does NOT duplicate existing layer visuals — SDK layer is LINES ONLY.
   // Cameras are excluded — they have their own dedicated layer.
-  useEffect(() => {
+  // DERIVED, NOT STORED. This was an effect that wrote `sdk_entities` back into
+  // the shared store and bumped no version, so the layer never triggered a
+  // repaint of its own — and it could not, because the effect depended on the
+  // version counter and would have looped. A value computed from other data is
+  // a derivation; storing it created a cycle that could only be broken by
+  // leaving the layer stale.
+  const sdkEntities = useMemo<any[]>(() => {
     const anyActive = activeLayers.sdk_sea || activeLayers.sdk_air || activeLayers.sdk_naval;
-    if (!anyActive) {
-      dataRef.current = { ...dataRef.current, sdk_entities: [] };
-      return;
-    }
+    if (!anyActive) return [];
 
     const sdkEntities: any[] = [];
 
@@ -929,8 +946,11 @@ export default function Dashboard() {
       }
     }
 
-    dataRef.current = { ...dataRef.current, sdk_entities: sdkEntities };
-  }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
+    return sdkEntities;
+  }, [data, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
+
+  /** What the map and panels actually read: the store plus what is derived from it. */
+  const mapData = useMemo(() => ({ ...data, sdk_entities: sdkEntities }), [data, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -1138,7 +1158,7 @@ export default function Dashboard() {
       <ErrorBoundary name="Map">
         <PayloadMap 
           key={payloadTheme}
-          data={data} 
+          data={mapData} 
           activeLayers={activeLayers} 
           projection={mapProjection} 
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'} 
@@ -1361,7 +1381,7 @@ export default function Dashboard() {
         </span>
 
         <span className="hidden lg:inline-flex items-center gap-1" title="Tracked entities on map">
-          <ActiveEntityCount data={data} />
+          <ActiveEntityCount data={mapData} />
           <span className="opacity-60">ENTITIES</span>
         </span>
 
@@ -1418,7 +1438,7 @@ export default function Dashboard() {
       )}
 
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />}
+      {showLayers && !isMobile && <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />}
 
 
 
@@ -1513,7 +1533,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showMarkets && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <MarketsPanel data={data} spaceWeather={spaceWeather} />
+                <MarketsPanel data={mapData} spaceWeather={spaceWeather} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1533,7 +1553,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {showAlerts && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <LiveAlerts data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                <LiveAlerts data={mapData} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1805,14 +1825,14 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />
+                      <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={payloadTheme} setTheme={setPayloadTheme} capabilities={capabilities} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
                       </div>
                     </>
                   )}
-                  {mobilePanel === 'markets' && <MarketsPanel data={data} spaceWeather={spaceWeather} />}
-                  {mobilePanel === 'intel' && <IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+                  {mobilePanel === 'markets' && <MarketsPanel data={mapData} spaceWeather={spaceWeather} />}
+                  {mobilePanel === 'intel' && <IntelFeed data={mapData} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar
@@ -1939,7 +1959,7 @@ export default function Dashboard() {
             selectedPolygon={selectedPolygon}
             onSelectPolygon={setSelectedPolygon}
             onRenamePolygon={(id, name) => setDrawnPolygons(p => p.map(x => x.id === id ? { ...x, name } : x))}
-            data={data}
+            data={mapData}
             onLocateEntity={(lat, lng) => setFlyToLocation({ lat, lng, zoom: 12, ts: Date.now() })}
             watched={watched}
             onToggleWatch={toggleWatch}
