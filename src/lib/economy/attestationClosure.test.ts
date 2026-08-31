@@ -189,6 +189,26 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // Claimable artifacts, carrier trust, claim economics, transparency log.
+    // These are counts and instants about OUR OWN process and OUR OWN records —
+    // how long a counterparty took, what we tendered, what we re-covered — and
+    // each figure that IS a claim about a carrier carries its own attestation
+    // class on the component, which is the whole point of the profile shape.
+    Claimable: 'the artifact envelope; validForSeconds and instants are terms of an offer we made',
+    ClaimLatency: 'how long a counterparty took to answer US — measured from our own two timestamps',
+    SelfContainmentCheck: 'counts of values examined and violations found in our own payload',
+    ClaimIncentive: 'a decay schedule and a head start — the terms of an offer, not a measurement',
+    ClaimDefault: 'notice seconds on a cancellation we recorded',
+    TonuSchedule: 'configured notice bands and amounts — policy, not measurement',
+    ResponseProfile: 'counts of offers we made and how they resolved; the verdict that reads it carries the n-floor',
+    Money: 'an amount and its currency; attested by the record that produced it',
+    CarrierTrustProfile: 'components each carry their own attestation class; loadsRun is a count of our own records',
+    FraudSignal: 'evidenceIds count what was observed; the observable is carried, not the inference',
+    TrustPolicy: 'configured floors and windows — the rule that decides what blocks a tender',
+    ComponentValue: 'the attestation class travels ON the component, which is the shape this type exists for',
+    SignedTreeHead: 'treeSize is the size of a log we published',
+    InclusionReceipt: 'a leaf index into our own log',
+    LogRecord: 'the canonical serialization we hashed; what it asserts is attested by whatever produced it',
     // The seed sweep's own accounting. These count WORLDS AND SEEDS — how often
     // a finding held across a set this process generated — not anything measured
     // outside it. A rate over 16 simulated worlds is a property of the sweep.

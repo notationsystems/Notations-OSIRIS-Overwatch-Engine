@@ -251,6 +251,13 @@ an ordinal that contradicts this table.
 | 25 | 64 | A confound that became the measurement — at ≥74% of the lane, the noise source was larger than the entire planted term |
 | 26 | 64 | A parameter denominated wrong: a probability of forcing read as a target share, so 0.35 produced 62-75% |
 | 27 | 64 | An assertion that grepped for a word and claimed to test a condition — `not.toContain('SOMETIMES')` against text that explains what a SOMETIMES is |
+| 28 | 65 | A module that injected one clock correctly and read another silently — `atPickup` passed in, `Date.now()` called for the authority window |
+| 29 | 65 | Two floors for one question, quoted in the same report: a carrier with 9 loads was above one and below the other simultaneously |
+| 30 | 65 | The one figure that reaches an invoice was the one with no currency, while every type beside it carried one |
+| 31 | 65 | A rate over an empty denominator reported as 0%: `Math.max(accepted, 1)` turned "no data" into "a clean record" |
+| 32 | 65 | An integrity field taken as input and stored unchecked — a content hash nobody derives, on an artifact whose claim is third-party verifiability |
+| 33 | 65 | A verifier whose effective scope was ZERO, with a passing negative test beside it reading as coverage — reproduced here after being reported |
+| 34 | 65 | A benchmark measuring the operation nobody waits on: ~300k appends/sec quoted while one customer-facing proof cost 64-69 ms |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,
