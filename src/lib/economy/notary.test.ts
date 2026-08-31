@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { createHash } from 'crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   merkleRoot, leafHash, computeCoverage, evaluateCondition, reading,
-  notarizeCondition, notarizeCustody, postedInTime, postingVerdict,
+  notarizeCondition, notarizeCustody, postedInTime, checkPosting,
   POST_GRACE_SECONDS, type Reading, type Handoff,
 } from './notary';
 import {
@@ -342,12 +345,14 @@ describe('THE PRE-DATING HOLE: the in-time rule is symmetric now', () => {
     };
   };
 
+  const side = (c: Commitment) => { const r = checkPosting(c); return r.ok ? 'in_time' : r.side; };
+
   it('a commitment posted a YEAR before its data is refused', () => {
     // MEASURED against the one-sided check this replaces: postedInTime returned
     // TRUE and the full pipeline returned HELD on exactly this input. A
     // commitment made before the fact existed cannot have been derived from
     // observing it.
-    expect(postingVerdict(at('2025-08-30T00:00:00.000Z'))).toBe('predates_interval');
+    expect(side(at('2025-08-30T00:00:00.000Z'))).toBe('early');
     const v = notarizeCondition({
       readings: readings(), commitment: at('2025-08-30T00:00:00.000Z'), predicate: REEFER,
       from: FROM, to: TO, device: DEVICE, now: NOW, prove,
@@ -355,23 +360,48 @@ describe('THE PRE-DATING HOLE: the in-time rule is symmetric now', () => {
     expect(v.status).toBe('unproven');
     if (v.status === 'unproven') {
       expect(v.reason).toBe('commitment_predates_its_interval');
-      expect(v.remedy).toContain('evidence of fabrication');
+      expect(v.remedy).toContain('cannot precede its own readings');
     }
   });
 
-  it('posting AT the start of the interval is legitimate — that is a pre-commitment', () => {
-    // earlyGrace is measured from coversFrom, not coversTo. Committing to
-    // observe, then observing, is the honest pattern and must not be refused.
-    expect(postingVerdict(at(FROM))).toBe('in_time');
+  it('posting at the START of the interval is REFUSED, and that is the correction', () => {
+    // An earlier revision anchored the early edge to `coversFrom`, reasoning
+    // that posting at the start is a legitimate pre-commitment. For a
+    // load_condition root that is exactly backwards:
+    //
+    //     root = merkleRoot(readings over [coversFrom, coversTo])
+    //
+    // Every reading must EXIST for the root to be computable, so the earliest
+    // honest postedAt is coversTo. A commitment posted at coversFrom claims a
+    // root over readings the period had not yet produced — the fabrication
+    // case. The permissive anchor admitted a whole interval's worth of it.
+    expect(side(at(FROM))).toBe('early');
+  });
+
+  it('posting at coversTo is in time; a few minutes of upload skew is fine', () => {
+    expect(side(at(TO))).toBe('in_time');
+    expect(side(at('2026-08-30T06:03:00.000Z'))).toBe('in_time');
+  });
+
+  it('a decision_expectation MAY precede its interval — that is pre-registration', () => {
+    // The one subject where committing before observing is the point. Handled
+    // by subject kind rather than by loosening the window for everything.
+    const preReg: Commitment = {
+      ...at(FROM), subject: { kind: 'decision_expectation', decisionId: 'D-1' },
+      postedAt: '2025-08-30T00:00:00.000Z',
+    };
+    expect(checkPosting(preReg).ok).toBe(true);
+    // ...and it is still bounded on the LATE side.
+    expect(side({ ...preReg, postedAt: '2026-09-01T06:00:00.000Z' })).toBe('late');
   });
 
   it('and posting two days late is still too late', () => {
-    expect(postingVerdict(at('2026-09-01T06:00:00.000Z'))).toBe('too_late');
+    expect(side(at('2026-09-01T06:00:00.000Z'))).toBe('late');
   });
 
   it('the window is policy: a permissive one accepts what the default refuses', () => {
     const wide = { lateGraceSeconds: 15 * 60, earlyGraceSeconds: 400 * 24 * 3600 };
-    expect(postingVerdict(at('2025-08-30T00:00:00.000Z'), wide)).toBe('in_time');
+    expect(checkPosting(at('2025-08-30T00:00:00.000Z'), wide).ok).toBe(true);
     // ...and the verdict records WHICH window was applied, so this is visible.
     const v = notarizeCondition({
       readings: readings(), commitment: at('2025-08-30T00:00:00.000Z'), predicate: REEFER,
@@ -458,5 +488,120 @@ describe('every unproven reason is reachable — enumerated, not remembered', ()
     // policy that refuses on it. Saying so is better than a reachability claim
     // that quietly excludes the member it cannot produce.
     expect(ALL_UNPROVEN_REASONS).toContain('device_unattested');
+  });
+});
+
+/**
+ * THE REVERT PINS.
+ *
+ * A proposed revision of `notary.ts` arrived that reverted six fixes at once —
+ * every one of them silently, because each reversion still typechecks, still
+ * runs, and still returns a verdict-shaped object. They are pinned here
+ * BEHAVIOURALLY rather than by grepping the source, so a reversion fails on
+ * what it does rather than on how it is spelled.
+ *
+ * These are not hypothetical. Each was a defect found by measurement, and each
+ * was re-proposed after being fixed.
+ */
+describe('the six fixes that a revision reverted, pinned by behaviour', () => {
+  it('1. the leaf hashes the INSTANT, not the ISO string', () => {
+    // Hashing `r.at` raw makes two offsets of one instant produce different
+    // leaves, while the circuit parses to u64 seconds and produces one. A
+    // reference and a circuit that disagree on the encoding disagree on every
+    // root, silently, because both look internally consistent.
+    const z = reading('2026-08-30T01:00:00.000Z', 'temperature_c', 5, 'd');
+    const plusOne = reading('2026-08-30T02:00:00+01:00', 'temperature_c', 5, 'd');
+    expect(leafHash(z)).toBe(leafHash(plusOne));
+  });
+
+  it('2. the root sorts by INSTANT, not lexically', () => {
+    // '2026-08-30T02:00:00+01:00' sorts AFTER '...T01:00:00.000Z' as a string
+    // and TIES with it as an instant. Ordering must follow the instant.
+    const off = reading('2026-08-30T00:00:00.000Z', 'temperature_c', 4, 'd');
+    const z = reading('2026-08-30T01:00:00.000Z', 'temperature_c', 5, 'd');
+    const plusOne = reading('2026-08-30T02:00:00+01:00', 'temperature_c', 5, 'd');
+    expect(merkleRoot([off, z]).root).toBe(merkleRoot([off, plusOne]).root);
+  });
+
+  it('3. internal nodes are domain-separated from leaves', () => {
+    // Without separation, a value whose encoding resembles a concatenated hash
+    // pair can be presented as an internal node. Concatenating two leaves must
+    // NOT reproduce their parent.
+    const a = reading(FROM, 'temperature_c', 5, 'd');
+    const b = reading(TO, 'temperature_c', 6, 'd');
+    const parent = merkleRoot([a, b]).root;
+    const naive = createHash('sha256')
+      .update(leafHash(a) + leafHash(b)).digest('hex');
+    expect(parent).not.toBe(naive);
+  });
+
+  it('4. coverage is NOT capped at 1, and out-of-order is reported', () => {
+    // Clamping to a reassuring 1.000 hides the case worth seeing; sorting
+    // silently erases the only evidence a device or upload path misbehaves.
+    const ordered = run(FROM, TO, 30, () => 5.0);
+    const jumbled = [ordered[3], ordered[1], ...ordered];
+    const cov = computeCoverage(jumbled, FROM, TO, 1800);
+    expect(cov.outOfOrder).toBe(true);
+    expect(cov).toHaveProperty('outOfOrder');
+  });
+
+  it('5. a curated subset plus the full commitment cannot yield held', () => {
+    // The omission attack. Dropping this check makes the root decoration.
+    const full = run(FROM, TO, 5, i => (i >= 36 && i <= 48 ? 9.4 : 5.0));
+    const commitment = commit(full, FROM, TO, TO);
+    const curated = full.filter(r => r.valueMilli <= toMilli(8.0));
+    expect(curated.length).toBeLessThan(full.length);
+    const v = notarizeCondition({
+      readings: curated, commitment, predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW, prove,
+    });
+    expect(v.status).toBe('unproven');
+    if (v.status === 'unproven') expect(v.reason).toBe('readings_do_not_match_commitment');
+  });
+
+  it('6. the engine holds no clock — two runs are byte-identical', () => {
+    // A verdict that stamps itself cannot be compared against a replay. `now`
+    // is injected for the same reason the spatial claim takes computedAt.
+    const readings = run(FROM, TO, 5, () => 5.0);
+    const args = {
+      readings, commitment: commit(readings, FROM, TO, TO), predicate: REEFER,
+      from: FROM, to: TO, device: DEVICE, now: NOW,
+    };
+    expect(JSON.stringify(notarizeCondition(args)))
+      .toBe(JSON.stringify(notarizeCondition(args)));
+
+    const P = { predicateId: 'c@1', statement: 's', maxHandoffGapSeconds: 1800, requireBothSignatures: true };
+    const hs: Handoff[] = [{ at: FROM, fromParty: 'a', toParty: 'b', fromSignature: 's', toSignature: 's' }];
+    const c = commit([], FROM, TO, TO);
+    expect(JSON.stringify(notarizeCustody(hs, P, FROM, TO, c, NOW)))
+      .toBe(JSON.stringify(notarizeCustody(hs, P, FROM, TO, c, NOW)));
+  });
+
+  it('6b. and the clock read the behavioural pin CANNOT reach, checked structurally', () => {
+    // MEASURED, and stated rather than papered over: applying all six
+    // reversions made 11 tests fail, and pin 6 was NOT among them.
+    //
+    // The reason is worth keeping. On the condition path the `system: 'none'`
+    // stub's `provedAt` is discarded — that branch returns `unproven` without
+    // the proof — so a wall-clock read there never reaches the output and no
+    // behavioural test can observe it. It is dead today and live the moment
+    // that branch starts carrying its proof.
+    //
+    // A pin that cannot fail is worse than no pin, so this half is checked at
+    // the source, and the split is named instead of implied.
+    const src = readFileSync(join(process.cwd(), 'src/lib/economy/notary.ts'), 'utf8');
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(code, 'the engine must take `now`, never read it').not.toMatch(/new Date\(\s*\)/);
+  });
+
+  it('7. one handoff does not read as a fully covered interval', () => {
+    // `covered: handoffs.length > 0 ? 1 : 0` renders "held across 100.0% of the
+    // interval" off a single handoff. Custody is not an interval-density
+    // question, so it reports 0 rather than a fraction that overstates.
+    const P = { predicateId: 'c@1', statement: 's', maxHandoffGapSeconds: 1800, requireBothSignatures: true };
+    const hs: Handoff[] = [{ at: FROM, fromParty: 'a', toParty: 'b', fromSignature: 's', toSignature: 's' }];
+    const v = notarizeCustody(hs, P, FROM, TO, commit([], FROM, TO, TO), NOW);
+    expect(v.context.coverage.covered).toBe(0);
+    expect(v.renderedClaim).not.toContain('100.0%');
   });
 });

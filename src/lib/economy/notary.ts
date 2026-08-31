@@ -100,44 +100,60 @@ export function merkleRoot(readings: Reading[]): { root: string; leafCount: numb
 /** Retained for the existing call sites; the window below is the real policy. */
 export const POST_GRACE_SECONDS = DEFAULT_POSTING_WINDOW.lateGraceSeconds;
 
-/** postedAt − coversTo, in seconds. Negative means posted before the interval closed. */
-export function postingOffsetSeconds(c: Commitment): number {
-  return (Date.parse(c.postedAt) - Date.parse(c.coversTo)) / 1000;
-}
-
-export type PostingVerdict = 'in_time' | 'too_late' | 'predates_interval';
+export type PostingCheck =
+  | { ok: true; offsetSeconds: number }
+  | { ok: false; offsetSeconds: number; side: 'late' | 'early' };
 
 /**
- * THE IN-TIME RULE, NOW SYMMETRIC.
+ * SUBJECT KINDS THAT MAY LEGITIMATELY COMMIT BEFORE THEIR INTERVAL.
  *
- * It checked only lateness. MEASURED against that version: a commitment posted
- * 2025-08-30 for readings covering 2026-08-30 — a full year BEFORE the data
- * existed — returned true, and the full pipeline returned `held`.
+ * A `decision_expectation` is a PRE-REGISTRATION: the whole point is to state
+ * what you expect before you observe it, so an early commitment is the honest
+ * pattern rather than the suspicious one. Every other subject commits to a root
+ * over data that must already exist.
  *
- * A commitment made before the fact existed cannot have been derived from
- * observing it. It is evidence of fabrication, not of honesty, and it is the
- * cheaper attack of the two: predating costs nothing, whereas backdating at
- * least requires the readings to exist first.
- *
- * `earlyGrace` is measured from `coversFrom`, not `coversTo`: posting at the
- * START of the interval is legitimate (that is a pre-commitment to observe),
- * posting before the interval begins is not.
+ * Enumerated rather than special-cased inline, so adding a subject kind forces
+ * the question "can this one be posted early?" instead of inheriting an answer.
  */
-export function postingVerdict(
-  c: Commitment, window: PostingWindow = DEFAULT_POSTING_WINDOW,
-): PostingVerdict {
-  const posted = Date.parse(c.postedAt);
-  if (posted - Date.parse(c.coversTo) > window.lateGraceSeconds * 1000) return 'too_late';
-  if (Date.parse(c.coversFrom) - posted > window.earlyGraceSeconds * 1000) {
-    return 'predates_interval';
-  }
-  return 'in_time';
+const MAY_PRECEDE_INTERVAL: ReadonlySet<Commitment['subject']['kind']> =
+  new Set(['decision_expectation']);
+
+/**
+ * The posting window is SYMMETRIC and fails closed in both directions.
+ *
+ * LATE is a story told afterwards. EARLY is worse, and the one-sided v1 check
+ * let it through: measured, a commitment posted 2025-08-30 for readings covering
+ * 2026-08-30 returned true and the pipeline returned `held`.
+ *
+ * BOTH EDGES ARE MEASURED FROM `coversTo`, and that is a correction to an
+ * earlier revision here which anchored the early edge to `coversFrom`, reasoning
+ * that posting at the start of an interval is a legitimate pre-commitment. For a
+ * `load_condition` root that is exactly backwards:
+ *
+ *     root = merkleRoot(readings over [coversFrom, coversTo])
+ *
+ * Every reading in the interval must EXIST for the root to be computable, so the
+ * earliest honest `postedAt` is `coversTo` plus upload skew. A commitment posted
+ * at `coversFrom` claims a root over readings the period had not yet produced —
+ * which is the fabrication case, not the honest one. The permissive anchor would
+ * have admitted a whole interval's worth of it.
+ *
+ * The genuine pre-registration case is a different SUBJECT, handled above.
+ */
+export function checkPosting(
+  c: Commitment, w: PostingWindow = DEFAULT_POSTING_WINDOW,
+): PostingCheck {
+  const offsetSeconds = (Date.parse(c.postedAt) - Date.parse(c.coversTo)) / 1000;
+  if (offsetSeconds > w.lateGraceSeconds) return { ok: false, offsetSeconds, side: 'late' };
+  if (MAY_PRECEDE_INTERVAL.has(c.subject.kind)) return { ok: true, offsetSeconds };
+  if (offsetSeconds < -w.earlyGraceSeconds) return { ok: false, offsetSeconds, side: 'early' };
+  return { ok: true, offsetSeconds };
 }
 
 export function postedInTime(
   c: Commitment, window: PostingWindow = DEFAULT_POSTING_WINDOW,
 ): boolean {
-  return postingVerdict(c, window) === 'in_time';
+  return checkPosting(c, window).ok;
 }
 
 export function computeCoverage(
@@ -277,10 +293,8 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
   const coverage = computeCoverage(readings, from, to, p.maxGapSeconds);
   // The applied window travels ON the verdict. A counterparty reading a refusal
   // can see which threshold produced it instead of trusting a hidden default.
-  const ctx = (c: Commitment | null): VerdictContext => ({
-    postingWindow: window,
-    postingOffsetSeconds: c ? postingOffsetSeconds(c) : 0,
-    coverage,
+  const ctx = (offsetSeconds: number): VerdictContext => ({
+    postingWindow: window, postingOffsetSeconds: offsetSeconds, coverage,
   });
 
   if (!commitment) {
@@ -288,21 +302,20 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
       status: 'unproven', predicateId: p.predicateId, commitmentId: null,
       reason: 'no_commitment_for_interval',
       remedy: 'Post a commitment covering this interval at the time readings are taken. A commitment created now cannot evidence the past.',
-      context: ctx(null), renderedClaim: renderCondition('unproven', p, coverage, 'internal', device),
+      context: ctx(NaN), renderedClaim: renderCondition('unproven', p, coverage, 'internal', device),
     };
   }
 
-  const posting = postingVerdict(commitment, window);
-  if (posting !== 'in_time') {
+  const posting = checkPosting(commitment, window);
+  if (!posting.ok) {
+    const late = posting.side === 'late';
     return {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-      reason: posting === 'too_late'
-        ? 'commitment_posted_after_the_fact'
-        : 'commitment_predates_its_interval',
-      remedy: posting === 'too_late'
-        ? `Commitment posted ${commitment.postedAt} for an interval ending ${commitment.coversTo}. Only commitments posted within ${window.lateGraceSeconds / 60} minutes after the covered interval can yield a held verdict.`
-        : `Commitment posted ${commitment.postedAt}, which is more than ${window.earlyGraceSeconds / 60} minutes BEFORE the interval beginning ${commitment.coversFrom}. A commitment made before the fact existed cannot have been derived from observing it — it is evidence of fabrication rather than of honesty.`,
-      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      reason: late ? 'commitment_posted_after_the_fact' : 'commitment_predates_its_interval',
+      remedy: late
+        ? `Commitment posted ${commitment.postedAt} for an interval ending ${commitment.coversTo} — ${Math.round(posting.offsetSeconds / 60)} min late, beyond the ${window.lateGraceSeconds / 60} min window. Only commitments posted within the window can yield a held verdict.`
+        : `Commitment posted ${commitment.postedAt} claims a root over an interval ending ${commitment.coversTo} — ${Math.round(-posting.offsetSeconds / 60)} min BEFORE the data it commits to existed, beyond the ${window.earlyGraceSeconds / 60} min allowance. The root is computable only once every reading in the interval exists, so a commitment cannot precede its own readings.`,
+      context: ctx(posting.offsetSeconds), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -332,7 +345,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
         (recomputed.leafCount < commitment.leafCount
           ? 'Fewer readings were supplied than were committed — the set is incomplete, and a verdict over a subset is not a verdict over what was committed.'
           : 'Supply exactly the committed set. A verdict may only be computed over the readings the commitment covers.'),
-      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(posting.offsetSeconds), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -341,7 +354,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
       reason: 'telemetry_gap_exceeds_max',
       remedy: `${coverage.gaps.length} gap(s) exceed the ${p.maxGapSeconds}s maximum. Narrow the requested interval to a covered window, or accept a verdict scoped to the covered sub-intervals.`,
-      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(posting.offsetSeconds), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -360,7 +373,7 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
       status: 'unproven', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
       reason: 'proof_generation_failed',
       remedy: 'No prover configured. The predicate evaluated locally, but an unproven evaluation is our claim, not verifiable evidence.',
-      context: ctx(commitment), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
+      context: ctx(posting.offsetSeconds), renderedClaim: renderCondition('unproven', p, coverage, commitment.anchor.kind, device),
     };
   }
 
@@ -368,12 +381,12 @@ export function notarizeCondition(inp: NotarizeInput): NotaryVerdict {
   return breached
     ? {
         status: 'breached', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-        proof, anchorStrength, excursions, context: ctx(commitment), deviceTrust: device,
+        proof, anchorStrength, excursions, context: ctx(posting.offsetSeconds), deviceTrust: device,
         renderedClaim: renderCondition('breached', p, coverage, anchorStrength, device, excursions),
       }
     : {
         status: 'held', predicateId: p.predicateId, commitmentId: commitment.commitmentId,
-        proof, anchorStrength, context: ctx(commitment), deviceTrust: device,
+        proof, anchorStrength, context: ctx(posting.offsetSeconds), deviceTrust: device,
         renderedClaim: renderCondition('held', p, coverage, anchorStrength, device),
       };
 }
@@ -400,7 +413,7 @@ export function notarizeCustody(
   };
   const ctx = (c: Commitment | null): VerdictContext => ({
     postingWindow: window,
-    postingOffsetSeconds: c ? postingOffsetSeconds(c) : 0,
+    postingOffsetSeconds: c ? checkPosting(c, window).offsetSeconds : NaN,
     coverage,
   });
 

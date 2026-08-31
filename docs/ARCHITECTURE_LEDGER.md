@@ -3944,3 +3944,82 @@ thousandths of a channel unit. The shape is shared; the unit is not. Stated in
 the code rather than left for a reader to infer from a bare number — the same
 commensurability failure this codebase refuses everywhere else, and the honest
 fix is a per-verdict unit, recorded here as owed.
+
+---
+
+## Phase 56 — a revision that reverted six fixes, and one that corrected me
+
+The engine arrived as a v2 file. One of its changes is a correction to this
+codebase and is adopted. Six of them are reversions of defects already found by
+measurement, and each reverts silently: every one still typechecks, still runs,
+and still returns a verdict-shaped object.
+
+### The correction, adopted
+
+`checkPosting` measures BOTH edges from `coversTo`. Phase 55 anchored the early
+edge to `coversFrom`, reasoning that posting at the start of an interval is a
+legitimate pre-commitment to observe. For a `load_condition` root that is
+exactly backwards:
+
+```
+root = merkleRoot(readings over [coversFrom, coversTo])
+```
+
+Every reading in the interval must EXIST for the root to be computable, so the
+earliest honest `postedAt` is `coversTo` plus upload skew. A commitment posted
+at `coversFrom` claims a root over readings the period had not yet produced —
+which is the fabrication case, not the honest one. The permissive anchor would
+have admitted a whole interval's worth of it, in the check written to close
+exactly that hole.
+
+The genuine pre-registration case is real but it is a different SUBJECT:
+`decision_expectation` states what you expect before observing, so early is the
+point. Handled by an enumerated `MAY_PRECEDE_INTERVAL` set rather than by
+loosening the window for everything — adding a subject kind now forces the
+question rather than inheriting an answer.
+
+`PostingCheck` also returns the offset, so the remedy can say *how far* out it
+was rather than only that it was.
+
+### The six reversions
+
+1. `leafHash` hashing `r.at` raw instead of `canonicalAt(r.at)` — two offsets of
+   one instant produce different leaves while the circuit produces one.
+2. `merkleRoot` sorting by `localeCompare` instead of by instant — same
+   divergence, in the ordering.
+3. Internal nodes as `sha(left + right)`, dropping `NODE_VERSION` domain
+   separation.
+4. `covered: Math.min(covered / span, 1)` — clamping away the above-1 signal
+   that says readings arrived out of order, and dropping `outOfOrder` with it.
+5. The entire readings-reconstruct-the-commitment block — the omission attack,
+   without which the root is decoration.
+6. `provedAt: new Date().toISOString()` — the engine reading a clock it is
+   supposed to be handed.
+
+None of these announce themselves. That is what makes them worth pinning rather
+than merely re-fixing: a fix that can be silently reverted has not been made
+permanent, it has been made once.
+
+### The pins, and the one that could not fire
+
+Applying all six reversions at once now fails **11 tests**. Seven are the new
+behavioural pins, written to fail on what the code DOES rather than on how it is
+spelled.
+
+Pin 6 was not among them, and the reason is kept rather than papered over: on
+the condition path the `system: 'none'` stub's `provedAt` is discarded — that
+branch returns `unproven` without the proof — so a wall-clock read there never
+reaches the output and no behavioural test can observe it. It is dead today and
+live the moment that branch starts carrying its proof.
+
+A pin that cannot fail is worse than no pin, because it reads as coverage. So
+that half is checked at the source, comments stripped first, and the split
+between the behavioural and structural halves is named in the test rather than
+implied by its title. Verified by planting the clock read: 6b fails, alone.
+
+### Also restored
+
+`notarizeCustody` reporting `covered: handoffs.length > 0 ? 1 : 0` renders
+"held across 100.0% of the interval" off a single handoff. Custody is not an
+interval-density question, and a fraction that cannot mean what it says is worse
+than a zero that admits the question does not apply.
