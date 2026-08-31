@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import maplibregl from 'maplibre-gl';
 import { createSatelliteLayer, parseColor, type SatPoint } from '@/lib/satellite-layer';
 import { styleEconEntity, splitFlowsByBasis, buildEconFlowLayerStyles } from '@/lib/economy/mapStyle';
+import type { SupplyStage } from '@/lib/economy/types';
 
 /** The catalogue fields the satellite layer and its popup actually read. */
 interface SatelliteRow {
@@ -1535,7 +1536,12 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       const p = e.features?.[0]?.properties;
       if (!p) return;
       const coords = (e.features![0].geometry as any).coordinates;
-      const stageCol = ({ production: '#D4AF37', smelting: '#FF7043', refining: '#4FC3F7', logistics: '#78909C', manufacturing: '#AB47BC' } as Record<string, string>)[p.stage] || '#B0BEC5';
+      const STAGE_COL: Record<SupplyStage, string> = {
+        production: '#D4AF37', concentrate: '#C9A227', smelting: '#FF7043',
+        refining: '#4FC3F7', manufacturing: '#AB47BC', demand: '#8BC34A',
+        logistics: '#78909C',
+      };
+      const stageCol = STAGE_COL[p.stage as SupplyStage] || '#B0BEC5';
       const bScore = p.bottleneckScore !== null && p.bottleneckScore !== undefined && p.bottleneckScore !== 'null' ? Number(p.bottleneckScore) : null;
       const prod = p.production !== null && p.production !== undefined && p.production !== 'null' ? Number(p.production) : null;
       const cap = p.capacity !== null && p.capacity !== undefined && p.capacity !== 'null' ? Number(p.capacity) : null;
@@ -1926,11 +1932,32 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
   useEffect(() => {
     if (!mapReady) return;
     const al = activeLayers as any;
+    // WHICH TOGGLE OWNS A STAGE, exhaustively.
+    //
+    // The chain this replaces ended `: al.econ_production`, so every stage
+    // it did not name — `concentrate` and `demand` among the ones that
+    // already existed — was silently governed by the PRODUCTION toggle.
+    // A dot appearing and disappearing with a control that does not claim
+    // it is worse than one nobody can toggle, because the operator reads
+    // the layer panel as an inventory of what is on screen.
+    //
+    // Written as a Record over SupplyStage so a new stage is a compile
+    // error here rather than a silent adoption by whichever branch happens
+    // to be last.
+    const STAGE_LAYER: Record<SupplyStage, 'econ_production' | 'econ_processing' | 'econ_ports'> = {
+      production: 'econ_production',
+      concentrate: 'econ_production',
+      smelting: 'econ_processing',
+      refining: 'econ_processing',
+      manufacturing: 'econ_processing',
+      demand: 'econ_processing',
+      logistics: 'econ_ports',
+    };
+    // A null stage is a record that never stated one — a different question
+    // from a stage this map does not handle, and it stays with production
+    // so an unclassified entity does not vanish.
     const stageVisible = (stage: string | null) =>
-      stage === 'production' ? al.econ_production
-        : stage === 'smelting' || stage === 'refining' || stage === 'manufacturing' ? al.econ_processing
-          : stage === 'logistics' ? al.econ_ports
-            : al.econ_production;
+      al[STAGE_LAYER[stage as SupplyStage] ?? 'econ_production'];
     const ents = data.econ_entities || [];
     // A stage toggle hides its dots, but the bottleneck layer keeps flagged
     // nodes visible — a constraint you have hidden is still a constraint.

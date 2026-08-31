@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import ForceGraph2D from 'react-force-graph-2d';
 import { graphLinkTreatment } from '@/lib/economy/mapStyle';
+import type { SupplyStage } from '@/lib/economy/types';
 import { X, Network } from 'lucide-react';
 
 /**
@@ -52,12 +53,27 @@ interface EconGraphViewProps {
   onClose: () => void;
 }
 
-const STAGE_COLOR: Record<string, string> = {
+/**
+ * EXHAUSTIVE OVER SupplyStage, deliberately.
+ *
+ * Typed `Record<string, string>` this map took any key and fell back to
+ * grey, so extending the stage vocabulary would have shipped a new stage
+ * that rendered as an unlabelled grey dot with nothing failing — the
+ * silent-default shape this codebase keeps finding. `Record<SupplyStage,
+ * string>` makes adding a stage a COMPILE ERROR here, which is the
+ * cheapest possible place to be told.
+ *
+ * The `?? fallback` at the call site stays: it handles a null stage on a
+ * record, which is a different question from an unhandled stage value.
+ */
+const STAGE_COLOR: Record<SupplyStage, string> = {
   production: '#D4AF37',
+  concentrate: '#C9A227',
   smelting: '#FF7043',
   refining: '#4FC3F7',
-  logistics: '#78909C',
   manufacturing: '#AB47BC',
+  demand: '#8BC34A',
+  logistics: '#78909C',
 };
 
 const FORM_COLOR: Record<string, string> = {
@@ -226,7 +242,7 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const n = node as GraphNode;
                 const r = 2.5 + Math.sqrt(Math.max(0, n.throughputKt)) / 9;
-                const color = STAGE_COLOR[n.stage ?? ''] ?? '#B0BEC5';
+                const color = STAGE_COLOR[n.stage as SupplyStage] ?? '#B0BEC5';
                 // Bottleneck halo under the node fill.
                 if ((n.bottleneckScore ?? 0) >= 0.45) {
                   ctx.beginPath();
