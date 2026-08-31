@@ -274,6 +274,7 @@ an ordinal that contradicts this table.
 | 48 | 71 | The conditional-route gate asserted a condition was STATED, never that it was kept: `osint/whois` named the individual-registrant hazard in its own header and returned the vCard `fn` eight lines below, retaining precisely the entities whose only identifier was a natural person's name |
 | 49 | 72 | `src/middleware.ts` sat in the execution-surface scan's population for four phases and passed every run: the markers ask which upstream host a file CONTACTS, and this one enclosed the visitor's raw address in a body posted to the firm's own collector |
 | 50 | 73 | Phase 46 searched for the advertised Telegram layer, found nothing, recorded "never built — nothing to delete", and built a gate against ADVERTISING it; the scraper was live in `api/news` the whole time, so the prohibition covered saying it and nothing covered doing it |
+| 51 | 74 | The same fact was prohibited in one route and served from another: phase 68 removed head-of-state person nodes from the intelligence layer while `region-dossier` kept returning the office-holder for any clicked coordinate |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

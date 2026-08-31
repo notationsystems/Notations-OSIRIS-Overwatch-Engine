@@ -81,6 +81,20 @@ const PROHIBITED_MARKERS: ReadonlyArray<{ pattern: RegExp; capability: string }>
    */
   { pattern: /\bt\.me\/s\//,
     capability: 'Telegram channel post scraping' },
+  /**
+   * Resolving the office-holder of a place (phase 74). The Wikidata properties
+   * for head of state and head of government return a NAMED NATURAL PERSON,
+   * and both have now appeared in this tree: one in the deleted intelligence
+   * layer's country resolver, one in `region-dossier`, which returned the
+   * office-holder for whichever country contained a clicked coordinate.
+   *
+   * Deliberately keyed on the property identifiers rather than on a field name
+   * like `head_of_state`, because a field name is what the route CALLS its
+   * output and the identifier is what it ASKS FOR — and because a marker on
+   * the field name would match every comment recording its removal.
+   */
+  { pattern: /\bwdt:P(?:6|35)\b/,
+    capability: 'resolving a head of state or government (a named natural person)' },
 ];
 
 function routeIds(): string[] {

@@ -5877,3 +5877,59 @@ entry.
   feeds → 3 RSS feeds, all under this instrument's own User-Agent.
 - Three surfaces from the retraction remain: `api/astra`, `api/region-dossier`,
   `public/robots.txt`.
+
+
+## Phase 74 — the office-holder in the country dossier
+
+Fourth of the six. `region-dossier` answers a right-click on the map with
+country context, and among population, area, capital, languages, currencies
+and flag it returned `head_of_state: { name, position }` — a named natural
+person, resolved from the Wikidata head-of-government property for whichever
+country contained the clicked point, and rendered by `page.tsx` as its own
+`HEAD OF STATE` panel.
+
+### The counter-argument, recorded because it is a real one
+
+A head of state is a public office-holder. Their name is civic fact, published
+everywhere, and returning it is not surveillance in any ordinary sense. Nothing
+about this resembles the breach lookups A-0 deleted, and a reader who thinks
+this phase is over-scrupulous is not being unreasonable.
+
+What decided it: **the collection policy has no person-data exception, and the
+one that would be needed here would have been written by the person who wanted
+it.** "Public figures are fine" is exactly the kind of carve-out that is
+obvious to its author and unbounded in practice — where does a public figure
+end, and who adjudicates the edge at the moment someone wants the edge?
+
+And it was already decided once. Phase 68 removed this same field from the
+intelligence layer, in the same words: *CEOs and heads of state emitted as
+person nodes — person data produced when the caller never asked for a person.*
+Leaving it here would mean one fact prohibited in one route and served from
+another, which is the condition the whole route-disposition machinery exists to
+prevent.
+
+It also costs the instrument nothing. A broker pricing a lane through a country
+needs its risk, its borders, its ports and its holidays. The office-holder's
+name was inherited from the overwatch dashboard, not required by anything
+downstream.
+
+### The marker, and where it is keyed
+
+The scan now names the Wikidata head-of-state and head-of-government
+properties. Both have appeared in this tree: one in the deleted intelligence
+layer's country resolver, one here.
+
+It is keyed on the PROPERTY IDENTIFIERS rather than on a field name like
+`head_of_state`, for two reasons. A field name is what a route calls its
+output, and the identifier is what it asks the upstream for — the second is
+harder to rename around. And a marker on the field name would match every
+comment recording the removal, which is the collision phase 73 resolved by not
+writing the literal; keying on the identifier means the prose can say
+`head_of_state` freely.
+
+### Measured after
+
+- **1244 passed, 6 skipped** — unchanged. A capability was removed and a marker
+  added.
+- Build compiles; typecheck clean.
+- Two surfaces from the retraction remain: `api/astra` and `public/robots.txt`.

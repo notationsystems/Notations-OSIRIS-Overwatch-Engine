@@ -2,9 +2,25 @@ import { NextResponse } from 'next/server';
 import { requireRouteEnabled } from '../../../lib/routeGate';
 
 /**
- * Payload — Region Dossier API
- * Provides country intelligence for any coordinate (right-click on map)
- * Fix #115: Steps 2-4 now run in parallel via Promise.allSettled
+ * Payload — country context for a coordinate (right-click on the map).
+ *
+ * NO NAMED NATURAL PERSON (ledger phase 74). This route used to return
+ * `head_of_state: { name, position }`, resolved from the Wikidata
+ * head-of-government property for whichever country contains the point, and
+ * the UI rendered it as its own panel.
+ *
+ * The counter-argument is real and worth recording rather than skipping: a
+ * head of state is a public office-holder and their name is civic fact, not
+ * surveillance. What decided it is that the collection policy has no
+ * person-data exception, and inventing one for "public figures" would be a
+ * carve-out nobody asked for, written by the person who wanted it. Phase 68
+ * removed exactly this field from the intelligence layer — CEOs and heads of
+ * state emitted as person nodes — and leaving it here would mean the same fact
+ * was prohibited in one route and served from another.
+ *
+ * It also costs the instrument nothing. A broker pricing a lane through a
+ * country needs its risk, its borders and its ports. The office-holder's name
+ * was inherited, not required.
  */
 
 export async function GET(request: Request) {
@@ -73,14 +89,10 @@ export async function GET(request: Request) {
         try {
           const safe = countryName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
           const sparql = `
-          SELECT ?leaderLabel ?positionLabel ?population ?area ?capitalLabel ?regionLabel ?flagUrl (GROUP_CONCAT(DISTINCT ?langLabel; separator=", ") AS ?languages) (GROUP_CONCAT(DISTINCT ?currLabel; separator=", ") AS ?currencies)
+          SELECT ?population ?area ?capitalLabel ?regionLabel ?flagUrl (GROUP_CONCAT(DISTINCT ?langLabel; separator=", ") AS ?languages) (GROUP_CONCAT(DISTINCT ?currLabel; separator=", ") AS ?currencies)
           WHERE { 
             ?country wdt:P31/wdt:P279* wd:Q6256; 
                      rdfs:label "${safe}"@en. 
-            OPTIONAL { 
-              ?country wdt:P6 ?leader. 
-              OPTIONAL { ?leader wdt:P39 ?position. }
-            }
             OPTIONAL { ?country wdt:P1082 ?population. } 
             OPTIONAL { ?country wdt:P2046 ?area. } 
             OPTIONAL { ?country wdt:P36 ?capital. } 
@@ -90,15 +102,13 @@ export async function GET(request: Request) {
             OPTIONAL { ?country wdt:P41 ?flagUrl. } 
             SERVICE wikibase:label { 
               bd:serviceParam wikibase:language "en". 
-              ?leader rdfs:label ?leaderLabel.
-              ?position rdfs:label ?positionLabel.
               ?capital rdfs:label ?capitalLabel. 
               ?region rdfs:label ?regionLabel. 
               ?lang rdfs:label ?langLabel. 
               ?curr rdfs:label ?currLabel. 
             } 
           } 
-          GROUP BY ?leaderLabel ?positionLabel ?population ?area ?capitalLabel ?regionLabel ?flagUrl
+          GROUP BY ?population ?area ?capitalLabel ?regionLabel ?flagUrl
           LIMIT 1`;
           
           const res = await fetch(
@@ -121,14 +131,8 @@ export async function GET(request: Request) {
     const wdData      = wdResult.status   === 'fulfilled' ? wdResult.value   : null;
 
     let countryData = null;
-    let headOfState = null;
 
     if (wdData) {
-      headOfState = wdData.leaderLabel ? {
-        name: wdData.leaderLabel.value,
-        position: wdData.positionLabel?.value || 'Head of State',
-      } : null;
-
       countryData = {
         name: countryName,
         official_name: countryName,
@@ -148,7 +152,6 @@ export async function GET(request: Request) {
       coordinates: { lat, lng },
       location: locationInfo,
       country: countryData,
-      head_of_state: headOfState,
       wikipedia: wikiSummary,
       timestamp: new Date().toISOString(),
     }, {
