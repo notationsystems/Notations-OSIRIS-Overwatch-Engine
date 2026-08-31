@@ -1262,7 +1262,9 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
         if (!e.features?.length) return;
         const p = e.features[0].properties as any;
         const coords = e.lngLat;
-        const srcUrl = p.url || SDK_SOURCE_URLS[p.source] || 'https://osirisai.live';
+        // No source URL means no link. Falling back to a host of our own
+        // choosing attributes someone else's data to a site they do not run.
+        const srcUrl = p.url || SDK_SOURCE_URLS[p.source] || '';
         const domainLabel = p.domain === 'SEA' ? '⚓ MARITIME' : p.domain === 'AIR' ? '✈ AIR CORRIDOR' : '🛡 NAVAL INTEL';
         const domainColor = p.domain === 'SEA' ? '#4FC3F7' : p.domain === 'AIR' ? '#B3E5FC' : '#81D4FA';
         const linkStyle = 'text-decoration:none;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:700;letter-spacing:0.05em;';

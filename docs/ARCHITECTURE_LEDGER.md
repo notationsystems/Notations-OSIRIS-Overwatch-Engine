@@ -5962,3 +5962,92 @@ second proxy to the same capability under a different name still fails.
 **Route count 67 → 66.** Build compiles, typecheck clean after the stale
 `.next/types` validator was regenerated — the only "failure" this phase, and an
 artifact rather than a fact.
+
+
+## Phase 76 — the identity phase 47 swept, in five files it did not reach
+
+Last of the six. Phase 47 removed the pre-fork name and domain and listed what
+it had deliberately left — the ledger, the compatibility env vars, the
+repository URL. Five tracked files kept the pre-fork production domain anyway,
+and none was on that list:
+
+| file | what it asserted |
+|---|---|
+| `public/robots.txt` | the pre-fork platform name as its first line, the domain in a `Sitemap:`, and `Disallow: /api/scanner` — publicly naming a route A-0 deleted |
+| `public/sitemap.xml` | `<loc>` naming the retired host as this instrument's canonical URL, to every crawler that asked |
+| `src/app/docs/DocsClient.tsx` | `FALLBACK_ORIGIN` — so every copy-pasteable `curl` on the docs page pointed at that third-party host until `useEffect` replaced it |
+| `src/components/PayloadMap.tsx` | the fallback link on an SDK entity popup, attributing someone else's data to a site the firm does not run |
+| `deploy.sh` | printed *"<retired host> is live"* to the operator's terminal on every deploy |
+
+Phase 47's own argument was that **the name asserts a purpose** — it swept the
+outbound User-Agent for exactly that reason, because introducing this client to
+Nominatim as an OSINT tool asserted something untrue. These five assert it to
+crawlers, to readers of the documentation, and to the operator.
+
+`robots.txt` is the sharpest of them. A `Disallow:` list is a public directory
+of paths, so naming a deleted scanner endpoint there advertises a capability
+twice over — and `Disallow: /api/` already covered it, making the specific line
+purely disclosure with no crawl effect. The rewritten file keeps the blanket
+rule and the health allow, and names nothing.
+
+`sitemap.xml` and `eye-of-horus.svg` were deleted rather than corrected: a
+sitemap must carry absolute URLs and this build cannot know its own host, so a
+wrong sitemap is worse than none; the icon was an unreferenced asset named for
+the pre-fork identity.
+
+### The gate, and why it is a scan
+
+Phase 47's remedy was a LIST of what had been swept and what had been left. The
+list is what fell behind. So Part D is a scan across the tracked working tree —
+a wider net than the capability scan, because identity travels in prose,
+config, markup and shell, not only in code — minus `docs/`, which is the
+historical record and would be falsified by the sweep.
+
+`public/robots.txt` also joins the classified description artifacts, and
+`candidateArtifacts()` now discovers it, so the next crawler-facing file cannot
+be unclassified.
+
+### The apparatus had to be excluded, and by a rule
+
+Part D failed on its own source: the pattern list must contain the strings it
+forbids. That is the **fourth** time in nine phases a marker has matched the
+prose that defines it — `nmap` in a comment about `nmap` (68), the preview
+endpoint (73), the head-of-state field name (74), and now this.
+
+The phase-73 remedy, *don't write the literal*, is unavailable when the literal
+IS the rule. So the scope excludes `*.test.*` — the checking apparatus is not
+the shipped identity — and it does so by a rule that Part A already draws,
+rather than by an exemption naming this one file. An exemption list stays at
+one entry; a rule that happens to cover the apparatus is not a hole.
+
+### Measured after
+
+- **1246 passed, 6 skipped** (from 1244 / 6). Build compiles, typecheck clean.
+- Tracked files naming the pre-fork domain: 5 → 0.
+- Description artifacts classified: 10 → 11.
+
+### The six are closed. What is open, stated precisely.
+
+The phase-70 retraction listed six surfaces; all six are now done (71–76). What
+that claim covers and nothing more: **no tracked file performs person
+targeting or host scanning, and none names the pre-fork identity.**
+
+It does NOT mean the shipped description is freight-only. Found while closing
+this phase and deliberately not folded into it, because it is a different
+question and this entry is about identity rather than category:
+
+- `SECURITY.md` opens *"The Payload Terminal Project provides powerful Open
+  Source Intelligence (OSINT) and cybersecurity monitoring tools designed to
+  visualize and analyze global threat landscapes"*, and its authorized-use
+  clause presumes the software scans third-party infrastructure.
+- `src/app/docs/page.tsx` metadata — the description a search engine indexes —
+  advertises *"aviation, maritime, seismic, conflict, cyber, and OSINT feeds"*.
+- `DocsClient` markets the same in its hero and ships a runnable *"Passive
+  subdomain enumeration"* recipe; `apiCatalog` still titles a group *"OSINT
+  Toolkit"*.
+
+The description gate reads all four and passes them, because its markers name
+prohibited CAPABILITIES and none of these names one — they describe the product
+as a category. Whether a freight instrument may describe itself as an OSINT
+platform is the next item, and it is a naming decision with an operator in it,
+not a defect I should settle by sweeping.

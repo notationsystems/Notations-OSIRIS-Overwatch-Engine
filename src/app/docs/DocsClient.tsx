@@ -22,7 +22,13 @@ const API_SECTIONS = [
 ];
 
 const ALL_SECTIONS = [...GUIDE_SECTIONS, ...API_SECTIONS];
-const FALLBACK_ORIGIN = 'https://osirisai.live';
+/**
+ * Pre-hydration placeholder for snippet URLs. It is deliberately a reserved
+ * example domain, not a real one: this used to be the pre-fork production
+ * host, so every copy-pasteable curl on this page pointed a reader at a
+ * third-party server until `useEffect` replaced it (ledger phase 76).
+ */
+const FALLBACK_ORIGIN = 'https://your-payload-instance.example';
 
 export default function DocsClient() {
   const [active, setActive] = useState('overview');

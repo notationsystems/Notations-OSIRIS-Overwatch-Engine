@@ -1,17 +1,11 @@
-# Osiris Global Intelligence Platform
-# https://osirisai.live
+# Payload Terminal — freight and physical-commerce instrument.
 
 User-agent: *
 Allow: /
 Disallow: /api/
-Disallow: /api/scanner
-Disallow: /api/osint/*
 
-# Allow search engines to index the main page
+# Liveness only.
 Allow: /api/health
-
-# Sitemap
-Sitemap: https://osirisai.live/sitemap.xml
 
 # Crawl-delay for respectful indexing
 Crawl-delay: 10

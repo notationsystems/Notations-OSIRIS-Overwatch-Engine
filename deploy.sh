@@ -1,10 +1,10 @@
 #!/bin/bash
 # =========================================================
-#  OSIRIS — Deploy Cycle Script
+#  Payload Terminal — Deploy Cycle Script
 #  Git → SSH → Docker Rebuild → Live
 # =========================================================
 #
-#  Usage (from your local osiris project directory):
+#  Usage (from your local Payload Terminal project directory):
 #    bash deploy.sh                  # deploys current staged changes
 #    bash deploy.sh "commit message" # deploys with custom commit message
 #
@@ -49,5 +49,5 @@ echo ""
 
 echo -e "${CYAN}╔══════════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║     ✅ DEPLOYMENT COMPLETE               ║${NC}"
-echo -e "${CYAN}║     https://osirisai.live is live         ║${NC}"
+echo -e "${CYAN}║     Deployed to ${SERVER}${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════════╝${NC}"

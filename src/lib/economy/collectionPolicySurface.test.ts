@@ -414,3 +414,86 @@ describe('no route admits a natural person or a host as its subject', () => {
     ].join(' ')).toEqual([]);
   });
 });
+
+/**
+ * PART D — THE RETIRED IDENTITY (ledger phase 76).
+ *
+ * Phase 47 swept the pre-fork name and domain out of the tree and listed what
+ * it had deliberately left. Five tracked files kept the pre-fork production
+ * domain anyway, and none of them was on that list:
+ *
+ *   public/robots.txt          the crawler-facing identity line, plus a
+ *                              `Sitemap:` pointing at the retired host
+ *   public/sitemap.xml         `<loc>` naming the retired host as canonical
+ *   src/app/docs/DocsClient    the pre-hydration origin for every
+ *                              copy-pasteable curl on the docs page
+ *   src/components/PayloadMap  the fallback link on an SDK entity popup
+ *   deploy.sh                  printed "<retired host> is live" to the
+ *                              operator on every deploy
+ *
+ * Phase 47's reasoning was that the name ASSERTS A PURPOSE — it swept the
+ * outbound User-Agent for exactly that reason. These five assert it to
+ * crawlers, to readers, and to the operator's own terminal.
+ *
+ * The gate is a scan rather than a list, because the previous remedy WAS a
+ * list and the list is what fell behind. Scoped to the tracked working tree
+ * minus `docs/`, which is the historical record: the ledger describes the
+ * pre-fork era and renaming it would falsify it.
+ */
+const RETIRED_IDENTITY: ReadonlyArray<{ pattern: RegExp; what: string }> = [
+  { pattern: /osirisai\.live/i, what: 'the pre-fork production domain' },
+  { pattern: /Osiris Global Intelligence/i, what: 'the pre-fork platform name' },
+];
+
+/** A wider net than the capability scan: identity travels in prose and config. */
+const IDENTITY_EXT = /\.(?:js|mjs|cjs|ts|tsx|py|sh|txt|xml|json|webmanifest|yml|yaml|md)$/;
+
+function identitySurface(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      if (SKIP_DIRS.has(entry)) continue;
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) { walk(full); continue; }
+      if (!IDENTITY_EXT.test(entry)) continue;
+      const rel = relative(ROOT, full).split(sep).join('/');
+      if (rel.startsWith('package-lock.json')) continue;
+      // Tests are the checking apparatus, not the shipped identity, and this
+      // check CANNOT exclude itself any other way: the patterns below have to
+      // contain the strings they forbid. That is the fourth time in nine
+      // phases a marker has matched the prose defining it — the phase-73
+      // remedy (don't write the literal) is unavailable when the literal IS
+      // the rule, so the scope excludes the apparatus instead, by a rule
+      // rather than by an exemption for one file. Part A draws the same line.
+      if (/\.test\.(?:ts|tsx|mjs)$/.test(rel)) continue;
+      out.push(rel);
+    }
+  };
+  walk(ROOT);
+  return out.sort();
+}
+
+describe('the instrument asserts no retired identity', () => {
+  const SURFACE_D = identitySurface();
+
+  it('finds files to check (the gate must not pass by being empty)', () => {
+    expect(SURFACE_D.length).toBeGreaterThan(50);
+    expect(SURFACE_D).toContain('public/robots.txt');
+  });
+
+  it('names the pre-fork platform or domain nowhere outside the historical record', () => {
+    const findings: string[] = [];
+    for (const file of SURFACE_D) {
+      const source = readFileSync(join(ROOT, file), 'utf8');
+      for (const { pattern, what } of RETIRED_IDENTITY) {
+        if (pattern.test(source)) findings.push(`${file}: asserts ${what}`);
+      }
+    }
+    expect(findings, [
+      'A tracked artifact still carries the pre-fork identity. Phase 47 swept the name',
+      'on the argument that it ASSERTS A PURPOSE the application does not have, and then',
+      'left five files asserting it to crawlers, to readers of the docs, and to the',
+      'operator\'s own terminal. The remedy that failed was a list; this is a scan.',
+    ].join(' ')).toEqual([]);
+  });
+});

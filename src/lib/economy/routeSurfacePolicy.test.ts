@@ -310,6 +310,11 @@ const DESCRIPTION_ARTIFACTS: Readonly<Record<string, ArtifactRole>> = {
   // text that those keys were gone. Two documents, one fact, and no check
   // reading either (ledger phase 70).
   '.env.example': 'outward-facing',
+  'public/robots.txt': 'outward-facing',
+  // Crawler-facing, and the file a search engine reads first. It carried the
+  // pre-fork platform name, that project's domain twice, and a `Disallow:` for
+  // `/api/scanner` — publicly naming a route A-0 had deleted (phase 76).
+
 };
 
 /**
@@ -329,6 +334,9 @@ function candidateArtifacts(): string[] {
   // holds real secrets, and is not a description of anything shipped.
   for (const entry of readdirSync(process.cwd())) {
     if (/^\.env\.(example|template|sample)$/.test(entry)) out.push(entry);
+  }
+  for (const entry of readdirSync(join(process.cwd(), 'public'))) {
+    if (entry === 'robots.txt') out.push(`public/${entry}`);
   }
   return out.sort();
 }
