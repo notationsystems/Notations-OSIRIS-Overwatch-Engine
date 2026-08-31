@@ -326,7 +326,7 @@ export default function DocsClient() {
             </p>
             <Callout tone="good" title="No credentials needed">
               Aviation, maritime, satellites, fires, earthquakes, weather, news, and CVE data all come from public
-              keyless feeds. Keys only matter for the optional RECON scanner and for raising rate limits.
+              keyless feeds. Keys only matter for raising rate limits on a few upstreams.
             </Callout>
           </Section>
 
@@ -403,20 +403,16 @@ docker compose up -d`}</Pre>
             <div className="space-y-2">
               {[
                 {
-                  k: 'SCANNER_URL / SCANNER_KEY',
-                  v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s OSIRIS_KEY. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
-                },
-                {
                   k: 'SDK_INGEST_KEY',
                   v: 'Shared secret for /api/sdk/ingest. The endpoint fails closed: while this is unset, ingestion is disabled and returns 503.',
                 },
                 {
-                  k: 'OSIRIS_TELEGRAM_CHANNELS',
-                  v: 'Comma-separated public Telegram channel names (no @) for the Telegram OSINT layer, overriding the curated default set.',
+                  k: 'PAYLOAD_PORT',
+                  v: 'Host port the UI is published on. The container itself always listens on 3000. (OSIRIS_PORT is honoured for one release and warns; it stops being read after v0.2.0.)',
                 },
                 {
-                  k: 'OSIRIS_PORT',
-                  v: 'Host port the UI is published on. The container itself always listens on 3000.',
+                  k: 'PAYLOAD_DISABLE_LIVE',
+                  v: 'Set to 1 to force every source to its snapshot rung. The degradation is visible in provenance, never silent. (OSIRIS_DISABLE_LIVE is honoured for one release and warns.)',
                 },
               ].map(row => (
                 <div
@@ -454,8 +450,8 @@ docker compose up -d`}</Pre>
                   v: 'The left rail. Switches individual feeds on and off, and carries the theme selector.',
                 },
                 {
-                  k: 'RECON Toolkit',
-                  v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, breach checks, sanctions, CVE lookup, port scanning.',
+                  k: 'Infrastructure Attribution',
+                  v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, and counterparty sanctions screening. Scoped to organisational attribution: never used to profile a person.',
                 },
                 {
                   k: 'Intel Feed',
@@ -545,10 +541,13 @@ docker compose up -d`}</Pre>
                 </div>
               ))}
             </div>
-            <Callout tone="warn" title="Responsible use">
-              The RECON scanner and <Code>/api/osint/sweep</Code> generate traffic against the targets you name. Only
-              point them at infrastructure you own or have written authorisation to test. The remaining OSINT routes
-              are passive and query third-party datasets rather than the subject itself.
+            <Callout tone="warn" title="Collection policy">
+              These routes attribute infrastructure to the <em>organisation</em> that operates it — whose domain,
+              whose network, whose ASN — and to nothing else. They must never be used to profile, locate or identify
+              a natural person, and no output of them may be joined to a person record. Sanctions screening covers
+              counterparty organisations, vessels and aircraft; the person path is not served. All of them are
+              passive: they query third-party datasets rather than the subject itself. Host and port scanning,
+              username enumeration, breach lookup and phone research were removed from this application.
             </Callout>
           </Section>
 

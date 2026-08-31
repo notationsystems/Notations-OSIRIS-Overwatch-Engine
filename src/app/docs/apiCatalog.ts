@@ -358,7 +358,7 @@ export const API_GROUPS: ApiGroup[] = [
     id: 'osint',
     title: 'OSINT Toolkit',
     blurb:
-      'The lookup tools behind the RECON panel. Every route takes a single subject and returns a normalised result, so they compose well in scripts.',
+      'Infrastructure attribution and counterparty screening. Every route takes a single subject and returns a normalised result, so they compose well in scripts. Scoped to organisations: never used to profile a person.',
     endpoints: [
       {
         path: '/api/osint/dns',
@@ -389,13 +389,6 @@ export const API_GROUPS: ApiGroup[] = [
         returns: ['…address record'],
       },
       {
-        path: '/api/osint/shodan',
-        method: 'GET',
-        summary: 'Exposed services, banners, and known vulnerabilities for a host.',
-        params: [{ name: 'ip', required: true, desc: 'Address to query.', example: '8.8.8.8' }],
-        returns: ['status', 'ports', 'hostnames', 'cpes', 'vulns', 'tags', 'detail'],
-      },
-      {
         path: '/api/osint/bgp',
         method: 'GET',
         summary: 'ASN, prefix, and peering relationships.',
@@ -408,54 +401,6 @@ export const API_GROUPS: ApiGroup[] = [
         summary: 'Resolves a MAC address or OUI prefix to its hardware vendor.',
         params: [{ name: 'mac', required: true, desc: 'MAC address or OUI prefix.', example: '00:1A:2B:3C:4D:5E' }],
         returns: ['mac', 'prefix', 'vendor', 'address', 'detail'],
-      },
-      {
-        path: '/api/osint/phone',
-        method: 'GET',
-        summary: 'Validates and classifies a phone number in E.164 form.',
-        params: [{ name: 'number', required: true, desc: 'Number in international format.', example: '+442071234567' }],
-        returns: [
-          'valid',
-          'number',
-          'country_code',
-          'region',
-          'line_type',
-          'national',
-          'international',
-          'lat',
-          'query',
-        ],
-      },
-      {
-        path: '/api/osint/github',
-        method: 'GET',
-        summary: 'Public profile metadata for a GitHub account.',
-        params: [{ name: 'user', required: true, desc: 'GitHub username.', example: 'torvalds' }],
-        returns: ['username', 'name', 'bio', 'company', 'location', 'blog', 'email', 'twitter', 'public_repos'],
-      },
-      {
-        path: '/api/osint/leaks',
-        method: 'GET',
-        summary: 'Checks an address against known breach corpora.',
-        params: [{ name: 'email', required: true, desc: 'Email address to check.' }],
-        returns: ['breached', 'breaches', 'data_exposed', 'detail'],
-      },
-      {
-        path: '/api/osint/hudsonrock',
-        method: 'GET',
-        summary: 'Reports whether an asset appears in Hudson Rock\'s infostealer corpus — machines compromised by credential-stealing malware.',
-        params: [
-          { name: 'query', required: true, desc: 'Email, domain, username or phone number.', example: 'tesla.com' },
-          { name: 'type', required: false, desc: 'Pins the asset type instead of inferring it: email, domain, username or phone.', example: 'domain' },
-        ],
-        returns: ['query', 'type', 'compromised', 'stealers', 'total_corporate_services', 'total_user_services', 'totalStealers', 'employees', 'users'],
-      },
-      {
-        path: '/api/osint/cve',
-        method: 'GET',
-        summary: 'Full NVD record for a single CVE identifier.',
-        params: [{ name: 'cve', required: true, desc: 'CVE ID.', example: 'CVE-2021-44228' }],
-        returns: ['id', 'description', 'cvss', 'cvss_vector', 'severity', 'published', 'references', 'source'],
       },
       {
         path: '/api/osint/sanctions',
@@ -475,17 +420,6 @@ export const API_GROUPS: ApiGroup[] = [
         params: [{ name: 'query', required: true, desc: 'IP, domain, or file hash.' }],
         returns: ['…enrichment record'],
       },
-      {
-        path: '/api/osint/sweep',
-        method: 'GET',
-        summary: 'Sweeps a single address or a CIDR range for reachable hosts.',
-        params: [
-          { name: 'ip', desc: 'Single address to sweep.' },
-          { name: 'cidr', desc: 'CIDR range to sweep. Use instead of `ip`.', example: '192.0.2.0/24' },
-        ],
-        returns: ['target_ip', '…sweep results'],
-        notes: 'Only sweep ranges you are authorised to test.',
-      },
     ],
   },
   {
@@ -493,24 +427,6 @@ export const API_GROUPS: ApiGroup[] = [
     title: 'Recon Scanner',
     blurb: 'Active scanning, delegated to a separate backend so the web tier never runs scans itself.',
     endpoints: [
-      {
-        path: '/api/scanner',
-        method: 'GET',
-        summary: 'Runs a scan against a target via the OSIRIS scanner backend.',
-        params: [
-          {
-            name: 'type',
-            required: true,
-            desc: 'Scan type.',
-            example: 'quick | ssl | headers | rdns | subdomains | tech | whois | geoloc | vuln',
-          },
-          { name: 'target', required: true, desc: 'Host, domain, or address to scan.' },
-        ],
-        returns: ['detail', 'hint', 'failed', 'error'],
-        env: ['SCANNER_URL', 'SCANNER_KEY'],
-        notes:
-          'Returns 503 when `SCANNER_URL` / `SCANNER_KEY` are unset — that is the supported way to disable RECON. `SCANNER_KEY` must equal the backend’s `OSIRIS_KEY`.',
-      },
     ],
   },
   {

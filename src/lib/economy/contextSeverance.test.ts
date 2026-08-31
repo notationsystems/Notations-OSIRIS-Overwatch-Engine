@@ -38,6 +38,12 @@ const ECONOMY_DIR = join(process.cwd(), 'src/lib/economy');
  */
 const CONTEXT_LOCAL_BY_DESIGN: Record<string, string> = {
   'processSingleton.ts': 'The registry itself. It is anchored on globalThis by definition; it cannot reach through itself.',
+  'envCompat.ts':
+    'The `warned` set de-duplicates a deprecation warning and nothing reads it. ' +
+    'Severed, each module context warns once about the same legacy variable name — ' +
+    'the message repeats, no answer changes, and the failure mode is a duplicated ' +
+    'log line rather than two contexts disagreeing about a value. The variable ' +
+    'itself is read from process.env on every call, which IS shared.',
 };
 
 /** Containers whose contents never change after module evaluation are not

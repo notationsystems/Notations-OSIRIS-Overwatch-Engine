@@ -22,7 +22,8 @@
  * drift from reality without a test noticing.
  *
  * Live fetches are disabled under vitest (RUN_LIVE_TESTS=1 re-enables) and
- * with OSIRIS_DISABLE_LIVE=1, in which case the snapshot rung serves.
+ * with PAYLOAD_DISABLE_LIVE=1, in which case the snapshot rung serves.
+ * (OSIRIS_DISABLE_LIVE is honoured for one release and warns.)
  */
 
 import type { Observation, Provenance, UnresolvedIdentifier } from './types';
@@ -39,6 +40,7 @@ import westmetallSnapshot from '@/data/economy/snapshots/westmetall-lme-stocks.j
 import comtradeDa from '@/data/economy/snapshots/comtrade-da.json';
 import { withHostRateLimit } from './outboundRate';
 import { processSingleton } from './processSingleton';
+import { readEnvWithLegacy } from './envCompat';
 
 const UA = 'OSIRIS-Overwatch/0.1 (internal research instrument)';
 
@@ -47,7 +49,7 @@ function liveDisabled(): boolean {
   // is not enough (vitest only defaults it when unset, so a CI shell that
   // pre-exports NODE_ENV=production would silently un-gate live fetches).
   const underTest = process.env.VITEST !== undefined || process.env.NODE_ENV === 'test';
-  return process.env.OSIRIS_DISABLE_LIVE === '1'
+  return readEnvWithLegacy('PAYLOAD_DISABLE_LIVE').value === '1'
     || (underTest && process.env.RUN_LIVE_TESTS !== '1');
 }
 

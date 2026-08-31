@@ -1,19 +1,19 @@
 <div align="center">
 
-# ⬡ OSIRIS
+# ⬡ Payload
 
-### Open Source Intelligence & Reconnaissance Integrated System
+### Payload Supply Chain Management — the physical-commerce operating system
 
-[![Live Demo](https://img.shields.io/badge/osirisai.live-00E5FF?style=for-the-badge&logo=vercel&logoColor=white)](https://osirislive.app)
-[![Support OSIRIS](https://img.shields.io/badge/Support_Project-Patreon-FF424D?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/posts/159077425)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
 [![License](https://img.shields.io/badge/License-MIT-D4AF37?style=for-the-badge)](LICENSE)
 
-**A real-time global intelligence dashboard that aggregates live flight tracking, CCTV networks, earthquake monitoring, conflict zone mapping, and 24/7 news feeds into a single GPU-accelerated interface.**
+**A freight and physical-commerce instrument: a provenance-preserving world
+state for loads, lanes, carriers and commitments, with every claim carrying
+where it came from, when it was known, and what it refuses to say.**
 
-[Live Demo](https://osirisai.live) · [Report Bug](https://github.com/simplifaisoul/osiris/issues) · [Request Feature](https://github.com/simplifaisoul/osiris/issues) · [Join Discord](https://discord.gg/umBykEpb98)
+**Payload Terminal** is the operator surface.
 
 </div>
 
@@ -21,37 +21,91 @@
 
 ## Overview
 
-Osiris is a production-grade OSINT platform that provides situational awareness across multiple intelligence domains. Built with Next.js 16 and MapLibre GL, every data point is rendered via WebGL for 60fps performance even with thousands of concurrent entities on-screen.
+Payload holds the physical economy as a record rather than a dashboard. Its
+core is a canonical world state — entities, observations, flows, capacities,
+dependencies, events — in which **every figure carries its provenance, its
+basis, and the date it became knowable**, and in which a question the data
+cannot answer returns a typed refusal with a remedy instead of a zero.
 
-> **Notations OSIRIS Overwatch Engine** — this fork extends OSIRIS with a
-> **physical-economy intelligence engine**: a canonical, provenance-preserving
-> world state (entities / observations / flows / capacities / dependencies /
-> events), live acquisition from USGS, UN Comtrade, COMEX and CFTC behind a
-> snapshot degradation ladder, a directed flow-dependency graph with a
-> force-graph explorer, analytical systems (HHI concentration + trajectory,
-> flow centrality, candidate bottlenecks, anomaly signals, event propagation),
-> and temporal playback that re-evaluates the world state at any date — all
-> rendered as map layers plus a research panel with evidence-backed
-> drill-down. See [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
-> [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
+That discipline is the product. A mean computed over a partition that does
+not exist, a residual that silently drops the half of the book with no
+settlement, an index whose coverage is unstated — each is a wrong number
+that looks exactly like a right one. Payload is built so those cannot be
+produced silently.
+
+Two verticals run on the same substrate:
+
+- **Commodities** — copper and aluminium: live acquisition from USGS, UN
+  Comtrade, COMEX and CFTC behind a snapshot degradation ladder, a directed
+  flow-dependency graph, concentration and bottleneck analytics, and temporal
+  playback that re-evaluates the world at any past knowledge state.
+- **Freight** — loads, lanes, carriers, commitments and outcomes: an
+  append-only book, lane residuals with a minimum-trials floor, three-state
+  carrier vetting, and an exception queue where two claims about one movement
+  disagree.
+
+See [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
+[`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
 
 ### Key Capabilities
 
-| Domain | Data Points | Sources |
-|--------|------------|---------|
-| **Aviation** | Commercial, Private, Military, Jets | OpenSky Network |
-| **Maritime** | 39 Global Ports, 10 Chokepoints | Static Naval Intel |
-| **CCTV** | 17,000+ Cameras | TfL, WSDOT, Caltrans, ODOT, MDOT, HK Transport Dept, Taiwan THB, NZTA + more |
-| **Seismic** | Real-time M2.5+ | USGS Earthquake API |
-| **Fires** | Active Hotspots | NASA FIRMS |
-| **News** | 24/7 Live Streams | 25+ Global Broadcasters |
-| **Weather** | Severe Events | NASA EONET |
-| **Space** | Solar Weather, Satellites | NOAA SWPC, N2YO |
-| **Cyber** | CVE Threats, Vulnerability Scanning | NVD, Custom Scanner |
-| **Conflict** | 13 Active Zones | Static OSINT Intel |
-| **Crypto** | BTC + ETH Wallet Tracing, OFAC SDN Match | blockstream.info, Blockscout, OpenSanctions |
-| **Sanctions** | Person / Org / Vessel SDN Search | OpenSanctions (US OFAC SDN mirror) |
-| **Telegram OSINT** | Geoparsed Posts from Public Channels | `t.me/s/<channel>` web preview |
+| Domain | What it holds | Sources |
+|--------|---------------|---------|
+| **Physical economy** | Entities, observations, flows, capacities, dependencies | USGS MCS, UN Comtrade, curated topology |
+| **Markets** | Benchmark price, positioning, warehouse stocks | COMEX (Yahoo), CFTC COT, LME via Westmetall |
+| **Freight book** | Loads, quotes, invoices, transit, appointments | Operator entry, append-only ledger |
+| **Lane memory** | Residuals by carrier, lane and season, with a trials floor | Derived, admissibility-stamped |
+| **Carrier vetting** | Three-state verdicts: cleared, blocked, undetermined | Regulator records, insurer confirmation |
+| **Routing** | Truck-legal mileage, geocoding, basemap | Valhalla / OSRM profiles, Nominatim |
+| **Maritime** | Ports, chokepoints, the ocean leg | Static naval reference |
+| **Weather & air quality** | Transit risk, seasonal detention | NASA EONET, open air-quality feeds |
+| **Infrastructure attribution** | Whose domain, whose network, whose ASN | RDAP, DoH, RIPE Stat, crt.sh |
+| **Sanctions screening** | Counterparty organisations, vessels, aircraft | OpenSanctions (US OFAC SDN mirror) |
+| **Disruption events** | News and wire signals against lanes | Broadcast and wire feeds |
+
+---
+
+<!-- collection-policy:begin -->
+## Collection policy
+
+Payload is being built for a firm that will hold carrier, driver and customer
+personal information. What the application is allowed to collect is therefore
+part of its design, not a footnote to it.
+
+**Prohibited, and removed from this tree:** username enumeration across
+platforms, breach-corpus lookup by email address, infostealer credential
+corpora, phone-number research, and host or port scanning. These were present
+in the upstream project this fork began from. They are deleted — code, routes,
+UI and client libraries — rather than disabled or feature-flagged, because a
+feature-flagged breach lookup is still a breach lookup in the tree and still
+in the image.
+
+**Conditional, and permitted only with the condition written down:** WHOIS,
+DNS, IP intelligence, certificate transparency, BGP/ASN and MAC-prefix
+lookup. Each states the same constraint in its own source —
+*organisational infrastructure attribution only; never used to profile a
+person*. A conditional permission with the condition left implicit is an
+unconditional permission.
+
+**Permitted:** sanctions screening of counterparty **organisations, vessels
+and aircraft**. The person path is not served, and is filtered out of every
+result set rather than merely omitted from the schema allowlist.
+
+Three checks hold this in place, and they run in CI:
+
+- the **source registry** refuses to register a source that yields
+  natural-person data;
+- the **route-surface gate**
+  ([`routeSurfacePolicy.test.ts`](src/lib/economy/routeSurfacePolicy.test.ts))
+  classifies every route under `src/app/api/**`, fails on an unclassified
+  one, and scans every route's source for a prohibited capability regardless
+  of how it is labelled;
+- the **shipped-description gate** fails if this README advertises a
+  prohibited capability — the description is an artifact and drifts from
+  policy like any other.
+
+Registration was never the only door.
+<!-- collection-policy:end -->
 
 ---
 
@@ -59,29 +113,27 @@ Osiris is a production-grade OSINT platform that provides situational awareness 
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                  OSIRIS CLIENT                   │
+│                 PAYLOAD TERMINAL                 │
 │  ┌──────────┐  ┌──────────┐  ┌───────────────┐ │
-│  │ MapLibre  │  │  HUD     │  │  RECON Toolkit│ │
-│  │  GL (GPU) │  │ Panels   │  │  Port Scan    │ │
-│  │  WebGL    │  │ Layers   │  │  DNS / WHOIS  │ │
-│  │  Render   │  │ Controls │  │  Vuln Scanner │ │
+│  │ MapLibre  │  │ Evidence │  │ Operations    │ │
+│  │  GL (GPU) │  │ Panels   │  │ Queue         │ │
+│  │  WebGL    │  │ Refusals │  │ Exceptions    │ │
+│  │  Render   │  │ Vintages │  │ Vetting       │ │
 │  └──────────┘  └──────────┘  └───────────────┘ │
 ├─────────────────────────────────────────────────┤
 │               NEXT.JS API ROUTES                 │
-│  /api/flights         /api/earthquakes          │
-│  /api/cctv            /api/news                 │
-│  /api/fires           /api/maritime             │
-│  /api/gdelt           /api/satellites           │
-│  /api/weather         /api/scanner              │
-│  /api/sentinel        /api/telegram-feed        │
-│  /api/osint/*  (whois, dns, ip, cve, sanctions, │
-│                 crypto, sweep, threats, …)      │
+│  /api/economy/*   state, search, table, guards, │
+│                   refusals, scenario, validate  │
+│  /api/directions  /api/geo      /api/geosearch  │
+│  /api/maritime    /api/weather  /api/markets    │
+│  /api/infrastructure            /api/news       │
+│  /api/osint/*  (whois, dns, ip, certs, bgp,     │
+│                 mac, threats, sanctions)        │
+│                 — organisational attribution     │
 ├─────────────────────────────────────────────────┤
 │              EXTERNAL DATA SOURCES               │
-│  OpenSky · USGS · NASA · NOAA · TfL · NVD      │
-│  GDACS · EONET · FIRMS · N2YO · RSS Feeds      │
-│  blockstream.info · Blockscout · OpenSanctions  │
-│  t.me public previews                            │
+│  USGS · UN Comtrade · CFTC · COMEX · LME        │
+│  NASA EONET · OpenSanctions · RDAP · RIPE Stat  │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -89,120 +141,104 @@ Osiris is a production-grade OSINT platform that provides situational awareness 
 
 ## Features
 
-### Intelligence Layers
-- **16 toggleable data layers** with real-time entity counts
-- **GPU-accelerated rendering** — all map data rendered via WebGL, not DOM
-- **Progressive loading** — data fetched on-demand when layers are activated
-- **Viewport-aware** — only loads relevant data for the visible region
+### The record, not the dashboard
+- **Provenance on every claim** — source, method, and `knownAt` distinct from
+  the period the figure describes
+- **Typed refusals with remedies** — an unanswerable question returns what is
+  missing and who would know, never a zero
+- **Null, not zero** — in every cell, every colour ramp, every empty collection
+- **Coverage annotation travels with every index** — an unstated population is
+  an unusable number
+- **Temporal playback** — re-evaluate the world at any past knowledge state:
+  *what did we know when we priced it* is the bid post-mortem
 
-### RECON Toolkit
-- **Port Scanner** — TCP connect scan with service fingerprinting
-- **DNS Lookup** — Full record resolution (A, AAAA, MX, NS, TXT, CNAME)
-- **WHOIS** — Domain/IP registration data (auto-cross-checked against OFAC SDN)
-- **SSL/TLS Inspector** — Certificate chain analysis
-- **IP Intelligence** — Geolocation, ASN, threat reputation (auto-cross-checked against OFAC SDN)
-- **Vulnerability Scanner** — CVE lookup against NVD database
-- **Crypto Wallet Trace** — BTC + ETH lookup (balance, tx history, OFAC SDN sanctions flag)
-- **OFAC Sanctions Search** — query persons, organizations, vessels and aircraft against the US OFAC SDN list
+### Freight operations
+- **Append-only book** — a mistake is superseded by a later entry naming what
+  it replaces; both stay readable
+- **Lane residuals** with a minimum-trials floor — below it, `n` is reported
+  and no estimate is offered
+- **Seasonal partition** — a lane running long in winter and on time in summer
+  has an annual mean that describes neither mode
+- **Three-state carrier vetting** — cleared, blocked, and *undetermined*,
+  which is not a pass and not a failure
+- **Exception queue** — loads where the tender and the bill of lading name
+  different carriers, with uncaptured bills of lading surfaced rather than
+  counted clean
 
-### Live Broadcast Network
-- **25+ live 24/7 news streams** from global broadcasters
-- Click any news dot on the map to open the live stream
-- Feeds from NBC, CBS, ABC, Sky News, Al Jazeera, France 24, NHK, WION, and more
+### Commodity analytics
+- Concentration (HHI with remainder and effective groups), flow centrality,
+  candidate bottlenecks, anomaly signals and event propagation
+- Divergence records where two sources disagree about one quantity
+- A degradation ladder from live acquisition down to committed snapshots,
+  visible in provenance and never silent
 
-### Telegram OSINT Layer
-- **Public-channel feed** scraped from the unauthenticated `t.me/s/<channel>` web preview — no Bot API token, no MTProto
-- Default curated set of 5 channels (EN + RU/UA war reporting), overridable via `OSIRIS_TELEGRAM_CHANNELS`
-- Posts are geoparsed against a multilingual place dictionary (EN + Cyrillic + Arabic) and plotted on the map
-- Click any cyan dot to read the post and jump to the original on Telegram
-
-### Crypto Wallet Intelligence
-- **BTC** lookups via [blockstream.info](https://blockstream.info) (Esplora API, keyless)
-- **ETH** lookups via [Blockscout](https://github.com/blockscout/blockscout)'s public ETH instance (`eth.blockscout.com`, keyless)
-- Every lookup is cross-checked against the OFAC SDN sanctioned-address list (mirrored from [`0xB10C/ofac-sanctioned-digital-currency-addresses`](https://github.com/0xB10C/ofac-sanctioned-digital-currency-addresses))
-- Sanctioned wallets surface a red **SANCTIONED — OFAC SDN** badge in the RECON panel
-
-### OFAC SDN Cross-Check
-- Standalone `SANCTIONS` tab in the RECON toolkit — full-text search across persons, organisations, vessels and aircraft
-- WHOIS and IP-intel routes auto-cross-check registrant / ASN-owner names against the SDN list and surface an inline alert
-- Data sourced from [OpenSanctions](https://www.opensanctions.org) (CC-BY 4.0) — keyless, ~7 MB cached in-memory for 24h
-
-### Conflict Zone Monitoring
-- **13 active conflict/tension zones** with severity-coded warning markers
-- Active Wars: Ukraine, Gaza, Sudan, Myanmar, DRC, Yemen
-- High Tension: Syria, Lebanon, Sahel, Somalia, Red Sea
-- Elevated: Taiwan Strait, Korean DMZ
-
-### Performance Optimized
-- **75% reduction in edge requests** vs initial release
-- Aggressive polling relaxation (15-30 min intervals for stable data)
-- Static data served from memory (zero external API calls for news feeds)
-- `layerFetchedRef` prevents duplicate API requests
+### Infrastructure attribution
+- **DNS** (DoH), **WHOIS/RDAP**, **certificate transparency**, **IP + ASN**,
+  **BGP**, **MAC OUI** — all scoped to organisational attribution
+- WHOIS and IP-intel cross-check registrant and ASN-owner names against the
+  OFAC SDN list and surface an inline alert
 
 ---
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
+git clone https://github.com/notationsystems/notations-osiris-overwatch-engine.git
+cd notations-osiris-overwatch-engine
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
+Run the checks:
+
+```bash
+npm test          # vitest, including the policy gates
+npx tsc --noEmit  # types
+```
+
 ### Docker / Self-Hosting
 
 ```bash
-git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
 cp .env.template .env     # optional — configure keys / port
 docker compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The image is a multi-stage
-`node:22-alpine` standalone build (~220 MB, non-root). The compose file also
-carries CasaOS app metadata (`x-casaos:`) for one-click install on
-[CasaOS](https://casaos.io). See **[DOCKER.md](DOCKER.md)** for the full Docker,
-CasaOS and API-key guide.
+The image is a multi-stage `node:22-alpine` standalone build (non-root). See
+**[DOCKER.md](DOCKER.md)** for the full guide.
 
-**Prebuilt image (GHCR)** — skip the build and pull it directly:
-
-```bash
-docker pull ghcr.io/simplifaisoul/osiris:latest
-docker run -d -p 3000:3000 --env-file .env ghcr.io/simplifaisoul/osiris:latest
-```
-
-**Custom port** — the container always listens on `3000`; set `OSIRIS_PORT` in
-`.env` to change the published host port (e.g. `OSIRIS_PORT=3005`) without
-editing the compose file.
+**Custom port** — the container always listens on `3000`; set `PAYLOAD_PORT`
+in `.env` to change the published host port.
 
 ### Environment Variables
 
-OSIRIS works **partially without any API keys** — all core feeds use public,
+Payload works **partially without any API keys** — the core feeds use public,
 keyless sources. Copy [`.env.template`](.env.template) to `.env` and set only
 what you need:
 
 ```env
 # Published host port (container always listens on 3000). Default: 3000
-OSIRIS_PORT=3000
+PAYLOAD_PORT=3000
 
-# RECON scanner backend (the only vars the current code reads).
-# SCANNER_KEY must match the backend's OSIRIS_KEY — generate with: openssl rand -hex 32
-SCANNER_URL=
-SCANNER_KEY=
+# Force every source to its snapshot rung (visible in provenance, never silent)
+PAYLOAD_DISABLE_LIVE=
 
-# Optional, for higher rate limits / future sources (see DOCKER.md for signup links)
-FIRMS_API_KEY=                # NASA FIRMS  — firms.modaps.eosdis.nasa.gov/api/map_key/
-OPENSKY_CLIENT_ID=            # OpenSky OAuth2 (since Mar 2025) — opensky-network.org
+# Optional, for higher rate limits (see DOCKER.md for signup links)
+FIRMS_API_KEY=                # NASA FIRMS
+OPENSKY_CLIENT_ID=            # OpenSky OAuth2
 OPENSKY_CLIENT_SECRET=
-N2YO_API_KEY=                 # N2YO satellites — n2yo.com (Profile → API key)
-AIS_API_KEY=                 # aisstream.io maritime
+N2YO_API_KEY=                 # N2YO satellites
+AIS_API_KEY=                  # aisstream.io maritime
 ```
 
-> Without `SCANNER_URL`/`SCANNER_KEY` the RECON toolkit returns `503`; every
-> other layer works out of the box. `.env` is gitignored — only the template is committed.
+> **Renamed from `OSIRIS_*`.** The old spellings are still read for one
+> release and log a deprecation warning naming the replacement, so a running
+> deployment does not break on the rename. They stop being read after
+> `v0.2.0`.
+
+> `SCANNER_URL` / `SCANNER_KEY` are **gone**. They configured a port-scanning
+> backend that has been removed; if they are set in your `.env`, delete them.
 
 ---
 
@@ -215,43 +251,22 @@ AIS_API_KEY=                 # aisstream.io maritime
 | Map Engine | MapLibre GL JS (WebGL) |
 | Animations | Framer Motion |
 | Icons | Lucide React |
-| Styling | Custom CSS Design System |
-| Deployment | Vercel Edge Network |
+| Testing | Vitest |
 
 ---
 
-## Keyboard Shortcuts
+## Provenance
 
-| Key | Action |
-|-----|--------|
-| `F` | Toggle flight layers |
-| `E` | Toggle earthquakes |
-| `S` | Toggle satellites |
-| `D` | Toggle day/night cycle |
-| `Escape` | Close panels |
+This project began as a fork of
+[simplifaisoul/osiris](https://github.com/simplifaisoul/osiris), an
+open-source situational-awareness dashboard, and retains its MIT licence and
+map/rendering foundation. It has since been rebuilt around a
+provenance-preserving physical-economy substrate, and the reconnaissance
+capabilities that defined the upstream project have been removed under the
+collection policy above.
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**🛠️ SUPPORT THE OSIRIS PROJECT**
-The OSIRIS Global Intelligence Grid is entirely open-source, but running the backend scanners and data firehoses isn't cheap.
-
-If you want to help keep the servers alive, and support us to get access to better tools  unlock the **Special OSIRIS Console**, Currently Just a Cool UI. a you can officially support the project here : 
-
-🔗 [Support OSIRIS on Patreon](https://www.patreon.com/posts/159077425)
-
-*Supporters receive the `🔴 RedTeam Console` role and access to encrypted developer comms.*
-
-
-**Built by [simplifaisoul](https://github.com/simplifaisoul)**
-
-[Join our Discord to be a part of this movement!](https://discord.gg/umBykEpb98)
-
-</div>

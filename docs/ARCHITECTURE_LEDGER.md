@@ -2951,3 +2951,162 @@ total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,
 research panel and entity inspector.
+
+
+## Phase 46 — the policy examined registration and was silent about the route surface
+
+The eighth instance of the class named in phase 38, and the largest. Every
+prior instance cost a partition of a measurement. This one shipped a
+person-targeting capability, publicly, under the firm's name.
+
+**The contradiction.** `src/lib/economy/sourceRegistry.ts` refuses to
+register a source that yields natural-person data, and the person-name
+policy is pinned in three places at the search layer: the index refuses to
+MATCH person names, the registry refuses to YIELD person data, the miss log
+refuses to RETAIN person-directed queries. Meanwhile `src/app/api/` served
+four prohibited categories directly, bypassing the registry entirely:
+
+| Route | What it did | Category | Classification |
+|---|---|---|---|
+| `osint/username` | Sherlock enumeration across social platforms, with an `nsfw=1` flag | `username_check` | prohibited — person targeting |
+| `osint/leaks` | XposedOrNot breach lookup **by email address** | `data_breach_search` | prohibited — unlawfully obtained data |
+| `osint/hudsonrock` | Infostealer corpus; assets `email\|domain\|username\|phone`, credentials from compromised machines | `data_breach_search` | prohibited — unlawfully obtained data |
+| `osint/phone` | Phone-number research, geolocated to the map | `phone_number_research` | prohibited — person targeting |
+
+The shape is exact: **a policy correct about what it examined —
+registration — and silent about what it handed on.** Nothing failed.
+The registry's self-description was true. It was true about a door that
+was not the one the application served through.
+
+**Why it was larger than the first reading.** The README establishes that
+the upstream project this forked from is not a mapping dashboard with some
+OSINT routes attached — it is an OSINT reconnaissance platform whose
+headline features ARE the prohibited categories, with the physical-economy
+engine forked on top. So this was not an oversight in one corner. It was
+the application's original purpose, still present, still shipping, in a
+public MIT-licensed repository, under the name of a firm about to hold
+carrier, driver and customer personal information. That is a due-diligence
+finding waiting to be made by a customer, an insurer or a regulator.
+
+**Duration.** Present from the fork point through 45 phases of work. The
+person-name policy was built in phase 12 and reinforced in phases 13 and
+14 — every one of those phases hardened one door while the other stood
+open. The gate was built at one door and the building had a dozen.
+
+### The disposition
+
+**Deleted outright** — code, routes, UI, and client libraries. Not
+feature-flagged: a feature-flagged breach lookup is still a breach lookup
+in the tree and still in the image.
+
+- `osint/username`, `osint/leaks`, `osint/hudsonrock`, `osint/phone`
+- `osint/shodan`, `osint/sweep`, `/api/scanner` and its `SCANNER_URL` /
+  `SCANNER_KEY` configuration — host and port scanning
+- `osint/crypto` — individual wallet tracing. Counterparty screening is
+  served by the organisation-only sanctions path; tracing an individual's
+  wallet is not a freight firm's business.
+- `osint/github` — **found by applying the gate rather than by reading the
+  order.** Neither amendment named it. It returns a named person's email,
+  location, employer and bio: its subject is a natural person, so the
+  route-enumeration test fails it. That is the gate earning its place on
+  the first run.
+- `osint/cve` — the vulnerability-scanner's enrichment path, orphaned once
+  the toolkit UI went. Not named in the order; recorded here as a judgement
+  rather than an instruction, and reversible.
+- `src/lib/sherlock.ts`, `src/lib/chainIntel.ts`, `src/lib/osint-utils.ts`,
+  `src/components/OsintPanel.tsx` (the RECON toolkit UI)
+
+`src/lib/ssrf-guard.ts` was **kept**: it is used by cctv, chain/daily,
+entity/expand, ip and sanctions, so it was never only these routes'.
+
+**Telegram person-post scraping was advertised and never built.** The
+README names a Telegram OSINT layer with geoparsed posts plotted on a map;
+no such route exists in the tree. Nothing to delete — but the README
+advertised it, which is why the shipped description needed a gate of its
+own.
+
+**Kept, with the condition written into the route:** `whois`, `dns`, `ip`,
+`certs`, `bgp`, `mac`, `threats` — each states *organisational
+infrastructure attribution only; never used to profile a person*. A
+conditional permission with the condition left implicit is an
+unconditional permission.
+
+**Rescoped:** `osint/sanctions` loses the person path. `Person` is removed
+from the schema allowlist AND filtered out of every result set — because
+the allowlist alone fails open for a caller who names no schema, and an
+unfiltered search over a list containing designated individuals returns
+people whether or not anyone asked for them.
+
+### The gate, at every door
+
+`src/lib/economy/routeSurfacePolicy.test.ts`, in three parts, because the
+first two are not enough on their own:
+
+1. **Every route is classified.** An unclassified route fails: a new route
+   cannot reach the surface without someone writing down what its subject
+   is. Accounting for every drop, applied to routes.
+2. **Every conditional route states its condition** in its own source.
+3. **A content scan that runs regardless of classification.** Part 1 trusts
+   the author's label, and a reintroduced breach lookup filed under
+   `permitted` would pass it. The scan looks for the capability itself —
+   person-shaped request parameters, breach and infostealer corpora,
+   enumeration tools, scanning tools, people-search aggregators. The
+   classification catches the honest omission; the scan catches the wrong
+   label.
+
+The scan's first draft matched `nmap` inside `unmapped` and failed a
+routing test — the reminder that a substring is not a word, and the reason
+every marker now carries `\b`.
+
+**And a gate on the shipped description.** The README is an artifact and
+drifts from policy like any other; the doc-count drift was caught twice by
+exactly this kind of check. A public repository describing itself as
+offering username enumeration is a finding whether or not the route still
+exists. The policy section may NAME a prohibited capability in order to
+prohibit it — a policy nobody can read is not a policy — so the scan runs
+outside a delimited block, and the exemption is bounded: the block must
+exist, must stay under a third of the file, and must still state the
+prohibition, so it cannot be grown to cover the document or emptied to
+pass.
+
+### Identity
+
+The fork still called itself OSIRIS in the README, the compose file, the
+CasaOS store metadata, the environment variables and the outbound
+User-Agent. Under the Payload rename that is not cosmetic: **the name
+asserts the prohibited purpose.** The User-Agent was the sharpest case —
+every outbound request to Nominatim, Overpass and the rest introduced this
+client as `OSIRIS-OSINT/1.0`, asserting to third parties a purpose the
+application does not have.
+
+- README rewritten to describe Payload: freight, physical commerce,
+  provenance. Upstream attribution kept — the fork's origin is a fact, and
+  the MIT licence is honoured.
+- `OSIRIS_*` → `PAYLOAD_*` via `envCompat.ts`. The old names are read for
+  one release and warn once each, naming the replacement and the release
+  that drops them (`v0.2.0`). A rename that takes effect immediately turns
+  a configured deployment into an unconfigured one with nothing said.
+- In-code `OSIRIS —` headers updated **only in files this change touched**.
+  A rename commit across 200 files would hide the real changes.
+
+### Self-application
+
+Adding `envCompat.ts` tripped the phase-38 context-severance guard on its
+own `warned` Set — the standing check catching this change on the way in.
+Argued and listed rather than wrapped: nothing reads the set, so a severed
+copy costs a duplicated log line, not two contexts disagreeing about a
+value. The variable itself is read from `process.env` on every call, which
+is genuinely shared.
+
+**713 tests green (6 skipped), typecheck clean.**
+
+### What this does not yet cover
+
+- `WorldRemote` plots BLE devices discovered by the browser. It has no API
+  route, so the route-enumeration gate cannot see it. Not acted on: it is
+  outside the order and outside this gate's reach, and it is named here so
+  it is a decision rather than an omission.
+- The general-purpose geopolitical feeds (earthquakes, conflicts, weather,
+  radar, satellites, cctv, aircraft, flights, gdelt, cyber-*) are
+  classified `general-purpose` and still served. Retiring them behind a
+  flag, and out of the alert feeds, is A-1 and is not done here.

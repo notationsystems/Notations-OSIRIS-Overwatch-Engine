@@ -20,7 +20,7 @@
  *
  *   SEA_DOG_MISS_LOG_DIR        where search-misses.jsonl accumulates
  *                               (default: <cwd>/data-archive)
- *   OSIRIS_DISABLE_LIVE=1       force every source to its snapshot rung
+ *   PAYLOAD_DISABLE_LIVE=1      force every source to its snapshot rung
  *                               (visible in provenance notes, never silent)
  */
 

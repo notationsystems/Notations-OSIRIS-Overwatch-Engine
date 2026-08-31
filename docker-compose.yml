@@ -8,9 +8,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: osiris
-    # Host port is configurable via OSIRIS_PORT in .env (defaults to 3000).
+    # Host port is configurable via PAYLOAD_PORT in .env (defaults to 3000).
+    # OSIRIS_PORT is honoured for one release so a running deployment does
+    # not break on the rename; it stops being read after v0.2.0.
     ports:
-      - "${OSIRIS_PORT:-3000}:3000"
+      - "${PAYLOAD_PORT:-${OSIRIS_PORT:-3000}}:3000"
     # Optional API keys / scanner backend — copy .env.template to .env and
     # fill in what you need. Missing file is ignored (keyless feeds still work).
     env_file:
@@ -68,19 +70,20 @@ x-casaos:
   main: osiris
   author: simplifaisoul
   developer: simplifaisoul
-  category: Network
+  category: Productivity
   description:
     en_us: >-
-      OSIRIS is a production-grade open-source OSINT situational-awareness
-      dashboard. It aggregates real-time global intelligence across aviation,
-      maritime, CCTV networks, seismic activity, wildfires, news feeds,
-      weather, space weather, cyber threats (CVEs) and conflict zones into a
-      single GPU-accelerated MapLibre interface. Most features work with no
-      API keys.
+      Payload is a freight and physical-commerce instrument. It holds a
+      provenance-preserving world state for loads, lanes, carriers and
+      commitments, in which every figure carries its source, its basis and
+      the date it became knowable, and an unanswerable question returns a
+      typed refusal rather than a zero. Commodity and freight verticals run
+      on one substrate, rendered on a GPU-accelerated MapLibre interface.
+      Most features work with no API keys.
   tagline:
-    en_us: Real-time global OSINT intelligence dashboard
+    en_us: Freight and physical-commerce operating system
   title:
-    en_us: OSIRIS
+    en_us: Payload
   icon: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/casaos-icon.png
   thumbnail: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/og-image.png
   screenshot_link:
@@ -91,12 +94,6 @@ x-casaos:
   index: /
   webui_port: 3000
   envs:
-    - container: SCANNER_URL
-      description:
-        en_us: "(Optional) RECON scanner backend URL, e.g. http://scanner:7700"
-    - container: SCANNER_KEY
-      description:
-        en_us: "(Optional) RECON scanner shared secret (must match backend OSIRIS_KEY)."
     - container: FIRMS_API_KEY
       description:
         en_us: "(Optional) NASA FIRMS API key for active-fire data."
