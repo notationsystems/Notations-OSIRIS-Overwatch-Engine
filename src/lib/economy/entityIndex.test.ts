@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getEconomyState } from './store';
+import { guardEvaluationScope } from './ledgerGuards';
 import { observationsAt, concentration, outranksObservation } from './analytics';
 import type { EconomyState, Entity } from './types';
 
@@ -24,7 +25,23 @@ import type { EconomyState, Entity } from './types';
  * tests make the precondition structural.
  */
 describe('the entity index rests on id uniqueness, and that is now checked', () => {
-  for (const commodity of ['copper', 'aluminium']) {
+  // DERIVED, not hand-listed. `['copper','aluminium']` was the copper-only
+  // blindness this codebase built `guardEvaluationScope()` to eliminate,
+  // reintroduced in a newer test: a third partition registers an adapter, the
+  // uniqueness precondition the index rests on is never checked for it, and the
+  // suite stays green. Deriving from the register means a new partition is
+  // covered the moment it exists.
+  // AND THE PIN THE DERIVATION NEEDS. `for (const x of [])` generates zero
+  // tests and the file still reports green — a derived scope that breaks turns
+  // this whole block vacuous with no signal at all. Assert it is populated
+  // before relying on it.
+  it('the derived scope is populated — an empty one would silently erase these tests', () => {
+    const scope = guardEvaluationScope();
+    expect(scope.length, 'no partitions derived from the adapter register').toBeGreaterThanOrEqual(2);
+    expect(scope).toContain('copper');
+  });
+
+  for (const commodity of guardEvaluationScope()) {
     it(`${commodity}: entity ids are unique`, async () => {
       const { state } = await getEconomyState(commodity);
       const seen = new Map<string, number>();

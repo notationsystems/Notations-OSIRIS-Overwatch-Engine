@@ -3400,3 +3400,118 @@ rather than leading it. And the predictions about what the freight corpus will
 do to this contract get pinned BEFORE any of it is ingested — the substrate
 learned what a commodity flow looks like, and freight will find every clause
 that was really about mines.
+
+---
+
+## Phase 50 — tenth instance: the door was an ENUMERATION, and so were the guards
+
+Three findings this phase, all the same class, all found by measurement rather
+than by reading intentions. Recorded together because separating them would
+hide that they are one shape.
+
+### 50.1 The panel exclusion, in nine hand-written copies
+
+Wiring a second control surface (the command bar) onto the terminal's panels
+required first establishing what the existing surface did. The nine inline
+`onClick` cascades in `page.tsx` were extracted mechanically and simulated:
+
+```
+spaceCam   closed  alerts, markets
+economy    closed  alerts, markets, spaceCam
+markets    closed  alerts, economy, spaceCam
+alerts     closed  drawing, markets              <- not spaceCam, not economy
+directions closed  alerts, search, drawing, markets, spaceCam
+search     closed  alerts, drawing, markets, spaceCam
+arcgis     closed  remote                        <- and nothing else
+remote     closed  alerts, arcgis, search, drawing, markets, spaceCam
+drawing    closed  alerts, markets, spaceCam
+```
+
+**19 asymmetric pairs** (A closes B while B leaves A open) and **24 two-click
+sequences** that left two panels open on the identical anchor
+`absolute right-12 top-1/2 -translate-y-1/2` — physically stacked. Which panel
+the operator saw depended on the order they clicked.
+
+Each handler READS as "open this panel exclusively". Each one closed a
+hand-listed subset. The intent lived in nine places and was written down in
+none, so no test could compare them. Apparent scope: exclusive. Effective
+scope: a subset that drifted every time a panel was added.
+
+**The fix is removing the list, not maintaining it better.** `src/lib/ui/panels.ts`
+declares the SLOT each panel renders into; exclusion is derived from two panels
+wanting the same slot, which makes it symmetric by construction rather than by
+discipline. A new panel cannot be added without answering the slot question.
+
+Checked by an exhaustive walk of all 22,620 click sequences up to length four,
+plus a vacuity pin that replays the OLD cascades through the same invariant to
+show they DO fail it, plus a ratchet that fails if an inline cascade reappears.
+
+### 50.2 The attestation-closure guard read one file
+
+`attestationClosure.test.ts` is titled "no analytic ships an unattested number"
+and its own guard-the-guard says it "covers every exported result interface".
+It read `analytics.ts` and nothing else. Measured across `src/lib/economy`:
+
+```
+59  exported interfaces carrying a bare `number` field
+10  in analytics.ts          <- everything the guard could ever see
+49  invisible to it
+40  of those declaring no attestation of any kind
+```
+
+The blind spot was **already realized, not hypothetical**: `notary.ts` and
+`notary.types.ts` had landed number- and verdict-bearing surfaces two commits
+earlier that the guard never looked at. The guard written to catch this class
+had the class.
+
+The widening deliberately does NOT demand `weakestInputClass` everywhere —
+`RateStats.requests` counts our own HTTP calls, `EconDotStyle.radiusPx` is a
+pixel, `BootReport.ms` is a stopwatch, and demanding an evidence class from
+those is noise, which is how a guard gets muted. The requirement is
+**accounting**: every number-bearing type is attested, or classified as
+not-a-claim-about-the-world with a stated reason, or recorded as an open debt.
+Silence is the option removed. 17 open debts are now named rather than
+invisible, under a ratchet that lets the list shrink and not grow.
+
+Three of the classifications I first wrote said only "pixels". The test's own
+minimum-reason-length check rejected them, which is the check earning its keep
+against its author.
+
+### 50.3 The context-severance guard watched one directory
+
+`contextSeverance.test.ts` scanned `src/lib/economy` alone while standing for
+"the economy instrument". `src/lib/spatial/` and `src/lib/ui/` hold instrument
+code, and a module-level `Map` in either severs under exactly the Next
+behaviour `processSingleton.ts` documents. Widened to three roots, with
+exemptions re-keyed to root-qualified paths so a bare filename cannot exempt a
+file in a directory nobody argued about.
+
+Verified by planting a severable `Map` in `src/lib/ui/` — the guard flagged it
+by path and went green when it was removed. A widened root that is declared but
+never walked would read as a fix while changing nothing, so that is pinned too.
+
+### 50.4 And the same shape in a test written days ago
+
+`entityIndex.test.ts` hand-listed `['copper', 'aluminium']` — the copper-only
+blindness that work order 3.1 built `guardEvaluationScope()` to eliminate,
+reintroduced in a newer test. Now derived from the adapter register, with a pin
+asserting the derived scope is populated: `for (const x of [])` generates zero
+tests and reports green, so a broken derivation would erase the block silently.
+
+### What this phase did not do
+
+The Phase 1 reconnaissance ranked "add freight primitives to `types.ts`" as the
+highest-risk change available, and it was the in-flight task. It is not taken
+here. Adding freight members to `EntityKind` fires the person-name-policy guard
+the moment a freight entity is ASSEMBLED (the predicate is over data, not over
+the type), and adding a freight array to `EconomyState` fails **silently**:
+`ID_PREFIX`, the `checkRecord` loop and the `withProvenance` concatenation are
+three separate hand-maintained places, and `stateFingerprint` hashes exactly
+five terms — so a new array would be stamped "reproducible" over inputs the
+digest never saw.
+
+The route the tree has already validated is the sidecar: `notary.{ts,types.ts}`
+landed a complete freight vertical importing two bare string aliases from
+`types.ts`, touching no `EconomyState` array, holding no module-level state.
+That is the template, and the ranked list's execution order is the inverse of
+its risk order for exactly this reason.

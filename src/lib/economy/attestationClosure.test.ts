@@ -113,3 +113,158 @@ describe('the attestation requirement is enumerated, not remembered', () => {
       .toEqual([]);
   });
 });
+
+
+/**
+ * THE GUARD'S OWN SCOPE — widened, because it was the defect it exists to catch.
+ *
+ * The describe above reads exactly one file: `analytics.ts`. Its name says "no
+ * analytic ships an unattested number" and its guard-the-guard says it "covers
+ * every exported result interface in analytics". Measured across the layer:
+ *
+ *   59 exported interfaces carry a bare `number` field
+ *   10 of them are in analytics.ts        <- all the guard could ever see
+ *   49 were invisible to it
+ *   40 of those declared no attestation of any kind
+ *
+ * APPARENT SCOPE: the economy layer's computed numbers.
+ * EFFECTIVE SCOPE: one file.
+ * Nothing failed. That is the tracked defect class, in the guard written to
+ * catch the tracked defect class.
+ *
+ * The blind spot was already realized, not hypothetical: `notary.ts` and
+ * `notary.types.ts` landed number- and verdict-bearing surfaces the guard never
+ * looked at.
+ *
+ * WHAT THIS DOES NOT DO: require `weakestInputClass` everywhere. `RateStats.
+ * requests` counts our own HTTP calls; `EconDotStyle.radiusPx` is a pixel;
+ * `BootReport.ms` is a stopwatch. Demanding an evidence class from those would
+ * be noise, and noise is how a guard gets muted. The requirement is ACCOUNTING:
+ * every number-bearing type is attested, or classified as not-a-claim with a
+ * stated reason, or recorded as an open debt. A type in none of the three fails.
+ */
+describe('every number-bearing type in the layer is accounted for', () => {
+  const DIR = join(process.cwd(), 'src/lib/economy');
+
+  /** Any of these beside a number means its evidence travels with it. */
+  const ATTESTATION_CARRIERS = [
+    'weakestInputClass', 'strongestAttestingClass', 'attestation',
+    'evidenceClass', 'provenance', 'deviceTrust', 'anchorStrength',
+  ];
+
+  /**
+   * NOT CLAIMS ABOUT THE WORLD. Each of these numbers describes the terminal
+   * itself — its own timings, counters, pixels and structural indices — not
+   * something measured outside it. An evidence class on a pixel is a category
+   * error, and the reason is stated so the classification can be disputed.
+   */
+  const NOT_A_WORLD_CLAIM: Record<string, string> = {
+    RowAccounting: 'counts of rows this process accepted and rejected — about the fetch, not the world',
+    ConcentrationShare: 'a component of Concentration, attested by its parent',
+    StructuralClassProfile: 'reports evidence classes; is not itself a claim',
+    CoverageRow: 'counts of records held, not a measured quantity',
+    ResponseAttribution: 'counts of records that fed one HTTP response',
+    CommodityBootOutcome: 'boot stopwatch and record counts',
+    BootReport: 'boot stopwatch and budget',
+    CorpusHeader: 'row counts and paging limits for a rendered table',
+    EvidenceCensus: 'how many results were shown of how many held',
+    TraversalStep: 'depth is a position in a walk, not a quantity',
+    EconDotStyle: 'radius, opacity and stroke in pixels — a rendering instruction, not a measurement',
+    FlowLineStyle: 'line width in pixels — a rendering instruction, not a measurement',
+    GraphLinkTreatment: 'link width and particle count for the force graph — rendering, not measurement',
+    McpCallRecord: 'counts of our own refusals',
+    RouteAroundEstimate: 'counts over our own session log',
+    SessionDigest: 'counts over our own session log',
+    RateStats: 'our own outbound throttle timings',
+    ValidationResult: 'count of claims extracted from a text',
+    UnresolvedIdentifier: 'how many times WE failed to resolve a string',
+    McsVintageSpec: 'configuration: which report years to read',
+    ConditionPredicate: 'configured tolerances — the rule, not a reading',
+    CustodyPredicate: 'configured tolerance — the rule, not a reading',
+    Commitment: 'leafCount is the size of the committed set, checked against the root',
+    ProofRef: 'proving cost in ms, recorded to tune the value threshold',
+    Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    TopologyValidity: 'extrapolationDays measures how far past the topology period WE reached — a property of our corpus coverage that qualifies a claim rather than being one',
+  };
+
+  /**
+   * OPEN DEBTS. These ARE claims about the world and do not yet carry their
+   * attestation. Listing them is not absolution — it is the difference between
+   * a known debt and a silent one, and the count below is a RATCHET: it may
+   * shrink, never grow.
+   */
+  const OWED: Record<string, string> = {
+    CorridorGrade: 'a grade measured from mirror pairs; should carry the class of the pair',
+    FlowEdge: 'ktPerYear after basis conversion; basisUnresolved is carried, the class is not',
+    NodeThroughput: 'summed converted tonnage',
+    EventImpact: 'disruptedKtPerYear derived from capacities',
+    Divergence: 'spread between observers; the observers have classes, the spread does not',
+    DivergenceClaim: 'one observer’s value inside a divergence',
+    DelayStats: 'measured publication delay per source',
+    InformationHorizon: 'achievable lead derived from DelayStats',
+    EventHorizon: 'event counts behind a horizon claim',
+    CorpusHealthSignal: 'observed staleness of a source, measured against expectation',
+    Alert: 'detectionLatencyDays measured against the corpus',
+    BacktestAlertRecord: 'lead measured at a historical knowledge state',
+    BacktestTruthRow: 'detection and price lead in days',
+    AlertScorecard: 'precision and quiet-rate over the backtest',
+    BacktestReport: 'precision, recall and median lead',
+    Reading: 'a sensor value; the notary carries deviceTrust beside the VERDICT, not the reading',
+    IntervalCoverage: 'the fraction of an interval covered by committed readings',
+  };
+
+  const numberBearing = (): { file: string; name: string; body: string }[] => {
+    const out: { file: string; name: string; body: string }[] = [];
+    for (const file of readdirSync(DIR)) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
+      const src = readFileSync(join(DIR, file), 'utf8');
+      // Tolerates generics and any spacing — the original missed `interface X<T> {`.
+      for (const m of src.matchAll(/export interface (\w+)\s*(?:<[^>]*>)?\s*\{/g)) {
+        const start = m.index! + m[0].length;
+        const end = src.indexOf('\n}', start);
+        const body = src.slice(start, end < 0 ? src.length : end);
+        if (/^\s*(?:readonly\s+)?\w+\??:\s*number\b/m.test(body)) out.push({ file, name: m[1], body });
+      }
+    }
+    return out;
+  };
+
+  it('the scan sees the whole layer, not one file — the test is not vacuous', () => {
+    const found = numberBearing();
+    expect(found.length).toBeGreaterThan(40);
+    expect(new Set(found.map(f => f.file)).size).toBeGreaterThan(10);
+    // The realized blind spot: the notary is in scope now.
+    expect(found.some(f => f.file.startsWith('notary'))).toBe(true);
+  });
+
+  it('no number-bearing type is unaccounted for', () => {
+    const unaccounted = numberBearing()
+      .filter(({ name, body }) =>
+        !ATTESTATION_CARRIERS.some(c => body.includes(c)) &&
+        !(name in NOT_A_WORLD_CLAIM) &&
+        !(name in OWED))
+      .map(({ file, name }) => `${file}: ${name}`);
+    expect(unaccounted, [
+      'A new type carrying a computed number must declare its attestation, be classified',
+      'as not-a-claim-about-the-world with a reason, or be recorded as an open debt.',
+      'Silence is the one option removed.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('THE RATCHET: the open-debt list may shrink, never grow', () => {
+    // 17 claims about the world that do not yet carry their evidence class.
+    // Raising this number requires deleting this comment, which is the point.
+    expect(Object.keys(OWED).length).toBeLessThanOrEqual(17);
+  });
+
+  it('every classification carries a reason, so it can be argued with', () => {
+    for (const [k, v] of [...Object.entries(NOT_A_WORLD_CLAIM), ...Object.entries(OWED)]) {
+      expect(v.length, `${k} has no stated reason`).toBeGreaterThan(20);
+    }
+  });
+
+  it('a type is never in two classifications at once', () => {
+    const both = Object.keys(OWED).filter(k => k in NOT_A_WORLD_CLAIM);
+    expect(both, 'a claim cannot also be not-a-claim').toEqual([]);
+  });
+});
