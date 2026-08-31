@@ -27,8 +27,10 @@ describe('sweep 1 — reachability', () => {
       accountedFor: { b: 'device attestation is carried beside the verdict, not blocking on it' },
     });
     expect(r.findings[0].severity).toBe('note');
-    // AND the status is `findings`, not `clean` — a note is still something to read.
-    expect(r.status).toBe('findings');
+    // The note does NOT disturb `clean`: `passed` reads blocking findings, and
+    // AuditReport.notes surfaces it regardless. An accounted-for exemption is a
+    // record, not a problem.
+    expect(r.status).toBe('clean');
   });
 
   it('every branch emitted is clean', () => {
@@ -222,5 +224,80 @@ describe('the audit gate', () => {
     // an audit report is for.
     expect(JSON.stringify(runAudit([ok()], AT))).toBe(JSON.stringify(runAudit([ok()], AT)));
     expect(runAudit([ok()], AT).runAt).toBe(AT);
+  });
+});
+
+
+/**
+ * THE NEGATIVE CASES.
+ *
+ * Every sweep above is planted with the defect it exists to catch. These assert
+ * the other half: an honest input must NOT be flagged. A sweep that flags
+ * everything is exactly as useless as one that flags nothing, and it fails in
+ * the more expensive direction — it gets suppressed, and then it catches
+ * nothing either.
+ */
+describe('the sweeps do not flag honest inputs', () => {
+  it('reachability: a fully-reached set is clean with no findings', () => {
+    const declared = ['a', 'b', 'c', 'd'];
+    const r = sweepReachability({
+      subject: 'Reason', declared, observed: new Set(declared), accountedFor: {},
+    });
+    expect(r.status).toBe('clean');
+    expect(r.findings).toHaveLength(0);
+  });
+
+  it('vacuity: both plants caught is clean', () => {
+    const r = sweepVacuity([{
+      checkName: 'c', plantedDefect: 'total', caughtIt: true,
+      subtlePlant: { described: 'partial', caughtIt: true },
+    }]);
+    expect(r.status).toBe('clean');
+    expect(r.findings).toHaveLength(0);
+  });
+
+  it('revert pins: a pinned fix is clean', () => {
+    expect(sweepRevertPins([{ fixName: 'f', reversion: 'x', firingTests: ['t1', 't2'] }]).status)
+      .toBe('clean');
+  });
+
+  it('claim honesty: a claim that states its own limits is clean', () => {
+    // Every qualifier present: the negative legality form, the modelled class,
+    // and no positive assertion anywhere in it.
+    const r = sweepClaimHonesty([{
+      producer: 'good',
+      rendered: '546.0 km, 5h30 — NOT legality-assured (requested height, honoured none); '
+        + 'computed by the configured backend. Modeled estimate, not an observation.',
+      entitled: { legalityAssured: false },
+    }]);
+    expect(r.status).toBe('clean');
+    expect(r.findings).toHaveLength(0);
+  });
+
+  it('self-application: a well-formed sweep is clean', () => {
+    const r = sweepSelfApplication([{
+      sweep: 's', status: 'clean', findings: [],
+      scope: { examined: 10, description: 'ten' },
+      vacuityProof: { planted: 'p', caught: true },
+    }]);
+    expect(r.status).toBe('clean');
+    expect(r.findings).toHaveLength(0);
+  });
+});
+
+describe('the audit report is actionable', () => {
+  it('every finding carries a remedy — a finding without one is a complaint', () => {
+    const rep = runAudit([{
+      sweep: 'b', status: 'findings',
+      findings: [{ sweep: 'b', severity: 'blocking', subject: 's', detail: 'd', remedy: 'do x' }],
+      scope: { examined: 1, description: '' }, vacuityProof: null,
+    }], AT);
+    const all = [...rep.blocking, ...rep.warnings, ...rep.notes];
+    expect(all.length).toBeGreaterThan(0);
+    for (const f of all) expect(f.remedy.length, `${f.subject} has no remedy`).toBeGreaterThan(0);
+  });
+
+  it('self-application is always appended — a step, not an option', () => {
+    expect(runAudit([ok()], AT).results.map(r => r.sweep)).toContain('self_application');
   });
 });

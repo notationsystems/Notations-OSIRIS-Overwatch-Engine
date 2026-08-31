@@ -4465,3 +4465,76 @@ Three. The `structuralOnly` assertion I got wrong. The clock, which I have now
 written three times. And the empty-audit case, which I found by probing the file
 before landing it rather than after — the only one of the three that cost
 nothing.
+
+---
+
+## Phase 62 — `git add -A` committed an agent's edit that the green suite never saw
+
+A self-correction with a committed consequence, and the sequence matters more
+than the defect.
+
+### What happened
+
+1. `fixtures.ts` held an **eight**-element inventory series, all months
+   well-formed, and the suite was green.
+2. A subagent from a running reconnaissance workflow — instructed *"Do not edit
+   any files. Report only."* — edited it anyway, expanding the series to
+   **twelve** while leaving the unpadded `2024-0${i + 1}` form.
+3. I ran the full suite: **1015 passed**. That run saw the eight-element file.
+4. Between that run and the commit, the agent's edit landed.
+5. `git add -A && git commit` swept it in. **HEAD went red and I reported it
+   green**, because the green was a hypothesis about a tree that had changed.
+
+§4 of the debug protocol, which had been committed twenty minutes earlier:
+*"Local green is a hypothesis until the pushed tree agrees."* The protocol names
+this exact case and I walked into it while the file was still warm.
+
+### What the agent's change actually did
+
+`2024-0${i + 1}` is correct for nine elements and produces `2024-010-01` at the
+tenth. `Date.parse` accepts it and returns the right instant, so nothing threw.
+`.slice(0, 7)` returns `'2024-01'`.
+
+Measured on the twelve-element version:
+
+```
+period keys : 2024-01 … 2024-09 2024-01 2024-01 2024-01
+extractSeries: 12 points -> 2024-01 2024-01 2024-01 2024-01 2024-02 … 2024-09
+values       : 100 100 101 100 101 99 100 101 100 100 60 99
+```
+
+October, November and December all keyed as **January**. Four points labelled
+`2024-01`, and the planted structural break moved from position 8 to position 11
+of 12 — in the fixture ten test files read, including the alert detector whose
+entire job is finding that break.
+
+### Two things I got wrong along the way
+
+I first read `git diff` and concluded the uncommitted change *added* the padStart
+fix. It did not — the diff I was reading was of a state the agent then rewrote,
+and I inferred from a stale read instead of looking at both sides. Corrected by
+`git show HEAD:… ` against the working tree, which showed the change **deleted
+four months** rather than fixing three dates.
+
+And I nearly committed that truncation as the fix. It makes the malformed dates
+disappear by removing the months that produce them, which also removes the
+post-break recovery the fixture plants — a structural-break detector needs
+observations after the break to confirm one.
+
+### The resolution
+
+The reviewed eight-element series is restored. The **latent** formatting defect
+is fixed anyway, via an exported `fixtureMonth()`, and pinned at twelve — the
+length the fixture has not reached. Pinning only the current series would be a
+check calibrated for the failure that does not happen: it would pass unchanged
+on the day someone adds a ninth month.
+
+Planting the unpadded formatter fails four tests, two of them the latent pins.
+
+### The standing correction
+
+`git add -A` is not safe while another process writes to the tree. The
+reconnaissance workflow has been stopped. Nothing in this repository enforces
+that a commit contains only reviewed changes, and that is now the owed item:
+the suite run and the commit must be over the same bytes, and today they were
+not.

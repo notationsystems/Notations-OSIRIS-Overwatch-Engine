@@ -92,7 +92,12 @@ export function sweepReachability(inp: ReachabilityInput): SweepResult {
   }
   return {
     sweep: 'reachability',
-    status: findings.length ? 'findings' : 'clean',
+    // A NOTE DOES NOT DISTURB `clean`. `passed` is computed from blocking
+    // findings and `AuditReport.notes` surfaces notes regardless, so an
+    // accounted-for exemption is a RECORD rather than a problem. Marking every
+    // exemption non-clean would pressure a reader to delete exemptions rather
+    // than argue them, which is the opposite of what `accountedFor` is for.
+    status: findings.some(f => f.severity === 'blocking') ? 'findings' : 'clean',
     findings,
     scope: { examined: inp.declared.length, description: `${inp.subject}: ${inp.declared.length} declared branches` },
     vacuityProof: null,
@@ -144,7 +149,7 @@ export function sweepVacuity(cases: VacuityCase[]): SweepResult {
   }
   return {
     sweep: 'vacuity',
-    status: findings.length ? 'findings' : 'clean',
+    status: findings.some(f => f.severity === 'blocking') ? 'findings' : 'clean',
     findings,
     scope: { examined: cases.length, description: `${cases.length} checks with planted defects` },
     vacuityProof: null,
@@ -214,7 +219,7 @@ export function sweepRevertPins(pins: RevertPin[]): SweepResult {
   }
   return {
     sweep: 'revert_pins',
-    status: findings.length ? 'findings' : 'clean',
+    status: findings.some(f => f.severity === 'blocking') ? 'findings' : 'clean',
     findings,
     scope: { examined: pins.length, description: `${pins.length} fixes with revert pins` },
     vacuityProof: null,
@@ -309,7 +314,7 @@ export function sweepClaimHonesty(cases: ClaimCase[]): SweepResult {
   }
   return {
     sweep: 'claim_honesty',
-    status: findings.length ? 'findings' : 'clean',
+    status: findings.some(f => f.severity === 'blocking') ? 'findings' : 'clean',
     findings,
     scope: { examined: cases.length, description: `${cases.length} rendered claims` },
     vacuityProof: null,
