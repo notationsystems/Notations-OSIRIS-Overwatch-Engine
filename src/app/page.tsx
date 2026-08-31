@@ -353,7 +353,7 @@ export default function Dashboard() {
     const byOp = new Map(spatialAvailability(NO_SPATIAL_BACKEND).map(a => [a.operation, a]));
     return ([
       ['route', 'route'], ['matrix', 'matrix'],
-      ['isochrone', 'isochrone'], ['service_area', 'serviceArea'],
+      ['isochrone', 'isochrone'], ['service_area', 'service_area'],
     ] as const).map(([uiKey, op]) => ({
       operation: uiKey,
       available: byOp.get(op)?.available ?? false,

@@ -3577,3 +3577,92 @@ may not.
 either refuses with `LEGALITY_NOT_ASSURED`, or is synthesised from N×M
 directions calls and declares that in its cost and its verdicts. The N×M cost
 is real and recordable. A silently car-legal matrix is not.
+
+---
+
+## Phase 52 — the semantic surface, landed; and `isDiscriminating` was inverted
+
+The spatial engine interface arrived as a complete file. It is better than what
+it replaced on five counts, and it carried one function that contradicted its
+own header. Both facts recorded, because the second is the interesting one.
+
+### What the new surface adds
+
+- **`degraded` as a third result state.** Computed, but not with every requested
+  restriction, with the shortfall named. Previously the layer had only ok and
+  refused, so a partially-honoured answer had nowhere to go but into one of the
+  two, and "refuse" is the wrong answer for a caller who asked for it knowingly.
+- **Integer millimetres on the profile.** The notary's `assertMilli` lesson at a
+  legal threshold: 4.1149 m rounded three ways by three backends is three
+  answers to "does this truck fit", and the caller sees one number.
+- **`optimality: proven_optimal | feasible_not_proven | time_limit_reached`.** A
+  timed-out plan is not an optimal plan, and a boolean would say it was.
+- **Matrix cells `number | null`, never 0 and never Infinity.** A consumer
+  coercing null to 0 manufactures a zero-cost leg.
+- **`unassigned` carries the binding constraint**, so a dropped job says why.
+
+### The inverted function
+
+```ts
+export function isDiscriminating(v: RestrictionVerification): boolean {
+  const p = v.probe;
+  if (!p) return false;
+  return p.belowThreshold.durationS !== p.aboveThreshold.durationS
+      || p.belowThreshold.distanceM !== p.aboveThreshold.distanceM;   // <- OR
+}
+```
+
+The file's own property 3 states: **duration is mandatory, distance is not
+sufficient**, from the measurement where a real honoured restriction moved
+distance −0.3% and duration +68%.
+
+That `||` accepts a distance-only change as discriminating. So a backend whose
+distance wobbles by a rounding amount while duration stays flat — which is the
+shape of the *refuted* case, not the assured one — would have been read as
+discriminating. And `isDiscriminating` is what promotes a capability to
+`assured`, which is what sets `legalityAssured`, which is what decides whether a
+driver is sent. The one function standing between the measurement and the
+verdict implemented the opposite of the measurement.
+
+Corrected to duration-only, with the 1% floor derived from the same measurement
+(68% honoured vs 0% not; 1% is the conservative end of the separating range).
+The fixture that would have passed under the original is now a named test.
+
+### Three smaller corrections
+
+- **`RESTRICTION_CAPS` was referenced by a comment and did not exist.** A shipped
+  interface pointing at a mechanism that is not there is a claim about a
+  guarantee nobody implemented. It exists now, mapping each restriction to the
+  profile field and unit that carries it, with `isProbeable` separating the
+  scalar thresholds a probe can straddle from the classes and preferences it
+  cannot — demanding a discriminating probe of `hazmat` would be an unmeetable
+  requirement.
+- **`networkAnalysis(req: unknown): Promise<SpatialResult<unknown>>`** was an
+  operation with no contract: no caller can construct a request, no backend
+  knows what to implement, no test can fail. Typed to the one question it
+  answers.
+- **`restrictionsHonoured: ReadonlySet<RestrictionKind>`** — one set for the
+  whole backend — cannot represent the phase-51 finding, and a shape that cannot
+  represent a known defect reports green through it. Now keyed per operation,
+  and `RestrictionVerification` carries its operation.
+
+`CapabilityState` keeps **four** states rather than collapsing to the proposed
+three. `unhonoured` (not accepted at all — the honest failure) and `refuted`
+(accepted and applied nothing — the measured, dangerous one) call for opposite
+responses, and a three-state model files both under `refuted`, which reads as
+"this backend is bad at height" when one of them means "this backend lies".
+
+### One definition per name
+
+Landing the file created ten colliding names against the previous `types.ts` —
+`SpatialEngine`, `VehicleProfile`, `RouteRequest`, `RoutingOptimizer` and six
+more — with **different shapes** behind them. `SpatialResult<T>` was the success
+payload in one and the three-state outcome in the other. TypeScript accepts that
+silently: two modules, two types, no error, and a caller importing the wrong one
+gets a different contract and finds out at runtime.
+
+`types.ts` and `capability.ts` are retired into `engine.types.ts`, and a guard
+now fails if any exported name is declared in two files in the directory. It is
+the same drift the ledger warns about for a substrate implemented twice in two
+languages, at the scale of one directory — and it was live for the length of one
+commit.
