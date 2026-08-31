@@ -5517,17 +5517,55 @@ here as a question for the operator, not answered by me: `whois`, `dns`, `ip`,
 `certs`, `bgp`, `mac`, `threats` and `sanctions` all say what they may not be
 used for, and this one says nothing.
 
-### The directive is now closed
+### RETRACTED: "the directive is now closed"
 
-Three phases, three commits: the resolver service (68), the browser recon
-engine (69), and the configuration that outlived the capability (70). What is
-left is not person-targeting or host-scanning, and is recorded as deliberate:
-the `general-purpose` feeds A-1 retired behind `routeGate`, and the eight
-`infrastructure-conditional` routes A-0 kept with the organisational-
-attribution constraint written into each one's source.
+**This section originally said the directive was closed. It is not, and the
+sentence was wrong when written.** It is retracted here rather than edited
+away, because how it came to be written is the finding.
 
-One thing found and NOT resolved, named so it is a decision: `ip-sweep-devices`,
-`ip-sweep-pulse` and `ip-sweep-connections` remain registered as map sources.
-Whether anything still fills them is not established. The A-0 note about
-WorldRemote is the standing warning against guessing from a name, so this is
-written as a question rather than an answer.
+**The measurement that licensed the claim was broken and returned zero.** The
+closure rested on a five-angle sweep I ran across the tree. Its finder stage
+produced **94 findings naming 25 distinct files**, and 24 verifier agents
+returned verdicts. Its aggregation then returned `confirmedRemnants: 0,
+refuted: 0` — it dropped all 24 verdicts on the floor. I had read the finder
+output mid-run, acted on the three remnants it named that I recognised, and
+taken the empty final tally as agreement.
+
+An empty result is a claim requiring a warrant, and this one had none: `0` did
+not mean *the tree is clean*, it meant *the count never ran*. That is class 7,
+in the apparatus I was using to certify the absence of a class-5 defect — and
+it is the same shape as the phase-61 audit that PASSED having examined nothing.
+
+**Verified against the tree, by reading each file — not from the sweep's
+claims.** Six unrecorded surfaces remain, and two of them contradict records
+this project already holds:
+
+| surface | what it does | why it is not covered |
+|---|---|---|
+| `src/middleware.ts` | runs on every page request, and POSTs the visitor's IP to Umami **twice** — as a pageview with the IP spoofed into `x-forwarded-for`, and as a named `"Network Log"` event carrying `data: { IP: ip }` | per-visitor IP retention, in the one file that runs before every route. No gate reads middleware |
+| `src/app/api/news/route.ts` | scrapes four named Telegram OSINT channels (`OSINTtechnical`, `Faytuks`, `Liveuamap`, `CyberKnow`) under the header *"Military-Grade Intelligence API"* | **phase 46 recorded that Telegram person-post scraping "was advertised and never built — nothing to delete". It is built.** And `news` is one of the only TWO general-purpose routes `KEPT_DESPITE_GENERAL_PURPOSE` keeps **live** |
+| `src/app/api/osint/whois/route.ts` | returns the RDAP registrant's vCard `fn` — a natural person's name for an individually registered domain — and RETAINS entities carrying only a personal name (`.filter(e => e.name \|\| e.org)`); separately performs an active HTTPS `HEAD` against the subject, harvesting `server` / `x-powered-by` banners | its own source states *"ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY … never used to profile a natural person"*. **The condition is contradicted by the code beneath it**, and the conditional-route test checks only that the sentence is PRESENT |
+| `src/app/api/astra/route.ts` | image geolocation — proxies an uploaded photograph to a GPU server's `/geolocate` and returns the inferred location | retired behind `routeGate` (`general-purpose`), so it is off by default and re-enablable by env var. The capability is in the tree |
+| `src/app/api/region-dossier/route.ts` | returns the **head of state** for the country under a map coordinate, as a named natural person from Wikidata | the same person-through-a-non-person-entry-point pattern the intel service used, surviving in a route |
+| `public/robots.txt` | `# Osiris Global Intelligence Platform`, `https://osirisai.live`, `Disallow: /api/scanner`, `Disallow: /api/osint/*`, and an `osirisai.live` sitemap | crawler-facing, publicly served, **names the deleted scanner route by path**, and carries the pre-fork identity phase 47 swept everywhere else. Not in `DESCRIPTION_ARTIFACTS` |
+
+Lower-signal, verified present, not yet judged: `.gitignore` reserves
+`scanner/` and `scanner_backend_backup.js` (an on-disk slot for the removed
+backend that no tracked-tree check would ever see), `package.json` still ships
+`google-libphonenumber` — the parser behind the deleted `osint/phone` route,
+`SECURITY.md` describes the product as "Open Source Intelligence (OSINT) and
+cybersecurity monitoring tools", `DocsClient.tsx` ships a runnable *"Passive
+subdomain enumeration"* recipe and falls back to `https://osirisai.live` as its
+snippet origin, and `PayloadMap.tsx` retains the render surface for host-sweep
+results — layers plotting devices around a `target_ip` with open ports, CPEs
+and a risk level, which answers the `ip-sweep-*` question below: something was
+built to fill them.
+
+**What this costs, stated plainly.** Three phases of removal were real and are
+not withdrawn. What is withdrawn is the closure claim: I asserted a negative
+over a population I had not enumerated, on the strength of a tally that had
+silently failed, having spent this same session documenting three separate
+gates that did exactly that. The next phase is the six above, and the first
+question for each is not *how do I remove it* but *what record already
+describes it, and is that record true?* — because two of them already had one,
+and both were wrong.
