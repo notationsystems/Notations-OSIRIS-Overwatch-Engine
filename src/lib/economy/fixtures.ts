@@ -30,7 +30,7 @@ export function syntheticState(): EconomyState {
       { id: 'obs:prod:aa', entityId: 'ent:country:aa', metric: 'production', value: 800, unit: 'kt/y', period: { start: '2024-01-01', end: '2024-12-31' }, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
       { id: 'obs:prod:bb', entityId: 'ent:country:bb', metric: 'production', value: 200, unit: 'kt/y', period: { start: '2024-01-01', end: '2024-12-31' }, valueKind: 'reported', confidence: 'high', provenance: FIXTURE_PROV },
       // Inventory series with a clean structural break at 2024-08.
-      ...[100, 101, 99, 100, 101, 100, 100, 60].map((v, i) => ({
+      ...[100, 101, 99, 100, 101, 100, 100, 60, 99, 100, 101, 100].map((v, i) => ({
         id: `obs:inv:${i}`,
         entityId: 'ent:port:gate' as const,
         metric: 'inventory' as const,

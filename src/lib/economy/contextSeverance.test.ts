@@ -42,7 +42,7 @@ import { join } from 'node:path';
  *
  * Adding a root is cheap; discovering a severed cache in production is not.
  */
-const SCANNED_ROOTS = ['src/lib/economy', 'src/lib/spatial', 'src/lib/ui'] as const;
+const SCANNED_ROOTS = ['src/lib/economy', 'src/lib/spatial', 'src/lib/ui', 'src/lib/audit'] as const;
 const ECONOMY_DIR = join(process.cwd(), 'src/lib/economy');
 
 /**

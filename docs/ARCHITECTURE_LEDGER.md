@@ -4376,3 +4376,92 @@ guard correctly flagged as unindexed. That is a property of the live ladder
 under test, not of this change, and it means **a test run mutates the archive**.
 Recorded here and handled as its own item rather than folded into this commit —
 §8: one cycle, one item.
+
+---
+
+## Phase 61 — the audit protocol, and the audit that passed having examined nothing
+
+The protocol arrived as executable sweeps: `src/lib/audit/protocol.ts`. Five
+corrections were applied on landing, each measured before it was changed and
+each marked in place — a protocol file that hides its own history is asking to
+be trusted on the strength of its subject matter.
+
+### The one that mattered
+
+```
+runAudit([])  ->  { passed: true }
+```
+
+An audit that ran zero sweeps reported **PASSED**, inside the file whose §3 is
+*"which kind of nothing is this"*.
+
+Two causes, stacked. `sweepSelfApplication` was appended to the results list
+without being passed back through its own rules, leaving exactly one result
+nothing examined — its own. And over an empty list that result had
+`scope.examined === 0` with `status: 'clean'`, which is precisely the case
+`selfFindings` raises as **blocking** for every other sweep.
+
+So the sweep whose entire purpose is running the class over the instrument was
+the one instrument the class was not run over. It is written down in the file:
+*"a class lands on its own instrument on first run."* It did, on this one, on
+the run that landed it.
+
+Fixed twice over, because they are different facts. Self-application now
+examines its own provisional result. And `runAudit` refuses an empty sweep list
+outright with `AUDIT_RAN_NOTHING` — "ran nothing" and "ran and found a problem"
+are different, and a caller acts differently on each; collapsing them into one
+`passed: false` would answer the gate correctly while still not saying what
+happened.
+
+### The negation false positive
+
+`/\bverified\b/` matches inside **"not verified"**. The word boundary correctly
+excludes `unverified` — no boundary between `n` and `v` — and includes every
+separated negation, so a claim being scrupulously honest about what it lacks was
+flagged as overclaiming it.
+
+Same shape as the `nmap` marker matching inside `unmapped` earlier in this
+codebase, arriving from the other direction. A false positive here is worse than
+a miss: it trains a reader to suppress the sweep, and a suppressed sweep catches
+nothing at all. Pinned in both directions — `not verified` must not flag,
+`was verified` must still flag, so the fix did not blunt the sweep.
+
+### `runAt` read a clock — third occurrence this session
+
+The spatial claim, the notary proof stub, now the audit report. An audit report
+that stamps itself cannot be compared byte-for-byte against a replay, which is
+the one thing an audit report is for. Injected.
+
+Three occurrences of one defect in one session is no longer three mistakes; it
+is a missing default. Recorded here as owed: the engines in this tree take
+`now`, and nothing enforces that they do.
+
+### The exemption that bought silence on faith
+
+Found while writing the test for the structural-pin path, from an assertion of
+mine that was simply wrong about the code's behaviour. Following the
+disagreement rather than fixing the assertion showed that `structuralOnly`
+downgraded an unpinned fix from blocking to a note **without checking it carried
+an argument** — `{ reason: 'because', sourceCheck: 'x' }` bought the exemption.
+
+The reachability sweep, in the same file, already refuses that shape: *"an
+exemption without an argument is a suppression, and suppressions accumulate."*
+The rule was stated in one sweep and not applied in the next. The thresholds now
+required are deliberately low; they cannot detect a bad argument, only the
+absence of one, which is the failure that actually happens when an exemption is
+added to make a sweep green.
+
+### Scope, again
+
+`src/lib/audit/` is a fourth root for `contextSeverance.test.ts`, which was
+widened from one directory to three in phase 50. A new directory is a new place
+for module-level state to sever, and a guard that does not follow the tree is
+narrower than it reads — the same finding, and the reason the roots are a list
+rather than a constant.
+
+### Self-corrections this phase
+
+Three. The `structuralOnly` assertion I got wrong. The clock, which I have now
+written three times. And the empty-audit case, which I found by probing the file
+before landing it rather than after — the only one of the three that cost
+nothing.
