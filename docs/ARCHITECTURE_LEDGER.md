@@ -4884,3 +4884,103 @@ hidden behind the append figure.
   describes — the effect **is** recoverable on the right estimator and missed by
   the naive one in 9 of 16 worlds, which is a stronger argument for the
   measurement layer than the original.
+
+## Phase 66 — the transparency log merged, and the pricing engine that refuses a win rate
+
+### A prediction I made from reading, refuted by measurement
+
+I read the supplied `verifyConsistency` and predicted a defect: the
+`else { i--; } i++;` branch appeared to drop the `fn === sn` case the RFC
+handles, and to omit the normalization loop. **The measurement refutes it.**
+
+```
+819 of 819 size pairs over a 40-leaf log   verify
+378 of 378 rewrites of record 12           caught
+590 truncated paths                        rejected
+590 padded paths                           rejected
+```
+
+The `i--` / `i++` pair is a net no-op on the index while `fn >>= 1` still runs,
+which reproduces the RFC's inner while-loop. And 819/819 is exactly the shape
+that can be vacuous, so the negative sweep beside it is what makes the positive
+one mean anything — the lesson from the bug that started this module.
+
+### What was adopted, and what was defended
+
+| adopted | why |
+|---|---|
+| `RECORD_VERSION` + `encodeRecord` | mine punted canonical serialization to the caller with a comment. That is a convention, not a mechanism: two call sites can serialize one record two ways and both roots look internally consistent — the encoding hazard `notary.program.md` documents for timestamps and floats |
+| self-contained `InclusionProof` / `ConsistencyProof` | the roots travel ON the proof. A verifier told separately which root to check can be handed the wrong one, and the mismatch surfaces as "your record is not in the log" |
+| `signedTreeHead()`, richer anchors, `recordsFor` | straightforwardly better |
+
+| defended | why |
+|---|---|
+| injected `publishedAt` | the supplied `signedTreeHead` read `new Date()`. An STH's timestamp is the ONE field anchoring exists to make unforgeable; read from our local clock it cannot be replayed in the dispute it is issued for |
+| the subtree cache | measured: one inclusion proof over 20,000 records cost 64–69 ms uncached, under 1 ms cached, and it is pinned against the uncached tree hash at every size so it cannot become fast and wrong |
+| `issueReceipt` reads the record FROM the log | the supplied signature took the record alongside the index, so `issueReceipt(log, 12, someOtherRecord)` ships a receipt that fails at the customer rather than at the issuer |
+
+### Pricing — and the one thing changed
+
+The tiering is adopted whole, and the single-carrier refusal is the sharpest idea
+in it: **n over one carrier is one observation repeated**, and its median tells
+you what that carrier charges, not what the lane costs. Most pricing tools quote
+confidently there.
+
+Generalised rather than kept as-is: a rule keyed on `distinctCarriers > 1`
+passes 15-of-17 on one carrier, which is not meaningfully better than 17-of-17.
+Concentration is measured as a SHARE against `MAX_CARRIER_SHARE`, the same
+discipline as the HHI work in the commodity layer, where "how many independent
+observers" is never answered by counting rows.
+
+**The win curve refuses.** The supplied design synthesized losses at ~45% with a
+hand-chosen margin/win relationship, exercised the machinery, and flagged in its
+README that the 87–95% rates were an artifact. The flag is right and the place is
+wrong: *a caveat in prose is what gets dropped when the number is copied into a
+deck.* So the engine returns `refused / no_loss_records`, and the remedy names
+what it actually is:
+
+> A win rate over a book that records only wins is 100% by construction, at every
+> margin. This is a SELECTION defect, not a small-n one, and **more loads will not
+> fix it.** Record the quotes you LOSE, from load one — a workflow change, not a
+> code one.
+
+Pinned both ways: 5,000 additional won quotes must still refuse, and a book with
+both outcomes must MEASURE, or "refuses" would be all the function ever does.
+
+### The density argument, measured on 900 loads
+
+```
+206 lane/equipment pairs
+ 18 reach the confident floor (n >= 20)
+183 cannot price at all      (n <  5)
+```
+
+Sharper than on the smaller book, and the distribution is **bimodal**: the spine
+lanes are dense and everything else is thin, with only 5 pairs in the indicative
+band between. That is the lane-concentration argument as a measurement rather
+than an intuition.
+
+Two real quotes off the current world:
+
+```
+$927 on TOR-DET van_53 — CONFIDENT, from 37 settled loads across 15 carriers over
+676 days (largest carrier 22%). Carrier cost median $642 (IQR $593-$687, spread
+15%), accessorial exposure $137 (32% of loads incur one). Work within $804-$1050.
+Ties up $919 until day 45.
+```
+
+### One figure to stop quoting
+
+The pricing write-up cites the governing constraint as *"a signal planted by
+construction was unmeasurable at n=9–12 per cell."* That was true of the fixture
+before phase 64 and is no longer: it was a confound taking ≥74% of the lane, a
+mean over a bimodal variable, a quarter-vs-Dec–Mar partition, and a single winter
+— not an n-limit. The effect now recovers in 16 of 16 worlds at n = 13–29.
+
+The constraint the pricing engine is actually built against is the real one, and
+it is stronger: **at 8.7 loads/week the record can price 18 pairs and cannot price
+183.**
+
+### Measured after
+
+- **83 test files, 1205 passed, 6 skipped.** 47 log/claimable pins, 13 pricing pins.

@@ -258,6 +258,10 @@ an ordinal that contradicts this table.
 | 32 | 65 | An integrity field taken as input and stored unchecked — a content hash nobody derives, on an artifact whose claim is third-party verifiability |
 | 33 | 65 | A verifier whose effective scope was ZERO, with a passing negative test beside it reading as coverage — reproduced here after being reported |
 | 34 | 65 | A benchmark measuring the operation nobody waits on: ~300k appends/sec quoted while one customer-facing proof cost 64-69 ms |
+| 35 | 66 | A canonical encoding left as a convention rather than a mechanism — two call sites could serialize one record two ways and both roots read as internally consistent |
+| 36 | 66 | A receipt issuer taking the record alongside the index, so a mismatch ships and fails at the customer rather than at the issuer |
+| 37 | 66 | A concentration rule keyed on a COUNT: `distinctCarriers > 1` passes 15-of-17 on one carrier |
+| 38 | 66 | A win rate computed over a book that records only wins — 100% by construction at every margin, with the caveat in prose where it gets dropped when the number is copied |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

@@ -80,14 +80,60 @@ export function merkleTreeHash(leaves: readonly Hash[]): Hash {
 // 2. The log — append only. No update, no delete. A correction is a new record.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * ADOPTED FROM THE SUPPLIED DESIGN, and it is better than what I had.
+ *
+ * Mine was `{ ownerId, data: string }` — the canonical serialization punted to
+ * the caller with a comment saying "what is hashed IS what is served". That is a
+ * convention, not a mechanism: two call sites can serialize the same record two
+ * ways and both roots look internally consistent, which is exactly the encoding
+ * hazard `notary.program.md` documents for timestamps and float values.
+ *
+ * A VERSIONED encoding closes it. `RECORD_VERSION` is in the hashed bytes, so
+ * changing the encoding changes every leaf and the change is loud rather than
+ * silent — the same discipline as `LEAF_VERSION` and `NODE_VERSION` in the notary.
+ */
 export interface LogRecord {
-  /** The party this record belongs to, for scoped serving. */
-  ownerId: string;
-  /** Canonical serialization. What is hashed IS what is served. */
-  data: string;
+  /** What this record is about. Drives customer-scoped proof serving. */
+  subject: { kind: string; id: string; ownerParty: string };
+  /** The record's own content. */
+  payload: string;
+  recordedAt: ISODateTime;
+}
+
+export const RECORD_VERSION = 'payload.log.record.v1';
+
+export function encodeRecord(r: LogRecord): string {
+  return `${RECORD_VERSION}|${r.subject.kind}|${r.subject.id}|${r.subject.ownerParty}|` +
+    `${r.recordedAt}|${r.payload}`;
 }
 
 export const LOG_APPEND_ONLY = 'LOG_APPEND_ONLY';
+
+/**
+ * SELF-CONTAINED PROOFS, adopted from the supplied design.
+ *
+ * The roots travel ON the proof rather than being passed beside it. Same reason
+ * `claimable.ts` refuses a payload carrying a bare reference: a verifier holding
+ * a proof and having to be told separately which root it is against can be
+ * handed the wrong one, and the mismatch surfaces as "your record is not in the
+ * log" rather than as "you were given the wrong root".
+ */
+export interface InclusionProof {
+  leafIndex: number;
+  treeSize: number;
+  /** Audit path — O(log n) sibling hashes, bottom-up. Nothing else is needed. */
+  path: Hash[];
+  root: Hash;
+}
+
+export interface ConsistencyProof {
+  fromSize: number;
+  toSize: number;
+  path: Hash[];
+  fromRoot: Hash;
+  toRoot: Hash;
+}
 
 export class TransparencyLog {
   private readonly leaves: Hash[] = [];
@@ -138,10 +184,32 @@ export class TransparencyLog {
    * nothing. A correction is a NEW record that supersedes, which is also how the
    * correction becomes auditable rather than invisible.
    */
-  append(rec: LogRecord): number {
-    this.leaves.push(leafHash(rec.data));
+  append(rec: LogRecord): { index: number; leafHash: Hash; treeSize: number } {
+    const lh = leafHash(encodeRecord(rec));
+    this.leaves.push(lh);
     this.records.push(rec);
-    return this.leaves.length - 1;
+    return { index: this.leaves.length - 1, leafHash: lh, treeSize: this.leaves.length };
+  }
+
+  /**
+   * The published head. `publishedAt` is INJECTED — the supplied design read
+   * `new Date()` here, and an STH's timestamp is the one field anchoring exists
+   * to make unforgeable. A head whose timestamp comes from our local clock at
+   * construction cannot be replayed in the dispute it is issued for.
+   */
+  signedTreeHead(args: {
+    sign: (root: Hash, size: number) => string;
+    publishedAt: ISODateTime;
+    anchor?: SignedTreeHead['anchor'];
+    atSize?: number;
+  }): SignedTreeHead {
+    const treeSize = args.atSize ?? this.leaves.length;
+    const root = this.root(treeSize);
+    return {
+      treeSize, root, publishedAt: args.publishedAt,
+      signature: args.sign(root, treeSize),
+      anchor: args.anchor ?? { kind: 'internal', ref: null, anchoredAt: null },
+    };
   }
 
   root(atSize: number = this.leaves.length): Hash {
@@ -157,16 +225,18 @@ export class TransparencyLog {
 
   recordAt(i: number): LogRecord | undefined { return this.records[i]; }
 
-  /** Indices owned by one party. Scoped serving — a customer gets theirs, not everyone's. */
-  indicesFor(ownerId: string): number[] {
-    return this.records.flatMap((r, i) => (r.ownerId === ownerId ? [i] : []));
+  /** What you may serve one party without leaking anyone else's records. */
+  recordsFor(ownerParty: string): Array<{ index: number; record: LogRecord }> {
+    return this.records
+      .map((record, index) => ({ index, record }))
+      .filter(x => x.record.subject.ownerParty === ownerParty);
   }
 
   /**
    * PATH(m, D[n]) — the audit path, BOTTOM-UP, as RFC 6962 defines it and as an
    * external verifier will expect it.
    */
-  inclusionProof(m: number, atSize: number = this.leaves.length): Hash[] {
+  inclusionProof(m: number, atSize: number = this.leaves.length): InclusionProof {
     if (m < 0 || m >= atSize || atSize > this.leaves.length) {
       throw new Error(
         `transparencyLog: no inclusion proof for leaf ${m} at size ${atSize} ` +
@@ -181,18 +251,20 @@ export class TransparencyLog {
         ? [...path(i, lo, lo + k), this.rangeHash(lo + k, hi)]
         : [...path(i, lo + k, hi), this.rangeHash(lo, lo + k)];
     };
-    return path(m, 0, atSize);
+    return { leafIndex: m, treeSize: atSize, path: path(m, 0, atSize), root: this.rangeHash(0, atSize) };
   }
 
   /** PROOF(m, D[n]) — consistency between an old size and the current one. */
-  consistencyProof(oldSize: number, newSize: number = this.leaves.length): Hash[] {
+  consistencyProof(oldSize: number, newSize: number = this.leaves.length): ConsistencyProof {
     if (oldSize < 0 || oldSize > newSize || newSize > this.leaves.length) {
       throw new Error(
         `transparencyLog: no consistency proof from ${oldSize} to ${newSize} ` +
         `(log holds ${this.leaves.length}).`,
       );
     }
-    if (oldSize === 0) return [];
+    const head = { fromSize: oldSize, toSize: newSize,
+      fromRoot: this.rangeHash(0, oldSize), toRoot: this.rangeHash(0, newSize) };
+    if (oldSize === 0) return { ...head, path: [] };
     const sub = (m: number, lo: number, hi: number, b: boolean): Hash[] => {
       if (m === hi - lo) return b ? [] : [this.rangeHash(lo, hi)];
       const k = splitPoint(hi - lo);
@@ -200,7 +272,7 @@ export class TransparencyLog {
         ? [...sub(m, lo, lo + k, b), this.rangeHash(lo + k, hi)]
         : [...sub(m - k, lo + k, hi, false), this.rangeHash(lo, lo + k)];
     };
-    return sub(oldSize, 0, newSize, true);
+    return { ...head, path: sub(oldSize, 0, newSize, true) };
   }
 }
 
@@ -226,14 +298,15 @@ export class TransparencyLog {
  * This is the algorithm an external verifier implements, which is the point —
  * a scheme only our code can check hands back the trust the log exists to remove.
  */
-export function verifyInclusion(args: {
-  data: string; leafIndex: number; treeSize: number; proof: readonly Hash[]; root: Hash;
-}): boolean {
-  const { leafIndex, treeSize, proof, root } = args;
+export function verifyInclusion(record: LogRecord, proof: InclusionProof, expectedRoot?: Hash): boolean {
+  const { leafIndex, treeSize, path: proofPath } = proof;
+  const root = expectedRoot ?? proof.root;
+  const args = { data: encodeRecord(record) };
+  const proofArr = proofPath;
   if (leafIndex < 0 || treeSize < 0 || leafIndex >= treeSize) return false;
   let fn = leafIndex, sn = treeSize - 1;
   let r: Hash = leafHash(args.data);
-  for (const sibling of proof) {
+  for (const sibling of proofArr) {
     // A proof longer than the tree is deep is not a valid proof that happens to
     // be long — it is a proof for a different tree, and accepting it would let a
     // prover pad a path until something matched.
@@ -257,10 +330,9 @@ export function verifyInclusion(args: {
  * every node, so "the chain says so" means "we say so". A consistency proof
  * against a root the customer already holds does not.
  */
-export function verifyConsistency(args: {
-  oldSize: number; oldRoot: Hash; newSize: number; newRoot: Hash; proof: readonly Hash[];
-}): boolean {
-  const { oldSize, oldRoot, newSize, newRoot, proof } = args;
+export function verifyConsistency(p: ConsistencyProof): boolean {
+  const oldSize = p.fromSize, newSize = p.toSize;
+  const oldRoot = p.fromRoot, newRoot = p.toRoot, proof = p.path;
   if (oldSize < 0 || newSize < 0 || oldSize > newSize) return false;
   if (oldSize === newSize) return proof.length === 0 && oldRoot === newRoot;
   if (oldSize === 0) return true;
@@ -302,17 +374,18 @@ export type AnchorKind = 'internal' | 'timestamp_authority' | 'public_chain';
 export interface SignedTreeHead {
   treeSize: number;
   root: Hash;
-  /** Injected. A log that reads a clock cannot be replayed in a dispute. */
+  /** INJECTED. A log that reads a clock cannot be replayed in a dispute. */
   publishedAt: ISODateTime;
   signature: string;
+  /** Where this head was anchored, if it was. Internal-only is STATED, not implied. */
   anchor: { kind: AnchorKind; ref: string | null; anchoredAt: ISODateTime | null };
 }
 
 export interface InclusionReceipt {
-  ownerId: string;
+  ownerParty: string;
   leafIndex: number;
-  data: string;
-  proof: Hash[];
+  record: LogRecord;
+  proof: InclusionProof;
   sth: SignedTreeHead;
   /** States its own limit rather than implying it away. */
   trustNote: string;
@@ -343,7 +416,10 @@ export function issueReceipt(
   const rec = log.recordAt(leafIndex);
   if (!rec) throw new Error(`transparencyLog: no record at ${leafIndex}`);
   return {
-    ownerId: rec.ownerId, leafIndex, data: rec.data,
+    // THE RECORD IS READ FROM THE LOG, never taken as a parameter. The supplied
+    // design accepted it alongside the index, so `issueReceipt(log, 12, someOther)`
+    // would ship a receipt that fails at the customer rather than at the issuer.
+    ownerParty: rec.subject.ownerParty, leafIndex, record: rec,
     // The audit path leaks SIBLING HASHES ONLY, never another party's payload.
     proof: log.inclusionProof(leafIndex, sth.treeSize),
     sth,
@@ -352,8 +428,5 @@ export function issueReceipt(
 }
 
 export function verifyReceipt(r: InclusionReceipt): boolean {
-  return verifyInclusion({
-    data: r.data, leafIndex: r.leafIndex, treeSize: r.sth.treeSize,
-    proof: r.proof, root: r.sth.root,
-  });
+  return verifyInclusion(r.record, r.proof, r.sth.root);
 }

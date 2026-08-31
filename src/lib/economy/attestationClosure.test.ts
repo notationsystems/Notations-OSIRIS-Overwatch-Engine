@@ -189,6 +189,18 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // The pricing engine. Every figure is computed from OUR OWN settled loads,
+    // which carry the world's `representative` stamp; the quote's own honesty
+    // lives in its confidence tier and its refusals, which is what the type is
+    // shaped around.
+    LaneStats: 'quantiles and counts over our own settled loads on one lane',
+    DensityReport: 'counts of lane/equipment pairs above and below the pricing floors',
+    QuotePolicy: 'a target margin and a band width — the rule that shapes a quote, not a measurement',
+    Quote: 'the quote carries its own confidence tier, n, carrier count and spread; stats travels with it',
+    QuoteOutcome: 'one recorded quote and whether it was won',
+    WinCurveVerdict: 'bucketed win rates, refused entirely when the book records only wins',
+    InclusionProof: 'a leaf index and tree size into our own log',
+    ConsistencyProof: 'two sizes of our own log',
     // Claimable artifacts, carrier trust, claim economics, transparency log.
     // These are counts and instants about OUR OWN process and OUR OWN records —
     // how long a counterparty took, what we tendered, what we re-covered — and

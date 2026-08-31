@@ -18,8 +18,15 @@ import {
 } from './claimEconomics';
 import {
   TransparencyLog, verifyInclusion, verifyConsistency, issueReceipt, verifyReceipt,
-  trustNoteFor, leafHash, nodeHash, merkleTreeHash, EMPTY_ROOT,
+  trustNoteFor, leafHash, nodeHash, merkleTreeHash, encodeRecord, RECORD_VERSION,
+  EMPTY_ROOT, type LogRecord,
 } from './transparencyLog';
+
+/** A log record, in the versioned shape the merged design uses. */
+const rec = (id: string, owner = 'SH-1', payload = `rate:2400`): LogRecord => ({
+  subject: { kind: 'load', id, ownerParty: owner }, payload,
+  recordedAt: '2026-09-01T00:00:00.000Z',
+});
 
 const NOW = '2026-09-05T00:00:00.000Z';
 const sign = (h: string) => `sig:${h.slice(0, 16)}`;
@@ -375,7 +382,11 @@ describe('claimEconomics - symmetry and the n-floor', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe('transparencyLog - the positive case FIRST', () => {
   const log = new TransparencyLog();
-  for (let i = 0; i < 64; i++) log.append({ ownerId: `SH-${(i % 3) + 1}`, data: `L-${i}|rate:${2400 + i}` });
+  const recs: LogRecord[] = [];
+  for (let i = 0; i < 64; i++) {
+    const r = rec(`L-${i}`, `SH-${(i % 3) + 1}`, `rate:${2400 + i}`);
+    recs.push(r); log.append(r);
+  }
 
   it('VERIFIES a valid inclusion proof', () => {
     // THE ORDER MATTERS. The first build emitted the audit path bottom-up and
@@ -384,59 +395,57 @@ describe('transparencyLog - the positive case FIRST', () => {
     // broken for everything. A passing negative next to a failing positive is
     // vacuous and reads as coverage.
     const proof = log.inclusionProof(17);
-    expect(proof).toHaveLength(6);   // log2(64)
-    expect(verifyInclusion({
-      data: log.recordAt(17)!.data, leafIndex: 17, treeSize: 64, proof, root: log.root(),
-    })).toBe(true);
+    expect(proof.path).toHaveLength(6);   // log2(64)
+    expect(verifyInclusion(recs[17], proof)).toBe(true);
   });
 
   it('verifies EVERY leaf, not just the convenient one', () => {
-    const root = log.root();
     for (let i = 0; i < 64; i++) {
-      expect(verifyInclusion({
-        data: log.recordAt(i)!.data, leafIndex: i, treeSize: 64,
-        proof: log.inclusionProof(i), root,
-      }), `leaf ${i}`).toBe(true);
+      expect(verifyInclusion(recs[i], log.inclusionProof(i)), `leaf ${i}`).toBe(true);
     }
   });
 
   it('THEN rejects a tampered payload - and the pair together is the evidence', () => {
     const proof = log.inclusionProof(17);
-    expect(verifyInclusion({
-      data: 'L-17|rate:2100', leafIndex: 17, treeSize: 64, proof, root: log.root(),
-    })).toBe(false);
+    expect(verifyInclusion({ ...recs[17], payload: 'rate:2100' }, proof)).toBe(false);
+    // Every field is in the hashed bytes, not just the payload.
+    expect(verifyInclusion({ ...recs[17], subject: { ...recs[17].subject, ownerParty: 'SH-9' } }, proof)).toBe(false);
+    expect(verifyInclusion({ ...recs[17], recordedAt: '2020-01-01T00:00:00.000Z' }, proof)).toBe(false);
+  });
+
+  it('versions the encoding, so changing it is loud rather than silent', () => {
+    expect(encodeRecord(recs[0]).startsWith(RECORD_VERSION)).toBe(true);
+    expect(leafHash(encodeRecord(recs[0]))).not.toBe(leafHash(recs[0].payload));
   });
 
   it('rejects a padded proof rather than accepting a longer path', () => {
-    const proof = [...log.inclusionProof(17), leafHash('junk')];
-    expect(verifyInclusion({
-      data: log.recordAt(17)!.data, leafIndex: 17, treeSize: 64, proof, root: log.root(),
-    })).toBe(false);
+    const p = log.inclusionProof(17);
+    expect(verifyInclusion(recs[17], { ...p, path: [...p.path, leafHash('junk')] })).toBe(false);
+    expect(verifyInclusion(recs[17], { ...p, path: p.path.slice(0, -1) })).toBe(false);
   });
 
   it('handles an odd tree size', () => {
     const odd = new TransparencyLog();
-    for (let i = 0; i < 7; i++) odd.append({ ownerId: 'X', data: `r${i}` });
+    const or: LogRecord[] = [];
+    for (let i = 0; i < 7; i++) { const r = rec(`r${i}`); or.push(r); odd.append(r); }
     for (let i = 0; i < 7; i++) {
-      expect(verifyInclusion({
-        data: `r${i}`, leafIndex: i, treeSize: 7, proof: odd.inclusionProof(i), root: odd.root(),
-      }), `leaf ${i} of 7`).toBe(true);
+      expect(verifyInclusion(or[i], odd.inclusionProof(i)), `leaf ${i} of 7`).toBe(true);
     }
   });
 
   it('the subtree cache agrees with the uncached tree hash, at every size', () => {
     // A cache is a second implementation of the same fact. Measured before it
-    // existed: one inclusion proof over 20,000 records cost 64-69 ms and the
+    // existed: one inclusion proof over 20,000 records cost 64-69 ms while the
     // append rate quoted beside it was ~300,000/s — the number measured the
-    // operation nobody waits on. The cache makes a proof sub-millisecond; this
-    // pin is what stops it making a proof sub-millisecond and WRONG.
+    // operation nobody waits on. This pin stops the cache making a proof
+    // sub-millisecond AND WRONG.
     const l = new TransparencyLog();
-    const leaves: string[] = [];
+    const hashes: string[] = [];
     for (let i = 0; i < 33; i++) {
-      const d = `rec-${i}`;
-      leaves.push(d);
-      l.append({ ownerId: 'X', data: d });
-      expect(l.root(i + 1), `size ${i + 1}`).toBe(merkleTreeHash(leaves.map(leafHash)));
+      const r = rec(`c${i}`);
+      hashes.push(leafHash(encodeRecord(r)));
+      l.append(r);
+      expect(l.root(i + 1), `size ${i + 1}`).toBe(merkleTreeHash(hashes));
     }
   });
 
@@ -448,51 +457,60 @@ describe('transparencyLog - the positive case FIRST', () => {
 });
 
 describe('transparencyLog - consistency: the property a private chain cannot give', () => {
+  const build = (n: number, alter?: number) => {
+    const l = new TransparencyLog();
+    for (let i = 0; i < n; i++) l.append(rec(`r${i}`, 'SH-1', i === alter ? 'ALTERED' : `p${i}`));
+    return l;
+  };
+
   it('proves an append-only extension', () => {
-    const log = new TransparencyLog();
-    for (let i = 0; i < 64; i++) log.append({ ownerId: 'X', data: `r${i}` });
-    const oldRoot = log.root(64);
-    for (let i = 64; i < 100; i++) log.append({ ownerId: 'X', data: `r${i}` });
-    expect(verifyConsistency({
-      oldSize: 64, oldRoot, newSize: 100, newRoot: log.root(100),
-      proof: log.consistencyProof(64, 100),
-    })).toBe(true);
+    const log = build(100);
+    expect(verifyConsistency(log.consistencyProof(64, 100))).toBe(true);
   });
 
   it('CATCHES a rewrite against a root the customer already holds', () => {
-    // The scenario this exists for. We control every node, so "the chain says
-    // so" means "we say so" — a consistency proof against THEIR held root does
-    // not.
-    const honest = new TransparencyLog();
-    for (let i = 0; i < 64; i++) honest.append({ ownerId: 'X', data: `r${i}` });
+    // We control every node, so "the chain says so" means "we say so". A
+    // consistency proof against THEIR held root does not.
+    const honest = build(64);
     const customerHolds = honest.root(64);
-
-    const rewritten = new TransparencyLog();
-    for (let i = 0; i < 64; i++) rewritten.append({ ownerId: 'X', data: i === 12 ? 'r12-ALTERED' : `r${i}` });
-    for (let i = 64; i < 100; i++) rewritten.append({ ownerId: 'X', data: `r${i}` });
-
+    const rewritten = build(100, 12);
     expect(rewritten.root(64)).not.toBe(customerHolds);
-    expect(verifyConsistency({
-      oldSize: 64, oldRoot: customerHolds, newSize: 100, newRoot: rewritten.root(100),
-      proof: rewritten.consistencyProof(64, 100),
-    })).toBe(false);
+    const p = rewritten.consistencyProof(64, 100);
+    expect(verifyConsistency({ ...p, fromRoot: customerHolds })).toBe(false);
   });
 
-  it('is consistent across many size pairs, not one lucky pair', () => {
-    const log = new TransparencyLog();
-    for (let i = 0; i < 40; i++) log.append({ ownerId: 'X', data: `r${i}` });
-    for (let a = 1; a <= 20; a++) for (const b of [a, a + 1, a + 7, 40]) {
-      if (b > 40 || b < a) continue;
-      expect(verifyConsistency({
-        oldSize: a, oldRoot: log.root(a), newSize: b, newRoot: log.root(b),
-        proof: log.consistencyProof(a, b),
-      }), `${a} -> ${b}`).toBe(true);
+  it('verifies EVERY size pair, and catches EVERY rewrite - neither alone is evidence', () => {
+    // 819/819 passing is exactly the shape that can be vacuous. The negative
+    // sweep beside it is what makes the positive one mean something.
+    const log = build(40);
+    let ok = 0;
+    for (let a = 1; a <= 39; a++) for (let b = a; b <= 40; b++) {
+      expect(verifyConsistency(log.consistencyProof(a, b)), `${a} -> ${b}`).toBe(true);
+      ok++;
     }
+    expect(ok).toBe(819);
+
+    const honest = build(40);
+    let caught = 0;
+    for (let a = 13; a <= 39; a++) for (let b = a + 1; b <= 40; b++) {
+      const rw = build(40, 12);
+      const p = rw.consistencyProof(a, b);
+      expect(verifyConsistency({ ...p, fromRoot: honest.root(a) }), `rewrite ${a} -> ${b}`).toBe(false);
+      caught++;
+    }
+    expect(caught).toBeGreaterThan(300);
+  });
+
+  it('rejects a truncated or padded consistency path', () => {
+    const log = build(40);
+    const p = log.consistencyProof(11, 29);
+    expect(p.path.length).toBeGreaterThan(1);
+    expect(verifyConsistency({ ...p, path: p.path.slice(0, -1) })).toBe(false);
+    expect(verifyConsistency({ ...p, path: [...p.path, leafHash('junk')] })).toBe(false);
   });
 
   it('refuses a root for a size the log never had', () => {
-    const log = new TransparencyLog();
-    log.append({ ownerId: 'X', data: 'r0' });
+    const log = build(1);
     expect(() => log.root(5)).toThrow(/fabricated/);
     expect(() => log.inclusionProof(3, 1)).toThrow(/verifies against nothing/);
   });
@@ -500,21 +518,29 @@ describe('transparencyLog - consistency: the property a private chain cannot giv
 
 describe('transparencyLog - scoped serving and an honest receipt', () => {
   const log = new TransparencyLog();
-  for (let i = 0; i < 100; i++) log.append({ ownerId: `SH-${(i % 3) + 1}`, data: `L-${i}` });
+  for (let i = 0; i < 100; i++) log.append(rec(`L-${i}`, `SH-${(i % 3) + 1}`));
+  const sth = log.signedTreeHead({
+    sign: (root, size) => `sig:${size}:${root.slice(0, 8)}`,
+    publishedAt: NOW,
+  });
+
+  it('holds no clock - the head carries the instant it was given', () => {
+    expect(sth.publishedAt).toBe(NOW);
+    const again = log.signedTreeHead({ sign: () => 'sig', publishedAt: '1999-01-01T00:00:00.000Z' });
+    expect(again.publishedAt).toBe('1999-01-01T00:00:00.000Z');
+    expect(again.root).toBe(sth.root);
+  });
 
   it('serves one party their own records', () => {
-    const mine = log.indicesFor('SH-3');
+    const mine = log.recordsFor('SH-3');
     expect(mine.length).toBeGreaterThan(20);
-    expect(mine.every(i => log.recordAt(i)!.ownerId === 'SH-3')).toBe(true);
+    expect(mine.every(x => x.record.subject.ownerParty === 'SH-3')).toBe(true);
   });
 
   it('issues a receipt that verifies and states its own limit', () => {
-    const sth = {
-      treeSize: 100, root: log.root(100), publishedAt: NOW, signature: 'sig',
-      anchor: { kind: 'internal' as const, ref: null, anchoredAt: null },
-    };
     const r = issueReceipt(log, 12, sth);
     expect(verifyReceipt(r)).toBe(true);
+    expect(r.ownerParty).toBe('SH-1');
     expect(r.trustNote).toContain('AS WE PUBLISHED IT');
     expect(r.trustNote).toContain('does not prove');
   });
