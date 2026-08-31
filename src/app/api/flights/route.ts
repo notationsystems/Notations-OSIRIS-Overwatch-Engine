@@ -1,4 +1,6 @@
 
+import { budgetState } from '@/lib/providerBudget';
+import { decideOpenSkyCall } from '@/lib/openSkyGate';
 import { NextResponse } from 'next/server';
 import { stealthFetch } from '@/lib/stealthFetch';
 import { requireRouteEnabled } from '../../../lib/routeGate';
@@ -237,6 +239,25 @@ const hasOpenSkyCreds = () =>
   Boolean(process.env.OPENSKY_CLIENT_ID && process.env.OPENSKY_CLIENT_SECRET);
 const openSkyInterval = () => (hasOpenSkyCreds() ? 90000 : 900000);
 
+/**
+ * THE BUDGET ABOVE IS NOW COUNTED, NOT ONLY DESCRIBED (ledger phase 80).
+ *
+ * Everything in the comment block above was true and none of it was enforced.
+ * The interval is sized so that the EXPECTED call rate stays under the cap,
+ * which holds exactly while nothing else calls OpenSky, no retry fires, and
+ * nobody edits the interval without redoing the arithmetic. It is an argument.
+ *
+ * `charge()` makes it a mechanism: the credit is deducted before the request is
+ * issued, and a call that would cross the cap is refused here rather than
+ * discovered as a 429 fifteen minutes into a cooldown.
+ *
+ * An unbounded `/states/all` costs 4 credits — the same figure the block above
+ * uses to derive the 90s interval, now written once and used by both.
+ */
+const OPENSKY_CALL_COST = 4;
+const openSkyProvider = () =>
+  hasOpenSkyCreds() ? 'opensky-authenticated' : 'opensky-anonymous';
+
 // The last good OpenSky snapshot is kept and reused between those calls. On the
 // anonymous interval a refetch is only due every 15 minutes, and rebuilding the
 // payload from adsb.fi alone in between would swing the map between ~10K
@@ -330,9 +351,26 @@ export async function GET() {
     // instead of sum. The military feed runs every cycle regardless of OpenSky
     // status and is always current, so military traffic stays live even while an
     // anonymous OpenSky snapshot is waiting out its interval.
-    const skipOpenSky =
-      Date.now() < openSkyCooldownUntil ||
-      Date.now() - osSnapshotTime < openSkyInterval();
+    /**
+     * The three conditions — cooldown, interval, budget — compose in
+     * `decideOpenSkyCall`, where a test can plant an exhausted pool and see
+     * what comes back. Cooldown and interval are evaluated before the budget so
+     * a call that was never going to be made does not spend a credit.
+     */
+    const osDecision = decideOpenSkyCall({
+      now: Date.now(),
+      cooldownUntil: openSkyCooldownUntil,
+      snapshotTime: osSnapshotTime,
+      intervalMs: openSkyInterval(),
+      provider: openSkyProvider(),
+      callCost: OPENSKY_CALL_COST,
+    });
+    const skipOpenSky = !osDecision.call;
+    const budgetRefusal = osDecision.reason;
+    if (osDecision.skippedBecause === 'budget') {
+      console.warn('[Payload Terminal] OpenSky call refused by budget:', budgetRefusal);
+    }
+
     const token = skipOpenSky ? null : await getOpenSkyToken();
     const osInit: RequestInit = token
       ? { signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}` } }
@@ -469,6 +507,16 @@ export async function GET() {
         opensky:         osSnapshot.length,
         opensky_auth:    hasOpenSkyCreds(),
         opensky_age_s:   osSnapshotTime ? Math.round((Date.now() - osSnapshotTime) / 1000) : null,
+        /**
+         * WHICH KIND OF THIN. A stale or small snapshot can mean the interval
+         * has not elapsed, the provider 429'd, or the day's credits are gone —
+         * and all three previously rendered as the same slightly-emptier map.
+         * `opensky_budget` distinguishes the third, and `quotable: false` says
+         * the cap itself is restated from a comment rather than read from
+         * OpenSky, so nobody quotes it as the provider's published limit.
+         */
+        opensky_budget:  budgetState(openSkyProvider(), Date.now()),
+        opensky_refused: budgetRefusal,
       },
       timestamp:          new Date().toISOString(),
     };

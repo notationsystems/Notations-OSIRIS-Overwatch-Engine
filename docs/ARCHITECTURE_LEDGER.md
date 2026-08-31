@@ -6304,3 +6304,84 @@ remedy, so the documentation asserts the policy rather than contradicting it.
   fails to fire reports, so it was re-run under `python` with an assertion that
   the edit changed the file. **A green result from a plant is only evidence if
   the plant is known to have landed.**
+
+
+## Phase 80 — the governor made load-bearing
+
+Phase 77 built the credit governor and left it inert, on the reasoning that
+wiring it changes a live route under a cap whose number is `restated`. The
+operator's instruction was to stop hedging: this is a beta build with no
+production traffic, and an unwired mechanism is a claim about the future.
+
+They are right, and the caution was mis-aimed. The risk of wiring it is that
+the route stops calling OpenSky when it should. The risk of NOT wiring it is
+the outage the route's own comment already describes as having happened —
+*"the budget was gone and the feeds it fell back to were the dead ones above.
+That is what emptied the map."* One of those is hypothetical.
+
+### What changed in the route
+
+`api/flights` now composes three conditions instead of two. The credit is
+deducted before the request is issued, so a call that would cross the cap is
+refused here rather than discovered as a 429 fifteen minutes into a cooldown.
+`OPENSKY_CALL_COST = 4` is now written once and used both by the governor and
+by the comment block that derives the 90-second interval from it.
+
+Under budget the behaviour is byte-for-byte what it was. The only new outcome
+is the refusal, and the only new output is the budget block.
+
+### The decision moved out of the handler
+
+The three conditions — cooldown, interval, budget — compose in
+`decideOpenSkyCall`, because a decision inside a route handler cannot be
+exercised without the network. Every phase this session that asked *what does
+this actually return* found something; every one that inspected source instead
+could only ask whether a field was mentioned. Phases 71 and 72 both ended in
+that same move, and this is the third.
+
+**ORDER IS A CORRECTNESS PROPERTY, not a style choice.** Cooldown and interval
+are evaluated before the budget, so a call that was never going to be made
+spends nothing. Charging first would drain the pool at the POLLING rate rather
+than the CALL rate — on the anonymous pool, where a refetch is due every 15
+minutes and the route is polled every 90 seconds, that is a tenfold error, and
+the mechanism built to protect the budget would become the thing that exhausts
+it. The plant confirms it: reordering those blocks fails two pins.
+
+### Which kind of thin
+
+A sparse OpenSky snapshot had three possible causes and rendered identically
+for all three. `providers.opensky_budget` and `providers.opensky_refused` now
+distinguish the exhausted-credits case, and `quotable: false` travels with the
+cap so nobody reports 400 as OpenSky's published limit — it is still restated
+from a comment, and no vendor page has been opened.
+
+The discriminating pin is the triple: all three reasons are `call: false`, so a
+boolean cannot separate them. That is precisely the state the route was in, and
+why an exhausted budget looked like a quiet sky.
+
+### The comment's arithmetic is now executable
+
+The route reasons in prose that 400 credits at 4 per call is 100 calls, and
+that polling anonymously on the authenticated interval burns the day in about
+half an hour. Three tests run that arithmetic: the 100th anonymous call
+succeeds and the 101st is refused, the authenticated pool permits the 1000 the
+interval was sized from, and the anonymous pool is shown exhausting within
+hours at the 90-second interval. A paragraph that diagnosed a real outage is
+now a thing the suite checks.
+
+### Plants
+
+| plant | fired |
+|---|---|
+| budget charged before cooldown/interval | both spends-nothing pins |
+| the budget refusal ignored | the budget-reason pin and the discriminating triple |
+| two reasons collapsed into one | the cooldown pin and the triple |
+
+### Measured after
+
+- **88 test files, 1274 passed, 6 skipped** (from 87 / 1264), read from the
+  runner rather than computed — see the correction two phases back.
+- Build compiles. `flights/route.ts` lint errors: 15 before, 15 after, none
+  added; both new files clean.
+- The governor is load-bearing: an OpenSky call over cap is now refused by this
+  instrument rather than by OpenSky.

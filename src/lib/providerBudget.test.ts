@@ -173,3 +173,52 @@ describe('the counter is process-wide, not per module context', () => {
     expect(budgetState('opensky-authenticated', T0)?.spent).toBe(600);
   });
 });
+
+describe("the arithmetic the flights comment asserted, now executable", () => {
+  /**
+   * `api/flights` reasons in prose: "Anonymous it is only 400 credits/day — 100
+   * calls, one per ~864s — so polling it on the same 90s TTL burns the whole
+   * day's budget in about half an hour, after which every call 429s and the
+   * route sits permanently in the cooldown branch. That is what emptied the
+   * map."
+   *
+   * That paragraph diagnoses a real outage correctly, and until phase 80
+   * nothing in the system could check it. An unbounded /states/all costs 4
+   * credits, which is the scenario below.
+   */
+  const CALL = 4;
+
+  it('permits exactly 100 anonymous calls in a day, and refuses the 101st', () => {
+    for (let i = 0; i < 100; i++) {
+      expect(charge('opensky-anonymous', CALL, T0).status, `call ${i + 1}`).not.toBe('refused');
+    }
+    expect(charge('opensky-anonymous', CALL, T0).status).toBe('refused');
+    expect(budgetState('opensky-anonymous', T0)?.spent).toBe(400);
+  });
+
+  it('permits 1000 authenticated calls, the figure the 90s interval was sized from', () => {
+    for (let i = 0; i < 1000; i++) {
+      expect(charge('opensky-authenticated', CALL, T0).status, `call ${i + 1}`).not.toBe('refused');
+    }
+    expect(charge('opensky-authenticated', CALL, T0).status).toBe('refused');
+  });
+
+  /**
+   * The outage the comment describes, reproduced: at the authenticated 90s
+   * interval an anonymous deployment issues ~40 calls an hour, so the 400-credit
+   * pool is gone in about two and a half hours — and the map empties with no
+   * signal beyond a 429. The refusal now arrives from the budget instead, with
+   * a reason, before the request is issued.
+   */
+  it('exhausts the anonymous pool in hours at the authenticated interval', () => {
+    const callsPerHour = 3600 / 90;
+    let spent = 0;
+    let hours = 0;
+    while (charge('opensky-anonymous', CALL, T0).status !== 'refused') {
+      spent += CALL;
+      if (spent % (callsPerHour * CALL) === 0) hours++;
+    }
+    expect(hours).toBeLessThanOrEqual(3);
+    expect(budgetState('opensky-anonymous', T0)?.remaining).toBeLessThan(CALL);
+  });
+});
