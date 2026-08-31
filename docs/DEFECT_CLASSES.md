@@ -267,6 +267,8 @@ an ordinal that contradicts this table.
 | 41 | 67 | A density report counting all-time while the quoter refused anything stale — one question, two populations, and the report was the flattering half |
 | 42 | 67 | A per-load amount and a run-rate requirement folded into one capital figure, in two different wrong ways |
 | 43 | 67 | A test asserting a band comparison across two variables at once, so it failed for a correct reason |
+| 44 | 68 | The collection-policy gate read `src/app/api/**/route.ts` and was silent about a person-and-IP resolver running beside it as its own container, declared in the compose file for 68 phases |
+| 45 | 68 | The gate's person markers matched parameter NAMES, so a proxy whose params were `type` and `id` forwarded `type=person` as a VALUE and was classified `freight` |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,

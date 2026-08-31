@@ -423,30 +423,6 @@ export const API_GROUPS: ApiGroup[] = [
     ],
   },
   {
-    id: 'recon',
-    title: 'Recon Scanner',
-    blurb: 'Active scanning, delegated to a separate backend so the web tier never runs scans itself.',
-    endpoints: [
-    ],
-  },
-  {
-    id: 'graph',
-    title: 'Entity Graph',
-    blurb: 'Link analysis over entities surfaced elsewhere in the platform.',
-    endpoints: [
-      {
-        path: '/api/entity/expand',
-        method: 'GET',
-        summary: 'Expands one graph node into its neighbours.',
-        params: [
-          { name: 'id', required: true, desc: 'Entity identifier to expand.' },
-          { name: 'type', required: true, desc: 'Entity type, which selects the expansion strategy.' },
-        ],
-        returns: ['…nodes and edges'],
-      },
-    ],
-  },
-  {
     id: 'ai',
     title: 'AI Analysis',
     blurb:

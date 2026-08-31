@@ -67,7 +67,6 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'economy/search': 'freight',
   'economy/table': 'freight',
   'economy/validate': 'freight',
-  'entity/expand': 'freight',
   fires: 'general-purpose',
   'flight-route': 'general-purpose',
   flights: 'general-purpose',

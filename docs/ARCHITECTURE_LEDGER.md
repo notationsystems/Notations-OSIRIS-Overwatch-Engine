@@ -5071,3 +5071,177 @@ confidence with spread. Split into two pins that hold one variable fixed each.
 ### Measured after
 
 - **83 test files, 1216 passed, 6 skipped.** 24 pricing pins.
+
+
+## Phase 68 — the intelligence layer the route gate could not see
+
+A-0 (phase 46) closed the collection policy's route door and installed
+`routeSurfacePolicy.test.ts` to hold it shut. That gate works. It is also,
+itself, the class it was built to catch, and this phase is the gate at the
+door IT could not see.
+
+**What was running.** `intel/server.js` — "OSIRIS Intelligence Layer" — a
+separate Express process, declared in `docker-compose.yml` as service
+`payload-intel`, built from `./intel`, published on port 4000, `restart:
+unless-stopped`, and reached by `src/app/api/entity/expand/route.ts`. It
+served, on a public HTTP endpoint:
+
+| resolver | what it produced |
+|---|---|
+| `resolvePerson` | a natural person by name, `?item wdt:P31 wd:Q5` (Wikidata "human") → nationality (P27), employer (P108), positions held (P39) |
+| `resolveIP` | `ip-api.com` geolocation — city, region, **postcode**, lat/lon, ISP, proxy/hosting/mobile flags — plus RIPEstat WHOIS and network-info |
+| `resolveIP`, again | RIPEstat **abuse-contact email addresses**, each emitted as a `person:` node labelled with the raw email |
+| `resolveCompany`, `resolveAircraft`, `resolveCountry` | CEOs and heads of state as `person:` nodes — **person data produced when the caller never asked for a person** |
+
+Its outbound User-Agent was `OSIRIS-Intel/1.0 (https://osirisai.live;
+ontology engine)`. Phase 47 swept that identity out of the Next app on the
+argument that **the name asserts the prohibited purpose**; the sweep did not
+reach this process, so the assertion kept going out to Wikidata.
+
+### Why four gates in a row were silent
+
+Nothing failed. Each mechanism was accurate about what it examined.
+
+1. `routeSurfacePolicy` reads `src/app/api/**/route.ts` **and nothing else**.
+   A whole process deployed beside the app is not a route file.
+2. Its person markers match parameter **names** — `searchParams.get('person')`.
+   `entity/expand` named its parameters `type` and `id` and carried the
+   prohibited subject as a **value**: `new Set([… 'person', 'ip' …])`.
+3. `routeGate` classified `entity/expand` as **`'freight'`**. The label was
+   applied to a proxy whose entire function was forwarding `type=person` and
+   `type=ip` to the resolver.
+4. `docker-compose.yml` was already classified `outward-facing` and scanned —
+   for what it **advertises**. Nothing asked what it **starts**.
+
+The shape is exact, and it is the phase-38 class: **a mechanism correct about
+what it examined and silent about what it handed on.** The remnant did not
+hide. It was declared in the deployment manifest in plain sight for 68 phases,
+and every check that read that file was reading it for something else.
+
+### The disposition
+
+Deleted, not flagged — the A-0 rule holds: a feature-flagged breach lookup is
+still a breach lookup in the tree and still in the image.
+
+- `intel/` — 593 tracked files (the service, its Dockerfile, its committed
+  `node_modules`).
+- `src/app/api/entity/expand/` — the proxy. No UI consumed it; only the docs
+  catalog and the disposition map referenced it.
+- `engine/__pycache__/` — 15 orphaned OSINT bytecode files (`osiris_intake`,
+  `oracle`, `swarm`). No `.py` sources remain and nothing references them.
+- The `payload-intel` service block in `docker-compose.yml`.
+- `apiCatalog.ts`'s **"Recon Scanner"** section — blurb "Active scanning,
+  delegated to a separate backend", `endpoints: []`. A-0 deleted the
+  endpoints and left the section advertising the capability with nothing in
+  it. Its sibling "Entity Graph" section went with `entity/expand`, rather
+  than being left as a second empty category.
+
+**609 files, 63,759 deletions.**
+
+### The gate at the door A-0 could not see
+
+`src/lib/economy/collectionPolicySurface.test.ts`, three parts:
+
+- **A — the execution surface.** Every source file outside
+  `src/app/api/**/route.ts` is scanned for the capability itself: Wikidata
+  `wd:Q5` person selection, person resolvers, IP geolocation hosts, RIPEstat
+  abuse-contact harvesting, breach corpora, enumeration and scanning tools,
+  people-search aggregators. *A capability does not become permitted by
+  living in another container.*
+- **B — the deployment manifest.** Every service the compose file starts is
+  classified, an unclassified service fails, a removed one must leave the
+  register, and a service built from a local directory must have that
+  directory's source actually reached by Part A.
+- **C — what a route admits.** No route's subject allowlist may contain
+  `person`, `ip`, `phone`, `email`, `username`, `ssn`, `dob` — as a **value**,
+  which is the hole `entity/expand` went through.
+
+**The vacuity trap, avoided deliberately.** The obvious shape for Part A is
+"scan every sibling service directory". After the deletion there are no
+sibling services, so that check would iterate an empty set and pass forever
+while proving nothing — class 3, inside the gate written to close class 5.
+The population is therefore the whole execution surface (175 files), which
+cannot empty while the application exists, and the floor is asserted.
+
+### Plant before you trust — and the plant was the real defect
+
+The gate was written and run **while the remnant was still in the tree**. All
+three parts failed, by name:
+
+```
+intel/server.js: a query that selects natural persons (Wikidata Q5 "human")
+intel/server.js: a person resolver
+intel/server.js: IP geolocation of a host
+intel/server.js: network attribution / abuse-contact harvesting
+payload-intel  (unclassified service)
+entity/expand: admits 'person' as a resolvable subject
+entity/expand: admits 'ip' as a resolvable subject
+```
+
+Then six synthetic plants, each failing **exactly one** assertion — a plant
+that reddens everything proves nothing about which check caught it:
+
+| plant | fired |
+|---|---|
+| an `ip-api.com` geolocator in `src/lib/` | Part A |
+| an unclassified service in compose | Part B |
+| a service built from a directory nothing scans | Part B (build-context) |
+| `'person'` added to a route's allowlist | Part C |
+| `entity/expand` left in `ROUTE_DISPOSITION` after deletion | **the existing** stale-classification check |
+| the exemption moved to a file that no longer matches | the exemption-staleness check |
+
+The fifth was pre-registered as prediction P2 and confirmed: A-0's own
+conservation check catches the omission of forgetting to deregister a deleted
+route.
+
+### What the work revealed that I did not anticipate
+
+**1. The scan's first run flagged a file for prose about a marker.**
+`src/lib/audit/protocol.ts` matched "host or port scanning" — on the word
+`nmap`, in a comment, discussing the `nmap`-matched-inside-`unmapped` false
+positive as its worked example of a word-boundary failure. A marker about
+prose, matching prose about a marker.
+
+The obvious fix — strip comments before scanning — is **wrong, and would have
+been worse than the defect**. The capability markers include URLs, and
+`'http://ip-api.com/json/'` contains `//`; a line-comment stripper deletes the
+rest of that line and takes the marker with it. The naive repair blinds the
+scan to the exact capability it exists to find, and goes green doing it. So
+the exemption is written down instead, keyed on **file AND capability** (an
+exempted file that acquires a different capability still fails) with a
+staleness check that fails when an exemption outlives its reason.
+
+**2. The remnant produced person data through non-person entry points.**
+`type=company` returned the CEO; `type=country` returned the head of state.
+Removing `person` from the allowlist would have left three doors open. This is
+why Part C checks what a route ADMITS and Part A checks what a process DOES —
+neither alone was sufficient here.
+
+**3. The purge was not complete, and the sweep said so.** A parallel sweep
+across five search angles found three further remnants this phase does not
+close, recorded here so they are a decision rather than an omission:
+
+- `src/components/WorldRemote.tsx` — "MARAUDER V8, Browser-based BLE Recon
+  Engine", live in the shipped UI. Port-scans localhost by timing
+  `fetch('http://127.0.0.1:${port}/')`, and captures nearby Bluetooth devices
+  including **serial numbers**, binds a high-accuracy GPS fix to each,
+  persists them to IndexedDB and exports CSV with 6-decimal coordinates.
+  A-0 named this file and deferred it as "plots BLE devices discovered by the
+  browser" — a description that is true and radically understates it, which is
+  class 6 arriving in the record of a deferral. **This is the next item.**
+- `.env.example` and `DOCKER.md` still instruct an operator to stand up an
+  OSIRIS port-scanning backend — `SCANNER_URL`/`SCANNER_KEY`, "the ONLY keys
+  the current code consumes", for a RECON toolkit A-0 deleted. Nothing in
+  `src/` has read those variables since.
+
+Part A did not catch WorldRemote: its markers name upstream OSINT hosts and
+tools, and a browser-side port scan built from `fetch` and a timer matches
+none of them. **The gate I just widened is already narrower than it appears** —
+which is the class's whole point, and the reason this section exists.
+
+### Measured after
+
+- **84 test files, 1225 passed, 6 skipped** (from 83 / 1216 / 6). No existing
+  test referenced the removed surface; the 9 new tests are the gate.
+- 609 files removed, 63,759 deletions.
+- Route dispositions: 67 → 66. Compose services: 3 → 2.

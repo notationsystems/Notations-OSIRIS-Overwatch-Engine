@@ -44,17 +44,6 @@ services:
     networks:
       - default
 
-  payload-intel:
-    build:
-      context: ./intel
-      dockerfile: Dockerfile
-    container_name: payload-intel
-    ports:
-      - "4000:4000"
-    restart: unless-stopped
-    networks:
-      - default
-
 volumes:
   nginx-cache:
 
