@@ -3515,3 +3515,65 @@ landed a complete freight vertical importing two bare string aliases from
 `types.ts`, touching no `EconomyState` array, holding no module-level state.
 That is the template, and the ranked list's execution order is the inverse of
 its risk order for exactly this reason.
+
+---
+
+## Phase 51 — a capability is per operation, because a backend is not uniform
+
+The spatial reconnaissance (VROOM 1.15.0, openrouteservice 9.10.0, pgRouting
+4.0.1, PostGIS 3.5, cuOpt 26.08 — read, not registered for) returned one
+finding sharp enough to change a type immediately.
+
+### The finding
+
+openrouteservice honours `profile_params.restrictions` on `/v2/directions` and
+on `/v2/isochrones`, and **discards them on `/v2/matrix`**. Not an error: HTTP
+200, a well-formed matrix, no warning field, the restriction never read.
+Structurally, `MatrixService.java:106` calls only `processRequestOptions(…)` —
+avoid-borders, polygons, countries, features — and never `convertParameters` or
+`convertVehicleType`; `isFlexibleMode()` (`MatrixRequest.java:258-260`) does not
+flip on `profile_params`, so both the default RPHAST path and the Dijkstra
+fallback build `AccessFilter.allEdges(...)` with no HGV edge filter at all.
+Upstream issue #315, open since 2018-10-09.
+
+**The matrix is what you call for fleet assignment**, and a truck-legal matrix
+is byte-shaped identically to a car-legal one.
+
+### Why it changed a type here
+
+`CapabilityVerdict` carried `restriction` and `state` and no operation. So this
+codebase **could not state the situation**: `heightM: assured` was true of one
+endpoint and false of another, on the same backend, with the same profile, and
+nothing in the type to tell them apart. The four-state machinery — assured /
+unverified / refuted / unhonoured, arbitrated by a discriminating probe against
+the measured 68%-duration / 0.3%-distance calibration — was correct and was
+being asked the wrong question.
+
+`operation` is now on the verdict, and `legalityAssured(verdicts, operation)`
+takes it as a **required** parameter rather than an optional one. Optional would
+have preserved exactly the bug: a matrix call reading a route call's assurance
+by default. Empty still means false — an operation with no verdict is an
+absence of evidence, and `[].every()` returning true is how absence of evidence
+reads as a pass.
+
+Every existing call site had to be updated, which is the type doing its job.
+
+The test now carries the asymmetry directly: one backend, one restriction,
+`assured` for `route` and `refuted` for `matrix` simultaneously; assurance not
+carrying across; an unprobed operation not assured; and a pin that strips the
+operation field to show the two verdicts become indistinguishable claims about
+`heightM` — which was the type's previous state.
+
+The vendor is named here and in `docs/`, deliberately **not** in
+`src/lib/spatial/`. The guard in `spatial.test.ts` caught exactly that mistake
+this session, in a refusal string of mine that named PostGIS, ORS and VROOM: a
+refusal message from the semantic layer that names an implementation is the
+semantic layer knowing its vendors. Comments may discuss vendors; shipped code
+may not.
+
+### Standing consequence for any adapter written later
+
+`matrix()` on a backend whose restriction verdict for `matrix` is `refuted`
+either refuses with `LEGALITY_NOT_ASSURED`, or is synthesised from N×M
+directions calls and declares that in its cost and its verdicts. The N×M cost
+is real and recordable. A silently car-legal matrix is not.

@@ -21,6 +21,7 @@ import {
 import { attestationOf, type Attestation } from '../economy/attestation';
 import type {
   Reproducibility, SpatialEngine, RoutingOptimizer, SpatialOutcome, SpatialRefusal,
+  SpatialOperation,
 } from './types';
 import { SPATIAL_BACKEND_UNAVAILABLE, SPATIAL_OPERATION_UNSUPPORTED } from './types';
 
@@ -188,9 +189,7 @@ export function vrpConserves(
 
 /* ── WHAT THE UI IS ALLOWED TO OFFER ──────────────────────────────────────── */
 
-export type SpatialOperation =
-  | 'route' | 'matrix' | 'isochrone' | 'nearest'
-  | 'serviceArea' | 'mapMatch' | 'networkAnalysis';
+export type { SpatialOperation } from './types';
 
 export const SPATIAL_OPERATIONS: readonly SpatialOperation[] = [
   'route', 'matrix', 'isochrone', 'nearest', 'serviceArea', 'mapMatch', 'networkAnalysis',

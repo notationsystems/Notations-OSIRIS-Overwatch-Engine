@@ -1,3 +1,4 @@
+import type { SpatialOperation } from './types';
 /**
  * Payload — is a vehicle restriction actually honoured?
  *
@@ -69,6 +70,25 @@ export interface RestrictionProbe {
 
 export interface CapabilityVerdict {
   readonly restriction: Restriction;
+  /**
+   * WHICH OPERATION THIS VERDICT IS ABOUT.
+   *
+   * Added because without it the type CANNOT EXPRESS THE MEASURED CASE: a
+   * backend that accepts a height restriction, applies it on the routing
+   * endpoint, and discards it on the matrix endpoint — HTTP 200, well-formed
+   * matrix, no warning field, restrictions never read. A verdict keyed only by
+   * restriction says "height: assured" and is true of one endpoint and false
+   * of the other, with the caller unable to tell which.
+   *
+   * The matrix endpoint is the one called for fleet assignment, so this is the
+   * asymmetry a dispatcher hits first, and a truck-legal matrix is byte-shaped
+   * identically to a car-legal one.
+   *
+   * (The specific backend and upstream issue are recorded in the ledger and
+   * in docs/, not here: naming a vendor in this layer is the coupling the
+   * whole module exists to prevent, and the guard enforces it.)
+   */
+  readonly operation: SpatialOperation;
   readonly state: CapabilityState;
   readonly reason: string;
   /** The relative duration change the probe produced, when it ran. */
@@ -99,12 +119,13 @@ const rel = (a: number, b: number): number => (a === 0 ? (b === 0 ? 0 : 1) : Mat
  */
 export function arbitrate(
   restriction: Restriction,
+  operation: SpatialOperation,
   probe: RestrictionProbe | undefined,
   accepted: boolean,
 ): CapabilityVerdict {
   if (!accepted) {
     return {
-      restriction, state: 'unhonoured',
+      restriction, operation, state: 'unhonoured',
       reason:
         `the backend does not accept ${restriction}. It is not pretending to apply a ` +
         'restriction it ignores, which is the honest failure — but a load planned here is ' +
@@ -113,7 +134,7 @@ export function arbitrate(
   }
   if (!probe) {
     return {
-      restriction, state: 'unverified',
+      restriction, operation, state: 'unverified',
       reason:
         `the backend declares ${restriction} and no discriminating probe has been run. This is ` +
         'an absence of evidence, not evidence of absence — and a declared capability that ' +
@@ -127,7 +148,7 @@ export function arbitrate(
   if (probe.below.durationS === probe.above.durationS
       && probe.below.distanceM === probe.above.distanceM) {
     return {
-      restriction, state: 'refuted', durationDelta, distanceDelta,
+      restriction, operation, state: 'refuted', durationDelta, distanceDelta,
       reason:
         `probing ${restriction} at ${probe.belowValue} and ${probe.aboveValue} returned an ` +
         'IDENTICAL route. The parameter was accepted and applied nothing. This is positive ' +
@@ -137,7 +158,7 @@ export function arbitrate(
 
   if (durationDelta < DISCRIMINATION_FLOOR) {
     return {
-      restriction, state: 'refuted', durationDelta, distanceDelta,
+      restriction, operation, state: 'refuted', durationDelta, distanceDelta,
       reason:
         `probing ${restriction} moved duration ${(durationDelta * 100).toFixed(2)}% ` +
         `(distance ${(distanceDelta * 100).toFixed(2)}%), below the ` +
@@ -149,7 +170,7 @@ export function arbitrate(
   }
 
   return {
-    restriction, state: 'assured', durationDelta, distanceDelta,
+    restriction, operation, state: 'assured', durationDelta, distanceDelta,
     reason:
       `probing ${restriction} at ${probe.belowValue} and ${probe.aboveValue} moved duration ` +
       `${(durationDelta * 100).toFixed(1)}% — the route measurably changed, so the restriction ` +
@@ -157,14 +178,30 @@ export function arbitrate(
   };
 }
 
-/** Legality is assured only when EVERY requested restriction is assured. */
-export function legalityAssured(verdicts: readonly CapabilityVerdict[]): boolean {
-  return verdicts.length > 0 && verdicts.every(v => v.state === 'assured');
+/**
+ * Legality is assured for ONE OPERATION when every restriction requested of
+ * that operation is assured for it.
+ *
+ * The operation is REQUIRED, not optional. An optional parameter defaulting to
+ * "all verdicts" would let a caller ask the question the type was just widened
+ * to make unaskable: a matrix call reading a route call's assurance. Empty
+ * still means FALSE — no verdict for this operation is an absence of evidence,
+ * and absence of evidence must never read as a pass.
+ */
+export function legalityAssured(
+  verdicts: readonly CapabilityVerdict[],
+  operation: SpatialOperation,
+): boolean {
+  const forOp = verdicts.filter(v => v.operation === operation);
+  return forOp.length > 0 && forOp.every(v => v.state === 'assured');
 }
 
-/** The restrictions that are not assured, with why — what a refusal names. */
-export function shortfall(verdicts: readonly CapabilityVerdict[]): CapabilityVerdict[] {
-  return verdicts.filter(v => v.state !== 'assured');
+/** The restrictions not assured FOR THIS OPERATION, with why. */
+export function shortfall(
+  verdicts: readonly CapabilityVerdict[],
+  operation: SpatialOperation,
+): CapabilityVerdict[] {
+  return verdicts.filter(v => v.operation === operation && v.state !== 'assured');
 }
 
 export const LEGALITY_NOT_ASSURED = 'LEGALITY_NOT_ASSURED';
@@ -177,10 +214,13 @@ export const LEGALITY_NOT_ASSURED = 'LEGALITY_NOT_ASSURED';
  * and there is no silent downgrade — the caller asked for it and the answer
  * says what it is.
  */
-export function degradedWarning(verdicts: readonly CapabilityVerdict[]): string {
-  const short = shortfall(verdicts);
+export function degradedWarning(
+  verdicts: readonly CapabilityVerdict[],
+  operation: SpatialOperation,
+): string {
+  const short = shortfall(verdicts, operation);
   return (
-    'LEGALITY NOT ASSURED — ' +
+    `LEGALITY NOT ASSURED for ${operation} — ` +
     short.map(v => `${v.restriction}: ${v.state}`).join(', ') +
     '. Do not send a driver on this route without confirming clearances independently. ' +
     'A route returned under an unhonoured restriction is a car route wearing a lorry label.'

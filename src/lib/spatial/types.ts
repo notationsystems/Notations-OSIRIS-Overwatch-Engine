@@ -238,6 +238,15 @@ export interface NetworkAnalysisValue {
  * "no route exists for this vehicle" are answers a dispatcher must tell
  * apart, and an exception collapses both into a stack trace.
  */
+/**
+ * The named semantic operations. Declared here rather than in the registry
+ * because a CAPABILITY IS PER OPERATION, and the capability module must be
+ * able to say which one without depending on the registry.
+ */
+export type SpatialOperation =
+  | 'route' | 'matrix' | 'isochrone' | 'nearest'
+  | 'serviceArea' | 'mapMatch' | 'networkAnalysis';
+
 export interface SpatialEngine {
   readonly backendId: string;
   route(req: RouteRequest): Promise<SpatialOutcome<RouteValue>>;
