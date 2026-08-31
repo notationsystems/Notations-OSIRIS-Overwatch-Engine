@@ -189,6 +189,13 @@ describe('every number-bearing type in the layer is accounted for', () => {
     Commitment: 'leafCount is the size of the committed set, checked against the root',
     ProofRef: 'proving cost in ms, recorded to tune the value threshold',
     Entity: 'lat/lng is a location on the entity record, provenance-carried at the observation level',
+    // Facility siting. Distances are computed from coordinates, so the figures
+    // are as good as the coordinates and the BASIS travels on every result.
+    LatLng: 'a coordinate pair; attested by whatever recorded the place',
+    WeightedPoint: 'a place and how much freight moves through it',
+    MedianRun: 'iterations, objective and step size of our own optimisation — about the solver',
+    MedianOptions: 'a tolerance and an iteration cap; configuration, not measurement',
+    SitingReport: 'weighted kilometres on a stated basis, over places attested where they were recorded',
     // Email intake. The opportunity carries its own attestation (derived +
     // negotiating_position); these are its parts.
     Field: 'one stated value, or why it could not become one',
