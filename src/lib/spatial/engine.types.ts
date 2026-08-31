@@ -290,6 +290,14 @@ export interface SpatialProvenance {
   backendVersion: string;
   /** The operation this result came from — the axis capability is keyed on. */
   operation: SpatialOperation;
+  /**
+   * The vehicle class the claim is about.
+   *
+   * Carried so a legality claim can name what it is legal FOR. Rendering
+   * "truck-legal" from provenance that does not know the mode would print it
+   * over a rail or sea profile just as happily.
+   */
+  mode: VehicleProfile['mode'];
   /** Which restrictions were REQUIRED, and which the backend actually honoured. */
   restrictionsRequested: RestrictionKind[];
   restrictionsHonoured: RestrictionKind[];

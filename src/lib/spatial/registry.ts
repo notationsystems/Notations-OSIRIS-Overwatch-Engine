@@ -464,7 +464,7 @@ export function renderRoute(
   const legality = p.restrictionsRequested.length === 0
     ? 'no restrictions requested, so no legality claim is made'
     : p.legalityAssured
-      ? `legal for ${p.restrictionsHonoured.join('/')}`
+      ? `${p.mode}-legal for ${p.restrictionsHonoured.join('/')}`
       : `NOT legality-assured (requested ${p.restrictionsRequested.join('/')}, ` +
         `honoured ${p.restrictionsHonoured.join('/') || 'none'})`;
 

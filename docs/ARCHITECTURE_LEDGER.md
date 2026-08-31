@@ -3758,3 +3758,88 @@ asked for and nothing checked, asserted by a `join` on an empty array. Nothing
 required now renders *"no restrictions requested, so no legality claim is
 made"*. It is the cheapest possible overclaim and it was one character of
 punctuation away from being invisible.
+
+---
+
+## Phase 54 — the test that ratified the dead branch, and the central test that could not catch its own bug
+
+The registry test arrived, and reconciling it produced two findings about
+tests rather than about code.
+
+### 54.1 A test asserting the absence of the feature it is named for
+
+```ts
+it('planning mode degrades and NAMES the shortfall — never silently', async () => {
+  const r = await reg.route(req, { strict: false });
+  // registry selects nothing assured, so it refuses at selection
+  expect(r.status).toBe('refused');
+});
+```
+
+The title says *degrades*. The assertion says *refused*. The comment explains
+the mechanism of the phase-53 defect as though it were the design.
+
+The assertion was written against observed behaviour, and the observed
+behaviour was the bug: `select()` returned `engine: null` whenever anything was
+unassured, so `route()` refused before reaching the degraded construction and
+`strict:false` was the same function as `strict:true`. Landing this test would
+have pinned the dead branch permanently — and it would have done so under a
+name that reads like coverage of the working feature, so a later reader
+checking "is degraded tested?" would have found a green test and stopped.
+
+A test written from observation rather than from intent ratifies whatever it
+found. The title was the intent, and the two halves of the same `it()`
+disagreed with each other in the file as supplied.
+
+### 54.2 The central test could not catch the bug it exists for
+
+The file names its own purpose: *"The central test is A1: the ACTUAL MEASURED
+response — 3.00m and 4.11m returning byte-identical routes — planted as a
+probe, and asserted to yield `refuted` rather than `assured`. If that assertion
+ever passes as assured, the abstraction has stopped doing the one thing it
+exists for."*
+
+That is the right story. It does not catch the phase-52 inversion.
+
+Verified by planting the original `isDiscriminating` (the `||` on distance) and
+re-running: **`registry.test.ts` passed all 29 tests.** Only `spatial.test.ts`
+went red. The reason is in the fixture — the A1 probe is byte-identical on
+BOTH axes:
+
+```
+belowThreshold: { distanceM: 18261, durationS: 1102 }
+aboveThreshold: { distanceM: 18261, durationS: 1102 }
+```
+
+`a !== a || b !== b` is false either way. The fixture cannot separate a
+duration-only test from a duration-or-distance test, because neither axis
+moves.
+
+The probe that separates them is the one where distance moves and duration does
+not — which is precisely what the REAL honoured restriction did to distance
+(−0.3%) while duration carried the signal (+68%). Added as
+`DISTANCE_ONLY_HEIGHT`, at the arbiter and end-to-end through `route()`.
+Re-planted the original implementation afterwards: `registry.test.ts` now fails
+two tests where it previously passed clean.
+
+The lesson is not that A1 is wrong. A1 is the right narrative fixture and it
+belongs in the file. It is that **a test named as the load-bearing one is a
+claim, and the claim has to be measured like any other** — by planting the
+violation and watching it fail. The one test the file says everything rests on
+was the one test that rested on nothing.
+
+### Smaller reconciliations
+
+- The fixtures now declare `status: 'assured'` on the REFUTED probe
+  deliberately, so the test proves the probe overrules the backend's own label.
+  A fixture declaring `refuted` would only prove we can read a string.
+- `SpatialProvenance` gains `mode`. `renderRoute` printed `truck-legal` from
+  provenance that did not know the vehicle class, so it would print it over a
+  rail or sea profile just as happily. Now `${mode}-legal`, pinned by a rail
+  test.
+- `fakeEngine` computed `legalityAssured` from `restrictionsHonoured` — "the
+  backend accepted it" — which is the exact conflation the probe exists to
+  break. It now requires an empty shortfall, and `require: []` no longer
+  produces a `true`.
+- `inventory()` is asserted per (backend, operation), since one row per backend
+  no longer describes the shape.

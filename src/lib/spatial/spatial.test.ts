@@ -111,7 +111,7 @@ describe('with no backend configured, the layer refuses', () => {
 const EMPTY_MATRIX_CLAIM: SpatialClaim<Matrix> = {
   value: { durationsS: [], distancesM: [], unreachablePairs: [] },
   provenance: {
-    backendId: 'none', backendVersion: '0', operation: 'matrix',
+    backendId: 'none', backendVersion: '0', operation: 'matrix', mode: 'truck',
     restrictionsRequested: [], restrictionsHonoured: [], legalityAssured: false,
     networkVintage: null, computedAt: '2026-08-31T00:00:00.000Z', computeMs: 0,
   },
