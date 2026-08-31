@@ -180,6 +180,7 @@ describe('every number-bearing type in the layer is accounted for', () => {
     UnresolvedIdentifier: 'how many times WE failed to resolve a string',
     McsVintageSpec: 'configuration: which report years to read',
     ConditionPredicate: 'configured tolerances — the rule, not a reading',
+    ExceptionPolicy: 'a materiality floor and a per-load daily cap — the rule that decides what interrupts an operator, not a measurement of anything',
     PostingWindow: 'configured grace thresholds in seconds — policy about when a commitment counts, not a measurement of anything',
     VerdictContext: 'postingOffsetSeconds is when WE published relative to an interval; the nested coverage is classified on its own',
     CustodyPredicate: 'configured tolerance — the rule, not a reading',

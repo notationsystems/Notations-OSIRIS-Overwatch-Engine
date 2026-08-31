@@ -4115,7 +4115,7 @@ characterization of the mechanism is corrected here.
 
 ---
 
-## Phase 58 — instance 16 was recorded twice, under two different numbers
+## Phase 58 — the instance count was itself an instance
 
 Auditing the class registry against the ledger found the two documents disagree
 about the instance count.
@@ -4167,3 +4167,114 @@ Instance 16 is this entry's own subject: recording a real backend in the wrong
 state of a distinction I had argued in the previous phase must be preserved,
 from a summary, with the primary source sitting unread in the session
 scratchpad.
+
+---
+
+## Phase 59 — the load lifecycle: the primitive with no analogue in the commodity tree
+
+A commodity flow has a PERIOD. A load has a LIFECYCLE, and the transition
+itself is the fact worth recording — when it happened, when we learned, and
+whether those are the same kind of knowledge.
+
+Built as a **sidecar**, which is what the Phase-1 reconnaissance ranked as the
+only safe route: `lifecycle.ts` and `lifecycle.types.ts` import one bare scalar
+alias from `./types`, touch no `EconomyState` array, register nothing, and hold
+no module-level mutable state. Zero commodity assertions can break because
+nothing shared is read or written. 37 tests.
+
+### Four refusals, each of which a reasonable default would have destroyed
+
+**The transition table is the invariant.** `booked → delivered` cannot be
+constructed. The refusal names what IS legal from that state and says the table
+should be *changed deliberately — not bypassed*, because a lifecycle with an
+escape hatch describes nothing. `exception` is reachable from every operational
+state and exits back to the one it interrupted: an exception is a CONDITION, not
+a position in the sequence. Pinned further by a reachability check that every
+non-terminal state can reach a terminal one — a trap state is a load that can
+never close.
+
+**Latency refuses to measure our inference against itself.** Every transition
+carries `occurredAt` and `firstReportedAt`, and detection latency is the gap —
+but only when `occurredAt` is `observed`. An INFERRED occurrence yields `null`,
+because a time we derived sits close to the report we derived it from, so the
+gap measures the estimator while wearing the label of warning time. Zero and
+null are distinguishable, and the test asserts both.
+
+**Silence is not a state.** A load quiet for eleven hours is not `in_transit` —
+it WAS `in_transit` eleven hours ago. Cadence is per state (`in_transit` 4h,
+`at_border` 2h) because a single global cadence makes one of those noise and the
+other invisible. Terminal states never go unobserved: nothing further is
+expected, so silence there is correct and permanent rather than a gap.
+`no_history` is its own reading — a load with no transitions is **not `booked`
+by default**.
+
+**Suppression is returned, not performed in silence.** The commodity programme
+measured an alert detector into a *not ready* verdict, and the finding was that
+statistical unusualness alone teaches operators to dismiss the queue. So an
+exception fires only with evidence AND materiality AND actionability, and all
+four suppression reasons are records — a detector suppressing everything is
+exactly as informative as one firing constantly, and neither is visible if
+suppression is a silent return. An UNKNOWN materiality suppresses as unknown
+rather than passing the floor.
+
+The rendered claim states the lead **including when it is negative**: *"30 min
+BEHIND other reporting — the operator likely already knows."* That is the number
+that decides whether a copilot is worth building, and hiding it would repeat the
+lead-versus-journalism error the commodity backtest already paid for.
+
+### Downstream impact — the computation the dispatcher has not done
+
+A 120-minute origin delay across three loads:
+
+```
+L-2  buffer 30min absorbs  → 90min, breaches, $400 at risk
+L-3  contribution unknown  → breach known in TIME, unknown in DOLLARS → unassessed
+L-4  no appointment        → breachesAppointment: null, not false
+total at risk: $400        ← not $700, and not $400 plus a zero
+```
+
+Three refusals: an unknown contribution is unassessed rather than zero, because
+a zero is indistinguishable in the total from a load genuinely at no risk; an
+unknown buffer does not absorb, stated as `bufferBasis: 'assumed_zero'` so the
+conservative assumption is visible as an assumption; a load with no planned
+arrival is not assumed on time. A fully absorbed delay stops propagating, and
+the loads behind it are neither assessed nor unassessed — unaffected is a
+different fact from affected by zero.
+
+Conservation is asserted: every input load appears in `assessed` or
+`unassessed`, never dropped. The claim says the total is a **FLOOR** whenever
+anything is unassessed.
+
+### What the guards caught on the way in
+
+Two fired on first full run, both correctly.
+
+`attestationClosure` — widened in phase 50 from one file to the layer — flagged
+four new number-bearing types. Following it found a real defect rather than a
+paperwork gap: the engine was **manufacturing** evidence classes, synthesising
+`reported/self_reported` for every exception record and `negotiating_position`
+for every cost contribution. Those are hardcoded claims about sources the
+functions never see. A customs feed and a driver's text message are not the same
+evidence, and a contractual penalty in a signed rate confirmation is not a
+shipper's claim basis. Evidence and contributions now CARRY their attestation
+and the engine combines rather than invents — weakest-input-wins, pinned by a
+test where one driver guess drags a customs record down instead of being
+averaged away.
+
+A total resting on no assessed load gets a **null** attestation, not a weak one.
+`combineAttestations([])` refuses an empty input because a quantity derived from
+nothing has no standing to inherit; handing the vacuous case `derived/low` would
+give it standing by borrowing the weakest label available, which is still a
+label.
+
+`defectClasses` — written one phase earlier — caught the phase-58 heading
+parsing as a claim to be instance 16, which is rostered at phase 57. The heading
+was about the miscount, not a declaration; retitled.
+
+### The reported self-correction, reproduced
+
+The delivery noted a test asserting `'not be bypassed'` against a message
+reading `'not bypassed'`. Built here with the message reading *"changed
+deliberately — not bypassed"* and the assertion checking that exact substring,
+plus `'changed deliberately'`, so the refusal's two halves are both pinned
+rather than one being assumed from the other.
