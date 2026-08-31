@@ -11,18 +11,27 @@
  * credential; the validation is the socket the first credentialed source
  * plugs into):
  *
- *   SEA_DOG_EDGAR_ENABLED=1     enables the EDGAR document-tier adapter
+ *   PAYLOAD_EDGAR_ENABLED=1     enables the EDGAR document-tier adapter
  *                               (unbuilt; operator-blocked on identity).
  *                               When set, BOTH identity parts are REQUIRED:
- *   SEA_DOG_SEC_UA_ORG          organization name for the SEC User-Agent
- *   SEA_DOG_SEC_UA_CONTACT      role email the firm controls
- *                               → UA: "SeaDogTerminal/<ver> <org> <contact>"
+ *   PAYLOAD_SEC_UA_ORG          organization name for the SEC User-Agent
+ *   PAYLOAD_SEC_UA_CONTACT      role email the firm controls
+ *                               → UA: `${PRODUCT}/${VERSION} <org> <contact>`
+ *                               from src/lib/identity.ts, never hand-written
  *
- *   SEA_DOG_MISS_LOG_DIR        where search-misses.jsonl accumulates
+ *   PAYLOAD_MISS_LOG_DIR        where search-misses.jsonl accumulates
  *                               (default: <cwd>/data-archive)
  *   PAYLOAD_DISABLE_LIVE=1      force every source to its snapshot rung
  *                               (visible in provenance notes, never silent)
+ *
+ * Every read goes through `envCompat.env`, so the `SEA_DOG_*` spellings
+ * these keys had for one day are still honoured, with a warning, until the
+ * release `LEGACY_ENV_REMOVED_AFTER` names. A missing key is reported under
+ * its CURRENT name: telling an operator to set the deprecated spelling
+ * would be a refusal that hands back the wrong remedy.
  */
+
+import { env } from './envCompat';
 
 export interface ConfigCheck {
   ok: boolean;
@@ -30,14 +39,14 @@ export interface ConfigCheck {
   missing: Array<{ key: string; reason: string }>;
 }
 
-export function checkRequiredConfig(env: Record<string, string | undefined> = process.env): ConfigCheck {
+export function checkRequiredConfig(source: Record<string, string | undefined> = process.env): ConfigCheck {
   const missing: ConfigCheck['missing'] = [];
-  if (env.SEA_DOG_EDGAR_ENABLED === '1') {
-    if (!env.SEA_DOG_SEC_UA_ORG) {
-      missing.push({ key: 'SEA_DOG_SEC_UA_ORG', reason: 'EDGAR document tier is enabled; the SEC requires a declared organization identity and the instrument must not fabricate one.' });
+  if (env('PAYLOAD_EDGAR_ENABLED', source) === '1') {
+    if (!env('PAYLOAD_SEC_UA_ORG', source)) {
+      missing.push({ key: 'PAYLOAD_SEC_UA_ORG', reason: 'EDGAR document tier is enabled; the SEC requires a declared organization identity and the instrument must not fabricate one.' });
     }
-    if (!env.SEA_DOG_SEC_UA_CONTACT) {
-      missing.push({ key: 'SEA_DOG_SEC_UA_CONTACT', reason: 'EDGAR document tier is enabled; the SEC requires a contact email (a role address the firm controls).' });
+    if (!env('PAYLOAD_SEC_UA_CONTACT', source)) {
+      missing.push({ key: 'PAYLOAD_SEC_UA_CONTACT', reason: 'EDGAR document tier is enabled; the SEC requires a contact email (a role address the firm controls).' });
     }
   }
   return { ok: missing.length === 0, missing };
@@ -46,8 +55,8 @@ export function checkRequiredConfig(env: Record<string, string | undefined> = pr
 /** Startup gate — throws with every missing key named. Called from the
  *  Next.js instrumentation hook so a misconfigured deploy dies at boot,
  *  not at first request. */
-export function assertRequiredConfig(env: Record<string, string | undefined> = process.env): void {
-  const check = checkRequiredConfig(env);
+export function assertRequiredConfig(source: Record<string, string | undefined> = process.env): void {
+  const check = checkRequiredConfig(source);
   if (!check.ok) {
     throw new Error(
       'Payload Terminal refuses to start — required configuration missing:\n'

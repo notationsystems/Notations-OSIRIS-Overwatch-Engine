@@ -5370,8 +5370,9 @@ follow the instrument:
   warning, `LEGACY_ENV_REMOVED_AFTER` naming the release that drops it — but
   none of the `SEA_DOG_*` reads go through it today. Migrating them is a
   bounded piece of work (route every read through `readEnvWithLegacy`, add
-  eight entries) and it is a change to how the thing is deployed, so it is
-  the operator's call and not a side effect of an audit.
+  eight entries) and it is a change to how the thing is deployed, so it was
+  put to the operator rather than taken as a side effect of an audit.
+  **Answered in phase 70: do it.** See that entry for what it took.
 - **`seaDogTerminal`** as a key in the `/api/health` response. A response
   schema with external readers and its own pins.
 - **`Symbol.for('sea-dog-terminal.process-singletons')`.** A runtime

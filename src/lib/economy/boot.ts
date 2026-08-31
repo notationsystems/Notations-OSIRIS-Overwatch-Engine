@@ -35,6 +35,7 @@ import { getEconomyState } from './store';
 import { guardEvaluationScope } from './ledgerGuards';
 import { recordProcessEvent } from './observability';
 import { processSingleton } from './processSingleton';
+import { env } from './envCompat';
 
 export interface CommodityBootOutcome {
   commodity: string;
@@ -70,7 +71,7 @@ export interface BootReport {
 // startup and makes the report accurate — measured in the running
 // configuration, the copper assembly runs past 30s once D-10's per-host
 // limiter serialises both commodities against comtradeapi.un.org.
-const BOOT_BUDGET_MS = Number(process.env.SEA_DOG_BOOT_BUDGET_MS ?? 180_000);
+const BOOT_BUDGET_MS = Number(env('PAYLOAD_BOOT_BUDGET_MS') ?? 180_000);
 
 /** The boot report lives on globalThis. Next runs instrumentation in a
  *  DIFFERENT module context from the route handlers, so a module-level
@@ -108,7 +109,7 @@ export function resetBootReport(): void {
  *  or unwritability is reported WITH THE PATH — every writer is
  *  best-effort by design, so this is the only place it can be noticed. */
 export async function checkArchiveWritable(dir?: string): Promise<ArchiveBootOutcome> {
-  const path = dir ?? process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
+  const path = dir ?? env('PAYLOAD_MISS_LOG_DIR') ?? `${process.cwd()}/data-archive`;
   try {
     const fs = await import('node:fs/promises');
     try {

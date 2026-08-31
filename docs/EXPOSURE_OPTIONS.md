@@ -11,7 +11,7 @@ applied — stated as such below, not smuggled in as a decision.**
 
 Stdio transport only. `npm run mcp` starts a server that speaks the
 protocol over standard input and output to a client on the same machine,
-and talks to the running terminal over `SEA_DOG_URL`. **It opens no port
+and talks to the running terminal over `PAYLOAD_URL`. **It opens no port
 and accepts no network connection.** Attaching therefore requires the
 same access standing up the instance already requires. This is the
 deliberately narrow default: it makes the tool surface real and testable

@@ -21,6 +21,7 @@
  */
 
 import { processSingleton } from './processSingleton';
+import { env } from './envCompat';
 
 export interface McpCallRecord {
   ts: string;
@@ -63,10 +64,10 @@ export function resetMcpSession(id?: string): void {
 /** Same env seams as the miss log / export log; suppressed under test
  *  unless the readiness seam forces the real write path. */
 async function appendMcpLog(rec: McpCallRecord): Promise<void> {
-  if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
+  if (process.env.VITEST && env('PAYLOAD_FORCE_MISS_LOG') !== '1') return;
   try {
     const fs = await import('node:fs/promises');
-    const dir = process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
+    const dir = env('PAYLOAD_MISS_LOG_DIR') ?? `${process.cwd()}/data-archive`;
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(`${dir}/mcp-sessions.jsonl`, JSON.stringify(rec) + '\n');
   } catch { /* best-effort by design */ }

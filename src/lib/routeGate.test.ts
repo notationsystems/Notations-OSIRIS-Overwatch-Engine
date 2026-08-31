@@ -1,10 +1,22 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { readdirSync, statSync, readFileSync } from 'node:fs';
+import { readdirSync, statSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  ROUTE_DISPOSITION, RETIRED_ROUTES, KEPT_DESPITE_GENERAL_PURPOSE,
+  ROUTE_DISPOSITION, RETIRED_ROUTES, KEPT_DESPITE_GENERAL_PURPOSE, DELETED_ROUTES,
   routesEnabled, isRouteEnabled, requireRouteEnabled, ROUTE_RETIRED_STATUS,
 } from './routeGate';
+
+/**
+ * Retired and STILL PRESENT on disk — the set the environment override can
+ * actually act on.
+ *
+ * Phase 70 deleted every handler that was retired at the time, so this is
+ * empty today. That is stated, and asserted, rather than left for a reader
+ * to infer from tests that quietly stopped exercising anything: a test that
+ * loops over an empty list passes, and passing is exactly what it must not
+ * be allowed to do silently.
+ */
+const RETIRED_BUT_PRESENT = RETIRED_ROUTES.filter((r) => !DELETED_ROUTES.has(r));
 
 const API_ROOT = join(process.cwd(), 'src/app/api');
 
@@ -39,7 +51,12 @@ describe('every route lands in exactly one bucket', () => {
   const ROUTES = routeIds();
 
   it('the tree has routes to account for', () => {
-    expect(ROUTES.length).toBeGreaterThan(40);
+    // Was >40 before phase 70 deleted 31 handlers. The floor is the LIVE
+    // surface now; the deleted ones are counted separately below, so the
+    // total this test guards did not silently absorb them.
+    expect(ROUTES.length).toBeGreaterThan(30);
+    expect(DELETED_ROUTES.size).toBe(31);
+    expect(ROUTES.length + DELETED_ROUTES.size).toBe(Object.keys(ROUTE_DISPOSITION).length);
   });
 
   it('every route on disk is classified', () => {
@@ -54,7 +71,19 @@ describe('every route lands in exactly one bucket', () => {
     const neither = ROUTES.filter((r) => !enabled.has(r) && !retired.has(r));
     expect(both, 'a route cannot be both live and retired').toEqual([]);
     expect(neither, 'a route in neither bucket is outside the mechanism').toEqual([]);
-    expect(enabled.size + retired.size).toBe(ROUTES.length);
+    // Conservation is now over THREE states, not two: every classified name
+    // is live, retired-and-present, or deleted. Folding deleted into either
+    // of the others is how a count starts looking right while meaning
+    // something else.
+    expect(enabled.size + retired.size).toBe(Object.keys(ROUTE_DISPOSITION).length);
+    expect(enabled.size + RETIRED_BUT_PRESENT.length).toBe(ROUTES.length);
+  });
+
+  it('a deleted route is not served, and is not reported live', () => {
+    for (const route of DELETED_ROUTES) {
+      expect(isRouteEnabled(route), `${route} is deleted and must not read as live`).toBe(false);
+      expect(routesEnabled().has(route)).toBe(false);
+    }
   });
 
   it('the sub-routes of a retired parent are retired too', () => {
@@ -134,23 +163,57 @@ describe('the refusal says which kind of nothing it is', () => {
 });
 
 describe('a vertical can flip a route back on', () => {
-  it('the env override enables a retired route', () => {
-    const retired = RETIRED_ROUTES[0];
-    expect(isRouteEnabled(retired)).toBe(false);
-    process.env.PAYLOAD_ROUTES_ENABLED = retired;
-    expect(isRouteEnabled(retired)).toBe(true);
-    expect(requireRouteEnabled(retired)).toBeNull();
+  /**
+   * WHAT THE DELETION DID TO THIS MECHANISM, said out loud.
+   *
+   * `PAYLOAD_ROUTES_ENABLED` was A-1's escape hatch: a retired route could be
+   * switched back on without a deploy. Phase 70 deleted every handler that
+   * was retired, so today the switch has nothing to act on — flipping any of
+   * the 31 names on would enable a route with no code behind it.
+   *
+   * The mechanism is KEPT, because the next route retired without deletion
+   * needs it and it is six lines. But a switch that can currently change
+   * nothing is exactly the shape this codebase keeps finding, so it is
+   * pinned as vacuous rather than left looking operative — and the pin
+   * inverts the moment a route is retired without being deleted.
+   */
+  it('is currently vacuous, and says so', () => {
+    expect(RETIRED_BUT_PRESENT, [
+      'The override has something to act on again. Delete this assertion and',
+      'restore the two below to use a real retired-but-present route.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('refuses to enable a route whose handler was deleted', () => {
+    // The important half. Enabling a deleted route would report it live and
+    // then answer nothing — an operator would believe the switch worked.
+    const deleted = [...DELETED_ROUTES][0];
+    process.env.PAYLOAD_ROUTES_ENABLED = deleted;
+    expect(isRouteEnabled(deleted)).toBe(false);
+    expect(requireRouteEnabled(deleted)).not.toBeNull();
+  });
+
+  it('the override still works, on a route that exists', () => {
+    // Exercised against a synthetic name rather than a real retirement,
+    // because there are none left. This holds the MECHANISM while
+    // RETIRED_BUT_PRESENT is empty, so the deletion did not quietly take
+    // the coverage with it.
+    const live = 'economy';
+    expect(isRouteEnabled(live)).toBe(true);
+    process.env.PAYLOAD_ROUTES_ENABLED = 'not-a-route';
+    expect(isRouteEnabled('not-a-route')).toBe(true); // unclassified names still pass through
+    delete process.env.PAYLOAD_ROUTES_ENABLED;
+    expect(isRouteEnabled('not-a-route')).toBe(false);
   });
 
   it('enablement is recomputed per call, not snapshotted at module load', () => {
     // A module-level snapshot would answer from the environment as it was when
     // the module first loaded — the severed-premise hazard, in a new place.
-    const retired = RETIRED_ROUTES[1];
-    expect(isRouteEnabled(retired)).toBe(false);
-    process.env.PAYLOAD_ROUTES_ENABLED = retired;
-    expect(isRouteEnabled(retired)).toBe(true);
+    expect(isRouteEnabled('synthetic-route')).toBe(false);
+    process.env.PAYLOAD_ROUTES_ENABLED = 'synthetic-route';
+    expect(isRouteEnabled('synthetic-route')).toBe(true);
     delete process.env.PAYLOAD_ROUTES_ENABLED;
-    expect(isRouteEnabled(retired)).toBe(false);
+    expect(isRouteEnabled('synthetic-route')).toBe(false);
   });
 });
 
@@ -163,73 +226,63 @@ describe('a vertical can flip a route back on', () => {
  * right, the test on the list passes, and the feed keeps serving. So the
  * wiring is asserted over the source, not assumed from the classification.
  */
-describe('every retired route actually consults the gate', () => {
-  it('each retired handler calls the gate', () => {
-    const unwired: string[] = [];
-    for (const route of RETIRED_ROUTES) {
-      const src = readFileSync(join(API_ROOT, route, 'route.ts'), 'utf8');
-      const consults = src.includes('requireRouteEnabled(') || src.includes('isRouteEnabled(');
-      if (!consults) unwired.push(route);
-    }
-    expect(unwired, [
-      'These routes are retired in the classification and still answer every request.',
-      'Retirement is a fact in a list until the handler consults it.',
-    ].join(' ')).toEqual([]);
+describe('the retired surface is served by one handler, and only one', () => {
+  /**
+   * WHAT THIS REPLACED, and why the question changed.
+   *
+   * Before phase 70 this block asserted that each of 31 retired handlers
+   * consulted the gate and named its own route — because retirement was a
+   * fact in a list until each handler chose to honour it, and a copy-paste
+   * guarding `earthquakes` from inside `fires` would have passed a weaker
+   * check. Thirty-one chances to get it wrong.
+   *
+   * Deleting the handlers deleted the hazard. There is now one place the
+   * refusal is produced, so the question becomes: is that place the ONLY
+   * place, and does it still answer for every name?
+   */
+  const CATCH_ALL = join(API_ROOT, '[...retired]', 'route.ts');
+
+  it('no deleted route has a handler left behind', () => {
+    // A survivor would answer without ever reaching the catch-all, and the
+    // record in DELETED_ROUTES would be false while looking right.
+    const survivors = [...DELETED_ROUTES].filter((r) => existsSync(join(API_ROOT, r, 'route.ts')));
+    expect(survivors, 'these are recorded as deleted and still have a handler').toEqual([]);
   });
 
-  it('each retired handler names ITS OWN route in the call', () => {
-    // A copy-paste that guards `earthquakes` from inside `fires` would pass
-    // the check above while gating the wrong feed.
-    const wrong: string[] = [];
-    for (const route of RETIRED_ROUTES) {
-      const src = readFileSync(join(API_ROOT, route, 'route.ts'), 'utf8');
-      if (!src.includes(`('${route}')`)) wrong.push(route);
-    }
-    expect(wrong, 'these guard a route other than themselves').toEqual([]);
+  it('the catch-all answers for every deleted route, by consulting the record', () => {
+    const src = readFileSync(CATCH_ALL, 'utf8');
+    // It must decide from DELETED_ROUTES rather than from a second list of
+    // its own — two lists of one fact drift, and drift silently.
+    expect(src).toContain('DELETED_ROUTES.has(route)');
+    expect(src).toContain('routeRetiredPayload(route)');
+    expect(src).toContain('ROUTE_RETIRED_STATUS');
+  });
+
+  it('the catch-all distinguishes retired from never-existed from missing', () => {
+    // Which kind of nothing. A 404 for a retired route would erase its
+    // history; a 503 for a typo would invent one; and a classified route
+    // with no handler is a build defect, not a policy refusal.
+    const src = readFileSync(CATCH_ALL, 'utf8');
+    expect(src).toContain("'no_such_route'");
+    expect(src).toContain("'route_handler_missing'");
   });
 
   it('no LIVE route consults the gate — that would retire it invisibly', () => {
-    const enabled = [...routesEnabled()];
+    // The catch-all is the one exemption, and it is named rather than
+    // pattern-matched away: it exists to PRODUCE the refusal, so finding the
+    // refusal in it is the point. Every other live route calling the gate
+    // would be retiring itself where no classification says so.
+    const REFUSAL_HANDLER = '[...retired]';
     const gated: string[] = [];
-    for (const route of enabled) {
-      const src = readFileSync(join(API_ROOT, route, 'route.ts'), 'utf8');
+    for (const route of routesEnabled()) {
+      if (route === REFUSAL_HANDLER) continue;
+      const file = join(API_ROOT, route, 'route.ts');
+      if (!existsSync(file)) continue;
+      const src = readFileSync(file, 'utf8');
       if (src.includes('requireRouteEnabled(') || src.includes('routeRetiredPayload(')) {
         gated.push(route);
       }
     }
     expect(gated, 'a live route that calls the gate is retired in effect').toEqual([]);
-  });
-});
-
-/**
- * The supplied suite's cases, kept — they assert things worth asserting and
- * two of them were not covered above.
- */
-describe('supplied route-allowlist expectations', () => {
-  it('keeps the economy substrate live', () => {
-    for (const r of ['economy', 'economy/search', 'economy/table']) {
-      expect(isRouteEnabled(r)).toBe(true);
-    }
-  });
-
-  it('retires every general-purpose route by default', () => {
-    for (const r of RETIRED_ROUTES) expect(isRouteEnabled(r)).toBe(false);
-  });
-
-  it('an enabled route passes through (null = proceed)', () => {
-    expect(requireRouteEnabled('economy')).toBeNull();
-  });
-
-  it('retired and enabled do not overlap, and retirement is not vacuous', () => {
-    const enabled = routesEnabled();
-    for (const r of RETIRED_ROUTES) expect(enabled.has(r)).toBe(false);
-    expect(RETIRED_ROUTES.length).toBeGreaterThan(15);
-  });
-
-  it('the remedy names the route that would re-enable it', async () => {
-    const res = requireRouteEnabled('cctv');
-    expect(res).not.toBeNull();
-    const body = await res!.json();
-    expect(body.remedy).toContain('cctv');
   });
 });

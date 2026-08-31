@@ -35,6 +35,7 @@
 import { MACHINE_CLIENT_HEADER } from './machineClient';
 import { recordMcpCall } from './mcpSession';
 import { SOURCE_REGISTRY, mayRedistributeToMachines, redistributionPostureOf } from './sourceRegistry';
+import { env } from './envCompat';
 
 export interface KnowledgeState {
   asOf: string;
@@ -48,7 +49,7 @@ export interface McpContext {
   fetchJson(path: string, init?: { method?: string; body?: string }): Promise<{ status: number; body: unknown }>;
 }
 
-export function httpContext(baseUrl = process.env.SEA_DOG_URL ?? 'http://localhost:3000'): McpContext {
+export function httpContext(baseUrl = env('PAYLOAD_URL') ?? 'http://localhost:3000'): McpContext {
   return {
     async fetchJson(path, init) {
       const res = await fetch(`${baseUrl}${path}`, {

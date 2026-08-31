@@ -4,7 +4,7 @@ import { join } from 'node:path';
 // Single source of truth: the disposition map lives in production
 // (src/lib/routeGate.ts) so classifying a route and deciding whether it
 // is live are the same act. This test asserts it stays complete.
-import { ROUTE_DISPOSITION } from '../routeGate';
+import { DELETED_ROUTES, ROUTE_DISPOSITION } from '../routeGate';
 
 /**
  * THE COLLECTION POLICY, ENFORCED AT THE ROUTE SURFACE (ledger phase 39).
@@ -104,10 +104,27 @@ describe('the collection policy holds at the route surface, not only at registra
     ].join(' ')).toEqual([]);
   });
 
-  it('has no stale classification (a deleted route must leave the register)', () => {
+  it('has no stale classification (a deleted route must leave the register, or be recorded as deleted)', () => {
+    // Phase 70 deleted 31 retired handlers and kept their classification, so
+    // "not on disk" now has TWO meanings and they must not be conflated: a
+    // route deliberately deleted, whose contract the catch-all still serves,
+    // and a classification left behind by a route nobody meant to remove.
+    // The first is recorded in DELETED_ROUTES; anything else is stale.
     const present = new Set(ROUTES);
-    const stale = Object.keys(ROUTE_DISPOSITION).filter((r) => !present.has(r));
-    expect(stale, 'classified routes that no longer exist').toEqual([]);
+    const stale = Object.keys(ROUTE_DISPOSITION)
+      .filter((r) => !present.has(r) && !DELETED_ROUTES.has(r));
+    expect(stale, 'classified routes that are neither on disk nor recorded as deleted').toEqual([]);
+  });
+
+  it('every deleted route is classified, and none of them is still on disk', () => {
+    // The other direction. A name in DELETED_ROUTES that still has a handler
+    // would mean the catch-all never sees it and the record is a lie; a name
+    // with no classification would be a deletion nobody accounted for.
+    const present = new Set(ROUTES);
+    const resurrected = [...DELETED_ROUTES].filter((r) => present.has(r));
+    const unclassified = [...DELETED_ROUTES].filter((r) => !(r in ROUTE_DISPOSITION));
+    expect(resurrected, 'recorded as deleted but a handler exists').toEqual([]);
+    expect(unclassified, 'deleted without a disposition').toEqual([]);
   });
 
   it('serves no route whose subject is a natural person or whose function is scanning', () => {

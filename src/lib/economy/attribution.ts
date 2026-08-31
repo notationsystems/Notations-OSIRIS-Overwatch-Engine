@@ -25,13 +25,14 @@
 import pkg from '../../../package.json';
 import { stateFingerprint } from './corpusTable';
 import type { EconomyState } from './types';
+import { env } from './envCompat';
 
 export interface ResponseAttribution {
   version: {
     release: string;
     /** Commit the image was built from — null when unstamped, never guessed. */
     commit: string | null;
-    commit_source: 'env:SEA_DOG_BUILD_SHA' | 'unstamped-build';
+    commit_source: 'env:PAYLOAD_BUILD_SHA' | 'unstamped-build';
   };
   state: {
     /** Same fingerprint function the corpus export stamps on every table. */
@@ -59,9 +60,9 @@ export interface ResponseAttribution {
 }
 
 export function buildVersion(): ResponseAttribution['version'] {
-  const sha = process.env.SEA_DOG_BUILD_SHA;
+  const sha = env('PAYLOAD_BUILD_SHA');
   return sha
-    ? { release: pkg.version, commit: sha, commit_source: 'env:SEA_DOG_BUILD_SHA' }
+    ? { release: pkg.version, commit: sha, commit_source: 'env:PAYLOAD_BUILD_SHA' }
     : { release: pkg.version, commit: null, commit_source: 'unstamped-build' };
 }
 

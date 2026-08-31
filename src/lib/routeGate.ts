@@ -42,6 +42,8 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'ai/overview': 'general-purpose',
   'air-quality': 'general-purpose',
   aircraft: 'general-purpose',
+  // The catch-all that answers for every deleted route. Its own plumbing.
+  '[...retired]': 'ops',
   arcgis: 'ops',
   astra: 'general-purpose',
   cctv: 'general-purpose',
@@ -129,6 +131,63 @@ export const RETIRED_ROUTES: readonly string[] = Object.entries(ROUTE_DISPOSITIO
   .map(([route]) => route)
   .sort();
 
+/**
+ * Retired routes whose HANDLERS WERE DELETED, phase 70.
+ *
+ * A-1 retired these behind a 503 without deleting them, so a commodity
+ * vertical could flip one back on. Measured a while later, that decision had
+ * a price nobody had counted: 8,835 lines — 58% of all API code — that no
+ * request could reach, carrying 104 of the codebase's 312 `any`s and a
+ * typecheck, lint and dependency burden on every change made anywhere near
+ * them. Thirty-one handlers that answer `503` are not thirty-one features
+ * held in reserve; they are one refusal, spelled thirty-one times.
+ *
+ * So the handlers go and the CONTRACT STAYS. `[...retired]/route.ts` returns
+ * the identical `route_retired` payload for every name in this set, because
+ * a static segment always beats a catch-all in Next's router: a live route
+ * is matched by its own handler and never reaches it. A caller cannot tell
+ * the difference, which is the requirement — deleting code must not change
+ * an answer.
+ *
+ * Re-enabling one is still a decision and still cheap: the classification
+ * above is unchanged, git holds every line, and `PAYLOAD_ROUTES_ENABLED`
+ * still names it. What is gone is the pretence that a 503 stub was the
+ * feature.
+ */
+export const DELETED_ROUTES: ReadonlySet<string> = new Set([
+  'ai/analyze',
+  'ai/briefing',
+  'ai/overview',
+  'aircraft',
+  'astra',
+  'cctv',
+  'cctv/proxy',
+  'cctv/resolve',
+  'cctv/stream-status',
+  'cloudflare-radar',
+  'conflicts',
+  'country-risk',
+  'crypto',
+  'cyber-attacks',
+  'cyber-threats',
+  'earthquakes',
+  'fires',
+  'flight-route',
+  'flights',
+  'frontlines',
+  'gdelt',
+  'gdelt-events',
+  'live-news',
+  'malware',
+  'radar',
+  'region-dossier',
+  'satellites',
+  'satellites/orbit',
+  'scm-suppliers',
+  'sentinel',
+  'space-weather',
+]);
+
 function envEnabled(): ReadonlySet<string> {
   const raw = process.env.PAYLOAD_ROUTES_ENABLED;
   if (!raw) return new Set();
@@ -147,7 +206,13 @@ export function routesEnabled(): ReadonlySet<string> {
   for (const route of Object.keys(ROUTE_DISPOSITION)) {
     if (!retired.has(route)) on.add(route);
   }
-  for (const route of envEnabled()) on.add(route);
+  for (const route of envEnabled()) {
+    // A deleted route cannot be switched back on by environment alone: there
+    // is no handler to reach. Enabling one silently would report a live
+    // route that answers nothing, which is worse than refusing it — the
+    // operator would believe the switch had worked.
+    if (!DELETED_ROUTES.has(route)) on.add(route);
+  }
   return on;
 }
 

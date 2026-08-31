@@ -29,8 +29,8 @@ Nothing is deployed today. What exists:
   intended tree: `/api/economy/guards` reports `version.commit`, which the
   image now carries. A `commit_source` of `unstamped-build` means the
   image was built outside the publish workflow; pass the SHA explicitly
-  (`--build-arg SEA_DOG_BUILD_SHA=<sha>` at build, or
-  `-e SEA_DOG_BUILD_SHA=<sha>` at run) rather than accepting a baseline
+  (`--build-arg PAYLOAD_BUILD_SHA=<sha>` at build, or
+  `-e PAYLOAD_BUILD_SHA=<sha>` at run) rather than accepting a baseline
   that cannot be attributed to a tree.
 
 ## Configuration seams (fail loudly, never degrade)
@@ -44,10 +44,10 @@ configuration layer.
 
 | Key | Required when | Meaning |
 |---|---|---|
-| `SEA_DOG_EDGAR_ENABLED=1` | — | Enables the EDGAR document tier (unbuilt; operator-blocked) |
-| `SEA_DOG_SEC_UA_ORG` | EDGAR enabled | SEC User-Agent organization — never fabricated |
-| `SEA_DOG_SEC_UA_CONTACT` | EDGAR enabled | SEC User-Agent role email — never fabricated |
-| `SEA_DOG_MISS_LOG_DIR` | optional | Miss-log directory (default `<cwd>/data-archive`) |
+| `PAYLOAD_EDGAR_ENABLED=1` | — | Enables the EDGAR document tier (unbuilt; operator-blocked) |
+| `PAYLOAD_SEC_UA_ORG` | EDGAR enabled | SEC User-Agent organization — never fabricated |
+| `PAYLOAD_SEC_UA_CONTACT` | EDGAR enabled | SEC User-Agent role email — never fabricated |
+| `PAYLOAD_MISS_LOG_DIR` | optional | Miss-log directory (default `<cwd>/data-archive`) |
 | `OSIRIS_DISABLE_LIVE=1` | optional | Force snapshot rungs — visible in provenance, never silent |
 
 No built source requires a credential today; the gate is the socket the

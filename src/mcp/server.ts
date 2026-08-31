@@ -1,9 +1,9 @@
 /**
  * Payload Terminal — MCP server entry (final order F-2).
  *
- * Run:  SEA_DOG_URL=http://localhost:3000 npm run mcp
+ * Run:  PAYLOAD_URL=http://localhost:3000 npm run mcp
  * (stdio transport — configure in a client as command "npm", args
- * ["run","mcp"], cwd this repo, with the terminal serving on SEA_DOG_URL.)
+ * ["run","mcp"], cwd this repo, with the terminal serving on PAYLOAD_URL.)
  *
  * The server is a THIN CONTRACT LAYER over the running terminal's own
  * HTTP routes — one logic path, nothing to drift. It carries the
@@ -20,6 +20,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { MCP_TOOLS, httpContext, runMcpTool } from '../lib/economy/mcpTools';
 import { VERSION } from '../lib/identity';
+import { env } from '../lib/economy/envCompat';
 
 const ctx = httpContext();
 
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stderr, never stdout: stdout IS the protocol channel on this transport.
-  console.error('[payload-terminal] MCP server on stdio; terminal at', process.env.SEA_DOG_URL ?? 'http://localhost:3000');
+  console.error('[payload-terminal] MCP server on stdio; terminal at', env('PAYLOAD_URL') ?? 'http://localhost:3000');
 }
 
 main().catch((e: unknown) => {

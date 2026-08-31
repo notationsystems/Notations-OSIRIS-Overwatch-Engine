@@ -204,8 +204,8 @@ describe('corpus table export (shipping-order addition, pre-registered criteria)
   //    the real digest. ──
   it('an export writes the export log through the real path and increments the session digest', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'sea-dog-export-log-'));
-    process.env.SEA_DOG_FORCE_MISS_LOG = '1';
-    process.env.SEA_DOG_MISS_LOG_DIR = dir;
+    process.env.PAYLOAD_FORCE_MISS_LOG = '1';
+    process.env.PAYLOAD_MISS_LOG_DIR = dir;
     resetSessionTelemetry();
     try {
       const before = sessionDigest().exportsServed;
@@ -227,8 +227,8 @@ describe('corpus table export (shipping-order addition, pre-registered criteria)
         if (rec.metric) expect(rec.metric).toMatch(/^[a-z_]+$/);
       }
     } finally {
-      delete process.env.SEA_DOG_FORCE_MISS_LOG;
-      delete process.env.SEA_DOG_MISS_LOG_DIR;
+      delete process.env.PAYLOAD_FORCE_MISS_LOG;
+      delete process.env.PAYLOAD_MISS_LOG_DIR;
       rmSync(dir, { recursive: true, force: true });
       resetSessionTelemetry();
     }
@@ -242,15 +242,15 @@ describe('corpus table export (shipping-order addition, pre-registered criteria)
     // The boundary regex refuses free text before it can reach the export
     // log — a person-shaped subject never persists anywhere.
     const dir = mkdtempSync(join(tmpdir(), 'sea-dog-export-refuse-'));
-    process.env.SEA_DOG_FORCE_MISS_LOG = '1';
-    process.env.SEA_DOG_MISS_LOG_DIR = dir;
+    process.env.PAYLOAD_FORCE_MISS_LOG = '1';
+    process.env.PAYLOAD_MISS_LOG_DIR = dir;
     try {
       const res = await GET(req(`/api/economy/table?commodity=copper&subject=${encodeURIComponent('jane doe')}`));
       expect(res.status).toBe(400);
       expect(existsSync(join(dir, 'export-log.jsonl'))).toBe(false); // refused BEFORE the log
     } finally {
-      delete process.env.SEA_DOG_FORCE_MISS_LOG;
-      delete process.env.SEA_DOG_MISS_LOG_DIR;
+      delete process.env.PAYLOAD_FORCE_MISS_LOG;
+      delete process.env.PAYLOAD_MISS_LOG_DIR;
       rmSync(dir, { recursive: true, force: true });
     }
   });

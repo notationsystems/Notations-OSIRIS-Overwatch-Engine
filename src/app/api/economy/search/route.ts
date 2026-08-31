@@ -8,6 +8,7 @@ import { isMachineClient } from '@/lib/economy/machineClient';
 import { asKnownThen } from '@/lib/economy/engine';
 import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
+import { env } from '@/lib/economy/envCompat';
 
 /**
  * Payload — Entity search: find "Escondida" from the search bar.
@@ -101,10 +102,10 @@ async function archiveSearchMiss(rec: SearchMissRecord & { ts: string }): Promis
   // except when the readiness test forces the REAL write path (work order
   // 3.7: "verify the miss log writes in the running configuration, not
   // only in principle"), pointing it at a scratch directory.
-  if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
+  if (process.env.VITEST && env('PAYLOAD_FORCE_MISS_LOG') !== '1') return;
   try {
     const fs = await import('node:fs/promises');
-    const dir = process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
+    const dir = env('PAYLOAD_MISS_LOG_DIR') ?? `${process.cwd()}/data-archive`;
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(`${dir}/search-misses.jsonl`, JSON.stringify(rec) + '\n');
   } catch { /* best-effort by design */ }

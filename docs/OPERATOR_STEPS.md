@@ -82,7 +82,7 @@ makes the ninety-day result mean anything in either direction.
 ## Optional: attach a language model to the corpus
 
 ```bash
-npm run mcp    # stdio MCP server; expects the terminal at SEA_DOG_URL (default http://localhost:3000)
+npm run mcp    # stdio MCP server; expects the terminal at PAYLOAD_URL (default http://localhost:3000)
 ```
 
 Configure it in an MCP client as command `npm`, args `["run","mcp"]`,
