@@ -7,7 +7,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
-[![License](https://img.shields.io/badge/License-MIT-D4AF37?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPLv3-D4AF37?style=for-the-badge)](LICENSE)
 
 **A freight and physical-commerce instrument: a provenance-preserving world
 state for loads, lanes, carriers and commitments, with every claim carrying
@@ -259,14 +259,18 @@ AIS_API_KEY=                  # aisstream.io maritime
 
 This project began as a fork of
 [simplifaisoul/osiris](https://github.com/simplifaisoul/osiris), an
-open-source situational-awareness dashboard, and retains its MIT licence and
-map/rendering foundation. It has since been rebuilt around a
+open-source situational-awareness dashboard, and retains its map and
+rendering foundation. It has since been rebuilt around a
 provenance-preserving physical-economy substrate, and the reconnaissance
 capabilities that defined the upstream project have been removed under the
 collection policy above.
+
+The upstream project is MIT-licensed; that permissive grant remains on the
+code inherited from it, and its notice is retained. This project as a whole
+is distributed under the GNU GPL v3 — see [LICENSE](LICENSE).
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+GNU General Public License v3.0 — see [LICENSE](LICENSE) for details.
