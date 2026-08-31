@@ -541,6 +541,7 @@ docker compose up -d`}</Pre>
                 </div>
               ))}
             </div>
+            {/* collection-policy:begin */}
             <Callout tone="warn" title="Collection policy">
               These routes attribute infrastructure to the <em>organisation</em> that operates it — whose domain,
               whose network, whose ASN — and to nothing else. They must never be used to profile, locate or identify
@@ -549,6 +550,7 @@ docker compose up -d`}</Pre>
               passive: they query third-party datasets rather than the subject itself. Host and port scanning,
               username enumeration, breach lookup and phone research were removed from this application.
             </Callout>
+            {/* collection-policy:end */}
           </Section>
 
           {API_GROUPS.map(group => (

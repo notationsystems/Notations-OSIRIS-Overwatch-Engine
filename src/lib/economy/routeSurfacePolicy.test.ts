@@ -245,6 +245,86 @@ describe('the collection policy holds at the route surface, not only at registra
  * enumeration is a due-diligence finding whether or not the route still
  * exists.
  */
+/**
+ * THE SHIPPED DESCRIPTION IS MORE THAN ONE FILE (ledger phase 48, the
+ * ninth instance of the phase-38 class).
+ *
+ * The first version of this gate read README.md and nothing else, and
+ * went green while `src/app/layout.tsx` advertised `nmap online`,
+ * `port scanner online` and `penetration testing tools` as SEO keywords
+ * with browser-based port scanning first in its schema.org featureList —
+ * the surface a search engine actually indexes. A gate against
+ * advertising a prohibited capability, itself narrower than its claim.
+ *
+ * The door there was an ENUMERATION: the check named its members and the
+ * world had more. An enumeration is silent about what it omits and the
+ * test goes green either way, so the only defence is to make the list
+ * itself checkable. Hence the shape below, which is the phase-46 route
+ * classification applied to documents: every description-bearing artifact
+ * is CLASSIFIED, an unclassified one fails, and the scan runs over every
+ * artifact classified as outward-facing.
+ */
+
+/** How an artifact relates to what the product claims to be. */
+type ArtifactRole =
+  /** Describes the product to people outside the firm. Scanned. */
+  | 'outward-facing'
+  /** Internal to contributors; names capabilities only to discuss them. */
+  | 'internal';
+
+const DESCRIPTION_ARTIFACTS: Readonly<Record<string, ArtifactRole>> = {
+  'README.md': 'outward-facing',
+  'DOCKER.md': 'outward-facing',
+  'SECURITY.md': 'outward-facing',
+  'src/app/layout.tsx': 'outward-facing',
+  'docker-compose.yml': 'outward-facing',
+  'public/manifest.json': 'outward-facing',
+  'public/site.webmanifest': 'outward-facing',
+  'src/app/docs/DocsClient.tsx': 'outward-facing',
+  'src/app/docs/apiCatalog.ts': 'outward-facing',
+};
+
+/**
+ * Where a new description-bearing artifact is likely to appear. Anything
+ * matching and not classified above fails the gate — which is the whole
+ * point: the list cannot silently fall behind the tree.
+ */
+function candidateArtifacts(): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(process.cwd())) {
+    if (entry.endsWith('.md') && entry === entry.toUpperCase().replace('.MD', '.md')) out.push(entry);
+  }
+  for (const entry of readdirSync(join(process.cwd(), 'public'))) {
+    if (entry.endsWith('.webmanifest') || entry === 'manifest.json') out.push(`public/${entry}`);
+  }
+  return out.sort();
+}
+
+/**
+ * Strip a delimited collection-policy region from an artifact.
+ *
+ * ANY outward-facing artifact may NAME a prohibited capability in order to
+ * say it is prohibited — a policy nobody can read is not a policy, and the
+ * /docs page states the same policy the README does. So the exemption is a
+ * property of the delimited REGION, not a property of being README.md.
+ * The markers differ only by comment syntax: HTML in Markdown, JSX in TSX.
+ */
+function withoutPolicyBlock(source: string): { advertised: string; policy: string } {
+  const MARKERS = [
+    ['<!-- collection-policy:begin -->', '<!-- collection-policy:end -->'],
+    ['{/* collection-policy:begin */}', '{/* collection-policy:end */}'],
+  ];
+  for (const [begin, end] of MARKERS) {
+    const start = source.indexOf(begin);
+    const stop = source.indexOf(end);
+    if (start >= 0 && stop > start) {
+      const policy = source.slice(start, stop + end.length);
+      return { advertised: source.replace(policy, ''), policy };
+    }
+  }
+  return { advertised: source, policy: '' };
+}
+
 describe('the shipped description advertises no prohibited capability', () => {
   const README = readFileSync(join(process.cwd(), 'README.md'), 'utf8');
 
@@ -319,6 +399,57 @@ describe('the shipped description advertises no prohibited capability', () => {
     for (const term of ['nmap', 'penetration testing', 'port scanner', 'palantir']) {
       expect(layout.toLowerCase(), `metadata must not advertise ${term}`).not.toContain(term);
     }
+  });
+
+  it('classifies every description-bearing artifact it can find', () => {
+    const unclassified = candidateArtifacts().filter((f) => !(f in DESCRIPTION_ARTIFACTS));
+    expect(unclassified, [
+      'These files describe the product and carry no declared role. Classify each as',
+      "'outward-facing' (scanned for prohibited capabilities) or 'internal'. A gate that",
+      'enumerates its members is silent about the ones it omits — which is exactly how',
+      'layout.tsx advertised port scanning while this gate reported the README clean.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('scans every outward-facing artifact, not just the README', () => {
+    const findings: string[] = [];
+    for (const [file, role] of Object.entries(DESCRIPTION_ARTIFACTS)) {
+      if (role !== 'outward-facing') continue;
+      let source: string;
+      try {
+        source = readFileSync(join(process.cwd(), file), 'utf8');
+      } catch {
+        findings.push(`${file}: classified but missing — remove it from the list or restore it`);
+        continue;
+      }
+      const body = withoutPolicyBlock(source).advertised;
+      for (const { pattern, capability } of ADVERTISED_PROHIBITIONS) {
+        if (pattern.test(body)) findings.push(`${file}: advertises ${capability}`);
+      }
+    }
+    expect(findings, [
+      'An outward-facing artifact advertises a capability the collection policy',
+      'prohibits. The shipped description is what a customer, an insurer or a regulator',
+      'reads — it is an artifact and drifts from policy like any other.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('names no scanning tool in any outward-facing artifact', () => {
+    const findings: string[] = [];
+    for (const [file, role] of Object.entries(DESCRIPTION_ARTIFACTS)) {
+      if (role !== 'outward-facing') continue;
+      let source: string;
+      try {
+        source = readFileSync(join(process.cwd(), file), 'utf8');
+      } catch {
+        continue;
+      }
+      const body = withoutPolicyBlock(source).advertised.toLowerCase();
+      for (const term of ['nmap', 'penetration testing', 'port scanner', 'palantir']) {
+        if (body.includes(term)) findings.push(`${file}: names "${term}"`);
+      }
+    }
+    expect(findings).toEqual([]);
   });
 
   it('states the prohibition it is exempted for (the section cannot be emptied)', () => {

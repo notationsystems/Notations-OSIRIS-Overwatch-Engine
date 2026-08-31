@@ -141,15 +141,12 @@ them only if you extend the relevant route or hit rate limits.
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `OSIRIS_TELEGRAM_CHANNELS` | Comma-separated list of public Telegram channel usernames (no `@`) to scrape for the **Telegram OSINT** map layer. Overrides the curated default set. | `osintdefender,insiderpaper,aljazeeraenglish,nexta_live,war_monitor` |
-| `OSIRIS_PORT` | Host port the compose file publishes (container itself always listens on 3000). | `3000` |
+| `PAYLOAD_PORT` | Host port the compose file publishes (container itself always listens on 3000). `OSIRIS_PORT` is honoured for one release and warns. | `3000` |
 
 ### Keyless sources (no configuration needed)
 
 Aviation → `adsb.lol` · Satellites → `celestrak.org` (TLE) · Fires →
 NASA FIRMS open-data CSV · Earthquakes → USGS · Weather → NASA EONET · Space
 weather → NOAA SWPC · CVEs → NVD · News → public RSS / HLS streams · CCTV →
-public traffic-authority feeds · Crypto (BTC) → `blockstream.info` · Crypto
-(ETH) → `eth.blockscout.com` ([Blockscout](https://github.com/blockscout/blockscout)
-open-source explorer) · OFAC SDN sanctions → [OpenSanctions](https://www.opensanctions.org)
-mirror (CC-BY 4.0) · Telegram OSINT → public `t.me/s/<channel>` web preview.
+public traffic-authority feeds · OFAC SDN sanctions → [OpenSanctions](https://www.opensanctions.org)
+mirror (CC-BY 4.0) · infrastructure attribution (DNS, WHOIS, RDAP, RIPE Stat).

@@ -3173,3 +3173,72 @@ follow the instrument that produced them.
 **719 tests green, typecheck clean, production build compiles.** The four
 Turbopack warnings are pre-existing dynamic `node:fs` imports, verified
 against a stashed baseline rather than assumed.
+
+
+## Phase 48 — ninth instance: "the shipped description" was more than one file
+
+Recorded separately from phase 47 because it is an instance of the phase-38
+class, not a rename detail, and the register is where instances live.
+
+**The instance.** Phase 46 built a gate on the shipped description, on the
+correct reasoning that the description is an artifact and drifts from policy
+like any other. It read `README.md`. Nothing else. Meanwhile
+`src/app/layout.tsx` — the page metadata a search engine indexes and a link
+preview renders — advertised `nmap online`, `port scanner online`,
+`penetration testing tools` and `palantir alternative` as SEO keywords, and
+carried *"Nmap port scanning from the browser — no install required"* as the
+**first** entry of its schema.org `featureList`.
+
+So the gate against advertising a prohibited capability was itself narrower
+than its claim, and the thing it failed to cover advertised harder than the
+thing it covered.
+
+| | |
+|---|---|
+| **The door** | AN ARTIFACT CLASS — "the shipped description" is a category with more than one member, and the gate enumerated one |
+| **What it looked like** | A green gate asserting the README was clean, which was true, while the more public surface was not checked |
+| **Found by** | The rename sweep touching `layout.tsx`, not by the gate |
+
+**Why it is worth its own entry.** The previous eight instances were each a
+mechanism narrowed by a predicate, a scope, a module context, a registration
+step. This one is narrowed by an ENUMERATION — the check named its members
+and the world had more. That is the door the next instance comes through, and
+naming it is the only defence, because the failure mode is invisible by
+construction: an enumeration is silent about what it omits, and the test goes
+green either way.
+
+**The fix, built rather than noted.** The first draft of this entry recorded
+the generalisation as future work. That was too weak: the class is an
+enumeration falling behind the world, and leaving the enumeration at two
+members is the same defect one member smaller. So the gate now iterates a
+CLASSIFIED LIST — `DESCRIPTION_ARTIFACTS` — in the phase-46 route shape:
+every description-bearing artifact declares a role (`outward-facing` or
+`internal`), the scan runs over every outward-facing one, and a
+`candidateArtifacts()` sweep over root Markdown and the web manifests fails
+the build when something matching appears unlisted. The list cannot silently
+fall behind the tree.
+
+**It found two more surfaces on its first run, and both were live.**
+
+- `DOCKER.md` still advertised `OSIRIS_TELEGRAM_CHANNELS` as a configurable
+  option for scraping public Telegram channels, and listed
+  *Telegram OSINT → public `t.me/s/<channel>` web preview* among its keyless
+  sources — a prohibited capability documented as a supported feature, with a
+  default channel list, after the capability had been established as never
+  built. The env var and the source line are gone.
+- `src/app/docs/DocsClient.tsx` — the `/docs` route — named four prohibited
+  capabilities. That one was a false positive worth keeping: it is the
+  collection-policy callout added in phase 47, naming them in order to say
+  they were removed.
+
+The second case forced the right generalisation. The README's policy
+exemption had been written as a property of *being README.md*; it is properly
+a property of the delimited REGION, since any outward-facing artifact may
+state the policy and the `/docs` page states the same one. `withoutPolicyBlock()`
+now strips a delimited policy region from any artifact, with markers in both
+comment syntaxes — HTML in Markdown, JSX in TSX.
+
+**What is still outside.** The repository's GitHub description and topics, and
+a published image's OCI labels, are outside the tree and cannot be gated from
+inside it. Those remain an operator responsibility, named here so they are a
+decision rather than an oversight.
