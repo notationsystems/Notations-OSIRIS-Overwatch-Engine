@@ -29,7 +29,7 @@ jobs:
         working-directory: zk/payload-event-batch
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
@@ -37,7 +37,7 @@ jobs:
           sudo apt-get install --yes --no-install-recommends clang protobuf-compiler
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.91.0
+        uses: dtolnay/rust-toolchain@1.94.1
         with:
           components: rustfmt
 
@@ -140,7 +140,7 @@ jobs:
           cat proof-output/ceremony.json
 
       - name: Publish ceremony artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: payload-event-batch-sp1-${{ github.sha }}
           path: |
