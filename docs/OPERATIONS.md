@@ -66,14 +66,21 @@ system `sp1`, and status `pending`. `GET` retrieves all batch commitments.
 
 This endpoint prepares public inputs; it does not accept a caller-supplied proof
 or verification key. The checked-in leased worker consumes pending batches,
-runs SP1, verifies locally against the pinned key, hashes the durable proof, and
-marks the exact batch proved. Authorization remains a
+runs SP1, verifies locally against the committed ceremony key, hashes the
+durable proof, and marks the exact batch proved. Before leasing a batch it asks
+the deployed executable for its program key and refuses any binary or
+configuration drift, so a bad deployment does not consume one of the batch's
+three attempts. `GET /api/freight/proof-batches` returns the trusted program
+identity, lifecycle counts, proved-event coverage, and exact batches.
+Authorization remains a
 microsecond blocking gate; proving remains asynchronous evidence about what
 executed.
 
 Build `zk/payload-event-batch` on Linux with the official SP1 toolchain, then set
-absolute `PAYLOAD_SP1_EXECUTABLE` and `PAYLOAD_SP1_PROOF_DIR` paths plus the
-pinned `PAYLOAD_SP1_VERIFICATION_KEY`. `PAYLOAD_SP1_PROOF_MODE` accepts `core`,
+absolute `PAYLOAD_SP1_EXECUTABLE` and `PAYLOAD_SP1_PROOF_DIR` paths.
+`PAYLOAD_SP1_VERIFICATION_KEY` is an optional deployment guard; when present it
+must equal the checked-in `verification-key.json` value. The embedded pin is
+authoritative. `PAYLOAD_SP1_PROOF_MODE` accepts `core`,
 `compressed`, `groth16`, or `plonk`. Run `npm run prove:event-batch` under a
 supervisor. The worker leases one batch for the prover timeout; an expired lease
 is recoverable, and three verified failures stop for operator review. Native

@@ -95,14 +95,31 @@ jobs:
         shell: bash
         run: |
           vkey="$(./target/release/payload-sp1-worker vkey | tail -n 1)"
+          guest_sha256="$(sha256sum program/src/main.rs | cut -d ' ' -f 1)"
           if [[ ! "$vkey" =~ ^0x[0-9a-f]{64}$ ]]; then
             echo "Invalid SP1 verification key: $vkey" >&2
             exit 1
           fi
           if [[ -f verification-key.json ]]; then
+            schema="$(jq -er '.schemaVersion' verification-key.json)"
+            program="$(jq -er '.program' verification-key.json)"
+            pinned_sp1="$(jq -er '.sp1Version' verification-key.json)"
             pinned="$(jq -er '.verificationKey' verification-key.json)"
+            pinned_guest="$(jq -er '.guestSourceSha256' verification-key.json)"
+            if [[ "$schema" != "1" || "$program" != "payload_event_batch_v1" ]]; then
+              echo "Pinned ceremony schema or program is invalid: schema=$schema program=$program" >&2
+              exit 1
+            fi
+            if [[ "$pinned_sp1" != "$SP1_VERSION" ]]; then
+              echo "SP1 version mismatch: pinned=$pinned_sp1 workflow=$SP1_VERSION" >&2
+              exit 1
+            fi
             if [[ "$vkey" != "$pinned" ]]; then
               echo "Verification key mismatch: pinned=$pinned actual=$vkey" >&2
+              exit 1
+            fi
+            if [[ "$guest_sha256" != "$pinned_guest" ]]; then
+              echo "Guest source mismatch: pinned=$pinned_guest actual=$guest_sha256" >&2
               exit 1
             fi
           else

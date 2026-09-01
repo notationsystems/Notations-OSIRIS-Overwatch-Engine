@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authorizeOperationsSurface } from '../../../../lib/economy/operationsHttpAuth';
 import { payloadEventDatabase } from '../../../../lib/economy/payloadEventDatabaseRuntime';
+import { payloadSp1ProgramIdentity, proofBatchLifecycleSummary } from '../../../../lib/economy/sp1ProgramIdentity';
 
 export const runtime = 'nodejs';
 const MAX_BODY_BYTES = 4_096;
@@ -18,9 +19,12 @@ export async function GET(req: Request) {
     detail: 'SP1 batch commitments require the globally ordered event database.',
     remedy: 'Configure PAYLOAD_DATABASE_PATH and migrate legacy journals first.',
   }, { status: 503 });
+  const batches = database.listProofBatches();
   return NextResponse.json({
     kind: 'payload_proof_batch_list',
-    batches: database.listProofBatches(),
+    trustedProgram: payloadSp1ProgramIdentity(),
+    summary: proofBatchLifecycleSummary(batches),
+    batches,
   });
 }
 
@@ -48,7 +52,7 @@ export async function POST(req: Request) {
       Object.keys(body).some(key => key !== 'throughSequence')) {
     return NextResponse.json({
       error: 'proof_batch_shape_invalid',
-      detail: 'Expected an empty object or { throughSequence: integer }. Proofs and verification keys are written only by the future prover worker.',
+      detail: 'Expected an empty object or { throughSequence: integer }. Proofs and verification keys are written only by the leased SP1 worker.',
     }, { status: 400 });
   }
   const supplied = (body as { throughSequence?: unknown }).throughSequence;
