@@ -7,7 +7,8 @@ import { FileLoadOperationStore } from './loadOperationsStore';
 import { processSingleton } from './processSingleton';
 
 export function loadOperationsJournalPath(): string {
-  return resolve(env('PAYLOAD_OPERATIONS_LOG') ?? `${process.cwd()}/data-archive/load-operations.jsonl`);
+  const configured = env('PAYLOAD_OPERATIONS_LOG') ?? 'data-archive/load-operations.jsonl';
+  return resolve(/* turbopackIgnore: true */ process.cwd(), configured);
 }
 
 export function loadOperationsWorkflow(): LoadOperationsWorkflow {

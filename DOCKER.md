@@ -17,8 +17,8 @@ app, and configuring the optional API keys.
 git clone https://github.com/simplifaisoul/osiris.git
 cd payload
 
-# optional: configure keys / scanner backend
-cp .env.template .env        # then edit .env
+# optional: configure freight authority, carrier integration, and feed keys
+cp .env.example .env        # then edit .env
 
 docker compose up -d
 ```
@@ -34,10 +34,13 @@ What the compose file does:
 - **`env_file: .env` (`required: false`)** — if a `.env` file exists its
   values are injected into the container; if it's missing, Payload Terminal still starts
   with the keyless feeds.
-- **`ports: ${OSIRIS_PORT:-3000}:3000`** — the web UI. The container always
-  listens on 3000; the published **host** port is `OSIRIS_PORT` (default
-  `3000`). Set `OSIRIS_PORT` in `.env` to remap it, e.g. `OSIRIS_PORT=3005`
+- **`ports: ${PAYLOAD_PORT:-3000}:3000`** — the web UI. The container always
+  listens on 3000; the published **host** port is `PAYLOAD_PORT` (default
+  `3000`). Set `PAYLOAD_PORT` in `.env` to remap it, e.g. `PAYLOAD_PORT=3005`
   when 3000 is already in use — no need to edit the compose file.
+- **`payload-runtime` volume** — persists the load-operation and carrier-
+  communication hash-chain journals across image rebuilds and container
+  replacement. Back this volume up as commercial operating evidence.
 - **`restart: unless-stopped`** — survives reboots.
 
 Common commands:
@@ -58,6 +61,9 @@ run Payload Terminal without building anything:
 docker pull ghcr.io/simplifaisoul/osiris:latest   # or a pinned tag, e.g. :0.1.0
 docker run -d --name payload \
   -p 3005:3000 --env-file .env --restart unless-stopped \
+  -v payload-runtime:/app/runtime-data \
+  -e PAYLOAD_OPERATIONS_LOG=/app/runtime-data/load-operations.jsonl \
+  -e PAYLOAD_CARRIER_COMMUNICATIONS_LOG=/app/runtime-data/carrier-communications.jsonl \
   ghcr.io/simplifaisoul/osiris:latest
 ```
 
@@ -67,7 +73,11 @@ The package is public — no `docker login` is required to pull it.
 
 ```bash
 docker build -t payload:latest .
-docker run -d --name payload -p 3000:3000 --env-file .env --restart unless-stopped payload:latest
+docker run -d --name payload -p 3000:3000 --env-file .env --restart unless-stopped \
+  -v payload-runtime:/app/runtime-data \
+  -e PAYLOAD_OPERATIONS_LOG=/app/runtime-data/load-operations.jsonl \
+  -e PAYLOAD_CARRIER_COMMUNICATIONS_LOG=/app/runtime-data/carrier-communications.jsonl \
+  payload:latest
 ```
 
 ### Image details
@@ -142,6 +152,14 @@ them only if you extend the relevant route or hit rate limits.
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `PAYLOAD_PORT` | Host port the compose file publishes (container itself always listens on 3000). `OSIRIS_PORT` is honoured for one release and warns. | `3000` |
+| `PAYLOAD_OPERATIONS_TOKEN` | Bearer authority for private freight-operation and carrier-delivery routes. Empty disables them. | none |
+| `PAYLOAD_OPERATIONS_LOG` | Append-only load-operation journal. Compose places it on `payload-runtime`. | `data-archive/load-operations.jsonl` outside Compose |
+| `PAYLOAD_CARRIER_COMMUNICATIONS_LOG` | Append-only delivery, receipt, acknowledgement, and tracking journal. | `data-archive/carrier-communications.jsonl` outside Compose |
+| `PAYLOAD_CARRIER_DISPATCH_URL` | Provider-neutral HTTPS endpoint that accepts carrier tenders. | none |
+| `PAYLOAD_CARRIER_DISPATCH_TOKEN` | Bearer credential sent only to the configured carrier endpoint. | none |
+| `PAYLOAD_CARRIER_DISPATCH_PROVIDER` | Stable identity recorded with delivery evidence. | `carrier-webhook` |
+| `PAYLOAD_CARRIER_DISPATCH_TIMEOUT_MS` | Outbound request deadline, clamped to 1–30 seconds. | `10000` |
+| `PAYLOAD_CARRIER_WEBHOOK_SECRET` | HMAC secret for inbound `/api/freight/carrier-events`; at least 32 random bytes. | none |
 
 ### Keyless sources (no configuration needed)
 
