@@ -114,6 +114,12 @@ x-casaos:
     - container: N2YO_API_KEY
       description:
         en_us: "(Optional) N2YO key for satellite tracking."
+    - container: FMCSA_WEB_KEY
+      description:
+        en_us: "FMCSA QCMobile WebKey for USDOT carrier authority and operating-status pulls."
+    - container: EIA_API_KEY
+      description:
+        en_us: "EIA Open Data key for the weekly U.S. diesel benchmark."
   ports:
     - container: "3000"
       description:

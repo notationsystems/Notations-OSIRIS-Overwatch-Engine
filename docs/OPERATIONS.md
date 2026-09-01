@@ -21,6 +21,30 @@ must honor that key to make a retry side-effect safe.
 
 ---
 
+## Authoritative freight-source pulls
+
+The private `/api/freight/sources` route pulls two fixed official APIs: FMCSA
+QCMobile for USDOT carrier identity, operating status, authority and
+out-of-service evidence; and EIA API v2 for the latest weekly U.S. retail
+on-highway diesel benchmark. Configure `FMCSA_WEB_KEY` and `EIA_API_KEY` plus
+the same `PAYLOAD_OPERATIONS_TOKEN` used by the operation journal.
+
+The response is normalized and excludes carrier address and telephone data.
+Every successful provider response receives an evidence id and a reported,
+disinterested attestation. API credentials are excluded from URLs in errors
+and from evidence hashes. The source route is pull-through rather than a raw
+proxy: provider hosts, paths, and the EIA series are fixed in code.
+
+FMCSA's public response is useful regulatory evidence but is not a current
+cargo certificate. `authorizationCarrier.insuranceExpiresAt` and
+`cargoCoverAmount` therefore remain null, with explicit remedies, until an
+insurer/broker record supplies them. An active authority status without an
+actual grant date is also surfaced as missing rather than backfilled with the
+retrieval date. This means the deterministic gate can refuse or remain
+undetermined without ever inventing a pass.
+
+---
+
 ## Restart and persistence semantics (D-8)
 
 Determined by inspection, then verified.

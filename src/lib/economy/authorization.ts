@@ -80,6 +80,17 @@ export interface AuthorizationRequest {
     cargoCoverAmount: { amount: number; currency: string } | null;
     authorityGrantedAt: ISODateTime | null;
     authorityRevokedAt: ISODateTime | null;
+    /**
+     * Optional point-in-time regulator observation. It may REFUSE a carrier
+     * observed inactive during the booking-to-pickup span, but an active
+     * snapshot never replaces the dated grant record required to clear.
+     */
+    regulatoryStatus?: {
+      status: 'active' | 'inactive' | 'undetermined';
+      observedAt: ISODateTime;
+      sourceId: string;
+      evidenceIds: readonly string[];
+    };
   };
   /**
    * The scope the acting principal actually holds. An agent with no binding
@@ -135,7 +146,33 @@ export function authorize(req: AuthorizationRequest, decidedAt: ISODateTime): Au
   }
 
   // 2. Operating authority active over the whole booking-to-pickup span.
-  if (c.authorityGrantedAt === null) {
+  const regulatory = c.regulatoryStatus;
+  const regulatoryRecordInvalid = regulatory && (
+    !Number.isFinite(Date.parse(regulatory.observedAt)) ||
+    !regulatory.sourceId.trim() ||
+    regulatory.evidenceIds.length === 0 ||
+    regulatory.evidenceIds.some(id => !id.trim())
+  );
+  const regulatoryObservedInsideSpan = regulatory && !regulatoryRecordInvalid &&
+    cmp(regulatory.observedAt, req.bookedAt) >= 0 && cmp(regulatory.observedAt, req.pickupAt) <= 0;
+  if (regulatoryRecordInvalid) {
+    checks.push({
+      check: 'operating_authority_active', outcome: 'undetermined',
+      detail: `regulatory status record for ${c.carrierId} is incomplete`,
+      remedy: 'a timestamped regulator response with a source id and evidence id',
+    });
+  } else if (regulatory?.status === 'inactive' && regulatoryObservedInsideSpan) {
+    checks.push({
+      check: 'operating_authority_active', outcome: 'refused',
+      detail: `${regulatory.sourceId} observed ${c.carrierId} inactive at ${regulatory.observedAt}`,
+    });
+  } else if (regulatory?.status === 'undetermined') {
+    checks.push({
+      check: 'operating_authority_active', outcome: 'undetermined',
+      detail: `${regulatory.sourceId} did not establish current authority for ${c.carrierId}`,
+      remedy: 'a dated active authority record from the regulator of record',
+    });
+  } else if (c.authorityGrantedAt === null) {
     checks.push({
       check: 'operating_authority_active', outcome: 'undetermined',
       detail: `no operating authority record for ${c.carrierId}`,
@@ -154,7 +191,8 @@ export function authorize(req: AuthorizationRequest, decidedAt: ISODateTime): Au
   } else {
     checks.push({
       check: 'operating_authority_active', outcome: 'authorized',
-      detail: `authority since ${c.authorityGrantedAt}, not revoked`,
+      detail: `authority since ${c.authorityGrantedAt}, not revoked` +
+        (regulatory?.status === 'active' ? `; ${regulatory.sourceId} observed active at ${regulatory.observedAt}` : ''),
     });
   }
 
