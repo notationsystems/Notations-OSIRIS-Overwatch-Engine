@@ -67,6 +67,12 @@ jobs:
           cargo fmt --all -- --check
           cargo test --locked -p payload-event-batch-lib
 
+      - name: Rebuild SP1's embedded native runner
+        # rust-cache retains Cargo's build-script fingerprint but SP1 6.5
+        # writes this helper outside the cached target tree. Rebuild exactly
+        # that package so include_bytes! always receives a real binary.
+        run: cargo clean -p sp1-core-executor-runner
+
       - name: Build the guest and host
         run: cargo build --locked --release -p payload-event-batch-script
 
