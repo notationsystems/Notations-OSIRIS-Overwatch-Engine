@@ -32,10 +32,10 @@ export const MANIFEST_PATH = 'data-archive/MANIFEST.json';
 
 /**
  * LIVE demand logs (final order, F-4 finding): the running instrument
- * appends search-misses.jsonl, export-log.jsonl and mcp-sessions.jsonl
- * into data-archive/ — so on any machine where the instrument has been
- * USED, an unruled path would fail buildManifest and a growing file can
- * never hash-match a static manifest. They are excluded from the
+ * appends search-misses.jsonl, export-log.jsonl, mcp-sessions.jsonl and
+ * load-operations.jsonl into data-archive/ — so on any machine where the
+ * instrument has been USED, an unruled path would fail buildManifest and a
+ * growing file can never hash-match a static manifest. They are excluded from the
  * manifest contract BY NAME (an accounted-for drop, not a silent one):
  * append-only demand evidence, unreconstructable in kind, protected by
  * the mirror refresh rather than by a hash that would be stale the next
@@ -45,6 +45,7 @@ export const LIVE_LOGS = [
   'data-archive/search-misses.jsonl',
   'data-archive/export-log.jsonl',
   'data-archive/mcp-sessions.jsonl',
+  'data-archive/load-operations.jsonl',
 ];
 
 /** First matching rule wins. Paths are repo-relative with forward slashes. */

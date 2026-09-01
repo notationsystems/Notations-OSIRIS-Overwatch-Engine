@@ -224,6 +224,10 @@ PAYLOAD_PORT=3000
 # Force every source to its snapshot rung (visible in provenance, never silent)
 PAYLOAD_DISABLE_LIVE=
 
+# Authorize persistent freight-operation commands; leave empty to disable the API
+PAYLOAD_OPERATIONS_TOKEN=
+PAYLOAD_OPERATIONS_LOG=./data-archive/load-operations.jsonl
+
 # Optional, for higher rate limits (see DOCKER.md for signup links)
 FIRMS_API_KEY=                # NASA FIRMS
 OPENSKY_CLIENT_ID=            # OpenSky OAuth2
@@ -231,6 +235,13 @@ OPENSKY_CLIENT_SECRET=
 N2YO_API_KEY=                 # N2YO satellites
 AIS_API_KEY=                  # aisstream.io maritime
 ```
+
+`GET /api/freight/operations` reads the current load-operation projections;
+`POST /api/freight/operations` advances opportunity intake, alternatives,
+authorization, assignment, dispatch evidence, and settlement outcome capture.
+Both require `Authorization: Bearer <PAYLOAD_OPERATIONS_TOKEN>`. The dispatch
+step records an authorized operational event; it does not contact a carrier.
+Run the journal on persistent, backed-up storage with one application writer.
 
 > **Renamed from `OSIRIS_*`.** The old spellings are still read for one
 > release and log a deprecation warning naming the replacement, so a running
