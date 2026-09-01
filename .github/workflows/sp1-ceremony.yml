@@ -47,6 +47,12 @@ jobs:
           workspaces: zk/payload-event-batch
           cache-on-failure: true
 
+      - name: Cache SP1's registry-side native runner
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/registry/src/**/sp1-core-executor-runner-6.5.0/target/sp1-native-bins
+          key: sp1-native-runner-${{ runner.os }}-${{ env.SP1_VERSION }}-${{ hashFiles('zk/payload-event-batch/Cargo.lock') }}
+
       - name: Install the pinned SP1 toolchain
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -67,11 +73,19 @@ jobs:
           cargo fmt --all -- --check
           cargo test --locked -p payload-event-batch-lib
 
-      - name: Rebuild SP1's embedded native runner
-        # rust-cache retains Cargo's build-script fingerprint but SP1 6.5
-        # writes this helper outside the cached target tree. Rebuild exactly
-        # that package so include_bytes! always receives a real binary.
-        run: cargo clean -p sp1-core-executor-runner
+      - name: Materialize SP1's embedded native runner
+        shell: bash
+        run: |
+          cargo fetch --locked
+          runner_manifest="$(find "$CARGO_HOME/registry/src" -path '*/sp1-core-executor-runner-binary-6.5.0/Cargo.toml' -print -quit)"
+          runner_crate="$(find "$CARGO_HOME/registry/src" -path '*/sp1-core-executor-runner-6.5.0' -type d -print -quit)"
+          if [[ -z "$runner_manifest" || -z "$runner_crate" ]]; then
+            echo "SP1 6.5 native-runner crates were not fetched" >&2
+            exit 1
+          fi
+          runner_target="$runner_crate/target/sp1-native-bins"
+          cargo build --manifest-path "$runner_manifest" --release --target-dir "$runner_target"
+          test -x "$runner_target/release/sp1-core-executor-runner-binary"
 
       - name: Build the guest and host
         run: cargo build --locked --release -p payload-event-batch-script
