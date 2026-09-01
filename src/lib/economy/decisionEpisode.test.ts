@@ -186,6 +186,25 @@ describe('decision episode ledger', () => {
     }))).toMatchObject({ kind: 'refusal', code: 'DECISION_WARRANT_INVALID' });
   });
 
+  it('refuses metric names paired with semantically wrong units', () => {
+    const ledger = new DecisionEpisodeLedger();
+    const bad = alternative('action:bad', 'carrier:bad');
+    expect(ledger.append(opened([{
+      ...bad,
+      predictedOutcomes: [metric('predicted_transit_hours', 5, 'minutes', 'model:bad')],
+    }]))).toMatchObject({ kind: 'refusal', code: 'DECISION_METRIC_INVALID' });
+  });
+
+  it('keeps policy identity and decider kind coherent with selection basis', () => {
+    const ledger = new DecisionEpisodeLedger();
+    appendAll(ledger, [opened()]);
+    expect(ledger.append(decision({
+      selectionBasis: 'deterministic_policy',
+      policy: null,
+      decidedBy: { kind: 'operator', id: 'operator:desk-1' },
+    }))).toMatchObject({ kind: 'refusal', code: 'DECISION_WARRANT_INVALID' });
+  });
+
   it('hash-chains the episode and seals appended events against mutation', () => {
     const ledger = new DecisionEpisodeLedger();
     const open = opened();
@@ -204,5 +223,16 @@ describe('decision episode ledger', () => {
     expect(ledger.append(outcome({
       occurredAt: t3, knownAt: '2026-09-02T17:59:00.000Z', recordedAt: t4,
     }))).toMatchObject({ kind: 'refusal', code: 'DECISION_EVENT_ORDER_INVALID' });
+  });
+
+  it('does not let one outcome event both observe and disclaim the same metric', () => {
+    const ledger = new DecisionEpisodeLedger();
+    appendAll(ledger, [opened(), decision(), execution()]);
+    expect(ledger.append(outcome({
+      absences: [{
+        metric: 'actual_transit_hours', reason: 'conflicting', detail: 'Two clocks disagree.',
+        remedy: 'Reconcile the telematics records.', evidenceIds: ['conflict:load:1'],
+      }],
+    }))).toMatchObject({ kind: 'refusal', code: 'DECISION_OUTCOME_INVALID' });
   });
 });

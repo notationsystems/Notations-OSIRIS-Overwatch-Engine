@@ -209,6 +209,21 @@ export type EpisodeResearchClass =
 
 const HASH_DOMAIN = 'payload.decision_episode.v1';
 
+const EXPECTED_METRIC_UNIT: Readonly<Record<DecisionMetricName, DecisionMetricUnit>> = Object.freeze({
+  quoted_cost: 'money_minor',
+  selection_probability: 'probability',
+  predicted_transit_hours: 'hours',
+  predicted_dwell_minutes: 'minutes',
+  predicted_accessorial_cost: 'money_minor',
+  actual_transit_hours: 'hours',
+  actual_dwell_minutes: 'minutes',
+  actual_accessorial_cost: 'money_minor',
+  carrier_invoice: 'money_minor',
+  gross_margin: 'money_minor',
+  damage_cost: 'money_minor',
+  rejection_indicator: 'binary',
+});
+
 function refusal(
   code: DecisionLedgerRefusalCode,
   detail: string,
@@ -228,6 +243,9 @@ function nonEmpty(ids: readonly string[]): boolean {
 
 function metricDefect(metric: DecisionMetric): string | null {
   if (!Number.isFinite(metric.value)) return `${metric.name} is not finite`;
+  if (metric.unit !== EXPECTED_METRIC_UNIT[metric.name]) {
+    return `${metric.name} must use ${EXPECTED_METRIC_UNIT[metric.name]}, not ${metric.unit}`;
+  }
   if (metric.attestation.inputCount < 1) return `${metric.name} has a vacuous attestation`;
   if (!nonEmpty(metric.evidenceIds)) return `${metric.name} cites no evidence`;
   if (metric.unit === 'money_minor' && !metric.currency) return `${metric.name} is money without a currency`;
@@ -408,6 +426,11 @@ export class DecisionEpisodeLedger {
     return Object.freeze([...(this.episodes.get(episodeId) ?? [])]);
   }
 
+  /** Stable enumeration for pure projections; callers still receive copies. */
+  episodeIds(): readonly string[] {
+    return Object.freeze([...this.episodes.keys()].sort());
+  }
+
   researchClass(episodeId: string): EpisodeResearchClass {
     const entries = this.episodes.get(episodeId) ?? [];
     const opened = latest(entries, 'episode_opened');
@@ -515,6 +538,17 @@ export class DecisionEpisodeLedger {
       );
     }
     const designed = event.selectionBasis === 'randomized_policy' || event.selectionBasis === 'designed_exploration';
+    const policySelected = event.selectionBasis !== 'operator_judgment';
+    if (policySelected !== (event.policy !== null) ||
+        policySelected !== (event.decidedBy.kind === 'policy')) {
+      return refusal(
+        'DECISION_WARRANT_INVALID',
+        `Decision ${event.eventId} has an incoherent selection basis, policy identity, or decider kind.`,
+        policySelected
+          ? 'Record the policy id/version and identify the decider as that policy.'
+          : 'Operator judgment must identify an operator and carry no policy identity.',
+      );
+    }
     if (designed) {
       if (!event.policy || !event.assignmentProbability) {
         return refusal(
@@ -642,6 +676,24 @@ export class DecisionEpisodeLedger {
         `Outcome ${event.eventId}: ${defect}.`,
         'Correct the outcome metric while preserving its evidence and attestation.',
       );
+    }
+    const absenceNames = new Set<DecisionMetricName>();
+    for (const absence of event.absences) {
+      if (absenceNames.has(absence.metric) || event.metrics.some(metric => metric.name === absence.metric)) {
+        return refusal(
+          'DECISION_OUTCOME_INVALID',
+          `Outcome ${event.eventId} gives ${absence.metric} more than one status.`,
+          'Record each metric once per outcome event: either an observation or one typed absence.',
+        );
+      }
+      if (!absence.detail.trim() || !absence.remedy.trim()) {
+        return refusal(
+          'DECISION_OUTCOME_INVALID',
+          `Outcome ${event.eventId} has an unexplained absence for ${absence.metric}.`,
+          'State why the metric is absent and how or when that absence can be resolved.',
+        );
+      }
+      absenceNames.add(absence.metric);
     }
     if (!nonEmpty(event.evidenceIds) || event.absences.some(absence => !nonEmpty(absence.evidenceIds))) {
       return refusal(
