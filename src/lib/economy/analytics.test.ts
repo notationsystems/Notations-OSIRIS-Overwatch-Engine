@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   concentration, capacityConcentration, concentrationTrajectory, flowCentrality,
-  bottleneckCandidates, detectAnomalies, extractSeries, observationsAt, operatorConcentration,
+  bottleneckCandidates, detectAnomalies, extractSeries, observationsAt, operatorConcentration, facilityCoverage,
 } from './analytics';
 import { buildGraph, upstream, downstream, nodeThroughput } from './graph';
 import { traversableEdgeFilter } from './propagation';
@@ -17,7 +17,7 @@ describe('concentration (synthetic, hand-computable)', () => {
     // Traceability: exactly the two country observations were used.
     expect(r.inputs.observationIds?.sort()).toEqual(['obs:prod:aa', 'obs:prod:bb']);
     expect(r.operation.name).toBe('concentration');
-    expect(r.execution.engine).toContain('osiris-economy-analytics');
+    expect(r.execution.engine).toContain('payload-economy-analytics');
   });
 
   it('never mixes entity kinds in one calculation', () => {
@@ -523,5 +523,124 @@ describe('the bottleneck sentence states the basis it is on (the researcher\'s f
     for (const v of converted) {
       for (const id of v.convertedFlowIds) expect(v.flowIds).toContain(id);
     }
+  });
+});
+
+/**
+ * The runbook's FIRST move meets an empty list at every historical date.
+ *
+ * Measured: 35 bottleneck candidates today, ZERO at 2017, 2019 and 2022 —
+ * every date the time bar can reach except the present, and the runbook's
+ * move #2 ("set a past date") sends a researcher there before move #1 sends
+ * them here. The zero is honest: the historical vintages are country↔country
+ * corridors and a country is an aggregate, not a chokepoint, so nothing
+ * qualifies. Unexplained, it reads as "no bottlenecks in 2017" — a claim
+ * about the world made from a rendering artefact.
+ */
+describe('an empty analytical result says why it is empty', () => {
+  it('MEASURED: candidates today, none at the country vintage', async () => {
+    const { state } = await getEconomyState('copper');
+    const today = bottleneckCandidates(state, buildGraph(state));
+    expect(today.result.length, 'the present-day ranking must be populated or this pin is vacuous').toBeGreaterThan(0);
+    expect(today.emptyBecause, 'a note on a populated result is a note on none').toBeUndefined();
+
+    for (const asOf of ['2017-06-30', '2019-06-30', '2022-06-30']) {
+      const past = bottleneckCandidates(state, buildGraph(state, asOf));
+      expect(past.result.length, `expected no candidates at ${asOf}`).toBe(0);
+      expect(past.emptyBecause, `${asOf} returned an unexplained empty list`).toBeTruthy();
+      // It says WHICH nothing: aggregates carry the flow, so nothing is a
+      // chokepoint — and it names the recorded deferral as the remedy.
+      expect(past.emptyBecause).toMatch(/AGGREGATES/);
+      expect(past.emptyBecause).toMatch(/allocation model/);
+    }
+  });
+
+  it('the OTHER nothing: no flow at all reads differently from aggregates-only', async () => {
+    // Two empty results that must not carry the same sentence. A date no
+    // vintage covers has nothing to rank at all; a country-vintage date has
+    // a topology whose nodes are excluded by construction here.
+    const { state } = await getEconomyState('copper');
+    const noTopology = bottleneckCandidates(state, buildGraph(state, '1990-01-01'));
+    expect(noTopology.result.length).toBe(0);
+    expect(noTopology.emptyBecause).toMatch(/No node carries flow/);
+    expect(noTopology.emptyBecause).not.toMatch(/AGGREGATES/);
+    const countryVintage = bottleneckCandidates(state, buildGraph(state, '2017-06-30'));
+    expect(countryVintage.emptyBecause).not.toBe(noTopology.emptyBecause);
+  });
+});
+
+/**
+ * The coverage table was dropping the rows that mattered most.
+ *
+ * `facilityCoverage` exists to answer one question — how much of a compiled
+ * country total does the facility model actually account for — and it
+ * `continue`d past every country with no facility observation. The rows it
+ * discarded were exactly the 0% ones. Silent filtering (class 1) inside the
+ * instrument that measures silence.
+ *
+ * MEASURED on the copper corpus: 19 countries carry a compiled mine-
+ * production total and 9 rows were served; the 10 dropped included China
+ * (1800 kt/y), Russia (930), Australia (800), Kazakhstan (740), Canada (450)
+ * and Poland (410). For refined production the corpus holds NO refinery or
+ * smelter production observation at all, so all 17 countries were dropped
+ * and the table was EMPTY — which reads as "no coverage question here"
+ * rather than "the facility model accounts for 0% of world refined output".
+ * Nothing failed, and no test pinned the row count, so there was nothing to
+ * trip.
+ */
+describe('facilityCoverage counts the countries it cannot cover', () => {
+  it('every country with a compiled total gets a row, and 0% is a row', async () => {
+    const { state } = await getEconomyState('copper');
+    const mine = facilityCoverage(state, 'production', ['mine']);
+    const direct = observationsAt(state, 'production', 'country');
+    expect(mine.result.length, 'a country with a compiled total must appear').toBe(direct.length);
+    const uncovered = mine.result.filter(r => r.status === 'uncovered');
+    expect(uncovered.length, 'the 0% rows are the finding — if this is 0 the corpus changed').toBeGreaterThan(0);
+    expect(uncovered.map(r => r.countryName)).toContain('China');
+    for (const r of uncovered) {
+      expect(r.facilityCount).toBe(0);
+      expect(r.rolledUp).toBe(0);
+      expect(r.ratio).toBe(0);
+      expect(r.direct, 'a zero total with zero facilities is a COMPLETE model of nothing, not uncovered').toBeGreaterThan(0);
+    }
+    // The existing documented rule survives: zero facilities against a zero
+    // country total stays `complete`, not `uncovered`.
+    const zeroTotals = mine.result.filter(r => r.direct === 0);
+    expect(zeroTotals.length).toBeGreaterThan(0);
+    for (const r of zeroTotals) expect(r.status).toBe('complete');
+  });
+
+  it('refined production: 0% across the board, stated as a table rather than an absence', async () => {
+    const { state } = await getEconomyState('copper');
+    const refined = facilityCoverage(state, 'refined_production', ['refinery', 'smelter']);
+    expect(refined.result.length).toBeGreaterThan(0);
+    expect(refined.result.every(r => r.status === 'uncovered'), 'the corpus holds no refinery/smelter production observation').toBe(true);
+    expect(refined.emptyBecause, 'a populated table needs no emptiness note').toBeUndefined();
+    // The DENOMINATOR case is different and says so: no compiled total to
+    // measure against is not a complete facility model.
+    const noDenominator = facilityCoverage(state, 'consumption', ['mine']);
+    if (noDenominator.result.length === 0) expect(noDenominator.emptyBecause).toMatch(/absence of the DENOMINATOR/);
+  });
+
+  it('TRIPWIRE: no country observation is unrollable in the real register', async () => {
+    // The one remaining drop — a country entity with no countryCode of its
+    // own — is a register defect rather than a coverage fact, and it is zero
+    // today. Counted in the operation params so it can never be silent.
+    const { state } = await getEconomyState('copper');
+    for (const [metric, kinds] of [['production', ['mine']], ['refined_production', ['refinery', 'smelter']]] as const) {
+      const r = facilityCoverage(state, metric as never, kinds as never);
+      expect(r.operation.params.unrollableCountryObservations, `${metric}: a country entity is missing its own countryCode`).toBe(0);
+    }
+  });
+
+  it('the coverage BIAS annotation now spans the real range', async () => {
+    // The facility HHI travels with a coverage range, and that range was
+    // computed over the surviving rows only — so it reported a floor of ~22%
+    // when seven countries, China among them, contribute 0% to the facility
+    // index. The bias note is only useful if its floor is the true floor.
+    const { state } = await getEconomyState('copper');
+    const ratios = facilityCoverage(state, 'production', ['mine']).result.map(r => r.ratio);
+    expect(Math.min(...ratios)).toBe(0);
+    expect(Math.max(...ratios)).toBeGreaterThan(0.9);
   });
 });

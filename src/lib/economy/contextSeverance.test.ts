@@ -30,6 +30,19 @@ import { join } from 'node:path';
  * state instead of rows.
  */
 
+/**
+ * THE ROOTS THIS GUARD WATCHES.
+ *
+ * It was one directory. The class it catches is not confined to one directory:
+ * `src/lib/spatial/` and `src/lib/ui/` hold instrument code today, and a
+ * module-level Map in either is severed by exactly the same Next behaviour
+ * `processSingleton.ts` documents. A guard scoped to `src/lib/economy` while
+ * named for "the economy instrument" has an EFFECTIVE SCOPE narrower than its
+ * APPARENT one — the class this suite exists to catch, in the check itself.
+ *
+ * Adding a root is cheap; discovering a severed cache in production is not.
+ */
+const SCANNED_ROOTS = ['src/lib/economy', 'src/lib/spatial', 'src/lib/ui', 'src/lib/audit'] as const;
 const ECONOMY_DIR = join(process.cwd(), 'src/lib/economy');
 
 /**
@@ -37,7 +50,14 @@ const ECONOMY_DIR = join(process.cwd(), 'src/lib/economy');
  * is a claim someone has to defend in review — which is the point.
  */
 const CONTEXT_LOCAL_BY_DESIGN: Record<string, string> = {
-  'processSingleton.ts': 'The registry itself. It is anchored on globalThis by definition; it cannot reach through itself.',
+  // Keyed by ROOT-QUALIFIED path: with more than one root scanned, a bare
+  // filename could exempt a file in a directory nobody argued about.
+  'src/lib/economy/envCompat.ts':
+    'The `warned` set de-duplicates a deprecation warning and nothing reads it. ' +
+    'Severed, each module context warns once about the same legacy variable name — ' +
+    'the message repeats, no answer changes, and the failure mode is a duplicated ' +
+    'log line rather than two contexts disagreeing about a value. The variable ' +
+    'itself is read from process.env on every call, which IS shared.',
 };
 
 /** Containers whose contents never change after module evaluation are not
@@ -55,9 +75,11 @@ interface Finding { file: string; line: number; decl: string }
 
 function scan(): Finding[] {
   const out: Finding[] = [];
-  for (const file of readdirSync(ECONOMY_DIR)) {
+  for (const root of SCANNED_ROOTS) {
+   const dir = join(process.cwd(), root);
+   for (const file of readdirSync(dir)) {
     if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
-    const src = readFileSync(join(ECONOMY_DIR, file), 'utf8');
+    const src = readFileSync(join(dir, file), 'utf8');
     const lines = src.split('\n');
     lines.forEach((line, i) => {
       // Module level only: a declaration at column 0.
@@ -69,8 +91,9 @@ function scan(): Finding[] {
       // A constant that is never mutated cannot be severed into disagreement.
       const mutated = new RegExp(`\\b${name}${MUTATORS.source}`).test(src);
       if (!mutated) return;
-      out.push({ file, line: i + 1, decl: line.trim().slice(0, 90) });
+      out.push({ file: `${root}/${file}`, line: i + 1, decl: line.trim().slice(0, 90) });
     });
+   }
   }
   return out;
 }
@@ -87,6 +110,46 @@ describe('context severance: mutable module state is shared or argued for', () =
       'CONTEXT_LOCAL_BY_DESIGN with the argument for why severance is harmless:\n' +
       unaccounted.map(f => `  ${f.file}:${f.line}  ${f.decl}`).join('\n'),
     ).toEqual([]);
+  });
+
+  /**
+   * THE EXEMPTION LIST IS A PREMISE, AND A PREMISE GOES STALE.
+   *
+   * `CONTEXT_LOCAL_BY_DESIGN` records why a file's module state is safe to
+   * sever. If that file is later repaired — the state wrapped in
+   * processSingleton, or deleted outright — the entry stays, and a reader
+   * of the list believes an exemption is load-bearing when it exempts
+   * nothing. Worse, the guard reports green either way, so the list and the
+   * tree quietly disagree with the suite agreeing with both.
+   *
+   * That is the defect class this file names, pointed at this file's own
+   * premise: recompute it every run rather than trusting what was true when
+   * it was written. Every entry must name a file that exists AND still be
+   * flagged by the scanner, or it is removed.
+   */
+  it('every exemption still earns its place — a repaired file leaves the list', () => {
+    const flagged = new Set(scan().map(f => f.file));
+    const present = new Set(
+      SCANNED_ROOTS.flatMap(root =>
+        readdirSync(join(process.cwd(), root)).map(f => `${root}/${f}`)),
+    );
+    const stale: string[] = [];
+    for (const file of Object.keys(CONTEXT_LOCAL_BY_DESIGN)) {
+      if (!present.has(file)) { stale.push(`${file} (no such file)`); continue; }
+      if (!flagged.has(file)) stale.push(`${file} (no module-level mutable state any more)`);
+    }
+    expect(stale, [
+      'These entries no longer exempt anything. An exemption list that keeps paid-off entries',
+      'stops measuring the debt, and an entry for a file that was repaired or deleted reads as',
+      'a live argument for a hazard that is gone. Remove them.',
+    ].join(' ')).toEqual([]);
+  });
+
+  it('every exemption carries an argument, not a placeholder', () => {
+    for (const [file, reason] of Object.entries(CONTEXT_LOCAL_BY_DESIGN)) {
+      expect(reason.length, `${file} needs the reason severance is harmless, not a note`)
+        .toBeGreaterThan(40);
+    }
   });
 
   it('the scanner is not vacuous: it finds planted severable state and ignores constants', () => {
@@ -112,6 +175,19 @@ describe('context severance: mutable module state is shared or argued for', () =
     expect(detect(wrapped), 'must not flag state already shared').toBe(false);
     // The generic form is the one that slipped past a literal match.
     expect(detect(wrappedGeneric), 'must not flag shared state declared with a type parameter').toBe(false);
+  });
+
+  it('the widened roots are actually walked, not just declared', () => {
+    // A root added to the list but never read would leave the guard exactly as
+    // narrow as before while reading as though it had been widened — the same
+    // apparent/effective scope gap, one level up. Assert each root contributes
+    // real files to the walk.
+    for (const root of SCANNED_ROOTS) {
+      const files = readdirSync(join(process.cwd(), root)).filter(
+        f => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+      expect(files.length, `${root} contributes no scannable file`).toBeGreaterThan(0);
+    }
+    expect(SCANNED_ROOTS.length).toBeGreaterThan(1);
   });
 
   it('the instruments that feed the FROZEN continue criterion are shared, by name', () => {

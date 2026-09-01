@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import ForceGraph2D from 'react-force-graph-2d';
 import { graphLinkTreatment } from '@/lib/economy/mapStyle';
+import type { SupplyStage } from '@/lib/economy/types';
 import { X, Network } from 'lucide-react';
 
 /**
- * OSIRIS — Flow graph explorer.
+ * Payload — Flow graph explorer.
  *
  * A force-directed projection of the engine's flow/dependency graph
  * (`/api/economy?view=graph`). Directional particles animate along material
@@ -52,12 +53,27 @@ interface EconGraphViewProps {
   onClose: () => void;
 }
 
-const STAGE_COLOR: Record<string, string> = {
+/**
+ * EXHAUSTIVE OVER SupplyStage, deliberately.
+ *
+ * Typed `Record<string, string>` this map took any key and fell back to
+ * grey, so extending the stage vocabulary would have shipped a new stage
+ * that rendered as an unlabelled grey dot with nothing failing — the
+ * silent-default shape this codebase keeps finding. `Record<SupplyStage,
+ * string>` makes adding a stage a COMPILE ERROR here, which is the
+ * cheapest possible place to be told.
+ *
+ * The `?? fallback` at the call site stays: it handles a null stage on a
+ * record, which is a different question from an unhandled stage value.
+ */
+const STAGE_COLOR: Record<SupplyStage, string> = {
   production: '#D4AF37',
+  concentrate: '#C9A227',
   smelting: '#FF7043',
   refining: '#4FC3F7',
-  logistics: '#78909C',
   manufacturing: '#AB47BC',
+  demand: '#8BC34A',
+  logistics: '#78909C',
 };
 
 const FORM_COLOR: Record<string, string> = {
@@ -73,8 +89,27 @@ const LEGEND: Array<[string, string]> = [
   ['LOGISTICS', '#78909C'], ['MANUFACTURING', '#AB47BC'],
 ];
 
+/** The topology block the route now sends with the graph, same shape the
+ *  map has carried since phase 13. */
+interface TopologyValidity {
+  status: 'within' | 'extrapolated' | 'predates';
+  granularity?: string;
+  topologyPeriod?: { start: string; end: string } | null;
+  monthsBeyond?: number;
+  note?: string;
+}
+
+const TOPOLOGY_BANNER: Record<TopologyValidity['status'], { label: string; color: string } | null> = {
+  within: null,
+  extrapolated: { label: 'TOPOLOGY EXTRAPOLATED', color: '#FF9500' },
+  predates: { label: 'TOPOLOGY OUT OF PERIOD', color: '#FF3D3D' },
+};
+
 export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEntity, onClose }: EconGraphViewProps) {
-  const [data, setData] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null);
+  const [data, setData] = useState<{
+    nodes: GraphNode[]; links: GraphLink[]; topology?: TopologyValidity;
+    representable?: { flowsInSelectedTopology: number; flowLinks: number; withheld: number; reason: string | null };
+  } | null>(null);
   // Failure is keyed to the evaluation date it happened for — a later fetch
   // (new asOf) must not stay stuck behind an old error banner.
   const [failedKey, setFailedKey] = useState<string | null>(null);
@@ -87,7 +122,7 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
     const qs = asOf ? `&asOf=${asOf}&knowledge=${knowledge}` : '';
     fetch(`/api/economy?commodity=copper&view=graph${qs}`, { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(d => { if (!cancelled) setData({ nodes: d.nodes, links: d.links }); })
+      .then(d => { if (!cancelled) setData({ nodes: d.nodes, links: d.links, topology: d.topology, representable: d.representable }); })
       .catch(() => { if (!cancelled) setFailedKey(key); });
     return () => { cancelled = true; };
   }, [asOf, knowledge]);
@@ -134,6 +169,23 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
             <Network className="w-3.5 h-3.5 text-[var(--gold-primary)]" />
             <span className="hud-text text-[11px] text-[var(--text-primary)]">FLOW GRAPH — COPPER</span>
             {asOf && <span className="text-[9px] font-mono text-[#D4AF37] border border-[#D4AF37]/40 rounded px-1">{knowledge === 'as_known_then' ? 'AS KNOWN' : 'AS OF'} {asOf}</span>}
+            {/* The AS OF chip asserts a knowledge state; before the route
+                selected its topology the network beneath it did not honour
+                one. The banner states what the drawn structure IS. */}
+            {data?.topology && TOPOLOGY_BANNER[data.topology.status] && (
+              <span
+                data-testid="graph-topology-banner"
+                className="text-[9px] font-mono rounded px-1"
+                style={{ color: TOPOLOGY_BANNER[data.topology.status]!.color, border: `1px solid ${TOPOLOGY_BANNER[data.topology.status]!.color}66` }}
+                title={data.topology.note ?? ''}
+              >
+                {TOPOLOGY_BANNER[data.topology.status]!.label}
+                {data.topology.status === 'extrapolated' && data.topology.monthsBeyond ? ` +${data.topology.monthsBeyond}mo` : ''}
+              </span>
+            )}
+            {data?.topology?.granularity && (
+              <span className="text-[8px] font-mono text-[var(--text-muted)]">{data.topology.granularity.toUpperCase()}-GRANULARITY</span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             {LEGEND.map(([label, color]) => (
@@ -152,6 +204,32 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-[#FF3D3D]">GRAPH PROJECTION UNAVAILABLE</div>
           ) : !data ? (
             <div className="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-[var(--text-muted)]">ASSEMBLING GRAPH…</div>
+          ) : data.representable && data.representable.flowLinks === 0 && data.representable.flowsInSelectedTopology > 0 ? (
+            // THE THIRD ZERO. The topology covers this date and holds flows;
+            // this view cannot draw them, because they are stated between
+            // countries and it renders sited structure. Naming that is the
+            // whole point — the previous behaviour drew today's facility
+            // network here instead, under an "AS OF <past date>" chip.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center" data-testid="graph-not-representable">
+              <div className="text-[11px] font-mono text-[#FF9500]">TOPOLOGY NOT REPRESENTABLE IN THIS VIEW</div>
+              <div className="text-[9px] font-mono text-[var(--text-muted)] max-w-[46rem] leading-relaxed">{data.representable.reason}</div>
+              <div className="text-[9px] font-mono" style={{ color: 'var(--gold-primary)' }}>
+                ↳ The MAP draws these corridors at country centroids. This view is facility-level structure.
+              </div>
+            </div>
+          ) : data.topology?.status === 'predates' ? (
+            // A REFUSAL, not an empty picture. Drawing the dependency
+            // skeleton alone here would read as "this is the network then",
+            // which is the claim the date cannot support.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-8 text-center" data-testid="graph-out-of-period">
+              <div className="text-[11px] font-mono text-[#FF3D3D]">NO FLOW TOPOLOGY DESCRIBES {asOf}</div>
+              <div className="text-[9px] font-mono text-[var(--text-muted)] max-w-[46rem] leading-relaxed">
+                {data.topology.note ?? 'The evaluation date precedes the earliest flow vintage the corpus holds. A network drawn here would be today\'s structure wearing a historical date.'}
+              </div>
+              <div className="text-[9px] font-mono" style={{ color: 'var(--gold-primary)' }}>
+                ↳ Scrub to a date the corpus covers, or search `vintage` to see which editions it holds.
+              </div>
+            </div>
           ) : (
             <ForceGraph2D
               width={size.w}
@@ -164,7 +242,7 @@ export default function EconGraphView({ selectedId, asOf, knowledge, onSelectEnt
               nodeCanvasObject={(node, ctx, globalScale) => {
                 const n = node as GraphNode;
                 const r = 2.5 + Math.sqrt(Math.max(0, n.throughputKt)) / 9;
-                const color = STAGE_COLOR[n.stage ?? ''] ?? '#B0BEC5';
+                const color = STAGE_COLOR[n.stage as SupplyStage] ?? '#B0BEC5';
                 // Bottleneck halo under the node fill.
                 if ((n.bottleneckScore ?? 0) >= 0.45) {
                   ctx.beginPath();

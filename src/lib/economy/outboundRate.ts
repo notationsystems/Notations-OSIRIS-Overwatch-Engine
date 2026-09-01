@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — outbound rate discipline in a LONG-RUNNING process
+ * Payload Terminal — outbound rate discipline in a LONG-RUNNING process
  * (deployment order D-10).
  *
  * INSPECTION FINDING, and the order was right to ask: the only throttle

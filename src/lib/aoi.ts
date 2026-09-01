@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Area of Interest analysis
+ * Payload — Area of Interest analysis
  *
  * Turns a drawn polygon into an answer to "what is inside this?". Every tracked
  * layer is swept, the hits are grouped by kind, and the result is what the
@@ -45,13 +45,25 @@ export interface AoiReport {
 /** Per-group cap. The count stays exact; only the listing is truncated. */
 export const MAX_ITEMS_PER_GROUP = 50;
 
+/**
+ * A record from the live map store. The fields differ per layer and are read by
+ * NAME, so the honest type is an unknown-valued record rather than `any`:
+ * `unknown` forces the narrowing at each read that `any` silently skipped.
+ */
+export type MapEntity = Record<string, unknown>;
+
+/** Narrow one unknown field to a usable string, or to nothing. */
+const str = (v: unknown): string | undefined =>
+  (typeof v === 'string' && v.trim() ? v.trim() : typeof v === 'number' ? String(v) : undefined);
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
 interface LayerSpec {
   key: string;
   label: string;
   color: string;
   /** Field holding a human-readable name, first match wins. */
   labelFields: string[];
-  detail?: (e: any) => string | undefined;
+  detail?: (e: MapEntity) => string | undefined;
 }
 
 /**
@@ -60,27 +72,27 @@ interface LayerSpec {
  */
 export const AOI_LAYERS: LayerSpec[] = [
   { key: 'commercial_flights', label: 'Commercial aircraft', color: '#00E5FF', labelFields: ['callsign', 'icao24'],
-    detail: e => [e.model, e.alt ? `${e.alt} m` : null].filter(Boolean).join(' · ') || undefined },
+    detail: e => [str(e.model), num(e.alt) !== undefined ? `${num(e.alt)} m` : null].filter(Boolean).join(' · ') || undefined },
   { key: 'private_flights', label: 'Private aircraft', color: '#76FF03', labelFields: ['callsign', 'icao24'],
-    detail: e => e.model || undefined },
+    detail: e => str(e.model) },
   { key: 'private_jets', label: 'Private jets', color: '#FFD500', labelFields: ['callsign', 'icao24'],
-    detail: e => e.model || undefined },
+    detail: e => str(e.model) },
   { key: 'military_flights', label: 'Military aircraft', color: '#FF3D3D', labelFields: ['callsign', 'icao24'],
-    detail: e => e.model || undefined },
+    detail: e => str(e.model) },
   { key: 'maritime_ships', label: 'Vessels', color: '#448AFF', labelFields: ['name', 'mmsi', 'imo'],
-    detail: e => e.destination || e.flag || undefined },
+    detail: e => str(e.destination) ?? str(e.flag) },
   { key: 'satellites', label: 'Satellites', color: '#E040FB', labelFields: ['name', 'noradId'],
-    detail: e => (e.altitude ? `${Math.round(e.altitude)} km` : undefined) },
+    detail: e => { const a = num(e.altitude); return a === undefined ? undefined : `${Math.round(a)} km`; } },
   { key: 'cameras', label: 'CCTV cameras', color: '#00E676', labelFields: ['name', 'id'],
-    detail: e => [e.city, e.country].filter(Boolean).join(', ') || undefined },
+    detail: e => [str(e.city), str(e.country)].filter(Boolean).join(', ') || undefined },
   { key: 'earthquakes', label: 'Earthquakes', color: '#FF9500', labelFields: ['place', 'id'],
-    detail: e => (e.magnitude != null ? `M${e.magnitude}` : undefined) },
+    detail: e => { const m = num(e.magnitude); return m === undefined ? undefined : `M${m}`; } },
   { key: 'infrastructure', label: 'Nuclear facilities', color: '#FFEE58', labelFields: ['name', 'id'],
-    detail: e => e.country || undefined },
+    detail: e => str(e.country) },
   { key: 'gdelt', label: 'Global incidents', color: '#FF6B1A', labelFields: ['name', 'id'],
-    detail: e => e.type || undefined },
+    detail: e => str(e.type) },
   { key: 'weather_events', label: 'Severe weather', color: '#7E57C2', labelFields: ['title', 'name', 'id'],
-    detail: e => e.category || undefined },
+    detail: e => str(e.category) },
 ];
 
 /**
@@ -114,7 +126,7 @@ export function bboxOf(ring: number[][]): { west: number; south: number; east: n
   return { west, south, east, north };
 }
 
-function pickLabel(e: any, fields: string[]): string {
+function pickLabel(e: MapEntity, fields: string[]): string {
   for (const f of fields) {
     const v = e?.[f];
     if (v !== undefined && v !== null && String(v).trim()) return String(v).trim();
@@ -129,7 +141,7 @@ function pickLabel(e: any, fields: string[]): string {
  * rather than treated as empty, so a layer that has not loaded yet simply does
  * not appear instead of reporting a confident zero.
  */
-export function selectInPolygon(ring: number[][], data: Record<string, any>): AoiReport {
+export function selectInPolygon(ring: number[][], data: Record<string, unknown>): AoiReport {
   if (!ring || ring.length < 3) return { total: 0, groups: [] };
 
   const box = bboxOf(ring);

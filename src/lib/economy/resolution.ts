@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — the entity resolution gate (work order 3.3).
+ * Payload Terminal — the entity resolution gate (work order 3.3).
  *
  * The deterministic gate the resolver contract has assumed since round 1:
  * proposals in, accept / unresolved out, nothing silently dropped. Round 25

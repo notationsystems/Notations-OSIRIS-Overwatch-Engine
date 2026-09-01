@@ -2,6 +2,22 @@ import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 import { matchExact, type SanctionEntry } from '@/lib/sanctions';
 
+/**
+ * Payload — IP geolocation and reputation, with OFAC screening of the ASN owner.
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is an address block and the organisation that announces it. This route exists to attribute infrastructure to the
+ * ORGANISATION that operates it — a carrier's mail domain, a terminal's
+ * network, a broker's hosting — and to no other purpose. It must never be
+ * used to profile, locate, enumerate or identify a natural person, and no
+ * output of it may be joined to a person record.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
+
 // IP Geolocation + Reputation — combines multiple free sources.
 // Cross-checks the ASN owner / ISP / org strings against the OFAC SDN
 // list so an IP routed via a sanctioned operator surfaces a hit.
@@ -51,7 +67,7 @@ export async function GET(req: Request) {
           };
         }
       }
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
 
     // 2. AbuseIPDB-style check via ip-api proxy flag
     results.reputation = {
@@ -75,7 +91,7 @@ export async function GET(req: Request) {
       results.sanctions_match = hits.length
         ? { source: 'OFAC SDN', hits }
         : null;
-    } catch (e) { console.warn('[OSIRIS] Sanctions cross-check failed:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Sanctions cross-check failed:', e instanceof Error ? e.message : e); }
 
     return NextResponse.json(results);
   } catch {

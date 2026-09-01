@@ -5,7 +5,7 @@
 > disagreements with the pre-registration rather than adjusting criteria.
 > Per-item reports live in the architecture ledger, phases 26+.
 
-Branch `claude/osiris-physical-economy-7o9g2w`, base commit `e65555f`, 555 tests passing.
+Branch `claude/payload-physical-economy-7o9g2w`, base commit `e65555f`, 555 tests passing.
 
 ## 1. How to work this order
 

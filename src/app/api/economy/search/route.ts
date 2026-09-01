@@ -2,15 +2,16 @@ import { NextResponse } from 'next/server';
 import { getEconomyState } from '@/lib/economy/store';
 import { strongestAttestingClass, knownAtOf, outranksObservation, type AttestationKind } from '@/lib/economy/analytics';
 import { matchRegistryGaps, missRecord, type SearchMissRecord } from '@/lib/economy/sourceRegistry';
-import { parseEvidenceQuery, searchEvidence } from '@/lib/economy/evidenceSearch';
+import { parseEvidenceQuery, searchEvidenceCensus, evidenceNote } from '@/lib/economy/evidenceSearch';
 import { recordEvidenceQuery, recordQuery } from '@/lib/economy/sessionTelemetry';
 import { isMachineClient } from '@/lib/economy/machineClient';
 import { asKnownThen } from '@/lib/economy/engine';
 import { buildGraph } from '@/lib/economy/graph';
 import type { EconomyState, Entity, Observation } from '@/lib/economy/types';
+import { env } from '@/lib/economy/envCompat';
 
 /**
- * OSIRIS — Entity search: find "Escondida" from the search bar.
+ * Payload — Entity search: find "Escondida" from the search bar.
  *
  *   GET /api/economy/search?q=escondida[&commodity=copper]
  *
@@ -39,7 +40,7 @@ interface SearchHit {
   headline?: string;
   /** Strongest evidence class attesting the entity's existence — the
    *  identity-level sibling of valueKind. 'representative' or below means
-   *  the entity exists, within OSIRIS, purely on curation. */
+   *  the entity exists, within Payload Terminal, purely on curation. */
   attestation?: AttestationKind;
 }
 
@@ -101,10 +102,10 @@ async function archiveSearchMiss(rec: SearchMissRecord & { ts: string }): Promis
   // except when the readiness test forces the REAL write path (work order
   // 3.7: "verify the miss log writes in the running configuration, not
   // only in principle"), pointing it at a scratch directory.
-  if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
+  if (process.env.VITEST && env('PAYLOAD_FORCE_MISS_LOG') !== '1') return;
   try {
     const fs = await import('node:fs/promises');
-    const dir = process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
+    const dir = env('PAYLOAD_MISS_LOG_DIR') ?? `${process.cwd()}/data-archive`;
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(`${dir}/search-misses.jsonl`, JSON.stringify(rec) + '\n');
   } catch { /* best-effort by design */ }
@@ -182,15 +183,27 @@ export async function GET(request: Request) {
     // The graph is built AT the evaluation date so the refusals reflect the
     // topology that actually serves it (a 2017 query runs over the 2017
     // country vintage, not today's facility snapshot mislabeled).
-    const evidenceResults = searchEvidence(evidenceState, buildGraph(evidenceState, asOf), evidenceQuery, {
+    const census = searchEvidenceCensus(evidenceState, buildGraph(evidenceState, asOf), evidenceQuery, {
       asOf, knowledge: knowledge as 'best_known' | 'as_known_then',
     });
+    // The page is served WITH its accounting. An evidence query that returns
+    // nothing is a common and honest state (`refused:basis` has no instances
+    // in today's facility topology — the gross-weight corridors are
+    // country-level, so the type is live at the 2017 vintage), and a bare
+    // empty array cannot be told apart from a typo, a dead fetch, or a
+    // mechanism that was never built. The note says which.
     return NextResponse.json({
       commodity, query: q, asOf: asOf ?? null, knowledge,
       evidenceKind: evidenceQuery.kind,
       ...(evidenceQuery.type ? { evidenceType: evidenceQuery.type } : {}),
       results: [], withheld: 0,
-      evidenceResults,
+      evidenceResults: census.hits,
+      evidenceTotal: census.total,
+      evidenceShown: census.shown,
+      evidenceTruncated: census.truncated,
+      evidenceByType: census.byType,
+      ...(census.unknownType ? { evidenceRefused: census.unknownType } : {}),
+      evidenceNote: evidenceNote(evidenceQuery, census, asOf),
     });
   }
 

@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
-// DNS Lookup via Google DNS-over-HTTPS (free, no key)
+/**
+ * Payload — DNS lookup via Google DNS-over-HTTPS (free, no key).
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is a domain name. This route exists to attribute infrastructure to the
+ * ORGANISATION that operates it — a carrier's mail domain, a terminal's
+ * network, a broker's hosting — and to no other purpose. It must never be
+ * used to profile, locate, enumerate or identify a natural person, and no
+ * output of it may be joined to a person record.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const domain = searchParams.get('domain');

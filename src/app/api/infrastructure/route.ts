@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 /**
- * OSIRIS — Global Infrastructure API
+ * Payload — Global Infrastructure API
  * Tracks critical global infrastructure: Nuclear Power Plants worldwide
  * Comprehensive coverage including all Russian, Chinese, and strategically important facilities
  */
@@ -127,7 +127,7 @@ export async function GET() {
         return facility;
       });
     }
-  } catch (e) {
+  } catch {
     // Fallback to static list if API fails
   }
 

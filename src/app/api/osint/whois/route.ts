@@ -2,11 +2,33 @@ import { NextResponse } from 'next/server';
 import { safeFetch, isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 import { matchExact, type SanctionEntry } from '@/lib/sanctions';
 
-// WHOIS + Domain Intelligence via RDAP (free, standardized).
-// Cross-checks any registrant / org names returned by RDAP against the
-// OFAC SDN list so a sanctioned registrant surfaces alongside the WHOIS
-// metadata (still keyless — the SDN snapshot is sourced from the open
-// OpenSanctions mirror).
+/**
+ * Payload — WHOIS / domain intelligence via RDAP (free, standardised).
+ * Cross-checks any registrant / org names returned by RDAP against the
+ * OFAC SDN list so a sanctioned registrant surfaces alongside the WHOIS
+ * metadata (still keyless — the SDN snapshot is sourced from the open
+ * OpenSanctions mirror).
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is a DOMAIN and the organisation that registered it. This
+ * route exists to attribute infrastructure to the organisation that
+ * operates it — is this carrier's mail domain really this carrier's — and
+ * to no other purpose. It must never be used to profile, locate or
+ * identify a natural person, and no output of it may be joined to a
+ * person record.
+ *
+ * WHOIS carries the sharpest edge of the conditional category, because a
+ * domain registered by an individual has a natural person in the
+ * registrant field. RDAP redacts most of it; where a registry does not,
+ * the redaction is the registry's choice and not this route's licence to
+ * use what comes back. Registrant contact details are passed through for
+ * ORGANISATIONAL attribution and OFAC screening only.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const domain = searchParams.get('domain');
@@ -55,7 +77,7 @@ export async function GET(req: Request) {
         results.expiration = events.find((e: any) => e.action === 'expiration')?.date;
         results.last_changed = events.find((e: any) => e.action === 'last changed')?.date;
       }
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
 
     // HTTP headers for tech fingerprinting — go through safeFetch so the
     // attacker can't aim a HEAD request at internal infrastructure with a
@@ -89,7 +111,7 @@ export async function GET(req: Request) {
       if (headers['x-content-type-options']) score += 1;
       if (headers['referrer-policy']) score += 1;
       results.security_score = { score, max: 7, grade: score >= 5 ? 'A' : score >= 3 ? 'B' : score >= 1 ? 'C' : 'F' };
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
 
     // OFAC SDN cross-check on RDAP entity names/orgs.
     try {
@@ -106,7 +128,7 @@ export async function GET(req: Request) {
       results.sanctions_match = hits.length
         ? { source: 'OFAC SDN', hits }
         : null;
-    } catch (e) { console.warn('[OSIRIS] Sanctions cross-check failed:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Sanctions cross-check failed:', e instanceof Error ? e.message : e); }
 
     return NextResponse.json(results);
   } catch {

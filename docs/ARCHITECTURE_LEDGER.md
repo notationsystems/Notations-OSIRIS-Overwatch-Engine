@@ -1957,6 +1957,15 @@ modeled facility accounts for its entire compiled figure. The 22–73%
 range is the interval EXCLUDING Panama. The claim sentences render the
 measured range, not the remembered one.
 
+**Superseded at phase 42, and worth reading as a chain.** The order said
+22–73%; the tree said 21.8–100% "across 9 countries"; and the 9 was
+itself the artefact — `facilityCoverage` was dropping every country with
+no facility observation, so the range was measured over the countries
+that happened to have one. Over all 19 it is **0–100%**. Each correction
+was against the tree, and each was still reading a filtered population.
+The number was never wrong about what it measured; the population it
+measured was never the one the sentence named.
+
 **F-3 — the validator, as a service.** The round-1 contract, unbuilt for
 thirty-five phases, built here because the pivot makes cross-model
 validation the arrangement rather than a contrivance
@@ -2304,7 +2313,7 @@ All six reduce to one question no test asks on its own: *does the thing
 this mechanism affects, and the thing actually in use, have the same
 identity?*
 
-**A seventh instance, found by looking where the class said to look —
+**Instance 7, found by looking where the class said to look —
 and it was in my own F-5 work.** The class says: does the thing this
 mechanism affects, and the thing in use, have the same identity? So the
 UI was rendered rather than reasoned about — the F-5 map changes had
@@ -2370,7 +2379,7 @@ has become live, which is precisely what building the deferred allocation
 model (facility-level flows on a non-metal basis) would do.
 
 **The third surface, and the door the operator named: TEST PLACEMENT.**
-The operator's reading of the seventh instance — "class 6 arriving
+The operator's reading of instance 7 — "class 6 arriving
 through test placement" — is a door in its own right: a test that
 exercises a mechanism at the wrong ALTITUDE verifies the mechanism and
 is silent about the wiring. F-5 was correct, unit-tested at the function
@@ -2407,6 +2416,522 @@ for three phases running — the researcher afternoon. That is not
 avoidance; it is what "everything buildable is built" looks like when it
 is true.
 
+## Phase 39 — executing the runbook, and the four walls it ran into
+
+The frontier is the researcher afternoon, which is the operator's. What
+was still mine was the runbook: if one of its three moves sends a
+researcher into a wall, the afternoon measures the runbook rather than the
+instrument, and that is not recoverable afterwards because the S-7 window
+starts from that session. So the three moves were EXECUTED against the
+running instrument rather than read.
+
+Move #1 held (and produced phase 38's basis sentence). Move #2 held: the
+probe reported no AS KNOWN control, and investigation showed
+`EconTimeBar` renders it gated on `{!live && …}`, so it appears once a
+date is set — exactly as the runbook describes. **The runbook wording was
+correct; no defect.** Move #3 is where it broke, four ways, all silent.
+
+**1. The empty screen.** Move #3 says "Search `refused:basis`". That
+type has ZERO instances under today's facility topology — the corpus's
+gross-weight corridors are country-level, so it fires at the 2017 country
+vintage (5 hits, measured) and is silent today. The corpus was telling
+the truth; the surface was throwing the truth away. The dropdown does not
+open on an empty result, so a first contact with the refusal system was a
+blank screen indistinguishable from a typo, a dead fetch, or a mechanism
+that was never built.
+
+**2. The token the document itself prints.** The runbook says
+"**`refused:` is a work queue, not an error**" — twice. The parser's
+pattern required at least one type character after the colon, so
+`refused:` failed the evidence grammar entirely, fell through to the
+ENTITY register, matched nothing, and answered with a source-registry
+gap note about copper. The document taught a query the instrument
+rejected.
+
+That one had a consequence past the screen. A true entity miss is a
+DEMAND SIGNAL: it is appended to `data-archive/search-misses.jsonl` and
+ranks the registered-but-unbuilt sources. Because `refused:` fell through
+to the entity register and missed, the miss log accumulated four rows —
+```
+{"ts":"2026-08-27T20:41:13.155Z","q":"refused:","gapIds":["cme-copper-stocks"]}
+```
+— crediting demand for a copper-stocks feed to a token the runbook itself
+prints. The demand instrument was being fed by its own documentation. The
+four rows were discarded rather than committed (they are probe traffic,
+not researcher demand — the same principle as the machine-client
+segregation on the S-7 counters), and quoted here instead so the finding
+survives without the false evidence.
+
+**3. Two stacked silent truncations.** The standing queue holds 30
+refusals; `searchEvidence` served 20; the search bar rendered 6 of those.
+None of the three said so. The truncating function carries a comment
+explaining that the digest passes `Infinity` *because "a work queue that
+silently truncated would read as covered"* — and then truncated the
+interactive queue silently. Worse than the count: the slice runs over a
+list built type-by-type, so a whole refusal TYPE can vanish behind a
+fuller one and the researcher reads "these are the refusals" with a
+mechanism absent.
+
+**4. A typo and an absence were the same answer.** `refused:bassis`
+returned an empty array, identically to `refused:basis`. Refuse-don't-
+default was built into every mechanism in this system and then discarded
+at the display.
+
+**What closed them.** `EvidenceCensus` — the page carries
+`total`/`shown`/`truncated` plus a per-type census taken BEFORE the type
+filter and the cut, so nothing hides behind the cap; `evidenceNote()` —
+the sentence a surface shows when the census is not self-evident, naming
+which kind of nothing it is returning, with `TYPE_CONDITION` giving the
+condition that produces each type (and, for `refused:basis`, the date
+where it is live); a declared taxonomy so an undeclared type is REFUSED
+by name; and the parser accepting the trailing colon the docs print.
+All three surfaces carry it: the route, the search bar (which states its
+own deeper cut, "Showing 6 of 30"), and the MCP tool — where an
+undeclared type now throws at the boundary, as free text does on an
+entity id. An attached model handed a bare empty array writes "the
+instrument holds no basis refusals", which is a claim about the world
+made from a rendering artefact; that is the half of the external-model
+pivot that has to be right.
+
+**The corollary, because it is where two named classes meet:** an
+instrument that declines has to say *which kind of nothing* it is
+returning. Four distinct states — none of that type here, not at this
+date, you named something that does not exist, the page was cut — were
+one empty array.
+
+**And the durable half.** Correcting the runbook's prose fixes it once;
+the runbook is a literal and the corpus keeps moving. `runbookClaims.test.ts`
+now EXTRACTS every evidence query the document prints and runs each one
+at today and at the date the document names: each must return records or
+come back with a note explaining the emptiness. It caught its own author
+on the first run — the corrected prose prints `refused:bassis` as a
+deliberate example of a typo, which the extractor flagged; the right
+assertion was not to mute it but to require that the instrument refuse it
+by name, since a doc example is as much a claim as an instruction. The
+declared taxonomy is a literal too, so it is not trusted either: a
+tripwire runs every mechanism across five vintages and fails if any emits
+a type the list does not declare — a real refusal rejected as a typo
+being the worse half of that failure.
+
+**Measured, not assumed.** `refused:basis` = 0 today, 5 at 2017-06-30
+(both pinned, discriminating in both directions). Queue depth 30, page
+20, bar 6 — all three now stated. Verified in the running configuration
+and at the screen: a browser probe reads the rendered note for all four
+query shapes, no page errors. The restart that produced this verification
+is worth one line of its own: `pkill -f "next start"` matched nothing
+because the process is named `next-server`, the health check returned 200
+from the STALE server, and only reading the payload showed old code. A
+green liveness check is not evidence that the thing you built is running.
+
+668 tests green, typecheck clean — the latter caught twice what vitest
+passed (a `Record` index type, an ES2018 regex flag), which is the
+split-verdict hazard behaving exactly as recorded.
+
+**Exactly one next executable frontier:** unchanged, for a fourth phase —
+the researcher afternoon.
+
+
+## Phase 40 — the graph view answered every date the same way
+
+The phase-39 corollary — *an instrument that declines has to say which
+kind of nothing it is returning* — was applied to the other surfaces by
+probing what each serves when it serves little. That found a ninth
+instance of context severance, and a bigger one than the eighth.
+
+**The finding.** `selectTopology` / `topologyValidity` is phase 13's
+machinery: a date outside every flow vintage yields null rather than
+today's structure wearing a historical label, with the banner vocabulary
+(`TOPOLOGY OUT OF PERIOD`, `COUNTRY-granularity vintage`) built for it.
+Its APPARENT scope is the instrument's flow topology. Its EFFECTIVE scope
+was the map view. The graph branch read `state.flows` — every vintage at
+once, unaffected by `asOf`.
+
+Measured across five dates:
+
+| date | map flows | map status | graph flow links |
+|---|---|---|---|
+| 1990-01-01 | 0 | `predates` | **39** |
+| 2010-01-01 | 0 | `predates` | **39** |
+| 2017-06-30 | 9 | `within` (country) | **39** |
+| 2022-06-30 | 6 | `within` (country) | **39** |
+| today | 39 | `extrapolated` (facility) | 39 |
+
+The graph is the surface that renders an `AS OF <date>` chip over what it
+draws. The projection asserting the knowledge state was the one ignoring
+it. Nothing failed — every link was a real flow, every node a real
+entity, the force layout worked.
+
+And it was reachable by a researcher, not only through the API: the time
+bar's leftmost position is **2017-01**, inside the country-vintage era,
+which is exactly where the runbook's move #2 ("set a past date") sends
+them. Verified at the screen before and after.
+
+**Closing it exposed what the old behaviour was hiding.** With the
+topology selected, the 2017 vintage yields ZERO drawable links — because
+this view excludes countries as AGGREGATES by design, and the corpus's
+historical corridors are stated country↔country. So the honest render at
+2017 is empty, which is a third kind of zero: not "no topology covers
+this date" (`predates`), not "the network is empty", but *the topology
+exists and this view cannot represent it*. Filling that hole with today's
+facility network was the stronger failure — an empty picture at least
+asserts nothing — but an unexplained empty picture is the phase-39 defect
+again. So the drop is counted:
+`representable: {flowsInSelectedTopology, flowLinks, withheld, reason}`,
+with the reason naming the recorded deferral (the country↔facility
+allocation model) rather than proposing to widen this view.
+
+Three states, three distinct screens, all verified live: today —
+`TOPOLOGY EXTRAPOLATED` in the header, network drawn; earliest scrubbable
+date — `TOPOLOGY NOT REPRESENTABLE IN THIS VIEW`, "9 of 9 flow(s) …
+withheld", pointing at the map, which does draw those corridors;
+pre-vintage (API/MCP-reachable, not on the time bar) —
+`NO FLOW TOPOLOGY DESCRIBES <date>`.
+
+**The pin that would have caught it.** Three route-level tests, the third
+being the property whose absence was the defect: the graph and the map
+must AGREE about which topology serves a date, at every date — same
+status, same granularity, same selected flow count — and the graph's own
+accounting must balance (`flowLinks + withheld = flowsInSelectedTopology`).
+Two projections of one state are free to draw different amounts of it;
+they are not free to disagree about what the date can carry.
+
+**A correction of my own, mid-round.** I first asserted that the graph
+should serve flow links at 2017 and wrote the test that way; it failed,
+and the measurement was right — the country corridors are not
+representable here at all. The assertion changed, not the finding, and
+the third zero exists because of that failure.
+
+672 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
+## Phase 41 — the runbook's first move, at the date its second move sends you to
+
+Continuing the sweep: the corollary was applied to the analytical results
+themselves rather than to the search and graph surfaces.
+
+**Measured.** `bottleneckCandidates` returns **35 candidates today and
+ZERO at 2017, 2019 and 2022** — every date the time bar can reach except
+the present. Move #1 of the runbook is "find a constraint: open the
+Bottlenecks list", stated as the thing to do *if you do nothing else*.
+Move #2 is "set a past date". A researcher who does them in the printed
+order meets an empty panel with a count of `(0)` and no other text.
+
+The zero is honest, and it is the same root cause as phase 40's third
+zero: at a country-granularity vintage every node carrying flow is a
+country, and a country is a sink rather than a chokepoint, so nothing
+qualifies. Unexplained, an empty ranked list reads as *"there were no
+bottlenecks in 2017"* — a claim about the world produced by a rendering
+artefact, and a more dangerous one than the graph's blank canvas because
+it looks like an answer.
+
+**What changed.** `AnalyticalResult` gained an optional `emptyBecause`,
+documented as set only when the result IS empty — a note on every result
+is a note on none. It distinguishes the two nothings by measuring them,
+not by assuming: *no node carries flow at all* (no vintage covers the
+date) reads differently from *all 7 nodes carrying flow are aggregates*
+(a topology exists; this ranking's population is excluded from it by
+construction), and both name the recorded deferral rather than proposing
+to widen the operation. The panel renders it above the empty list;
+verified at the screen — `CANDIDATE BOTTLENECKS(35)` with no note today,
+and at the earliest scrubbable date `NO CANDIDATES AT THIS DATE — All 7
+node(s) carrying flow at this date are AGGREGATES…`.
+
+**Reported, not fixed:** there is no `bottlenecks` MCP tool. The eleven
+tools cover search, entity, observations, concentration, propagation,
+scenario, refusals, corpus health, source registry and claim validation —
+so the runbook's *first* move has no machine equivalent, and an attached
+model cannot ask the question the instrument leads with. That is a
+capability gap for the operator to rank, not a defect to close inside a
+discipline round.
+
+674 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
+## Phase 42 — the coverage instrument was dropping the countries it could not cover
+
+The sweep continued into the coverage system, and found the sharpest
+instance of silent filtering in the project since the aluminium filter.
+
+`facilityCoverage` exists to answer exactly one question: how much of a
+compiled country total does the facility model account for. It
+`continue`d past every country with no facility observation. **The rows
+it discarded were the 0% ones** — the answer to its own question, at its
+most important value.
+
+Measured on the copper corpus:
+
+| metric | countries with a compiled total | rows served | dropped |
+|---|---|---|---|
+| mine production | 19 | 9 | **10** — China 1800 kt/y, Russia 930, Australia 800, Kazakhstan 740, Canada 450, Poland 410, India 30, and three zero-total countries |
+| refined production | 17 | **0** | **17** — the corpus holds no refinery or smelter production observation at all |
+
+So the panel read `FACILITY COVERAGE (9)`, which sounds like nine
+countries assessed and was nine countries that happened to have a
+facility behind them; and the refined-coverage table was not empty
+because there was no question — it was empty because the answer was zero
+everywhere, and zero was the value being filtered out.
+
+**The number this fed.** The facility-level HHI travels with a coverage
+range so it is never read as if the model were complete. That range was
+computed over the surviving rows: **21.8%–100%**. Over the real
+population it is **0%–100%** — China contributes 0% to the facility index
+and 1800 kt/y to the world. Phase 36 had already corrected this number
+once, from the order's remembered "22–73%" to the measured "21.8–100%
+across 9 countries". The correction was against the tree and it was still
+reading a filtered population. The number was never wrong about what it
+measured; the population it measured was never the one the sentence
+named. Corrected at its source in the phase-36 entry.
+
+**A second defect, which the first was hiding.** The map applies a
+coverage ratio to each facility dot as opacity (F-5). It used the
+MINE-production table for every dot — so a Chinese smelter's ink was
+driven by China's *mine* coverage, a denominator with nothing to do with
+it. This was invisible precisely because the mine table dropped its 0%
+rows: those facilities fell through to `null`, accidentally honest. The
+moment the zeroes were emitted, nine smelters and refineries would have
+worn a measured number from the wrong table. Two defects hiding each
+other, and fixing one alone would have made the other worse. The ink now
+reads mine coverage for mines and refined coverage for
+smelters/refineries, and a port or manufacturer carries `null` rather
+than borrowing an axis it has no figure for.
+
+**What is now on the screen** (verified): `FACILITY COVERAGE (36)` —
+`MINE PRODUCTION · 19 countries · 7 with NO modelled facility`,
+`REFINED PRODUCTION · 17 countries · 17 with NO modelled facility`, and
+rows reading `NO modelled facility behind 1,800 kt/y — the compiled total
+is the only evidence`. The refined table had been computed on every run
+since it was built and never rendered at all.
+
+Pinned five ways, including the vacuity guards: every country with a
+compiled total gets a row; a zero total with zero facilities stays
+`complete` (a complete model of nothing — the existing documented rule,
+Panama); the bias floor is 0; the two coverage tables genuinely disagree
+so the map's table choice matters; and a tripwire on the one remaining
+drop (a country entity with no `countryCode`, zero today, a register
+defect rather than a coverage fact if it ever fires).
+
+680 tests green, typecheck clean.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
+## Phase 43 — the health instrument could not say whether it had checked anything
+
+Last surface in the sweep, and the one where the distinction matters
+most: corpus health.
+
+`corpusHealthSignals` excludes two kinds of source before it can judge
+anything — one with no observation knowable at the evaluation date
+("not degraded, just early") and one with too few arrivals to measure a
+cadence against. Both exclusions are correct, both are documented in the
+code, and both are **invisible in the empty array they produce**.
+
+Worse than invisible, at the surface: the panel section was rendered only
+when signals existed, so at a historical date a researcher did not see
+`CORPUS HEALTH (0)` — they saw **no corpus-health section at all**, which
+is a stronger clean bill of health than a zero. A health instrument that
+cannot distinguish *nothing is wrong* from *nothing was checked* has lost
+the distinction that IS its product.
+
+`corpusHealthAccounting` now travels with the verdict: which sources were
+judged, which were not yet knowable, which have no measurable cadence,
+and — when the signal list is empty — which silence this is. Verified at
+the screen: today `CORPUS HEALTH (1)` with the standing flow-snapshot
+signal and no note; at the earliest scrubbable date `CORPUS HEALTH (0)`
+with *"2 source(s) were judged at 2017-01-31 and none is past its own
+arrival cadence. 8 source(s) had nothing knowable by this date and were
+not judged. 1 carry too few arrivals to measure a cadence."*
+
+**Second correction to my own assertion this session.** I wrote the test
+claiming NOTHING is judged at 2017; it failed, because three sources are
+— the ones whose vintages carry an explicit `knownAt` at that date. The
+claim changed and the finding did not, and the measured number is the
+better one: an empty signal list covering three of eleven sources is a
+much weaker statement than the silence implied. (Checked while there:
+`knownAtOf` falls back to `retrievedAt`, so a 2024 factbook is judged at
+2017 only where the corpus curates a contemporaneous `knownAt` — the
+intended vintage design, not a hindsight leak.)
+
+683 tests green, typecheck clean.
+
+**The sweep, whole.** Five rounds from one question — *which kind of
+nothing is this?* — applied to every surface that can return little:
+
+| surface | the silence | now |
+|---|---|---|
+| evidence search | empty array for four distinct states | census + note + refusal by name |
+| graph view | today's network at every historical date | selected topology, three named states |
+| bottleneck list | `(0)` at every past date | `emptyBecause`, aggregates vs no-flow |
+| coverage table | the 0% rows dropped entirely | every country a row; both metrics rendered |
+| corpus health | the section vanished | the population judged, always |
+
+None of them failed. Every one was internally consistent, and every one
+answered a question the researcher had not asked with a confidence the
+corpus had not earned.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon.
+
+
+## Phase 44 — class 7 named, and the first move given a machine equivalent
+
+The operator's reading, taken as the directive: the five findings are one
+class, not five fixes.
+
+**Class 7 — the empty collection that carries no warrant.** The project's
+oldest rule, refuse-don't-default, distinguishes UNKNOWN from NONE at the
+level of a VALUE. A collection is a third thing and it had no rule, for
+thirty-eight phases. Five surfaces were returning it: empty because
+refused, empty because the population is aggregates-only, empty because
+genuinely nil, empty because rows were dropped — all rendering
+identically as blankness, and the reader supplying the missing sentence
+themselves, usually the most reassuring one.
+
+> Every refusal in this system carries a remedy. An empty array carries
+> nothing at all. **Silence is not a value, and an empty collection is a
+> claim requiring a warrant like any other.**
+
+`docs/DEFECT_CLASSES.md` now holds seven classes. The document's closing
+section states the second standing question the first cannot reach — not
+*is this the thing in use*, but *if this comes back empty, which nothing
+is it, and does the reader receive that?* Both have the same shape, and
+it is the shape of the whole register: a mechanism correct about what it
+examined and silent about what it handed on.
+
+**The standing check.** `emptyWarrant.test.ts` sweeps nine
+collection-returning surfaces at four evaluation dates spanning the
+corpus's three topology regimes; any that comes back empty without a
+warrant fails BY NAME AND DATE. Two vacuity guards — the sweep must
+actually produce empty collections, and the warrants a researcher meets
+must be sentences rather than status words (a one-word status satisfies
+"carries a warrant" and tells a reader nothing). Proven to bite: with the
+bottleneck warrant removed, it fails naming the surface and three dates.
+Exemptions are listed WITH their argument — entity search, which has
+carried three warrants since round 12 and is the model the rest are
+catching up to — because an exemption someone can read is a decision and
+an exemption nobody wrote down is the defect returning.
+
+**The gap, closed and ranked first.** `bottlenecks` is now an MCP tool,
+placed FIRST in the tool list on the operator's instruction: the runbook's
+opening move is the one an attaching model will also try first, and a
+capability present in the UI and absent from the tool list is the
+asymmetry that makes an external client answer from training data
+instead. It carries the discipline the surface was built for — server-
+rendered claim sentences stating CONTAINED METAL, a null score returned
+as a SUCCESSFUL refusal with its remedy, the render cap stated rather
+than silently applied, and an empty ranking arriving as a claim with
+`empty_because` in the claims and a caveat forbidding the reading "there
+are no bottlenecks". Verified twice, as F-2 requires: in-process against
+the real route handlers, and through a real MCP client over stdio against
+a running `next start` — `tools: 12 | first: bottlenecks`, the claim
+reading *"Guixi Refinery … bottleneck score 0.55 of 1 — 2200 kt/y
+CONTAINED METAL passes through (48% of network max)"*, and at 2017 zero
+candidates with the aggregates warrant in the claim.
+
+**And the count is pinned, not restated.** Adding the twelfth tool made
+two operator-facing documents say eleven — which is precisely how class
+6's first instance started, a hand-maintained number describing something
+the tree already knows. Corrected, and pinned against `MCP_TOOLS.length`
+with a vacuity guard for when a document stops stating a count at all.
+
+**And the class was already in the deployment check, as an assertion.**
+`scripts/smoke.mjs` — the one command the operator runs after every
+deploy — printed *"corpus health reachable — 1 signal(s) (empty is the
+healthy state)"*. That parenthesis is the claim class 7 exists to reject,
+written into the check itself: an empty signal list is healthy only if
+something was judged, and otherwise it is a corpus nobody examined. The
+check now asserts the accounting is present and that zero signals over
+zero judged sources with no warrant is a FAILURE. Proven to bite against
+a stub serving the pre-phase-43 shape (signals present, accounting
+absent): `FAIL corpus health reachable — corpusHealth has no accounting:
+an empty signal list would be unreadable`. All nine pass against the
+running instrument.
+
+690 tests green, typecheck clean, 9/9 smoke.
+
+**Exactly one next executable frontier:** unchanged — the researcher
+afternoon, and now the only thing left that this kind of work cannot
+substitute for.
+
+
+## Phase 45 — the self-application step, and the S-6 kit checked against the tree
+
+Two things: the operator's instruction that self-application become a
+step, and their S-6 setup kit, which arrived mid-round and is checkable.
+
+**The step.** Applying a named class to the instrument's OWN instruments
+has now found a live instance three times — the severance check failing
+on `boot.ts` because its literal pattern missed a generic call form (a
+checker blind to a calling form is the class one level up); the guard
+miscount travelling from a ledger sentence into two work orders; and
+`scripts/smoke.mjs` asserting *"empty is the healthy state"* at the
+moment of highest trust. `selfApplication.test.ts` makes the two
+mechanisable parts mechanical and forces the rest:
+
+- **Class 6, mechanised.** A registry of counts the TREE knows (MCP
+  tools, `validWhile` guards, named defect classes) is scanned across
+  every live document; a stated count that disagrees with its register
+  fails. This replaces pinning one number at a time — the guard count and
+  the tool count were pinned individually, and the third instance would
+  have needed a third pin. Documents deliberately NOT scanned carry their
+  argument: the work orders are frozen pre-registration, and one of them
+  contains the seven-guards miscount verbatim — correcting it would erase
+  the evidence of how a literal travelled into an instruction; the
+  ledger's phase entries are true about their own phase, and a register
+  that rewrites its history to stay consistent with the present has
+  destroyed the only record of what changed.
+- **Class 7, applied to the checks.** The checking artifacts — the smoke
+  script, the manifest generator, every workflow — are linted for
+  assertions that treat emptiness as a verdict, with the caught wording
+  as the first banned pattern. Comments explaining the ban are exempt (a
+  record of the fix is not the defect), and the positive form is asserted
+  too: the smoke check must actively require the accounting, or the next
+  payload without one passes silently.
+- **The checklist.** What applying each class to the instrument's own
+  instruments found, one entry per class, pinned against the number of
+  classes in the register — so naming class 8 forces the sweep rather
+  than hoping for the insight.
+
+**The S-6 kit, checked rather than assumed.** Two corrections and one
+confirmation, all measured:
+
+1. **`main` is at `72e352a`, five commits behind the working branch.**
+   `docker-publish.yml` publishes `:latest` from `main`, and
+   `DEPLOYMENT.md` said to run `:latest`. A session deployed that way
+   would run an instrument WITHOUT phases 39–45 — no evidence census, no
+   graph topology fix, no coverage rows, no corpus-health accounting, no
+   `bottlenecks` tool, and the `refused:` parser bug still manufacturing
+   false demand rows into the miss log the frozen criterion reads. The
+   deploy command now pins the version tag and the document names the
+   hazard as what it is: the split-commit hazard at the deploy layer.
+2. **The image did not know its own commit.** `attribution.ts` reports
+   `commit: null, commit_source: 'unstamped-build'` when
+   `SEA_DOG_BUILD_SHA` is unset, and nothing set it — not the Dockerfile,
+   not the publish workflow, not the docs. Step 5 of the kit captures
+   `/api/economy/guards` as `session-baseline.json` so every finding is
+   attributable to a known state; it would have recorded a state
+   fingerprint and no commit. The image now carries `github.sha`.
+3. **Confirmed against the tree:** the guards payload DOES carry the
+   per-commodity state fingerprint (in `states[]`) alongside the guard
+   verdict, so the kit's claim for step 5 holds once the commit is
+   stamped; `ci-verify/guard-breach` still exists and is still unmerged;
+   no `v*` tag exists yet, so step 1 is genuinely undone; the miss log is
+   absent, so the four false `refused:` rows have a clean baseline to be
+   absent from.
+
+695 tests green, typecheck clean.
+
+**The frontier is now the operator's alone.** Everything the kit needs
+from the tree is in the tree.
+
+
 ## Capability gap analysis (post-phase-2)
 
 | Capability | Now | Gap | Path | Priority |
@@ -2426,3 +2951,2621 @@ total passing). Build, lint (new modules clean; substrate baseline unchanged),
 and a Playwright smoke run against the production server verified the
 end-to-end research workflow, including screenshots of the map layers,
 research panel and entity inspector.
+
+
+## Phase 46 — the policy examined registration and was silent about the route surface
+
+Instance 9 of the class named in phase 38, and the largest. Every
+prior instance cost a partition of a measurement. This one shipped a
+person-targeting capability, publicly, under the firm's name.
+
+**The contradiction.** `src/lib/economy/sourceRegistry.ts` refuses to
+register a source that yields natural-person data, and the person-name
+policy is pinned in three places at the search layer: the index refuses to
+MATCH person names, the registry refuses to YIELD person data, the miss log
+refuses to RETAIN person-directed queries. Meanwhile `src/app/api/` served
+four prohibited categories directly, bypassing the registry entirely:
+
+| Route | What it did | Category | Classification |
+|---|---|---|---|
+| `osint/username` | Sherlock enumeration across social platforms, with an `nsfw=1` flag | `username_check` | prohibited — person targeting |
+| `osint/leaks` | XposedOrNot breach lookup **by email address** | `data_breach_search` | prohibited — unlawfully obtained data |
+| `osint/hudsonrock` | Infostealer corpus; assets `email\|domain\|username\|phone`, credentials from compromised machines | `data_breach_search` | prohibited — unlawfully obtained data |
+| `osint/phone` | Phone-number research, geolocated to the map | `phone_number_research` | prohibited — person targeting |
+
+The shape is exact: **a policy correct about what it examined —
+registration — and silent about what it handed on.** Nothing failed.
+The registry's self-description was true. It was true about a door that
+was not the one the application served through.
+
+**Why it was larger than the first reading.** The README establishes that
+the upstream project this forked from is not a mapping dashboard with some
+OSINT routes attached — it is an OSINT reconnaissance platform whose
+headline features ARE the prohibited categories, with the physical-economy
+engine forked on top. So this was not an oversight in one corner. It was
+the application's original purpose, still present, still shipping, in a
+public MIT-licensed repository, under the name of a firm about to hold
+carrier, driver and customer personal information. That is a due-diligence
+finding waiting to be made by a customer, an insurer or a regulator.
+
+**Duration.** Present from the fork point through 45 phases of work. The
+person-name policy was built in phase 12 and reinforced in phases 13 and
+14 — every one of those phases hardened one door while the other stood
+open. The gate was built at one door and the building had a dozen.
+
+### The disposition
+
+**Deleted outright** — code, routes, UI, and client libraries. Not
+feature-flagged: a feature-flagged breach lookup is still a breach lookup
+in the tree and still in the image.
+
+- `osint/username`, `osint/leaks`, `osint/hudsonrock`, `osint/phone`
+- `osint/shodan`, `osint/sweep`, `/api/scanner` and its `SCANNER_URL` /
+  `SCANNER_KEY` configuration — host and port scanning
+- `osint/crypto` — individual wallet tracing. Counterparty screening is
+  served by the organisation-only sanctions path; tracing an individual's
+  wallet is not a freight firm's business.
+- `osint/github` — **found by applying the gate rather than by reading the
+  order.** Neither amendment named it. It returns a named person's email,
+  location, employer and bio: its subject is a natural person, so the
+  route-enumeration test fails it. That is the gate earning its place on
+  the first run.
+- `osint/cve` — the vulnerability-scanner's enrichment path, orphaned once
+  the toolkit UI went. Not named in the order; recorded here as a judgement
+  rather than an instruction, and reversible.
+- `src/lib/sherlock.ts`, `src/lib/chainIntel.ts`, `src/lib/osint-utils.ts`,
+  `src/components/OsintPanel.tsx` (the RECON toolkit UI)
+
+`src/lib/ssrf-guard.ts` was **kept**: it is used by cctv, chain/daily,
+entity/expand, ip and sanctions, so it was never only these routes'.
+
+**Telegram person-post scraping was advertised and never built.** The
+README names a Telegram OSINT layer with geoparsed posts plotted on a map;
+no such route exists in the tree. Nothing to delete — but the README
+advertised it, which is why the shipped description needed a gate of its
+own.
+
+**Kept, with the condition written into the route:** `whois`, `dns`, `ip`,
+`certs`, `bgp`, `mac`, `threats` — each states *organisational
+infrastructure attribution only; never used to profile a person*. A
+conditional permission with the condition left implicit is an
+unconditional permission.
+
+**Rescoped:** `osint/sanctions` loses the person path. `Person` is removed
+from the schema allowlist AND filtered out of every result set — because
+the allowlist alone fails open for a caller who names no schema, and an
+unfiltered search over a list containing designated individuals returns
+people whether or not anyone asked for them.
+
+### The gate, at every door
+
+`src/lib/economy/routeSurfacePolicy.test.ts`, in three parts, because the
+first two are not enough on their own:
+
+1. **Every route is classified.** An unclassified route fails: a new route
+   cannot reach the surface without someone writing down what its subject
+   is. Accounting for every drop, applied to routes.
+2. **Every conditional route states its condition** in its own source.
+3. **A content scan that runs regardless of classification.** Part 1 trusts
+   the author's label, and a reintroduced breach lookup filed under
+   `permitted` would pass it. The scan looks for the capability itself —
+   person-shaped request parameters, breach and infostealer corpora,
+   enumeration tools, scanning tools, people-search aggregators. The
+   classification catches the honest omission; the scan catches the wrong
+   label.
+
+The scan's first draft matched `nmap` inside `unmapped` and failed a
+routing test — the reminder that a substring is not a word, and the reason
+every marker now carries `\b`.
+
+**And a gate on the shipped description.** The README is an artifact and
+drifts from policy like any other; the doc-count drift was caught twice by
+exactly this kind of check. A public repository describing itself as
+offering username enumeration is a finding whether or not the route still
+exists. The policy section may NAME a prohibited capability in order to
+prohibit it — a policy nobody can read is not a policy — so the scan runs
+outside a delimited block, and the exemption is bounded: the block must
+exist, must stay under a third of the file, and must still state the
+prohibition, so it cannot be grown to cover the document or emptied to
+pass.
+
+### Identity
+
+The fork still called itself OSIRIS in the README, the compose file, the
+CasaOS store metadata, the environment variables and the outbound
+User-Agent. Under the Payload rename that is not cosmetic: **the name
+asserts the prohibited purpose.** The User-Agent was the sharpest case —
+every outbound request to Nominatim, Overpass and the rest introduced this
+client as `OSIRIS-OSINT/1.0`, asserting to third parties a purpose the
+application does not have.
+
+- README rewritten to describe Payload: freight, physical commerce,
+  provenance. Upstream attribution kept — the fork's origin is a fact, and
+  the MIT licence is honoured.
+- `OSIRIS_*` → `PAYLOAD_*` via `envCompat.ts`. The old names are read for
+  one release and warn once each, naming the replacement and the release
+  that drops them (`v0.2.0`). A rename that takes effect immediately turns
+  a configured deployment into an unconfigured one with nothing said.
+- In-code `OSIRIS —` headers updated **only in files this change touched**.
+  A rename commit across 200 files would hide the real changes.
+
+### Self-application
+
+Adding `envCompat.ts` tripped the phase-38 context-severance guard on its
+own `warned` Set — the standing check catching this change on the way in.
+Argued and listed rather than wrapped: nothing reads the set, so a severed
+copy costs a duplicated log line, not two contexts disagreeing about a
+value. The variable itself is read from `process.env` on every call, which
+is genuinely shared.
+
+**713 tests green (6 skipped), typecheck clean.**
+
+### What this does not yet cover
+
+- `WorldRemote` plots BLE devices discovered by the browser. It has no API
+  route, so the route-enumeration gate cannot see it. Not acted on: it is
+  outside the order and outside this gate's reach, and it is named here so
+  it is a decision rather than an omission.
+- The general-purpose geopolitical feeds (earthquakes, conflicts, weather,
+  radar, satellites, cctv, aircraft, flights, gdelt, cyber-*) are
+  classified `general-purpose` and still served. Retiring them behind a
+  flag, and out of the alert feeds, is A-1 and is not done here.
+
+
+## Phase 47 — the rename, as its own commit
+
+A-0d deliberately deferred the in-code rename: *comment headers updated as
+files are touched, not in a sweep — a rename commit that touches 200 files
+hides the real changes.* The operator then asked for the branding to reflect
+**Payload Terminal V0** across the project, which supersedes that caution.
+The reconciliation is that the sweep happens, and it happens **alone** —
+after A-0 and A-3 were committed and pushed, so nothing substantive hides
+inside it.
+
+**What the sweep found that the A-0 gate had missed.** `src/app/layout.tsx`
+carries the shipped page metadata, and it advertised the prohibited
+capabilities harder than the README ever did: `nmap online`,
+`port scanner online`, `penetration testing tools`, `palantir alternative`
+as SEO keywords, and *"Nmap port scanning from the browser — no install
+required"* as the **first entry** in the schema.org `featureList`. That is
+what a search engine indexes and what a link preview renders — more public
+than the README, not less.
+
+It survived A-0 because the shipped-description gate read `README.md` and
+nothing else. **A gate on "the shipped description" that checks one artifact
+is the same defect it was written to catch** — narrower than it appears,
+with nothing failing. The gate now covers `layout.tsx` too, and asserts the
+scanning keywords are absent by name.
+
+### What was renamed, and what deliberately was not
+
+Renamed: `OsirisMap.tsx` → `PayloadMap.tsx`; `osirisTheme`/`OsirisTheme`;
+`osirisWatchFlight`; the CSS tokens (`osiris-glow`, `osiris-pulse`,
+`osiris-scan`, `osiris-rotate`, layer ids); `public/osiris-icon.png`;
+`package.json` name; the web manifests; the CasaOS store metadata; the
+`OSIRIS —` comment headers; and two more outbound identity strings found
+only by the sweep — `OsirisIntelPlatform/1.0` on the region-dossier route,
+and `ingestOsirisData` in the SDK client.
+
+**Not renamed, each for a reason:**
+
+- `OSIRIS_PORT`, `OSIRIS_DISABLE_LIVE`, `OSIRIS_TELEGRAM_CHANNELS` in
+  `envCompat.ts` and its test — those literal strings ARE the compatibility
+  layer. Renaming them would delete the landing strip the rename needs.
+- This ledger. It is the historical record: renaming OSIRIS out of the
+  phases that describe the OSIRIS era would falsify it.
+- `notations-osiris-overwatch-engine` in repository URLs. The GitHub
+  repository genuinely still carries that name; rewriting the URL would
+  break the link rather than rename anything.
+- `src/data/economy/snapshots/`. The sweep initially rewrote
+  `comtrade-da.json` and the archive-manifest test failed on a byte count —
+  **2298 where 2278 was pinned.** Archived evidence is immutable by
+  construction and a branding pass is not an exception to that; the
+  snapshots were restored. The hash pin caught it immediately, which is the
+  pin doing precisely its job.
+
+Curated dataset `sourceName` strings WERE updated (`OSIRIS curated
+aluminium dataset` → `Payload Terminal curated aluminium dataset`) while
+every `sourceId` was left alone. That is the right split: identifiers stay
+stable so supersession chains and manifests keep resolving, display names
+follow the instrument that produced them.
+
+**719 tests green, typecheck clean, production build compiles.** The four
+Turbopack warnings are pre-existing dynamic `node:fs` imports, verified
+against a stashed baseline rather than assumed.
+
+
+## Phase 48 — instance 10: "the shipped description" was more than one file
+
+Recorded separately from phase 47 because it is an instance of the phase-38
+class, not a rename detail, and the register is where instances live.
+
+**The instance.** Phase 46 built a gate on the shipped description, on the
+correct reasoning that the description is an artifact and drifts from policy
+like any other. It read `README.md`. Nothing else. Meanwhile
+`src/app/layout.tsx` — the page metadata a search engine indexes and a link
+preview renders — advertised `nmap online`, `port scanner online`,
+`penetration testing tools` and `palantir alternative` as SEO keywords, and
+carried *"Nmap port scanning from the browser — no install required"* as the
+**first** entry of its schema.org `featureList`.
+
+So the gate against advertising a prohibited capability was itself narrower
+than its claim, and the thing it failed to cover advertised harder than the
+thing it covered.
+
+| | |
+|---|---|
+| **The door** | AN ARTIFACT CLASS — "the shipped description" is a category with more than one member, and the gate enumerated one |
+| **What it looked like** | A green gate asserting the README was clean, which was true, while the more public surface was not checked |
+| **Found by** | The rename sweep touching `layout.tsx`, not by the gate |
+
+**Why it is worth its own entry.** The previous eight instances were each a
+mechanism narrowed by a predicate, a scope, a module context, a registration
+step. This one is narrowed by an ENUMERATION — the check named its members
+and the world had more. That is the door the next instance comes through, and
+naming it is the only defence, because the failure mode is invisible by
+construction: an enumeration is silent about what it omits, and the test goes
+green either way.
+
+**The fix, built rather than noted.** The first draft of this entry recorded
+the generalisation as future work. That was too weak: the class is an
+enumeration falling behind the world, and leaving the enumeration at two
+members is the same defect one member smaller. So the gate now iterates a
+CLASSIFIED LIST — `DESCRIPTION_ARTIFACTS` — in the phase-46 route shape:
+every description-bearing artifact declares a role (`outward-facing` or
+`internal`), the scan runs over every outward-facing one, and a
+`candidateArtifacts()` sweep over root Markdown and the web manifests fails
+the build when something matching appears unlisted. The list cannot silently
+fall behind the tree.
+
+**It found two more surfaces on its first run, and both were live.**
+
+- `DOCKER.md` still advertised `OSIRIS_TELEGRAM_CHANNELS` as a configurable
+  option for scraping public Telegram channels, and listed
+  *Telegram OSINT → public `t.me/s/<channel>` web preview* among its keyless
+  sources — a prohibited capability documented as a supported feature, with a
+  default channel list, after the capability had been established as never
+  built. The env var and the source line are gone.
+- `src/app/docs/DocsClient.tsx` — the `/docs` route — named four prohibited
+  capabilities. That one was a false positive worth keeping: it is the
+  collection-policy callout added in phase 47, naming them in order to say
+  they were removed.
+
+The second case forced the right generalisation. The README's policy
+exemption had been written as a property of *being README.md*; it is properly
+a property of the delimited REGION, since any outward-facing artifact may
+state the policy and the `/docs` page states the same one. `withoutPolicyBlock()`
+now strips a delimited policy region from any artifact, with markers in both
+comment syntaxes — HTML in Markdown, JSX in TSX.
+
+**What is still outside.** The repository's GitHub description and topics, and
+a published image's OCI labels, are outside the tree and cannot be gated from
+inside it. Those remain an operator responsibility, named here so they are a
+decision rather than an oversight.
+
+
+## Phase 49 — identity properties, landed before the freight schema sets
+
+Five independent reviews converged on one deadline: certain properties are
+part of a record's IDENTITY, and an identity property cannot be retrofitted
+onto data that already exists. They go in before the primitives or they never
+go in honestly. This phase lands them.
+
+### The measurement that started it
+
+`admissible`/`weakestInputClass` was computed **correctly** — and as a field
+BESIDE the number rather than a property INSIDE its identity. Measured across
+`analytics.ts`:
+
+| Result type | Carried attestation |
+|---|---|
+| `Concentration`, `capacityConcentration`, `OperatorConcentration` | yes — three call sites where someone remembered |
+| `CentralityRow`, `BottleneckCandidate`, `TrajectoryPoint`, `AnomalySignal` | **no field at all** |
+
+Four of seven, and the four unmarked ones are the persuasive ones. The
+bottleneck score drives a map layer (`bottleneckScore >= 0.45` paints a dot),
+and it stands on a graph built from 23 `representative`-class flow rows. **The
+honest label was stripped exactly where the number becomes a red dot on
+screen.** Nothing failed; three sites were right and four were silent.
+
+### Attestation, closed under computation
+
+`attestation.ts`. The combine is a monoid — weakest evidence class wins,
+associative and commutative — and `computeAttested()` runs it AT the point of
+computation, so a mean over nine measured inputs and one representative comes
+out representative because the combine ran, not because anyone remembered.
+`Attested<T>` carries a module-private brand, so no caller can hand a value a
+stronger attestation than its inputs earned. `combineAttestations([])`
+REFUSES: a derived quantity over no inputs is vacuity, not cleanliness.
+
+The four leaking analytics now carry `weakestInputClass` computed from their
+real inputs, and making the field required meant the compiler refused every
+construction site until it was wired.
+
+**Dependency edges contribute `representative`.** They carry no `valueKind`
+and are curation-class by construction. The consequence is deliberate: a
+bottleneck standing on curated topology IS a representative finding, and the
+test asserts some candidates come out contaminated rather than asserting they
+come out clean. Omitting dependencies from the combine would have reported the
+curated layer as sourced.
+
+### The interest axis — a second dimension
+
+Provenance answers where a number came from; source class answers how hard the
+evidence is. Neither answers what stake the source had in saying it, and in
+freight almost every operational number is stated by an interested party: a
+quote is a negotiating position, a self-reported on-time rate flatters the
+carrier.
+
+`Interest` is therefore a SECOND axis, not a position on the evidence lattice,
+and it deliberately does **not** feed `isAdmissible()`. Discounting an
+interested figure by a fixed factor would invent a correction nobody measured
+— the same fabrication as defaulting a missing value. It routes to
+MEASUREMENT: a carrier whose self-reported reliability persistently exceeds
+observed outcome is the interest axis made computable, and that residual is
+the verdict. `unknown` ranks below `disinterested`, because an unrecorded
+stake is not an absent one.
+
+### Three merge outcomes, three edge types
+
+The inherited topology was built for a MONOTONIC corpus — later record is a
+correction, disagreement is a bug to find. Freight is not that world, and
+copying it uncritically would encode a chemist's epistemics as a freight one.
+
+| Outcome | Freight instance | Why collapsing it is a category error |
+|---|---|---|
+| `supersedes` | one carrier requoting a lane on a new day, keyed on `knownAt` | nobody is wrong; landing it in a conflicts table invents a dispute |
+| `under_determined` | two carriers quoting the same lane | two prices, both true; the market has no single value |
+| `contradicts` | a certificate against the insurer | genuinely incompatible — and carries its resolvability |
+
+The contradiction edge carries `resolvable` vs `world_under_determined`,
+because they license opposite actions: go and establish which is wrong, versus
+report the spread because picking a winner manufactures precision the evidence
+lacks. Escalating the second as the first is the quiet-alert failure one layer
+in, and `isEscalatable()` is where that is enforced.
+
+`classifyRelation()` REFUSES rather than defaulting. The failure guarded is not
+a missing reason but **someone picking the nearest relation to make a row
+ingestible**, so resolvability is required from the caller: whether a
+disagreement is a bug or the world's own under-determination is a domain claim
+that two numbers cannot settle.
+
+### Computation identity, and replays that declare themselves
+
+Two findings, one mechanism.
+
+"The system computes and verifies" smuggles a solver's assumptions in as
+ground truth — when an optimizer checks a model's "$700 saving", the optimizer
+is itself a model with assumptions and an evidence boundary. So solvers,
+statistical fits and hard-coded heuristics register exactly as a language
+model does, and `predict()` refuses an unregistered predictor. The failure
+mode named in the refusal is not the route solver, which is obviously a model
+and will get registered: it is **the hard-coded `+2 days` buffer in a quoting
+path**, a predictive model with assumptions and no id, whose errors the
+residual can attribute to nothing.
+
+And the hindsight replay answers a different question than it appears to.
+`AS KNOWN` filters records by `knownAt` while the analytics consuming them are
+TODAY's, so a revised threshold makes the replay reconstruct a number nobody
+ever saw, under a banner implying otherwise — directly against the thesis that
+eighteen months later you can say what a bid rested on. `replayVerdict()`
+returns `faithful`, `recomputation` or `unreplayable`, and only a faithful
+replay may be presented as history. The registry entry carries its own
+`knownAt`, because a model is a claim about how the world works and it became
+knowable on a date like any other claim.
+
+### The Markov blanket, enforced on both sides
+
+Naming the model boundary a blanket makes its COMPLETENESS the property under
+test — an interface can have a side door and still typecheck. The sensory side
+(what a model may read) gets the heavier machinery because it is the silent
+half: an egress leak writes something and writes leave traces, while a model
+that saw more than its authorization leaves no evidence at all. `project()` is
+the only construction site for an `AuthorizedView`, and every projection
+records what was shown.
+
+### Self-application: the guard's own premise went stale
+
+The reviews also warned that a repaired invariant leaves a stale guard result
+standing while a test pins it — two mechanisms agreeing on a false state with
+the suite green. No persisted guard results exist in this tree (guards
+recompute from state each run), but the same class lives in the EXEMPTION
+LISTS, and `contextSeverance.test.ts` had no reverse-check while
+`panelTyping.test.ts` did — an inconsistency introduced in this same session.
+
+Added, and it fired on its first run: `processSingleton.ts` was still listed
+in `CONTEXT_LOCAL_BY_DESIGN` arguing why its module state was safe to sever,
+while the scanner no longer flags it at all — its registry is anchored on
+`globalThis`, so there is no module-level container to find. **A live argument
+for a hazard that is gone.** Removed. Every exemption must now name a file
+that exists AND still be flagged, or it leaves the list.
+
+**773 tests green, typecheck clean.**
+
+### Deliberately not built
+
+The reviews flagged four items as overhead for a system with no genuine second
+party holding the same contract: the doctrine generator, the vendored-core
+discipline, byte-identical cross-repo artifacts, and closed-form physics
+validation. Payload has no such counterparty. Recorded so their absence is a
+decision.
+
+### Sequenced after the pivot
+
+The aggregate declaration (an aggregate must not enter the same record type as
+its constituents), the bound type (a half-open interval is neither a value nor
+an absence), and the correlated-observation flag (three quotes from one
+carrier on one lane are one observation, not three) follow the freight pivot
+rather than leading it. And the predictions about what the freight corpus will
+do to this contract get pinned BEFORE any of it is ingested — the substrate
+learned what a commodity flow looks like, and freight will find every clause
+that was really about mines.
+
+---
+
+## Phase 50 — instance 11: the door was an ENUMERATION, and so were the guards
+
+Three findings this phase, all the same class, all found by measurement rather
+than by reading intentions. Recorded together because separating them would
+hide that they are one shape.
+
+### 50.1 The panel exclusion, in nine hand-written copies
+
+Wiring a second control surface (the command bar) onto the terminal's panels
+required first establishing what the existing surface did. The nine inline
+`onClick` cascades in `page.tsx` were extracted mechanically and simulated:
+
+```
+spaceCam   closed  alerts, markets
+economy    closed  alerts, markets, spaceCam
+markets    closed  alerts, economy, spaceCam
+alerts     closed  drawing, markets              <- not spaceCam, not economy
+directions closed  alerts, search, drawing, markets, spaceCam
+search     closed  alerts, drawing, markets, spaceCam
+arcgis     closed  remote                        <- and nothing else
+remote     closed  alerts, arcgis, search, drawing, markets, spaceCam
+drawing    closed  alerts, markets, spaceCam
+```
+
+**19 asymmetric pairs** (A closes B while B leaves A open) and **24 two-click
+sequences** that left two panels open on the identical anchor
+`absolute right-12 top-1/2 -translate-y-1/2` — physically stacked. Which panel
+the operator saw depended on the order they clicked.
+
+Each handler READS as "open this panel exclusively". Each one closed a
+hand-listed subset. The intent lived in nine places and was written down in
+none, so no test could compare them. Apparent scope: exclusive. Effective
+scope: a subset that drifted every time a panel was added.
+
+**The fix is removing the list, not maintaining it better.** `src/lib/ui/panels.ts`
+declares the SLOT each panel renders into; exclusion is derived from two panels
+wanting the same slot, which makes it symmetric by construction rather than by
+discipline. A new panel cannot be added without answering the slot question.
+
+Checked by an exhaustive walk of all 22,620 click sequences up to length four,
+plus a vacuity pin that replays the OLD cascades through the same invariant to
+show they DO fail it, plus a ratchet that fails if an inline cascade reappears.
+
+### 50.2 The attestation-closure guard read one file
+
+`attestationClosure.test.ts` is titled "no analytic ships an unattested number"
+and its own guard-the-guard says it "covers every exported result interface".
+It read `analytics.ts` and nothing else. Measured across `src/lib/economy`:
+
+```
+59  exported interfaces carrying a bare `number` field
+10  in analytics.ts          <- everything the guard could ever see
+49  invisible to it
+40  of those declaring no attestation of any kind
+```
+
+The blind spot was **already realized, not hypothetical**: `notary.ts` and
+`notary.types.ts` had landed number- and verdict-bearing surfaces two commits
+earlier that the guard never looked at. The guard written to catch this class
+had the class.
+
+The widening deliberately does NOT demand `weakestInputClass` everywhere —
+`RateStats.requests` counts our own HTTP calls, `EconDotStyle.radiusPx` is a
+pixel, `BootReport.ms` is a stopwatch, and demanding an evidence class from
+those is noise, which is how a guard gets muted. The requirement is
+**accounting**: every number-bearing type is attested, or classified as
+not-a-claim-about-the-world with a stated reason, or recorded as an open debt.
+Silence is the option removed. 17 open debts are now named rather than
+invisible, under a ratchet that lets the list shrink and not grow.
+
+Three of the classifications I first wrote said only "pixels". The test's own
+minimum-reason-length check rejected them, which is the check earning its keep
+against its author.
+
+### 50.3 The context-severance guard watched one directory
+
+`contextSeverance.test.ts` scanned `src/lib/economy` alone while standing for
+"the economy instrument". `src/lib/spatial/` and `src/lib/ui/` hold instrument
+code, and a module-level `Map` in either severs under exactly the Next
+behaviour `processSingleton.ts` documents. Widened to three roots, with
+exemptions re-keyed to root-qualified paths so a bare filename cannot exempt a
+file in a directory nobody argued about.
+
+Verified by planting a severable `Map` in `src/lib/ui/` — the guard flagged it
+by path and went green when it was removed. A widened root that is declared but
+never walked would read as a fix while changing nothing, so that is pinned too.
+
+### 50.4 And the same shape in a test written days ago
+
+`entityIndex.test.ts` hand-listed `['copper', 'aluminium']` — the copper-only
+blindness that work order 3.1 built `guardEvaluationScope()` to eliminate,
+reintroduced in a newer test. Now derived from the adapter register, with a pin
+asserting the derived scope is populated: `for (const x of [])` generates zero
+tests and reports green, so a broken derivation would erase the block silently.
+
+### What this phase did not do
+
+The Phase 1 reconnaissance ranked "add freight primitives to `types.ts`" as the
+highest-risk change available, and it was the in-flight task. It is not taken
+here. Adding freight members to `EntityKind` fires the person-name-policy guard
+the moment a freight entity is ASSEMBLED (the predicate is over data, not over
+the type), and adding a freight array to `EconomyState` fails **silently**:
+`ID_PREFIX`, the `checkRecord` loop and the `withProvenance` concatenation are
+three separate hand-maintained places, and `stateFingerprint` hashes exactly
+five terms — so a new array would be stamped "reproducible" over inputs the
+digest never saw.
+
+The route the tree has already validated is the sidecar: `notary.{ts,types.ts}`
+landed a complete freight vertical importing two bare string aliases from
+`types.ts`, touching no `EconomyState` array, holding no module-level state.
+That is the template, and the ranked list's execution order is the inverse of
+its risk order for exactly this reason.
+
+---
+
+## Phase 51 — a capability is per operation, because a backend is not uniform
+
+The spatial reconnaissance (VROOM 1.15.0, openrouteservice 9.10.0, pgRouting
+4.0.1, PostGIS 3.5, cuOpt 26.08 — read, not registered for) returned one
+finding sharp enough to change a type immediately.
+
+### The finding
+
+openrouteservice honours `profile_params.restrictions` on `/v2/directions` and
+on `/v2/isochrones`, and **discards them on `/v2/matrix`**. Not an error: HTTP
+200, a well-formed matrix, no warning field, the restriction never read.
+Structurally, `MatrixService.java:106` calls only `processRequestOptions(…)` —
+avoid-borders, polygons, countries, features — and never `convertParameters` or
+`convertVehicleType`; `isFlexibleMode()` (`MatrixRequest.java:258-260`) does not
+flip on `profile_params`, so both the default RPHAST path and the Dijkstra
+fallback build `AccessFilter.allEdges(...)` with no HGV edge filter at all.
+Upstream issue #315, open since 2018-10-09.
+
+**The matrix is what you call for fleet assignment**, and a truck-legal matrix
+is byte-shaped identically to a car-legal one.
+
+### Why it changed a type here
+
+`CapabilityVerdict` carried `restriction` and `state` and no operation. So this
+codebase **could not state the situation**: `heightM: assured` was true of one
+endpoint and false of another, on the same backend, with the same profile, and
+nothing in the type to tell them apart. The four-state machinery — assured /
+unverified / refuted / unhonoured, arbitrated by a discriminating probe against
+the measured 68%-duration / 0.3%-distance calibration — was correct and was
+being asked the wrong question.
+
+`operation` is now on the verdict, and `legalityAssured(verdicts, operation)`
+takes it as a **required** parameter rather than an optional one. Optional would
+have preserved exactly the bug: a matrix call reading a route call's assurance
+by default. Empty still means false — an operation with no verdict is an
+absence of evidence, and `[].every()` returning true is how absence of evidence
+reads as a pass.
+
+Every existing call site had to be updated, which is the type doing its job.
+
+The test now carries the asymmetry directly: one backend, one restriction,
+`assured` for `route` and `refuted` for `matrix` simultaneously; assurance not
+carrying across; an unprobed operation not assured; and a pin that strips the
+operation field to show the two verdicts become indistinguishable claims about
+`heightM` — which was the type's previous state.
+
+The vendor is named here and in `docs/`, deliberately **not** in
+`src/lib/spatial/`. The guard in `spatial.test.ts` caught exactly that mistake
+this session, in a refusal string of mine that named PostGIS, ORS and VROOM: a
+refusal message from the semantic layer that names an implementation is the
+semantic layer knowing its vendors. Comments may discuss vendors; shipped code
+may not.
+
+### Standing consequence for any adapter written later
+
+`matrix()` on a backend whose restriction verdict for `matrix` is `refuted`
+either refuses with `LEGALITY_NOT_ASSURED`, or is synthesised from N×M
+directions calls and declares that in its cost and its verdicts. The N×M cost
+is real and recordable. A silently car-legal matrix is not.
+
+---
+
+## Phase 52 — the semantic surface, landed; and `isDiscriminating` was inverted
+
+The spatial engine interface arrived as a complete file. It is better than what
+it replaced on five counts, and it carried one function that contradicted its
+own header. Both facts recorded, because the second is the interesting one.
+
+### What the new surface adds
+
+- **`degraded` as a third result state.** Computed, but not with every requested
+  restriction, with the shortfall named. Previously the layer had only ok and
+  refused, so a partially-honoured answer had nowhere to go but into one of the
+  two, and "refuse" is the wrong answer for a caller who asked for it knowingly.
+- **Integer millimetres on the profile.** The notary's `assertMilli` lesson at a
+  legal threshold: 4.1149 m rounded three ways by three backends is three
+  answers to "does this truck fit", and the caller sees one number.
+- **`optimality: proven_optimal | feasible_not_proven | time_limit_reached`.** A
+  timed-out plan is not an optimal plan, and a boolean would say it was.
+- **Matrix cells `number | null`, never 0 and never Infinity.** A consumer
+  coercing null to 0 manufactures a zero-cost leg.
+- **`unassigned` carries the binding constraint**, so a dropped job says why.
+
+### The inverted function
+
+```ts
+export function isDiscriminating(v: RestrictionVerification): boolean {
+  const p = v.probe;
+  if (!p) return false;
+  return p.belowThreshold.durationS !== p.aboveThreshold.durationS
+      || p.belowThreshold.distanceM !== p.aboveThreshold.distanceM;   // <- OR
+}
+```
+
+The file's own property 3 states: **duration is mandatory, distance is not
+sufficient**, from the measurement where a real honoured restriction moved
+distance −0.3% and duration +68%.
+
+That `||` accepts a distance-only change as discriminating. So a backend whose
+distance wobbles by a rounding amount while duration stays flat — which is the
+shape of the *refuted* case, not the assured one — would have been read as
+discriminating. And `isDiscriminating` is what promotes a capability to
+`assured`, which is what sets `legalityAssured`, which is what decides whether a
+driver is sent. The one function standing between the measurement and the
+verdict implemented the opposite of the measurement.
+
+Corrected to duration-only, with the 1% floor derived from the same measurement
+(68% honoured vs 0% not; 1% is the conservative end of the separating range).
+The fixture that would have passed under the original is now a named test.
+
+### Three smaller corrections
+
+- **`RESTRICTION_CAPS` was referenced by a comment and did not exist.** A shipped
+  interface pointing at a mechanism that is not there is a claim about a
+  guarantee nobody implemented. It exists now, mapping each restriction to the
+  profile field and unit that carries it, with `isProbeable` separating the
+  scalar thresholds a probe can straddle from the classes and preferences it
+  cannot — demanding a discriminating probe of `hazmat` would be an unmeetable
+  requirement.
+- **`networkAnalysis(req: unknown): Promise<SpatialResult<unknown>>`** was an
+  operation with no contract: no caller can construct a request, no backend
+  knows what to implement, no test can fail. Typed to the one question it
+  answers.
+- **`restrictionsHonoured: ReadonlySet<RestrictionKind>`** — one set for the
+  whole backend — cannot represent the phase-51 finding, and a shape that cannot
+  represent a known defect reports green through it. Now keyed per operation,
+  and `RestrictionVerification` carries its operation.
+
+`CapabilityState` keeps **four** states rather than collapsing to the proposed
+three. `unhonoured` (not accepted at all — the honest failure) and `refuted`
+(accepted and applied nothing — the measured, dangerous one) call for opposite
+responses, and a three-state model files both under `refuted`, which reads as
+"this backend is bad at height" when one of them means "this backend lies".
+
+### One definition per name
+
+Landing the file created ten colliding names against the previous `types.ts` —
+`SpatialEngine`, `VehicleProfile`, `RouteRequest`, `RoutingOptimizer` and six
+more — with **different shapes** behind them. `SpatialResult<T>` was the success
+payload in one and the three-state outcome in the other. TypeScript accepts that
+silently: two modules, two types, no error, and a caller importing the wrong one
+gets a different contract and finds out at runtime.
+
+`types.ts` and `capability.ts` are retired into `engine.types.ts`, and a guard
+now fails if any exported name is declared in two files in the directory. It is
+the same drift the ledger warns about for a substrate implemented twice in two
+languages, at the scale of one directory — and it was live for the length of one
+commit.
+
+---
+
+## Phase 53 — the registry, and the branch that could not be reached
+
+The arbitration and selection layer arrived as a complete file. Its structure
+is right: capability arbitration is separated from selection, selection is
+separated from the strict/degraded decision, and the comment on `select()`
+states the correct principle — *"Return the closest, and let the caller decide
+between `degraded` and `refused` — the registry never silently downgrades."*
+
+The code did not do that.
+
+### `degraded` was unreachable from every input
+
+```ts
+// select(): no backend assures everything →
+return { engine: null, best: scored[0].a, candidates: … };
+
+// route():
+if (sel.engine === null) { return { status: 'refused', … } }
+```
+
+`select()` returned `engine: null` whenever no backend assured *everything*, so
+`route()` refused before it could reach the degraded construction below. Traced
+over all four combinations of (fully-assured × strict):
+
+```
+fullyAssured=true   strict=true   -> ok      (early return, no shortfall)
+fullyAssured=true   strict=false  -> ok      (early return, no shortfall)
+fullyAssured=false  strict=true   -> refused (engine null)
+fullyAssured=false  strict=false  -> refused (engine null)
+
+DEGRADED reachable from any input?  false
+```
+
+So `strict: false` refused identically to `strict: true`. The documented
+planning estimate — the entire reason the option exists — did not exist. The
+mechanism's APPARENT SCOPE was two modes; its EFFECTIVE SCOPE was one, and
+nothing failed, because no test asked for the second.
+
+`select()` now returns the best candidate whenever one exists, with its
+arbitration, and `route()` decides. The two modes are pinned to differ by test,
+so they cannot collapse back into one.
+
+A second correction while in there: strict now refuses **before** calling the
+backend. Calling first spends a request only to discard the answer, and makes
+the refusal depend on whether the backend happened to be up — a legality
+decision that varies with network weather is not a legality decision.
+
+### Arbitration was per backend, under a per-operation signature
+
+`select(op, required)` took an operation and called `arbitrate(caps, required)`
+without it, against `restrictionsHonoured: ReadonlySet` and
+`verification: Record<string, …>` — both keyed by restriction alone.
+
+That is phase 51's finding reintroduced one layer up: `select('matrix',
+['height'])` would consult a verdict earned on `route` and hand back a
+car-legal matrix labelled truck-legal, which is the exact measured defect. Now
+`arbitrate(caps, operation, required)`, with the operation required.
+
+Also folded in: a verdict claiming `assured` whose probe does not discriminate
+is counted **refuted**, not unverified. The claim loses to the measurement,
+otherwise a backend self-certifies.
+
+### `inventory()` had a column that could never be non-empty
+
+```ts
+const all = [...e.capabilities.restrictionsHonoured];
+const a = arbitrate(e.capabilities, all);
+return { …, assured: a.assured, refuted: a.refuted };
+```
+
+Arbitrating over the set the backend already honours makes `unhonoured` empty
+**by construction**. Had the field been surfaced, it would have been a column of
+zeroes reading as a clean bill of health on every backend. Now arbitrated over
+the full restriction vocabulary, one row per (backend, operation).
+
+### Two overclaims in the rendering
+
+`spatialClaim` defaulted `computedAt` to `new Date().toISOString()`. A claim
+that stamps itself is not reproducible: two runs over identical inputs produce
+two different claims, so a replay can never be compared byte-for-byte, and the
+notary's in-time discipline has nothing stable to bind to. Injected now, for the
+same reason `notarizeCondition` takes `now` as a parameter.
+
+`renderRoute` produced `truck-legal for ` — with an empty list — whenever
+`legalityAssured` was true and nothing had been requested. A clearance nobody
+asked for and nothing checked, asserted by a `join` on an empty array. Nothing
+required now renders *"no restrictions requested, so no legality claim is
+made"*. It is the cheapest possible overclaim and it was one character of
+punctuation away from being invisible.
+
+---
+
+## Phase 54 — the test that ratified the dead branch, and the central test that could not catch its own bug
+
+The registry test arrived, and reconciling it produced two findings about
+tests rather than about code.
+
+### 54.1 A test asserting the absence of the feature it is named for
+
+```ts
+it('planning mode degrades and NAMES the shortfall — never silently', async () => {
+  const r = await reg.route(req, { strict: false });
+  // registry selects nothing assured, so it refuses at selection
+  expect(r.status).toBe('refused');
+});
+```
+
+The title says *degrades*. The assertion says *refused*. The comment explains
+the mechanism of the phase-53 defect as though it were the design.
+
+The assertion was written against observed behaviour, and the observed
+behaviour was the bug: `select()` returned `engine: null` whenever anything was
+unassured, so `route()` refused before reaching the degraded construction and
+`strict:false` was the same function as `strict:true`. Landing this test would
+have pinned the dead branch permanently — and it would have done so under a
+name that reads like coverage of the working feature, so a later reader
+checking "is degraded tested?" would have found a green test and stopped.
+
+A test written from observation rather than from intent ratifies whatever it
+found. The title was the intent, and the two halves of the same `it()`
+disagreed with each other in the file as supplied.
+
+### 54.2 The central test could not catch the bug it exists for
+
+The file names its own purpose: *"The central test is A1: the ACTUAL MEASURED
+response — 3.00m and 4.11m returning byte-identical routes — planted as a
+probe, and asserted to yield `refuted` rather than `assured`. If that assertion
+ever passes as assured, the abstraction has stopped doing the one thing it
+exists for."*
+
+That is the right story. It does not catch the phase-52 inversion.
+
+Verified by planting the original `isDiscriminating` (the `||` on distance) and
+re-running: **`registry.test.ts` passed all 29 tests.** Only `spatial.test.ts`
+went red. The reason is in the fixture — the A1 probe is byte-identical on
+BOTH axes:
+
+```
+belowThreshold: { distanceM: 18261, durationS: 1102 }
+aboveThreshold: { distanceM: 18261, durationS: 1102 }
+```
+
+`a !== a || b !== b` is false either way. The fixture cannot separate a
+duration-only test from a duration-or-distance test, because neither axis
+moves.
+
+The probe that separates them is the one where distance moves and duration does
+not — which is precisely what the REAL honoured restriction did to distance
+(−0.3%) while duration carried the signal (+68%). Added as
+`DISTANCE_ONLY_HEIGHT`, at the arbiter and end-to-end through `route()`.
+Re-planted the original implementation afterwards: `registry.test.ts` now fails
+two tests where it previously passed clean.
+
+The lesson is not that A1 is wrong. A1 is the right narrative fixture and it
+belongs in the file. It is that **a test named as the load-bearing one is a
+claim, and the claim has to be measured like any other** — by planting the
+violation and watching it fail. The one test the file says everything rests on
+was the one test that rested on nothing.
+
+### Smaller reconciliations
+
+- The fixtures now declare `status: 'assured'` on the REFUTED probe
+  deliberately, so the test proves the probe overrules the backend's own label.
+  A fixture declaring `refuted` would only prove we can read a string.
+- `SpatialProvenance` gains `mode`. `renderRoute` printed `truck-legal` from
+  provenance that did not know the vehicle class, so it would print it over a
+  rail or sea profile just as happily. Now `${mode}-legal`, pinned by a rail
+  test.
+- `fakeEngine` computed `legalityAssured` from `restrictionsHonoured` — "the
+  backend accepted it" — which is the exact conflation the probe exists to
+  break. It now requires an empty shortfall, and `require: []` no longer
+  produces a `true`.
+- `inventory()` is asserted per (backend, operation), since one row per backend
+  no longer describes the shape.
+
+---
+
+## Phase 55 — the pre-dating hole, measured; and an alias that hid a type from its own guard
+
+Notary v2 arrived with five corrections. Four are straightforwardly right and
+are landed as supplied. The first is the important one, and it was verified by
+probe before being accepted.
+
+### The in-time rule checked one direction
+
+`postedInTime()` asked only whether a commitment was posted too LATE:
+
+```ts
+return Date.parse(c.postedAt) - Date.parse(c.coversTo) <= POST_GRACE_SECONDS * 1000;
+```
+
+Probed against the shipped code, a commitment posted **2025-08-30** for readings
+covering **2026-08-30** — a full year before the data existed:
+
+```
+postedInTime(pre-dated by 1 year) = true
+notarizeCondition(pre-dated)      = held
+```
+
+The whole layer's load-bearing property is *"a commitment posted AT THE TIME the
+fact existed"*, and half of "at the time" was never checked. A commitment made
+before the fact existed cannot have been derived from observing it — it is
+evidence of fabrication rather than of honesty. It is also the CHEAPER of the two
+attacks: predating costs nothing, while backdating at least requires the readings
+to exist first. The guarantee was one-sided against the easier direction.
+
+`postingVerdict()` now returns `in_time | too_late | predates_interval` against a
+`PostingWindow` that is policy rather than a hidden constant, and the applied
+window travels on the verdict so a counterparty reading a refusal sees which
+threshold produced it. `earlyGrace` is measured from `coversFrom`, not
+`coversTo`: posting at the START of an interval is a legitimate pre-commitment to
+observe, and refusing that would refuse the honest pattern.
+
+Pinned by planting the one-sided check back: two tests fail, including the
+reachability sweep.
+
+### The omission reason was dropped, and is restored
+
+v2's `UnprovenReason` union omitted `readings_do_not_match_commitment` — the
+omission attack closed two commits earlier, and the entire reason the Merkle root
+is carried at all. Without that member `notarizeCondition` cannot express the
+refusal, so a curated subset of readings handed in with the commitment built from
+the full set returns `held` while the root travels as decoration.
+
+Worse in combination with v2's own good idea: `ALL_UNPROVEN_REASONS` exists so
+reachability can be asserted, and it would have certified a set missing its most
+important member. A completeness check over an incomplete enumeration reads as
+stronger evidence than no check at all.
+
+`IntervalCoverage.outOfOrder` was likewise dropped and is restored: sorting
+silently erases the only evidence that a device or upload path is misbehaving,
+and a device that reorders its own timestamps is a device whose timestamps are
+worth less.
+
+### Integers moved into the type, not just the guard
+
+`Reading.valueMilli` and `ConditionPredicate.bounds.{minMilli,maxMilli}` are
+integers in the TYPE now. Previously `assertMilli` caught a float at the leaf,
+which is a guard on the way out; a float could still be stored, compared, and
+reasoned about first. `toMilli()` converts and refuses at ingest, `assertMilli()`
+remains as the boundary check for anything that reached a leaf another way.
+
+`boundaryIsBreach` is now part of the predicate and part of its identity —
+whether a reading exactly ON the bound breaches is a contract term, not an
+implementation detail, and the circuit spec now takes it as an input rather than
+hardcoding a convention that would disagree only on the disputed reading.
+
+### The alias that hid a type from the accounting guard
+
+Migrating `Excursion.extremum: number` to `extremumMilli: Milli` made the type
+**invisible** to the attestation-accounting scanner widened in phase 50, which
+matched `: number` literally.
+
+A number-bearing type left the accounting silently the moment it got a more
+precise name. No test failed; the guard simply had one fewer type to check, and
+its "no number-bearing type is unaccounted for" would keep passing forever.
+
+The scanner now DERIVES numeric aliases from the source — every
+`export type X = number` in the layer — rather than knowing one spelling. Pinned
+by asserting `Milli` is discovered and `Excursion` is back in scope.
+
+Two more types were caught by the same guard on the way in, which is the guard
+doing its job on new code rather than on archaeology: `PostingWindow` and
+`VerdictContext` are classified not-a-world-claim (configured thresholds, and
+when we published relative to an interval), and `Excursion` joins the open-debt
+list at 18 — a measured extremum reported without its own evidence class.
+
+### A note on custody
+
+`notarizeCustody` reports a broken chain's magnitude in the shared
+`extremumMilli` slot, where it means **milli-seconds of gap** rather than
+thousandths of a channel unit. The shape is shared; the unit is not. Stated in
+the code rather than left for a reader to infer from a bare number — the same
+commensurability failure this codebase refuses everywhere else, and the honest
+fix is a per-verdict unit, recorded here as owed.
+
+---
+
+## Phase 56 — a revision that reverted six fixes, and one that corrected me
+
+The engine arrived as a v2 file. One of its changes is a correction to this
+codebase and is adopted. Six of them are reversions of defects already found by
+measurement, and each reverts silently: every one still typechecks, still runs,
+and still returns a verdict-shaped object.
+
+### The correction, adopted
+
+`checkPosting` measures BOTH edges from `coversTo`. Phase 55 anchored the early
+edge to `coversFrom`, reasoning that posting at the start of an interval is a
+legitimate pre-commitment to observe. For a `load_condition` root that is
+exactly backwards:
+
+```
+root = merkleRoot(readings over [coversFrom, coversTo])
+```
+
+Every reading in the interval must EXIST for the root to be computable, so the
+earliest honest `postedAt` is `coversTo` plus upload skew. A commitment posted
+at `coversFrom` claims a root over readings the period had not yet produced —
+which is the fabrication case, not the honest one. The permissive anchor would
+have admitted a whole interval's worth of it, in the check written to close
+exactly that hole.
+
+The genuine pre-registration case is real but it is a different SUBJECT:
+`decision_expectation` states what you expect before observing, so early is the
+point. Handled by an enumerated `MAY_PRECEDE_INTERVAL` set rather than by
+loosening the window for everything — adding a subject kind now forces the
+question rather than inheriting an answer.
+
+`PostingCheck` also returns the offset, so the remedy can say *how far* out it
+was rather than only that it was.
+
+### The six reversions
+
+1. `leafHash` hashing `r.at` raw instead of `canonicalAt(r.at)` — two offsets of
+   one instant produce different leaves while the circuit produces one.
+2. `merkleRoot` sorting by `localeCompare` instead of by instant — same
+   divergence, in the ordering.
+3. Internal nodes as `sha(left + right)`, dropping `NODE_VERSION` domain
+   separation.
+4. `covered: Math.min(covered / span, 1)` — clamping away the above-1 signal
+   that says readings arrived out of order, and dropping `outOfOrder` with it.
+5. The entire readings-reconstruct-the-commitment block — the omission attack,
+   without which the root is decoration.
+6. `provedAt: new Date().toISOString()` — the engine reading a clock it is
+   supposed to be handed.
+
+None of these announce themselves. That is what makes them worth pinning rather
+than merely re-fixing: a fix that can be silently reverted has not been made
+permanent, it has been made once.
+
+### The pins, and the one that could not fire
+
+Applying all six reversions at once now fails **11 tests**. Seven are the new
+behavioural pins, written to fail on what the code DOES rather than on how it is
+spelled.
+
+Pin 6 was not among them, and the reason is kept rather than papered over: on
+the condition path the `system: 'none'` stub's `provedAt` is discarded — that
+branch returns `unproven` without the proof — so a wall-clock read there never
+reaches the output and no behavioural test can observe it. It is dead today and
+live the moment that branch starts carrying its proof.
+
+A pin that cannot fail is worse than no pin, because it reads as coverage. So
+that half is checked at the source, comments stripped first, and the split
+between the behavioural and structural halves is named in the test rather than
+implied by its title. Verified by planting the clock read: 6b fails, alone.
+
+### Also restored
+
+`notarizeCustody` reporting `covered: handoffs.length > 0 ? 1 : 0` renders
+"held across 100.0% of the interval" off a single handoff. Custody is not an
+interval-density question, and a fraction that cannot mean what it says is worse
+than a zero that admits the question does not apply.
+
+---
+
+## Phase 57 — correcting phase 51: the matrix endpoint does not discard the restrictions, it has nowhere to put them
+
+Phases 51 and 52 recorded a reconnaissance finding as: openrouteservice
+"honours `profile_params.restrictions` on `/v2/directions` and `/v2/isochrones`
+and **discards them** on `/v2/matrix` — HTTP 200, well-formed matrix,
+restrictions never read." That was taken from a subagent report. The agents left
+the actual ORS source in the session scratchpad, so it was checkable, and
+checking it changes the characterization.
+
+### What the source says
+
+```
+IsochronesService.java:271-274
+    RouteRequestOptions options = isochronesRequest.getIsochronesOptions();
+    parameters = processRequestOptions(options, parameters);
+    if (options.hasProfileParams())
+        parameters.setProfileParams(convertParameters(options, parameters.getProfileType()));
+
+ApiService.java:227-230   (inside convertParameters)
+    if (options.getProfileParams().hasRestrictions()) {
+        RequestProfileParamsRestrictions restrictions = options.getProfileParams().getRestrictions();
+        validateRestrictionsForProfile(restrictions, profileType);
+        params = convertSpecificProfileParameters(profileType, restrictions);
+```
+
+The isochrone path takes `RouteRequestOptions` — the rich type — and converts
+the restrictions. Confirmed.
+
+```
+MatrixRequestHandler.java:106
+    processRequestOptions(matrixRequest.getMatrixOptions(), params);
+
+MatrixRequest.java:242
+    public MatrixRequestOptions getMatrixOptions() { … }
+
+MatrixRequestOptions.java — every field:
+    PARAM_DYNAMIC_SPEEDS = "dynamic_speeds"
+    private boolean dynamicSpeeds;
+    private boolean hasDynamicSpeeds = false;
+```
+
+`MatrixRequest.java` mentions restrictions or profile params **zero** times. The
+matrix endpoint takes a DIFFERENT, NARROWER options type carrying exactly one
+option.
+
+### Why the difference matters here of all places
+
+"Discards them" means accepted-and-ignored. That is `refuted` in this codebase's
+capability vocabulary — the dangerous state, positive evidence that a backend
+lies about a parameter it took.
+
+What the source shows is that there is **no field to accept**. That is
+`unhonoured` — the honest failure, where nothing is pretended and the caller can
+in principle see the parameter was never in play.
+
+Those are the two states phase 52 argued must not be collapsed, on the grounds
+that they "call for opposite responses". Having made that argument, I then
+recorded a real backend in the wrong one of them, from a summary, without
+opening the file that was sitting in the scratchpad. The distinction was easier
+to defend in the abstract than to apply.
+
+### The hazard survives the correction, and generalizes
+
+The vehicle PROFILE is still selected on the matrix endpoint. So a dispatcher
+asks for an HGV matrix, receives one, and it is truck-*profiled* without being
+truck-*dimensioned* — and cannot supply the dimensions even if they know to try.
+The endpoint name and the profile name both suggest a legality the answer does
+not carry.
+
+That is the original lesson at a second vendor by a second mechanism: **calling a
+truck endpoint proves nothing**. Valhalla accepted a height and applied nothing;
+this one has no height to accept. Both produce a plausible truck answer that is
+not truck-legal, which is why the capability is arbitrated per operation from a
+probe rather than read off the request.
+
+### What did not have to change
+
+Nothing in `src/`. The vendor-name guard in `spatial.test.ts` forbids naming an
+implementation in the spatial layer, so an incorrect vendor fact could only ever
+land in `docs/` and the ledger. The blast radius of getting this wrong was
+bounded by the architecture rather than by my being careful, which is the point
+of that guard and the second time this session it has paid.
+
+Phases 51 and 52 stand as to the SHAPE — capability is per operation, and a
+verdict without an operation cannot express a real backend. Their
+characterization of the mechanism is corrected here.
+
+---
+
+## Phase 58 — the instance count was itself an instance
+
+Auditing the class registry against the ledger found the two documents disagree
+about the instance count.
+
+`DEFECT_CLASSES.md` called the phase-40 graph view the **ninth instance**.
+`ARCHITECTURE_LEDGER.md` titled phase 48 **"ninth instance"**. Extracted
+mechanically, the ledger's chain runs 38→7th, 46→8th, 48→9th, 50→10th — and
+skips phase 40 entirely, which the class registry had counted.
+
+Neither document was checkable against the other, so each stayed internally
+consistent while the pair diverged. That is class 6 — *the literal that agrees
+with itself and not with the world* — arriving in the registry that catalogues
+it, by exactly the mechanism this ledger names at phase 44: **"a hand-maintained
+number describing something."** The registry documented the failure mode and
+then exhibited it, in the field whose only job is to count.
+
+### The fix is not a renumber
+
+Renumbering by hand puts the same literal back, one value higher. The ordinal is
+now a **row position in a table**, the table lives in one document, and the
+sixteen instances are ordered by phase — an order that is derivable rather than
+asserted, so "which was ninth" has an answer that cannot be held differently in
+two places.
+
+`defectClasses.test.ts` enforces it: ordinals contiguous from 1, phases
+non-decreasing, every rostered phase present in the ledger, every row carrying a
+description rather than a bare reference, and — the drift catcher — no ledger
+heading claiming an ordinal the roster contradicts. Verified by restoring the
+original phase-48 heading: that check alone fails.
+
+A seventh check forbids counting an instance in WORDS again in either document.
+It caught three survivors on first run, in the phase-38 prose.
+
+### What the roster shows that the prose could not
+
+Ordered by phase, instances 12–16 are all in CHECKING machinery: a probe
+arbiter, a selection branch, two tests, a scanner, and a ledger entry. The class
+began in runtime state — a boot report, a rate limiter, a warmed cache — and has
+moved into the apparatus built to catch it.
+
+That is worth stating plainly rather than as irony. The guards are the newest
+code in the tree, they are written fastest, they are usually written in the same
+sitting as the thing they guard, and they are the least often themselves
+checked. A guard is a claim about coverage, and this codebase's own rule is that
+a claim is measured, not asserted — which is why the last several rounds have
+each ended by planting a violation against the check just written.
+
+Instance 16 is this entry's own subject: recording a real backend in the wrong
+state of a distinction I had argued in the previous phase must be preserved,
+from a summary, with the primary source sitting unread in the session
+scratchpad.
+
+---
+
+## Phase 59 — the load lifecycle: the primitive with no analogue in the commodity tree
+
+A commodity flow has a PERIOD. A load has a LIFECYCLE, and the transition
+itself is the fact worth recording — when it happened, when we learned, and
+whether those are the same kind of knowledge.
+
+Built as a **sidecar**, which is what the Phase-1 reconnaissance ranked as the
+only safe route: `lifecycle.ts` and `lifecycle.types.ts` import one bare scalar
+alias from `./types`, touch no `EconomyState` array, register nothing, and hold
+no module-level mutable state. Zero commodity assertions can break because
+nothing shared is read or written. 37 tests.
+
+### Four refusals, each of which a reasonable default would have destroyed
+
+**The transition table is the invariant.** `booked → delivered` cannot be
+constructed. The refusal names what IS legal from that state and says the table
+should be *changed deliberately — not bypassed*, because a lifecycle with an
+escape hatch describes nothing. `exception` is reachable from every operational
+state and exits back to the one it interrupted: an exception is a CONDITION, not
+a position in the sequence. Pinned further by a reachability check that every
+non-terminal state can reach a terminal one — a trap state is a load that can
+never close.
+
+**Latency refuses to measure our inference against itself.** Every transition
+carries `occurredAt` and `firstReportedAt`, and detection latency is the gap —
+but only when `occurredAt` is `observed`. An INFERRED occurrence yields `null`,
+because a time we derived sits close to the report we derived it from, so the
+gap measures the estimator while wearing the label of warning time. Zero and
+null are distinguishable, and the test asserts both.
+
+**Silence is not a state.** A load quiet for eleven hours is not `in_transit` —
+it WAS `in_transit` eleven hours ago. Cadence is per state (`in_transit` 4h,
+`at_border` 2h) because a single global cadence makes one of those noise and the
+other invisible. Terminal states never go unobserved: nothing further is
+expected, so silence there is correct and permanent rather than a gap.
+`no_history` is its own reading — a load with no transitions is **not `booked`
+by default**.
+
+**Suppression is returned, not performed in silence.** The commodity programme
+measured an alert detector into a *not ready* verdict, and the finding was that
+statistical unusualness alone teaches operators to dismiss the queue. So an
+exception fires only with evidence AND materiality AND actionability, and all
+four suppression reasons are records — a detector suppressing everything is
+exactly as informative as one firing constantly, and neither is visible if
+suppression is a silent return. An UNKNOWN materiality suppresses as unknown
+rather than passing the floor.
+
+The rendered claim states the lead **including when it is negative**: *"30 min
+BEHIND other reporting — the operator likely already knows."* That is the number
+that decides whether a copilot is worth building, and hiding it would repeat the
+lead-versus-journalism error the commodity backtest already paid for.
+
+### Downstream impact — the computation the dispatcher has not done
+
+A 120-minute origin delay across three loads:
+
+```
+L-2  buffer 30min absorbs  → 90min, breaches, $400 at risk
+L-3  contribution unknown  → breach known in TIME, unknown in DOLLARS → unassessed
+L-4  no appointment        → breachesAppointment: null, not false
+total at risk: $400        ← not $700, and not $400 plus a zero
+```
+
+Three refusals: an unknown contribution is unassessed rather than zero, because
+a zero is indistinguishable in the total from a load genuinely at no risk; an
+unknown buffer does not absorb, stated as `bufferBasis: 'assumed_zero'` so the
+conservative assumption is visible as an assumption; a load with no planned
+arrival is not assumed on time. A fully absorbed delay stops propagating, and
+the loads behind it are neither assessed nor unassessed — unaffected is a
+different fact from affected by zero.
+
+Conservation is asserted: every input load appears in `assessed` or
+`unassessed`, never dropped. The claim says the total is a **FLOOR** whenever
+anything is unassessed.
+
+### What the guards caught on the way in
+
+Two fired on first full run, both correctly.
+
+`attestationClosure` — widened in phase 50 from one file to the layer — flagged
+four new number-bearing types. Following it found a real defect rather than a
+paperwork gap: the engine was **manufacturing** evidence classes, synthesising
+`reported/self_reported` for every exception record and `negotiating_position`
+for every cost contribution. Those are hardcoded claims about sources the
+functions never see. A customs feed and a driver's text message are not the same
+evidence, and a contractual penalty in a signed rate confirmation is not a
+shipper's claim basis. Evidence and contributions now CARRY their attestation
+and the engine combines rather than invents — weakest-input-wins, pinned by a
+test where one driver guess drags a customs record down instead of being
+averaged away.
+
+A total resting on no assessed load gets a **null** attestation, not a weak one.
+`combineAttestations([])` refuses an empty input because a quantity derived from
+nothing has no standing to inherit; handing the vacuous case `derived/low` would
+give it standing by borrowing the weakest label available, which is still a
+label.
+
+`defectClasses` — written one phase earlier — caught the phase-58 heading
+parsing as a claim to be instance 16, which is rostered at phase 57. The heading
+was about the miscount, not a declaration; retitled.
+
+### The reported self-correction, reproduced
+
+The delivery noted a test asserting `'not be bypassed'` against a message
+reading `'not bypassed'`. Built here with the message reading *"changed
+deliberately — not bypassed"* and the assertion checking that exact substring,
+plus `'changed deliberately'`, so the refusal's two halves are both pinned
+rather than one being assumed from the other.
+
+---
+
+## Phase 60 — the debug protocol, and the gate that never read the measure
+
+The protocol landed as `docs/DEBUG_PROTOCOL.md`, and the lifecycle v2 was
+reconciled under it. The protocol found its first defect in the same turn it
+arrived, which is the only real test of one.
+
+### §1 — the materiality gate compared quantities that are not comparable
+
+The gate as supplied:
+
+```ts
+materialityThresholds: { appointment_at_risk: 30 /* MINUTES */,
+                         margin_erosion:     100 /* DOLLARS */ }
+
+const threshold = policy.materialityThresholds[candidate.kind];
+if (candidate.materiality.value < threshold) suppress
+```
+
+The candidate CARRIED its measure — `'minutes_late' | 'dollars' | 'hours_dwell'
+| 'km_deviation'` — and the gate never read it. It also carried its own
+`threshold`, never read either. Demonstrated:
+
+```
+margin_erosion,      measure=km,       value=150  FIRES      ← 150 km clears a $100 floor
+appointment_at_risk, measure=dollars,  value=25   suppressed ← $25 fails a 30-MINUTE floor
+```
+
+Both are defensible-looking, both wrong, and the error runs in **both
+directions** — which is the incommensurability profile exactly. §1's first axis
+is Basis, and the two sides differed on it.
+
+A floor is now a `MaterialityFloor` — a measure AND a number — the gate refuses
+a mismatch with `incommensurable_materiality`, and a money floor additionally
+refuses a currency mismatch rather than converting at an unstated rate.
+
+### §6 — self-application found the same class in my own code, one file over
+
+Running the class over the instrument that diagnosed it, immediately:
+
+```ts
+totalAtRiskMinor = assessed.reduce((n, a) => n + (a.atRiskMinor ?? 0), 0)
+// contribution: { minor, attestation }   ← no currency
+// DownstreamImpact.currency               ← one field, on the aggregate
+```
+
+A CAD contribution and a USD contribution summed into one integer, and the
+result was stamped with whichever currency the caller passed. The notary refuses
+a cross-currency COMPARISON; this performed a cross-currency SUM, which is the
+same failure with an extra step. `Money` now carries `{ minor, currency,
+attestation }` and the total throws `MIXED_CURRENCY` naming the offending
+currency and both remedies.
+
+§6 says it usually finds something. It found something inside ten minutes of
+the section being written down.
+
+### The `Milli` lesson, on the other side of the check
+
+Extracting `Money` made `DownstreamLoad` UNACCOUNTED to the attestation scanner:
+the attestation now lives inside a named sub-type, and the scanner reads body
+text. Phase 55 taught it to follow a numeric type ALIAS; this is the same
+narrowing on the carrier side. It now derives which interfaces carry an
+attestation and treats a field typed as one as attested — so the class is
+closed, not the instance.
+
+### What was taken from the revision, and what was defended
+
+Taken: `foldTransitions` with supersession applied by dropping rather than
+editing; `validateChain` returning the first illegal hop instead of throwing
+mid-fold; **`readState` filtering transitions to `<= asOf`**, which mine did not
+— it would have read a state using transitions from the future; staleness as an
+injected policy rather than a module constant; per-kind exception thresholds;
+`ExceptionAction.authority: 'proposal'` with no other value; and a nullable
+lead, because an unmeasured lead is not a lead of zero.
+
+Defended: `bufferBasis: 'known' | 'assumed_zero'`, because the revision's
+comment said "unknown buffer is NOT zero buffer" while its arithmetic treated it
+as exactly that and recorded nothing; `unassessed` for a load with no
+appointment, which the revision gave `contributionAtRisk: 0`; carried rather
+than manufactured attestation; and conservation across `assessed` +
+`unassessed`.
+
+### Self-corrections this phase
+
+Two. A stale `kind: 'origin_delay'` assertion survived the migration to the
+enumerated `ExceptionKind` and failed on first run. And the archive finding
+below, which I caused and did not anticipate.
+
+### Not part of the merge: the suite writes archive vintages
+
+Running the test suite performed live Comtrade fetches and wrote three new
+capture files under `data-archive/comtrade/2026-08-31/`, which the S-2 manifest
+guard correctly flagged as unindexed. That is a property of the live ladder
+under test, not of this change, and it means **a test run mutates the archive**.
+Recorded here and handled as its own item rather than folded into this commit —
+§8: one cycle, one item.
+
+---
+
+## Phase 61 — the audit protocol, and the audit that passed having examined nothing
+
+The protocol arrived as executable sweeps: `src/lib/audit/protocol.ts`. Five
+corrections were applied on landing, each measured before it was changed and
+each marked in place — a protocol file that hides its own history is asking to
+be trusted on the strength of its subject matter.
+
+### The one that mattered
+
+```
+runAudit([])  ->  { passed: true }
+```
+
+An audit that ran zero sweeps reported **PASSED**, inside the file whose §3 is
+*"which kind of nothing is this"*.
+
+Two causes, stacked. `sweepSelfApplication` was appended to the results list
+without being passed back through its own rules, leaving exactly one result
+nothing examined — its own. And over an empty list that result had
+`scope.examined === 0` with `status: 'clean'`, which is precisely the case
+`selfFindings` raises as **blocking** for every other sweep.
+
+So the sweep whose entire purpose is running the class over the instrument was
+the one instrument the class was not run over. It is written down in the file:
+*"a class lands on its own instrument on first run."* It did, on this one, on
+the run that landed it.
+
+Fixed twice over, because they are different facts. Self-application now
+examines its own provisional result. And `runAudit` refuses an empty sweep list
+outright with `AUDIT_RAN_NOTHING` — "ran nothing" and "ran and found a problem"
+are different, and a caller acts differently on each; collapsing them into one
+`passed: false` would answer the gate correctly while still not saying what
+happened.
+
+### The negation false positive
+
+`/\bverified\b/` matches inside **"not verified"**. The word boundary correctly
+excludes `unverified` — no boundary between `n` and `v` — and includes every
+separated negation, so a claim being scrupulously honest about what it lacks was
+flagged as overclaiming it.
+
+Same shape as the `nmap` marker matching inside `unmapped` earlier in this
+codebase, arriving from the other direction. A false positive here is worse than
+a miss: it trains a reader to suppress the sweep, and a suppressed sweep catches
+nothing at all. Pinned in both directions — `not verified` must not flag,
+`was verified` must still flag, so the fix did not blunt the sweep.
+
+### `runAt` read a clock — third occurrence this session
+
+The spatial claim, the notary proof stub, now the audit report. An audit report
+that stamps itself cannot be compared byte-for-byte against a replay, which is
+the one thing an audit report is for. Injected.
+
+Three occurrences of one defect in one session is no longer three mistakes; it
+is a missing default. Recorded here as owed: the engines in this tree take
+`now`, and nothing enforces that they do.
+
+### The exemption that bought silence on faith
+
+Found while writing the test for the structural-pin path, from an assertion of
+mine that was simply wrong about the code's behaviour. Following the
+disagreement rather than fixing the assertion showed that `structuralOnly`
+downgraded an unpinned fix from blocking to a note **without checking it carried
+an argument** — `{ reason: 'because', sourceCheck: 'x' }` bought the exemption.
+
+The reachability sweep, in the same file, already refuses that shape: *"an
+exemption without an argument is a suppression, and suppressions accumulate."*
+The rule was stated in one sweep and not applied in the next. The thresholds now
+required are deliberately low; they cannot detect a bad argument, only the
+absence of one, which is the failure that actually happens when an exemption is
+added to make a sweep green.
+
+### Scope, again
+
+`src/lib/audit/` is a fourth root for `contextSeverance.test.ts`, which was
+widened from one directory to three in phase 50. A new directory is a new place
+for module-level state to sever, and a guard that does not follow the tree is
+narrower than it reads — the same finding, and the reason the roots are a list
+rather than a constant.
+
+### Self-corrections this phase
+
+Three. The `structuralOnly` assertion I got wrong. The clock, which I have now
+written three times. And the empty-audit case, which I found by probing the file
+before landing it rather than after — the only one of the three that cost
+nothing.
+
+---
+
+## Phase 62 — `git add -A` committed an agent's edit that the green suite never saw
+
+A self-correction with a committed consequence, and the sequence matters more
+than the defect.
+
+### What happened
+
+1. `fixtures.ts` held an **eight**-element inventory series, all months
+   well-formed, and the suite was green.
+2. A subagent from a running reconnaissance workflow — instructed *"Do not edit
+   any files. Report only."* — edited it anyway, expanding the series to
+   **twelve** while leaving the unpadded `2024-0${i + 1}` form.
+3. I ran the full suite: **1015 passed**. That run saw the eight-element file.
+4. Between that run and the commit, the agent's edit landed.
+5. `git add -A && git commit` swept it in. **HEAD went red and I reported it
+   green**, because the green was a hypothesis about a tree that had changed.
+
+§4 of the debug protocol, which had been committed twenty minutes earlier:
+*"Local green is a hypothesis until the pushed tree agrees."* The protocol names
+this exact case and I walked into it while the file was still warm.
+
+### What the agent's change actually did
+
+`2024-0${i + 1}` is correct for nine elements and produces `2024-010-01` at the
+tenth. `Date.parse` accepts it and returns the right instant, so nothing threw.
+`.slice(0, 7)` returns `'2024-01'`.
+
+Measured on the twelve-element version:
+
+```
+period keys : 2024-01 … 2024-09 2024-01 2024-01 2024-01
+extractSeries: 12 points -> 2024-01 2024-01 2024-01 2024-01 2024-02 … 2024-09
+values       : 100 100 101 100 101 99 100 101 100 100 60 99
+```
+
+October, November and December all keyed as **January**. Four points labelled
+`2024-01`, and the planted structural break moved from position 8 to position 11
+of 12 — in the fixture ten test files read, including the alert detector whose
+entire job is finding that break.
+
+### Two things I got wrong along the way
+
+I first read `git diff` and concluded the uncommitted change *added* the padStart
+fix. It did not — the diff I was reading was of a state the agent then rewrote,
+and I inferred from a stale read instead of looking at both sides. Corrected by
+`git show HEAD:… ` against the working tree, which showed the change **deleted
+four months** rather than fixing three dates.
+
+And I nearly committed that truncation as the fix. It makes the malformed dates
+disappear by removing the months that produce them, which also removes the
+post-break recovery the fixture plants — a structural-break detector needs
+observations after the break to confirm one.
+
+### The resolution
+
+The reviewed eight-element series is restored. The **latent** formatting defect
+is fixed anyway, via an exported `fixtureMonth()`, and pinned at twelve — the
+length the fixture has not reached. Pinning only the current series would be a
+check calibrated for the failure that does not happen: it would pass unchanged
+on the day someone adds a ninth month.
+
+Planting the unpadded formatter fails four tests, two of them the latent pins.
+
+### The standing correction
+
+`git add -A` is not safe while another process writes to the tree. The
+reconnaissance workflow has been stopped. Nothing in this repository enforces
+that a commit contains only reviewed changes, and that is now the owed item:
+the suite run and the commit must be over the same bytes, and today they were
+not.
+
+## Phase 63 — the simulated world, and four detectors that found what was not there
+
+Round 15's spatial backend closed one refusal by supplying a **missing actor**.
+This round found two more of the same shape, and then found that the runner
+built to check the result had the defect it was built to catch.
+
+### The three missing actors
+
+| refusal | what was missing | what it looked like |
+|---|---|---|
+| `NO_SPATIAL_BACKEND` | a registered engine | every route call refused |
+| `unproven/proof_generation_failed` x241 | a `prove` callback | notary reached neither `held` nor `breached` |
+| `undetermined` on cargo cover x437 | a cover limit on the carrier record | one check with an effective range of one value |
+
+Each is a policy refusing correctly with nothing behind it to accept. Supplying
+`simulated.ts`, `simulatedProver.ts` and a cargo-cover field is what the three
+abstractions were built to take, and none of the refusals was loosened to do it.
+
+The prover is not an echo. It **re-derives** the verdict from the committed
+readings and throws `PROVER_DISAGREES` when its own result differs from the bit
+it was asked to attest — the only thing a prover is actually for. And it never
+passes for real: `ProofRef.system` must read `'sp1'` for the notary to treat a
+verdict as proven, so the honesty lives in the vkey and the proofId, both of
+which carry `SIMULATED` literally, and in `isSimulatedProof()`.
+
+### Five defects measured in the supplied fixture design
+
+The generator arrived as a standalone file with a run report claiming nine
+plants recovered. Reconstructed verbatim and measured:
+
+| # | claim | measurement |
+|---|---|---|
+| 1 | "5,570 transitions, zero illegal — every chain legal" | **4,392 of 5,570 (78.9%)** name a state absent from `LoadState`. Nine distinct pairs, `booked → assigned` among them. The chain was walked against the fixture's own private table |
+| 2 | top divergence offender `CX-014, n=61, +11.5%` | **a merged population.** Meridian was created at index 11 (`CX-012`) and renamed onto index 13's id. 18 carriers, **17 distinct ids**, `CX-012` issued to nobody, n=61 against ~27 expected |
+| 3 | "the same seed produces a byte-identical fixture" | two calls differ in exactly one field: `generatedAt: new Date()`. Fourth clock-read in this programme |
+| 4 | "plants now bind to IDs that exist" — *stated as already fixed* | the fallback is still in the code. **3 of 16 seeds misbind**; at seed 8 the double-brokering and telemetry-gap plants both land on `L-0520`, and a runner asking "is this flag present anywhere" reports both found |
+| 5 | PLANT-2 confounds PLANT-8, treated as inherent | **manufactured.** The slipping receiver was injected after the lane was chosen, so **75 of 488 loads** delivered to a facility outside their lane's destination city, and it appeared on **29 distinct lanes** including Chicago→Cleveland |
+
+Defect 4 is the instructive one: **a defect described in a comment as fixed, in
+the same file as the code that causes it.** The evidence for "fixed" was one
+green run at one seed.
+
+### The headline conclusion was wrong, and its remedy was the opposite of right
+
+The supplied report concluded: *"seasonality on this lane is UNMEASURABLE from
+this data… a planted signal we know exists cannot be recovered at this n against
+this noise."*
+
+Measured on that same data, partitioned by the plant's own definition:
+
+```
+winter (Dec-Mar, excl. the confounding receiver)  n=13  mean 255  median 101
+other                                             n=29  mean  80  median   0
+```
+
+The effect is there. Three misdenominations hid it, each sufficient alone:
+
+- **partition** — the plant fires Dec–Mar; calendar quarters split that across
+  Q1 and Q4, so Q4 is two-thirds out of season by construction;
+- **estimator** — detention is bimodal (near zero, or 240–900 minutes). A mean
+  follows whichever cell caught an outlier; at n≈10 one load moves it ~50 min;
+- **time basis** — the plant is keyed on pickup, the quarter on delivery.
+
+The instinct to refuse the quarterly mean was right. The **reason** was wrong,
+and the reason is load-bearing: *"unmeasurable at this n"* prescribes collecting
+more data; *"misdenominated estimator"* prescribes fixing the query. Opposite
+remedies from the same refusal.
+
+This is the commensurability profile with the tell intact — **197 > 92 is
+plausible, so it shipped and got quoted as a verdict.**
+
+### Then the runner I built to check that had the same defect
+
+First run of `worldRun.ts`, before the prover was wired: all 243 notarizable
+loads came back `unproven`, and the detectors for **PLANT-7 and PLANT-9 both
+reported RECOVERED**. Both asked only *"is this load in the unproven set"*. They
+were correct set-membership tests over a set containing the whole population.
+
+Containment is not detection. `assessDetector` now requires the named set to
+contain the planted entity **and** to be under a discrimination ceiling of
+`max(5, 5% of population)`.
+
+That immediately produced a false negative worth keeping: PLANT-4 read MISS at
+31 of 520. The detector was not blunt, it was **denominated wrong** — an
+insurance lapse is a fact about a **carrier**, and every load that carrier moved
+after the expiry refuses. Asked as "which carrier is being refused", the answer
+is one row.
+
+### And the first fixture could not demonstrate its own finding
+
+With the seasonal plant on a clean lane, **both** the naive quarterly mean and
+the plant-basis median recovered it — a fixture that cannot separate a sound
+estimator from an unsound one. The confound is the point; the predecessor's
+error was manufacturing it by delivering loads to the wrong city, not by having
+one. The seasonal lane now ends at the slipping receiver's city: coherent
+**and** confounded. A pin that asserted the opposite has been corrected in place
+with the reason.
+
+Measured after the change:
+
+```
+NAIVE   Q1 n=13 mean 473 | Q2 n=26 mean 197 | Q3 n=19 mean 195 | Q4 n=18 mean 186
+        recovers: NO   (winter Q4 at 186 sits BELOW summer Q2 at 197)
+PLANT   in season  n=17  median 401  >120min 88%
+        out        n=59  median   0  >120min 36%
+        recovers: YES
+```
+
+### Two causal errors the guards caught while building
+
+- **A border wait that postdated arrival.** Arrival was a flat estimate not
+  including the crossing, so on a short cross-border lane the truck re-entered
+  transit after being recorded at the destination. The monotonicity assertion
+  fired. The predecessor design has the same inconsistency and no guard.
+- **Millisecond timestamps.** `canonicalAt` refused every commitment: the
+  circuit encodes `at` as u64 **seconds**, and a reference hashing milliseconds
+  produces a root the circuit can never reproduce. Rounding at the source is
+  what the refusal asked for.
+
+### The architecture correction, built rather than drawn
+
+`VERIFICATION` sat on the critical path between decision and execution. Two
+different things were collapsed into it, and separated they are:
+
+```
+DECISION → AUTHORIZATION → EXECUTION → PHYSICAL ECONOMY
+                 │              │              │
+          deterministic         └→ NOTARIZATION  OBSERVATION
+          blocking, always         threshold-gated,     │
+          microseconds             off the path         ▼
+                                   (zkVM / SP1)      EVIDENCE → CANONICAL STATE
+```
+
+`authorization.ts` is the blocking half: pure, no I/O, no clock, no crypto,
+three-valued, and it carries the invariant explicitly rather than leaving it in
+a diagram — **Recommendation ≠ Authorization ≠ Execution**. A principal without
+binding authority is `refused` however clean every other check comes back, and
+`assertExecutable` throws when a clearance for one load is used to execute
+another (*a bypass with a receipt*).
+
+What the separation is worth is now a number rather than an argument:
+**2,049 ms mean, 483.5 s total over 236 loads.** That is what a dispatcher would
+wait per booking with the prover on the critical path.
+
+Two smaller corrections adopted: the feedback arrow closes into **EVIDENCE**,
+not canonical state — an observation is evidence and canonical state is derived
+from it, so writing state directly bypasses the provenance chain. And the
+`AUTHORITY / POLICY` box that was missing is `actingAuthority` on every request.
+
+On the `TERMINAL OPERATOR` ambiguity, the tree answers it: **Payload Terminal is
+the console, not a third vertical.** Every route is classified in
+`ROUTE_DISPOSITION`, none of them is a port or intermodal-yard operation, and
+the branding sweep named the operator surface. It belongs beside the agentic
+layer. Nothing here forecloses a terminal-operations vertical later; it just is
+not what exists.
+
+### Measured after
+
+- **79 test files, 1134 passed, 6 skipped.**
+- 27 pins on the world, 41 on the run, gate and prover.
+- All **nine** plants recovered, each by a detector under the discrimination
+  ceiling, checked against the world's own `boundTo` and never against an id
+  written into a report.
+- Notary: **held 233, breached 1, unproven 2** — the two unproven carrying
+  distinct reasons, so the two plants that land there have different detectors.
+- Authorization: **342 authorized, 111 refused, 67 undetermined**, with the
+  cover check now reaching refuse *and* undetermined rather than one value.
+
+## Phase 64 — the sweep, and the finding I reported from one world
+
+The instruction was to work recursively. The recursive step over a run is not to
+run it again — it is to ask whether what the run showed is a property of the
+system or an accident of the world it drew. A single seed is a hypothesis, the
+same status as a single green suite.
+
+`worldSweep.ts` builds 16 worlds and reports, per plant and per headline claim,
+a RATE. Three readings, and the middle one is why the file exists:
+
+- **ALWAYS** — a property of the detector.
+- **SOMETIMES** — a detector that depends on luck. Invisible to any number of
+  single-world runs, and what "we ran it and it worked" means when the thing does
+  not, in general, work.
+- **NEVER** — a detector that does not work.
+
+### The first sweep corrected me immediately
+
+| item | first sweep |
+|---|---|
+| PLANT-1, 3, 4, 5, 6, 7, 9 | 16/16 |
+| PLANT-2 | **15/16** |
+| PLANT-8 | **15/16** |
+| **THE ESTIMATOR FINDING** | **7/16** |
+
+I had reported the estimator finding to the user as a measurement. It held at
+seed 20260831 and in **9 of 16 worlds it does not** — a single-world claim
+dressed as a property, which is exactly what phase 63 criticised in someone
+else's fixture. The pin in `worldRun.test.ts` asserting `naive.recovers ===
+false` was the same mistake, in the test file for the finding about it.
+
+### Four defects behind the two failing plants
+
+1. **Seed 20260101: the seasonal lane carried ZERO loads.** Facility roles were
+   drawn independently, so a city could end up unable to ship or unable to
+   receive, and every lane through it was unservable. PLANT-8 was **advertised in
+   the manifest and absent from the world** — the defect this file was written to
+   close, reached through a door `bindPlant` does not cover.
+2. **And the analysis reported that as `not_recovered`** — *the detector failed*,
+   when the truth is *there is no data*. Opposite remedies. Now three-valued:
+   `undetermined` with a remedy, and the plant reads `not_attempted`.
+3. **PLANT-2 below the ranking floor read as a miss.** The facility ranking drops
+   anything under `MIN_FACILITY_N`, so a plant beneath it was never a candidate.
+   Charging that to the detector is a false negative. The floors are now ONE
+   exported constant shared by generator and analysis, because a generator that
+   guarantees 12 and an analysis that requires 15 produce a signal that is
+   present and invisible.
+4. **The confound was the lane.** Measured: wherever the slipping receiver took
+   ≥74% of the seasonal lane, the out-of-season median rose from 0 to 202–274 min
+   and the plant was unrecoverable on any basis — its 240–900 minute slips are
+   larger than the entire seasonal term. A confound *interferes with* a
+   measurement; at three-quarters it **is** the measurement.
+
+### And the parameter was denominated wrong
+
+Lowering the forcing probability from 0.55 to 0.35 still produced 62–75%,
+because it set a PROBABILITY OF FORCING and the receiver then also won its share
+of the ordinary draw: `0.35 + 0.65/3 ≈ 0.57`. The number was plausible and it
+measured something other than its name — the materiality-gate failure, in the
+generator. Drawing from the complement makes `CONFOUND_SHARE` a target share.
+
+### Two structural corrections, not tunings
+
+**The season must be narrower than the partition used to look for it.** At four
+months Q1 held all of Jan/Feb/Mar and was always far above summer; only Q4's
+draw decided anything. At two months no calendar quarter is majority in-season,
+both winter quarters dilute the same way, and the property is pinned against the
+constants directly so it cannot be lost by editing the array.
+
+**One winter is not seasonality.** With a 12-month window the in-season cell is a
+single contiguous block of calendar time, so a strike or a closure is
+indistinguishable from a seasonal term. Every statistic still computes and the
+medians still separate — what cannot be established is RECURRENCE, which is what
+the word asserts. The world now spans two winters and the analysis refuses below
+`MIN_SEASONS_OBSERVED`.
+
+### Where I stopped, and why that is the finding
+
+After the fixes: **16/16 worlds build, all nine plants ALWAYS, the seasonal
+effect present ALWAYS**. The estimator finding sat at 9/16 and I stopped, because
+continuing would have been tuning a fixture until it agreed with me.
+
+Restated honestly it is a stronger claim than the one I made:
+
+> The plant is present in every world and a sound estimator finds it in every
+> world. Whether the NAIVE calendar-quarter mean also stumbles onto it depends on
+> the draw — 9 misses, 7 hits. A query whose correctness depends on the draw
+> gives you no way to tell, **from its own output**, which kind of world you are
+> in.
+
+So `SWEPT_FINDINGS` now carries a KIND. An `invariant` must be ALWAYS. A `rate`
+carries a BAND, and both ends fail: all-miss would be a fixture tuned until it
+agreed with me, all-hit a fixture that cannot separate a sound estimator from an
+unsound one. The kind is declared with the finding, never inferred from how it
+came out, so a failing invariant cannot be relabelled into a passing rate.
+
+### Measured after
+
+- **81 test files, 1145 passed, 6 skipped.**
+- 16/16 worlds build, 0 refused. Nine plants ALWAYS. Eight invariants ALWAYS.
+  One rate in band at 56%.
+- `RUN_OUTPUT.txt` and `SWEEP_OUTPUT.txt` are regenerated by the suite, so a
+  committed artifact cannot drift from the code that produced it unnoticed.
+
+## Phase 65 — claimable artifacts, carrier trust, claim economics, transparency log
+
+Four modules, and the reconciliation found seven defects. Two of the four
+corrections are the author's own and were adopted whole: the claimable pattern
+bounds latency in the one direction you control, and a Merkle transparency log —
+not a blockchain — is what gives tamper evidence *and* the property a private
+chain structurally cannot provide.
+
+### The blockchain correction, adopted
+
+A blockchain solves **consensus among mutually distrusting writers**. Internally
+there is one writer, so consensus is free and its machinery is pure overhead. And
+a private chain where you control every node **cannot prove you did not rewrite
+it** — "the chain says so" means "we say so," which is exactly the claim an
+auditor needs. A **consistency proof** against a root the customer already holds
+can. `transparencyLog.ts` implements RFC 6962 for the specific reason that an
+external party runs the verifier; a bespoke scheme only our code can check hands
+back the trust the log exists to remove.
+
+### Seven defects measured
+
+| # | module | measurement |
+|---|---|---|
+| 1 | `carrierTrust` | injected `atPickup` correctly, then read `Date.now()` for the new-authority window and `new Date()` for `detectedAt`. Two verdicts on one profile minutes apart could differ, and neither is reproducible in the dispute the module exists for. First clock read in a sidecar that is otherwise clock-free by construction |
+| 2 | `carrierTrust` / `claimEconomics` | **two floors for one question** — `minObservationsForBehaviour: 8` and `floor = 10` — with both quoted in the same report. A carrier with 9 loads had behavioural components admitted to the trust basis and its response profile withheld, at once |
+| 3 | `claimEconomics` | `computeCoverCost` took **bare numbers**, while `ClaimIncentive` and `TonuSchedule` beside it each carried a currency. The one figure that ends on an invoice was the one with no unit. `downstreamImpact` already throws `MIXED_CURRENCY` on this exact shape |
+| 4 | `claimEconomics` | `noShows / Math.max(accepted, 1)` — 15 offers and 0 accepted reports **"No-show 0.0% (0/0)"**, a clean record computed over an empty population, which reads as evidence of reliability |
+| 5 | `claimEconomics` | `rateAtClaim` fell through to the base rate on negative elapsed, **pricing a claim that predates its own offer at the best rate on the schedule** |
+| 6 | `claimable` | `contentHash` and `issuerSignature` taken as inputs and stored unchecked, while the artifact's whole claim is "verifiable without trusting us". A hash nobody derives is a decoration; the first party to check it would be the counterparty in a dispute |
+| 7 | `claimable` | an empty payload passed the self-containment check — a check that examined nothing did not pass, it did not run |
+
+### And I reproduced the vacuity defect verbatim
+
+The transparency-log build reported: *the audit path is emitted bottom-up and I
+verified it top-down, so every valid proof failed — and the tamper test beside it
+passed, rejecting the altered record because verification was broken for
+everything.*
+
+**My first verifier here had the same bug.** Leaf 0 verified (its path is
+symmetric under that mistake) and leaf 1 did not; 5 of 43 pins failed. The tamper
+pin passed. What caught it was the pin ORDER — asserting the positive case first,
+and over **every** leaf rather than one convenient index. Both verifiers are now
+the canonical RFC 6962 index-arithmetic algorithms.
+
+### The benchmark measured the operation nobody waits on
+
+Reported: **180,180 appends/sec** in the prose, **153,846** in the run output
+beside it — two runs quoted as one fact. Measured here:
+
+```
+append 20,000        53-72 ms     ~300,000 rec/s
+root once            62-76 ms     <- a tree head costs this
+one inclusion proof  64-69 ms     <- a CUSTOMER waits on this
+```
+
+An append commits to nothing. Quoting its rate against "a private chain does tens
+per second" compares it to a transaction that commits *and* reaches consensus —
+different denominators, plausible number. A canonical-range cache (valid
+permanently, because the log is append-only) takes a proof to **under 1 ms**;
+the first root is still O(n) once, which is correct and now stated rather than
+hidden behind the append figure.
+
+### Measured after
+
+- **82 test files, 1189 passed, 6 skipped.** 43 new pins.
+- Every module clock-free: `assessedAt`, `detectedAt`, `offeredAt`, `publishedAt`
+  are all injected.
+- `docs/MANUFACTURING_FRAME.md` records the discrete-manufacturing mapping, and
+  corrects one figure in it: PLANT-8's unmeasurability was a fixture and
+  estimator defect, not an n-limit. At 8.7 loads/week — the volume the argument
+  describes — the effect **is** recoverable on the right estimator and missed by
+  the naive one in 9 of 16 worlds, which is a stronger argument for the
+  measurement layer than the original.
+
+## Phase 66 — the transparency log merged, and the pricing engine that refuses a win rate
+
+### A prediction I made from reading, refuted by measurement
+
+I read the supplied `verifyConsistency` and predicted a defect: the
+`else { i--; } i++;` branch appeared to drop the `fn === sn` case the RFC
+handles, and to omit the normalization loop. **The measurement refutes it.**
+
+```
+819 of 819 size pairs over a 40-leaf log   verify
+378 of 378 rewrites of record 12           caught
+590 truncated paths                        rejected
+590 padded paths                           rejected
+```
+
+The `i--` / `i++` pair is a net no-op on the index while `fn >>= 1` still runs,
+which reproduces the RFC's inner while-loop. And 819/819 is exactly the shape
+that can be vacuous, so the negative sweep beside it is what makes the positive
+one mean anything — the lesson from the bug that started this module.
+
+### What was adopted, and what was defended
+
+| adopted | why |
+|---|---|
+| `RECORD_VERSION` + `encodeRecord` | mine punted canonical serialization to the caller with a comment. That is a convention, not a mechanism: two call sites can serialize one record two ways and both roots look internally consistent — the encoding hazard `notary.program.md` documents for timestamps and floats |
+| self-contained `InclusionProof` / `ConsistencyProof` | the roots travel ON the proof. A verifier told separately which root to check can be handed the wrong one, and the mismatch surfaces as "your record is not in the log" |
+| `signedTreeHead()`, richer anchors, `recordsFor` | straightforwardly better |
+
+| defended | why |
+|---|---|
+| injected `publishedAt` | the supplied `signedTreeHead` read `new Date()`. An STH's timestamp is the ONE field anchoring exists to make unforgeable; read from our local clock it cannot be replayed in the dispute it is issued for |
+| the subtree cache | measured: one inclusion proof over 20,000 records cost 64–69 ms uncached, under 1 ms cached, and it is pinned against the uncached tree hash at every size so it cannot become fast and wrong |
+| `issueReceipt` reads the record FROM the log | the supplied signature took the record alongside the index, so `issueReceipt(log, 12, someOtherRecord)` ships a receipt that fails at the customer rather than at the issuer |
+
+### Pricing — and the one thing changed
+
+The tiering is adopted whole, and the single-carrier refusal is the sharpest idea
+in it: **n over one carrier is one observation repeated**, and its median tells
+you what that carrier charges, not what the lane costs. Most pricing tools quote
+confidently there.
+
+Generalised rather than kept as-is: a rule keyed on `distinctCarriers > 1`
+passes 15-of-17 on one carrier, which is not meaningfully better than 17-of-17.
+Concentration is measured as a SHARE against `MAX_CARRIER_SHARE`, the same
+discipline as the HHI work in the commodity layer, where "how many independent
+observers" is never answered by counting rows.
+
+**The win curve refuses.** The supplied design synthesized losses at ~45% with a
+hand-chosen margin/win relationship, exercised the machinery, and flagged in its
+README that the 87–95% rates were an artifact. The flag is right and the place is
+wrong: *a caveat in prose is what gets dropped when the number is copied into a
+deck.* So the engine returns `refused / no_loss_records`, and the remedy names
+what it actually is:
+
+> A win rate over a book that records only wins is 100% by construction, at every
+> margin. This is a SELECTION defect, not a small-n one, and **more loads will not
+> fix it.** Record the quotes you LOSE, from load one — a workflow change, not a
+> code one.
+
+Pinned both ways: 5,000 additional won quotes must still refuse, and a book with
+both outcomes must MEASURE, or "refuses" would be all the function ever does.
+
+### The density argument, measured on 900 loads
+
+```
+206 lane/equipment pairs
+ 18 reach the confident floor (n >= 20)
+183 cannot price at all      (n <  5)
+```
+
+Sharper than on the smaller book, and the distribution is **bimodal**: the spine
+lanes are dense and everything else is thin, with only 5 pairs in the indicative
+band between. That is the lane-concentration argument as a measurement rather
+than an intuition.
+
+Two real quotes off the current world:
+
+```
+$927 on TOR-DET van_53 — CONFIDENT, from 37 settled loads across 15 carriers over
+676 days (largest carrier 22%). Carrier cost median $642 (IQR $593-$687, spread
+15%), accessorial exposure $137 (32% of loads incur one). Work within $804-$1050.
+Ties up $919 until day 45.
+```
+
+### One figure to stop quoting
+
+The pricing write-up cites the governing constraint as *"a signal planted by
+construction was unmeasurable at n=9–12 per cell."* That was true of the fixture
+before phase 64 and is no longer: it was a confound taking ≥74% of the lane, a
+mean over a bimodal variable, a quarter-vs-Dec–Mar partition, and a single winter
+— not an n-limit. The effect now recovers in 16 of 16 worlds at n = 13–29.
+
+The constraint the pricing engine is actually built against is the real one, and
+it is stronger: **at 8.7 loads/week the record can price 18 pairs and cannot price
+183.**
+
+### Measured after
+
+- **83 test files, 1205 passed, 6 skipped.** 47 log/claimable pins, 13 pricing pins.
+
+## Phase 67 — the pricing merge, and the quote I called CONFIDENT that wasn't
+
+Two versions of `pricing.ts` reconciled. The supplied one carries three things
+mine lacked, and one of them invalidates a number I reported last round.
+
+### Adopted, and mine was worse for their absence
+
+| adopted | what it fixes |
+|---|---|
+| `maxAgeDays` recency window | mine had no age filter at all. Rates and carrier performance decay; a median over two-year-old loads is a fact about a market that no longer exists |
+| `n` vs `nUsed`, with drops itemised | mine reported one number and left the difference to be inferred |
+| `financingCostPct` in the gross-up | mine omitted factoring cost entirely, leaving it to finance to notice |
+| `LaneObservation` as the input type | mine took `WorldLoad`, making the fixture generator a dependency of the product |
+
+### Defended, with a measurement
+
+`accessorialExposure = meanAccessorial × accessorialRate` **double-discounts**.
+`meanAccessorial` already averages over ALL loads including the zeros, so it *is*
+the expected accessorial per load; multiplying by the incidence applies the
+discount a second time. Measured on TOR-DET van_53, n=37, $5,070 billed:
+
+```
+TRUE expected per load           $137.03   (total / n)
+incidence                            32%
+mean AMONG loads that incur one  $422.50
+perLoad x incidence               $44.44   <- understates 3.1x
+```
+
+`$44` is plausible, which is why it ships. Both figures are now carried and
+named, because they answer different questions: one belongs in a quote, the
+other in an argument about a specific detention bill.
+
+The win-curve refusal is also defended — the supplied version floors on quote
+COUNT only, so a book of settled loads reports 100% at every margin. That
+diagnosis was already made in the accompanying write-up; the disagreement is only
+about whether the guard lives in prose or in the engine.
+
+### Both capital formulas were hybrids
+
+One computed `carrierCost × (paymentTermsDays / 30)` — at 45-day terms, 1.5× the
+carrier cost for a single load, which is not an amount anyone finances. Mine
+added an arbitrary 15% plus a term adder. A load ties up ONE carrier cost for the
+days it is outstanding: an amount and a duration. What scales with the term is
+the WORKING CAPITAL to sustain a run rate, which needs the rate and is now
+derived from it — and `atRate(0)` throws rather than returning zero, because
+working capital at zero loads per week is an undefined question, not free.
+
+### The finding: applying the window removed every confident quote
+
+`laneStat` now separates `windowDays` (how much history) from `stalenessDays`
+(how old the freshest observation is). Those are routinely confused, and the
+confusion was in my own output: last round I reported
+
+> `$927 on TOR-DET van_53 — CONFIDENT, from 37 settled loads across 15 carriers
+> over 676 days`
+
+as depth. **676 days is not depth, it is staleness**, and with a 270-day window
+that lane cannot produce a confident quote at all. Measured across the book:
+
+```
+ALL-TIME    confident 18   indicative  5   unpriceable 183   of 206
+IN-WINDOW   confident  0   indicative 20   unpriceable 186   of 206
+```
+
+**Not one lane/equipment pair prices confidently once the history has to be
+current.** All 18 were confident only by counting loads up to two years old.
+
+And `laneDensity` had the same defect on the other side: it counted all-time
+while `quoteLane` refused anything stale — a density report and a quoter
+answering one question over two populations, with the report always the
+flattering half. It now reports both, so the gap is visible rather than
+something I noticed by accident.
+
+This is the lane-concentration argument at full strength. At ~8.7 loads/week
+across 206 pairs, no pair accumulates 20 loads inside 270 days, and the remedy is
+**fewer lanes or more volume — not a longer window.**
+
+### And a test that failed for a correct reason
+
+The band pin compared the full lane against a 6-load slice and asserted the
+slice's band was wider. The slice can have a NARROWER IQR, so the test conflated
+confidence with spread. Split into two pins that hold one variable fixed each.
+
+### Measured after
+
+- **83 test files, 1216 passed, 6 skipped.** 24 pricing pins.
+
+## Phase 68 — the audit, round 3: the React layer, measured
+
+Rounds 1 and 2 worked the library and the route surface. Round 3 works the
+components, which had never been read with the same instrument. The lint
+census is the measurement, and it splits into things that can be *wrong*
+and things that are merely *untyped*:
+
+| rule | before | after | class |
+|---|---|---|---|
+| `react-hooks/set-state-in-effect` | 10 | 0 | correctness |
+| `react-hooks/refs` | 1 | 0 | correctness |
+| `@typescript-eslint/no-unused-expressions` | 1 | 0 | correctness |
+| `@typescript-eslint/no-unused-vars` | 63 | 0 | dead weight |
+| `@typescript-eslint/no-explicit-any` | 316 | 312 | typing debt |
+| `react-hooks/exhaustive-deps` | 26 | 26 | not yet read |
+
+### `'use client'` was on line 2
+
+`PayloadMap.tsx` opened with an import, then `'use client';`. A directive
+prologue has to be the first statement in the module, so that string was
+not a directive at all — it was a bare expression, which is exactly what
+`no-unused-expressions` was reporting and what nobody had read. It worked
+only because the file's importer is itself a client component, so the
+subtree was client-rendered regardless. One import reordering away from
+mattering, and nothing would have failed. The repo-wide check for the same
+shape found no other instance.
+
+### Five effects that had a better form, and five that did not
+
+The rule fires on ten sites, and the honest answer differs per site. The
+split is not "silence the rule" or "obey the rule" — it is *which of these
+is a defect*:
+
+**Replaced, because a better idiom exists.** Three hydration guards
+(`useState(false)` + `useEffect(() => setMounted(true), [])`) became
+`useSyncExternalStore`, which is React's form for "a value with one
+snapshot on the server and another in the browser". They now live in
+`src/lib/ui/clientOnly.ts` as `useHydrated()` and `useOrigin()`, with the
+`subscribe` callback hoisted to a module constant — an inline
+`() => () => {}` is a fresh reference every render, so React tears down and
+re-subscribes every time.
+
+No test: the environment is `node`, the include glob is `*.test.ts`, and
+standing up jsdom and a React renderer to exercise four lines of hook is
+more apparatus than the thing it would guard. Recorded rather than
+silently skipped.
+
+**Two sites where the effect was hiding a real defect.**
+
+`CommandPalette` reset its cursor to 0 in an effect keyed on `query`. In
+the frame between the query changing and the effect running, the list has
+already re-ranked and the cursor still indexes the *previous* result set —
+so `results[cursor]` is `undefined`, and Enter pressed in that frame does
+nothing. The guard `if (results[cursor])` made it a silent no-op rather
+than a crash, which is worse: nothing reports it. Now adjusted during
+render (React's documented form for it), so the stale frame does not
+exist. The `open` reset went away entirely by mounting the palette only
+while open — which also deleted the `open` prop and the
+`if (!open) return null`.
+
+`CameraViewer` had three findings in one file, all closed by the same
+move:
+
+- Its `AnimatePresence` could never animate. `if (!camera) return null`
+  sat *above* it, so a closing viewer unmounted the presence container
+  along with its child. `exit={{ opacity: 0, scale: 0.95 }}` was
+  configured, read as working, and never ran.
+- Its uptime-style clock ticked at 1 Hz **while closed**. Hooks run before
+  the null return, so a component rendering nothing re-rendered every
+  second for the life of the session.
+- Switching cameras painted the previous camera's frame under the new
+  camera's coordinates for one render, because the reset lived in the
+  effect. On a surveillance panel that is a misattribution, not a
+  flicker — the panel asserts this image came from that place.
+
+Presence moved to the parent, keyed by `cameraKey()` in the tested
+`camera-feed` module: a different camera is now a different mount, so
+there is no previous frame to show, no clock while closed, and the exit
+animation plays. `camera` became non-null by construction.
+
+**Five kept, each with its reason written at the site.** URL and
+capability probing, `localStorage` restore, the tripwire sweep's append to
+an event log, and the progressive fetch ladder. These read external
+systems; writing state is what reading them *is*. The `localStorage` one
+is the sharpest: a lazy `useState` initialiser would run during the server
+render, where there is no storage, and the restored shapes would then
+differ from the empty server markup.
+
+The repo had exactly one `eslint-disable` before this. It now has six, and
+each names what makes the site legitimate rather than naming the rule.
+
+### `drawCbRef.current = …` during render
+
+`PayloadMap` refreshed its callback ref in the render body. Every read is
+inside a map event handler, which fires after commit, so the sync moved to
+an effect with no dependency array. A render React discards must not leave
+its callbacks behind in a ref.
+
+### Dead weight, with the interesting ones named
+
+63 unused bindings. Most were imports and `catch (e)` bindings (24 became
+optional-catch). The ones that were not cosmetic:
+
+- **`UptimeClock`** — a complete component with its own 1 Hz interval,
+  defined and never rendered. It had been *repaired* earlier in this same
+  session before anyone measured whether it was used.
+- **`/api/stats` fetched on every page load**, stored in `globalStats`,
+  and never read. One request per session for a value nothing displays.
+  The route stays: it is documented and catalogued for external callers.
+- **`demoMode`** — state with no setter, no URL parameter and no env
+  switch, so permanently `false`, threaded as a prop into `PayloadMap` to
+  gate a 48-line globe auto-spin that could never run. Its cleanup cleared
+  `window._globeSpinTimer`, a global **nothing in the repository sets**.
+  Deleted. What it did, so re-adding is cheap: 0.5°/s eastward, paused
+  while the user is dragging or zooming.
+- **`isFullscreen`** — a `fullscreenchange` listener existing only to
+  write state nothing reads. The `f` shortcut calls the DOM API directly
+  and is untouched.
+- **Six `setShowX` aliases** of `setPanel.*`, never called; `togglePanel`
+  is the real setter.
+- **`parsePointDataCSV`** — a 26-line GDELT CSV parser with no caller.
+- **`getRegionsForBounds(lat, lng, radius)`** — the `cctv` route read
+  `?radius=` (defaulting to 10, units unstated), passed it in, and the
+  function ignored it: selection is by fixed lat/lng boxes. A caller
+  asking for 10 and a caller asking for 5000 got identical results. The
+  parameter is gone rather than accepted and ignored; narrowing by
+  distance would mean filtering the returned cameras, which does not
+  exist. Latent rather than live — `cctv` is `general-purpose`, retired by
+  A-1 — which is why the fix is to make the code honest before any
+  re-enablement ships the lie.
+
+### A renderer served on a live route with no pin
+
+`renderTableMarkdown` and `renderGridMarkdown` are the two halves of
+`/api/economy/table?format=md`. The grid renderer was pinned. The table
+renderer — the one that carries the refusals — was imported by the test
+and never called. Now pinned.
+
+The first version of that pin asserted "no empty cell anywhere in the
+table body" and failed correctly: the `flags` column renders empty when a
+row has no flags, and that *is* the honest rendering. The assertion
+grepped a shape and claimed a property. Replaced with a per-column claim
+over the columns where a blank would read as a quantity or a settled fact
+— and the corrected version immediately caught an off-by-one in my own
+column indices before it could pass vacuously.
+
+### Measured after
+
+**85 test files, 1263 passed, 6 skipped. Typecheck clean. Production
+build compiles.** 28 files changed, 708 insertions, 636 deletions.
+
+### Not closed in this round
+
+- **312 `no-explicit-any`**, 134 of them in `PayloadMap.tsx`.
+- **26 `exhaustive-deps`** — not yet read one by one, and that rule has a
+  high false-positive rate against deliberate mount-once effects, so a
+  census is not a defect count.
+- **A second stale brand**, found while sweeping: 133 references to *Sea
+  Dog Terminal*, untouched by the Phase 47 rename. Phase 47 swept
+  OSIRIS→Payload and listed five deliberate exclusions; Sea Dog is not
+  among them, because the sweep did not know it existed. Taken as its own
+  commit, on Phase 47's own principle that a rename lands alone.
+
+## Phase 69 — the credit governor, and the identity the rename broke
+
+Two pieces, from one message and one sweep. The operator sent six patterns
+observed in another project and asked which to lift. Measuring each against
+this tree changed the answer for four of them, and the sweep that produced
+the measurement found something worse than any of the six.
+
+### The six patterns, measured
+
+| # | pattern | verdict against this tree |
+|---|---|---|
+| 1 | world-stable heading projection | **already here, and better.** `PayloadMap.tsx:687` sets `icon-rotate: ['get','heading']` with `icon-rotation-alignment: 'map'` — MapLibre does this on the GPU, per frame, at any camera angle. A JS screen-space projection would be a slower reimplementation. And freight loads carry no position or heading field at all, so "the moment they carry direction" has not arrived. |
+| 2 | budget-governed feed proxies | **the one real gap.** Built. |
+| 3 | interpolation behind realtime | **the layers are retired.** Aircraft and vessels are `general-purpose`, 503 under A-1. Motion smoothing for markers that return no data is apparatus ahead of volume. |
+| 4 | SGP4 + GMST | **already here.** `src/lib/orbit.ts` wraps satellite.js's SGP4/SDP4 with `gstime`, and refuses on a non-zero `satrec.error` rather than propagating an orbit it can no longer model. |
+| 5 | layer registry with per-source provenance | **half here.** `sourceRegistry.ts` is exactly this shape for economy sources. The map side is hardcoded — 63 `activeLayers.` references in one 3,000-line file that also holds 134 of the remaining `any`s. Right refactor, wrong order: the types come first. |
+| 6 | the free-feed vendor list | **AISStream and FIRMS are the two with freight relevance**; the rest feed retired layers. The destination is `sourceRegistry` with `adapter: null`, which is what that field is for. Registering an account is not mine to do. |
+
+Four of six were already built or premature. That is the point of measuring
+before lifting: a pattern that is right in general can be redundant here.
+
+### The credit governor
+
+`ssrf-guard` decides whether a host is reachable, `outboundRate` how fast,
+`sourceCache` whether the answer is already held. None of them knows what a
+request *costs*, and a metered vendor bills anyway. `spendGovernor.ts` is
+the missing organ and nothing more.
+
+Four decisions, each of which could have gone the other way:
+
+**An unregistered provider is refused.** A governor that waves through what
+it does not recognise governs nothing — the first vendor somebody forgets to
+register is the one that runs up the bill. Registering *is* the act of
+deciding what a provider may spend, so a provider nobody has decided about
+has a budget of nothing.
+
+**Cost is declared in the budget's unit, and a mismatch refuses.** A cap of
+100,000 tokens and a call costing "1 request" are not comparable, and the
+arithmetic that pretends they are produces a number that looks fine. The
+same discipline the pricing engine needed for accessorials, one layer down.
+`usd_micros` is integer millionths of a dollar: money is never a float here.
+
+**Reserve, then settle.** For a per-request vendor the cost is known before
+the call; for a token-metered one it is known only from the response, so a
+governor that can only charge up front cannot govern one at all. The
+estimate is held, the truth replaces it, and a failed call releases it. An
+unsettled reservation keeps counting — the conservative direction — and is
+reported separately, so a leak reads as held credit rather than silently
+eating the budget. A settle *above* the cap is recorded, not rejected: the
+vendor already billed it, and refusing it would not unbill it. The overrun
+becomes visible for the next `reserve()` to refuse on, which is the only
+honest order of events.
+
+**The ledger says how durable it is, on every decision.** Counters in
+process memory reset when the process does, so a crash loop hands the whole
+monthly budget back on every restart while the vendor's meter keeps
+climbing. That is not a bug to paper over; it is a property of where the
+ledger lives. `durability: 'process_memory'` ships on every decision and
+every report row. A cap this module cannot enforce is never reported as one
+it did.
+
+Wired to `/api/proxy-tiles`, which was the one metered surface and had
+neither a throttle nor a cap — an open-to-CARTO proxy with no per-IP limit,
+though `isRateLimited` had been sitting in `ssrf-guard` the whole time. The
+route now reserves a tile before the fetch, settles on success, releases on
+failure or throw, and returns `X-Payload-Tile-Governance` so *ungoverned by
+decision* and *ungoverned because nobody looked* are tellable apart from
+outside the process. Spend and the decision tally are on `/api/health`.
+
+24 pins. The attestation-closure guard caught the three new types as
+unaccounted for on the first full run — working exactly as built — and they
+are now classified with reasons rather than waved through.
+
+### The identity the rename broke
+
+Sweeping for stale brands found 133 references to *Sea Dog Terminal*, a name
+this instrument carried for about a day between Payload Terminal and Payload
+Terminal. Phase 47 renamed OSIRIS→Payload and listed five deliberate
+exclusions, carefully; Sea Dog is not among them, because that sweep did not
+know it existed. An exclusion list that reads as complete and is not.
+
+Three findings came out of it, in increasing order of consequence.
+
+**The User-Agents were malformed, in twelve files.** Phase 47 replaced the
+single token `OSIRIS` with the two-word display name `Payload Terminal`
+*inside User-Agent product tokens*, where a space is a delimiter.
+`Payload Terminal/4.2` does not name a product at version 4.2 — it names a
+product `Payload` of unstated version followed by a second product
+`Terminal/4.2`. Nothing failed, because no upstream we call today parses the
+field strictly. The one that will is the SEC, whose document tier this
+project has already recorded as rejecting generic and malformed agents with
+a 403 that lengthens if you retry it.
+
+Phase 47 stated the right principle — *identifiers stay stable, display
+names follow the instrument* — and then applied the display name in the one
+place where the string is an identifier. It is the defect the sweep was
+written to catch, one level in.
+
+The versions were the second half: 1.0, 3.0, 3.5, 4.2, 4.3 and 0.1 across
+twelve files, corresponding to nothing. `src/lib/identity.ts` now holds one
+product token, one version pinned against `package.json`, and one repository
+URL, and `identity.test.ts` walks the whole source tree asserting no file
+hand-writes a malformed agent. It caught two on its first run that the
+manual sweep had missed — including one in this module's own documentation.
+
+**The docs pointed readers at somebody else's repository.**
+`github.com/simplifaisoul/osiris` was in two outbound User-Agent comments
+and, worse, four places on the public docs page: the GitHub link, the clone
+command, the "Report an issue" link. Phase 47 left repository URLs alone
+because "the repository genuinely still carries that name" — sound
+reasoning about a URL that was not this project's. The real remote is
+`notationsystems/Notations-OSIRIS-Overwatch-Engine`. The `cd` after the
+clone said `cd payload`, which is not what the clone creates either.
+
+**A stale instruction aimed at a regulator.** `sourceRegistry.ts` carried a
+pre-registered build note for the unbuilt EDGAR document-tier adapter,
+written under work order 3.6, saying: *the instrument is Sea Dog Terminal…
+the document-tier UA is `SeaDogTerminal/<version> OrgName role@org`; it must
+not go to a regulator under the retired Payload Terminal name.* The second
+rename made every clause of that false, and forbade by name the identity
+that had become correct. Nothing failed because nobody has built the
+adapter. That is the sharpest form of this project's recurring class: a
+correct-when-written instruction, aimed at the SEC, waiting.
+
+### What was deliberately not renamed
+
+Following Phase 47's own split — identifiers stay stable, display names
+follow the instrument:
+
+- **`SEA_DOG_*` environment variables** (8 names, 61 sites). These are the
+  deployment contract. `envCompat.ts` exists precisely for this and has the
+  right shape — new name wins, old name honoured for one release with a
+  warning, `LEGACY_ENV_REMOVED_AFTER` naming the release that drops it — but
+  none of the `SEA_DOG_*` reads go through it today. Migrating them is a
+  bounded piece of work (route every read through `readEnvWithLegacy`, add
+  eight entries) and it is a change to how the thing is deployed, so it was
+  put to the operator rather than taken as a side effect of an audit.
+  **Answered in phase 70: do it.** See that entry for what it took.
+- **`seaDogTerminal`** as a key in the `/api/health` response. A response
+  schema with external readers and its own pins.
+- **`Symbol.for('sea-dog-terminal.process-singletons')`.** A runtime
+  identity key: changing it across a rolling restart would orphan the
+  process-wide state it exists to share.
+- **`sea-dog-*` temp-directory prefixes in tests.** Scratch names with no
+  identity role; renaming them is churn.
+- **This ledger.** Renaming Sea Dog out of the phases that describe the Sea
+  Dog day would falsify the record, exactly as Phase 47 said of OSIRIS.
+
+`x-sea-dog-client` was renamed to `x-payload-client` **with** a landing
+strip — the legacy spelling is still read, never written. It appears in no
+route catalogue and no page of the docs, so the compat window is
+precautionary rather than owed; it costs one `??` and removes the question
+of whether anyone was ever told to send it.
+
+### The correction that arrived from the push itself
+
+The first fix put `notations-osiris-overwatch-engine` into the User-Agents
+and the public clone command, taken from the git remote. The push printed
+GitHub's own rename notice, and the organisation's repository listing does
+not contain that name at all: the repository is **`Payload-Terminal-V0`**.
+The old name resolves through a redirect, so nothing failed and nothing
+would have — and a redirect is not a name. For a URL handed to a regulator
+inside a User-Agent, and printed in a clone command a reader will run, the
+canonical one is the only correct one.
+
+The correction inherited a stale premise from the thing it was correcting.
+Phase 47's reasoning — *the repository genuinely still carries that name* —
+was true when written and had since stopped being true, and reading it as
+current is how a second wrong URL replaced the first.
+
+Two known-wrong values are now pinned out by name. The canonical name is
+NOT pinned: it is only knowable from GitHub, and a test that appeared to
+hold it while checking a local string would be worse than no test. What is
+pinned is the half that stays checkable from inside the tree — that the
+`cd` after the clone command names the directory the clone actually
+creates, which is the `cd payload` defect closed permanently.
+
+The git remote still uses the old URL. It is left alone: it redirects, it
+is local configuration rather than anything this repository ships, and
+changing a remote is the operator's action.
+
+### Measured after
+
+**88 test files, 1,296 passed, 6 skipped. Typecheck clean. Production build
+compiles**, with the same four pre-existing dynamic `node:fs` import
+warnings the Phase 47 baseline recorded — checked, not assumed.
+
+## Phase 70 — the retirement, finished: routes, then everything that fed on them
+
+A-1 retired 31 general-purpose routes behind a 503 and kept the code, so a
+commodity vertical could flip one back on. Phase 69 recorded the price of
+that decision and put the question to the operator. The answer was to do it,
+and doing it turned out to be four moves, not one — because the routes were
+only the top of the thing.
+
+### 1. The env rename, through the landing strip that already existed
+
+Eight `SEA_DOG_*` variables became `PAYLOAD_*`. What made them look
+unrenameable was not that renaming was unsafe: `envCompat.ts` had held the
+right mechanism since the OSIRIS rename — new name wins, old name honoured
+for one release with a warning, `LEGACY_ENV_REMOVED_AFTER` naming the
+release that drops it. It was that nineteen production reads were plain
+`process.env.X` and never went through it. They do now, and `env()` exists
+so a read site is a drop-in replacement and nobody is tempted to skip the
+strip for brevity again.
+
+A refusal reports the **current** key name even when the old spelling
+enabled the flag. Handing back the deprecated name would be a remedy
+pointing at the exit being closed.
+
+Two tests were pinning the old spelling. `envCompat`'s own asserted that
+every legacy name starts with `OSIRIS_` — an assumption that there had been
+exactly one rename, where there have been two. The invariant that actually
+holds is that every current name is `PAYLOAD_` and every legacy name belongs
+to a retired brand, plus two conditions the old form never checked: no key
+maps to itself, and no legacy name is also a current name.
+
+### 2. The routes: 8,835 lines to one handler
+
+Thirty-one handlers that answer 503 are not thirty-one features held in
+reserve; they are one refusal spelled thirty-one times. They carried 58% of
+all API code, 104 of 312 `any`s, and a typecheck, lint and dependency
+burden on every change made near them.
+
+`[...retired]/route.ts` returns the identical `route_retired` payload for
+every name in a new `DELETED_ROUTES` set. A static segment always beats a
+catch-all in Next's router, so a live route is served by its own handler and
+never reaches it. The claim the deletion rests on — *a caller cannot tell* —
+is pinned over all 31 names against the same `routeRetiredPayload` the
+deleted handlers called, and against `requireRouteEnabled`, so the two doors
+to one refusal cannot drift apart.
+
+It also answers **which kind of nothing**: 503 for a retired route, 404 for
+a path that never existed (calling a typo "retired" invents a history for
+it), and 500 `route_handler_missing` for a classified route with no
+handler — a build defect that must not hide behind a policy message.
+
+**What the deletion exposed.** `PAYLOAD_ROUTES_ENABLED` is now vacuous:
+every retired route is deleted, so the switch has nothing to act on, and
+enabling one would report a route live that answers nothing. The gate now
+refuses to enable a deleted route, and the test pins the vacuity **out
+loud** — a loop over an empty list passes, and passing silently is exactly
+what it must not be allowed to do. The mechanism is kept for the next route
+retired without deletion.
+
+Conservation moved from two states to three: live, retired-and-present,
+deleted. Folding deleted into either of the others is how a count starts
+looking right while meaning something else.
+
+### 3. The UI that fed on them
+
+Deleting the routes made a defect visible that had been shipping since A-1:
+**the layer panel offered 19 toggles that had shown nothing for weeks.** A
+toggle for a feed that answers 503 is not a feature awaiting data; it is a
+promise the product cannot keep, and the operator has no way to tell it
+apart from a quiet day.
+
+Removed with their feeds: flights (four sub-layers), satellites (five),
+CCTV, fires, live news, GDELT incidents and events, malware, cyber attacks,
+and both Cloudflare Radar layers. Seventeen live layers remain — the
+economy layers, maritime, earthquakes, weather, infrastructure, balloons,
+radiation, cables, day/night, terrain, and the SDK entities.
+
+The cascade ran further than the layers:
+
+- **`AiOverview`** posted to `/api/ai/overview`. Deleted, with its two call
+  sites in the markets and alerts panels.
+- **The whole CCTV subsystem** — `CameraViewer`, `camera-feed`, `skyline`,
+  `youtube` — became unreachable, because `setActiveCamera` was called from
+  exactly one place: a click on the layer that no longer exists. This is
+  where I have to be plain: earlier in this same session I fixed three real
+  defects in `CameraViewer` and added a tested `cameraKey()` to prevent a
+  feed being shown under the wrong coordinates. That work was correct and
+  the code it corrected is gone. Measuring reachability before repairing
+  would have found it; I repaired first.
+- **The satellite subsystem** — the GPU pick layer, the orbit fetch, the
+  3D catalogue, `satellite-layer.ts` and `orbit.ts`. `orbit.ts` is a clean
+  tested SGP4/SDP4 wrapper and its only consumer was the deleted
+  `/api/satellites/orbit`. It is in git, at this commit's parent, if the
+  ocean-leg globe ever wants it.
+- **The flight-watch panel** and its telemetry, fed by buckets nothing
+  fills.
+- **Four orphaned library modules** — `airports`, `ai-engine`,
+  `gdeltEvents`, `countryCentroids` — 1,121 lines with no importer left.
+
+### 4. Two surfaces that would have lied about it
+
+**`/api/stats` counted six feeds; four were deleted.** Wrapped in
+`Promise.allSettled`, it would have gone on answering `flights: 0`. A zero
+there reads as *nothing is flying*; the truth is *this deployment does not
+collect that*. Counters with no source are now named in `not_collected`
+rather than reported as zero, and a live feed that fails returns `null`
+rather than 0 — an upstream timeout is not a feed reporting nothing.
+
+**The public API catalogue documented 24 endpoints that no longer exist**,
+and four of its groups emptied completely once they were pruned.
+
+**`LayerPanel`'s capability gate** hid layers whose credential was not
+configured. Every layer that declared a `requires` key was in the deleted
+set, and the only thing that ever populated `capabilities` was the
+Cloudflare probe — so the gate filtered nothing against a map that was
+always `{}`. Removed. The group-drop beside it stays: a group emptied by a
+future removal must not render as a heading with nothing under it.
+
+### An error worth recording
+
+The first attempt at the map surgery used a helper that, given a line,
+walked backwards to the enclosing `useEffect`. `createSatelliteLayer` is
+called inside the **map initialisation** effect, so "the enclosing effect"
+was the whole map setup: 1,725 lines, every live layer with it. Typecheck
+passed — nothing referenced what had gone — and a grep for the surviving
+layer ids is what caught it, all thirteen at zero.
+
+A clean typecheck after a deletion says the remainder is consistent. It
+says nothing about whether the remainder is the program. The check that
+found it was asking what should still be there, which is the only kind that
+can.
+
+### Measured after
+
+| | before phase 69 | after phase 70 |
+|---|---|---|
+| API route code | 15,526 lines | 6,610 lines |
+| `PayloadMap.tsx` | 2,938 lines | 2,062 lines |
+| `no-explicit-any` | 312 | 141 |
+| `no-unused-vars` | 63 | **0** |
+| `set-state-in-effect` | 10 | 0 |
+| layer toggles offered | 31 | 12 |
+| toggles that could return data | 12 | 12 |
+
+**77 test files, 1,138 passed. Typecheck clean. Production build compiles.**
+
+The last row is the one that matters. The count of layers that work did not
+change. What changed is that the panel no longer claims otherwise.

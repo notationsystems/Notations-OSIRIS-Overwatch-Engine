@@ -1,0 +1,128 @@
+──────────────────────────────────────────────────────────────────────────────
+PAYLOAD — SIMULATED FREIGHT WORLD, END TO END
+──────────────────────────────────────────────────────────────────────────────
+world freight-world-20260831   generated 2026-09-05T00:00:00.000Z   evaluated at 2026-09-05T00:00:00.000Z
+sourceClass: representative  →  isAdmissible() is false at every derivation
+
+──────────────────────────────────────────────────────────────────────────────
+1. LIFECYCLE — the ENGINE's transition table, not a private one
+──────────────────────────────────────────────────────────────────────────────
+loads 900   transitions 11140   illegal 0
+detection latency  p50 27min   p90 66min
+  over 7200 OBSERVED instants; 3940 inferred ones excluded.
+  A geofence crossing is our reconstruction of when the truck arrived, not a report of
+  it. Averaging the two produces a distribution over two different quantities.
+
+──────────────────────────────────────────────────────────────────────────────
+2. AUTHORIZATION — deterministic, blocking, ON the critical path
+──────────────────────────────────────────────────────────────────────────────
+authorized 296   refused 525   undetermined 79
+  refused: insurance_valid_at_pickup x440
+  refused: bol_matches_tendered_carrier x1
+  refused: value_within_cargo_cover x152
+  undetermined: value_within_cargo_cover x134
+  L-0001: REFUSED — cover expires 2025-11-20T08:53:15.000Z, pickup is 2026-04-05T11:45:20.000Z; tendered to CX-010, BOL names CX-001.
+  L-0003: REFUSED — cover expires 2025-09-06T08:29:31.000Z, pickup is 2026-06-11T23:14:34.000Z.
+  L-0004: REFUSED — cover expires 2025-12-17T22:21:45.000Z, pickup is 2026-05-07T23:39:12.000Z.
+  L-0005: REFUSED — cover expires 2025-11-05T04:22:55.000Z, pickup is 2025-12-16T11:01:01.000Z.
+  UNDETERMINED IS NOT CLEARED. It blocks like a refusal; only the remedy differs.
+
+──────────────────────────────────────────────────────────────────────────────
+3. DIVERGENCE — committed vs invoiced, per carrier
+──────────────────────────────────────────────────────────────────────────────
+  CX-012  n= 49  +11.8%  +3540 CAD
+  CX-013  n= 48  +1.3%  +571 CAD
+  CX-009  n= 52  +1.3%  +520 CAD
+  CX-006  n= 49  +1.3%  +509 CAD
+  CX-018  n= 33  +1.2%  +331 CAD
+
+──────────────────────────────────────────────────────────────────────────────
+4. FACILITY RELIABILITY — two metrics, and they need not agree
+──────────────────────────────────────────────────────────────────────────────
+  by LATE RATE                        by MEAN DETENTION
+  FAC-020 n= 69 62%                   FAC-020 n= 69 mean 296 / median 283 min
+  FAC-022 n= 24 38%                   FAC-013 n= 18 mean 126 / median 0 min
+  FAC-034 n= 66 27%                   FAC-018 n= 97 mean 121 / median 0 min
+  the two rankings AGREE on the worst receiver.
+  Which one is "reliability" is a definition, not a fact, so both are reported.
+
+──────────────────────────────────────────────────────────────────────────────
+5. FACILITY RESOLUTION — the duplicate that would break lane memory
+──────────────────────────────────────────────────────────────────────────────
+  FAC-036 / FAC-037  →  "4820 industrial dr"  14 m apart
+  Unresolved, these are two facilities and every load is a first load.
+
+──────────────────────────────────────────────────────────────────────────────
+6. NOTARY — cryptographic, threshold-gated, OFF the critical path
+──────────────────────────────────────────────────────────────────────────────
+notarization required for 412 loads; 412 had committed readings
+  held 409   breached 1   unproven 2
+    unproven/telemetry_gap_exceeds_max x1
+    unproven/commitment_posted_after_the_fact x1
+  410 verdict(s) rest on a SIMULATED proof and are a rehearsal,
+  not evidence. `system: sp1` alone cannot say that, so the vkey and proofId carry it.
+  proving cost, were it on the critical path: 2037 ms mean, 839.1 s total over 412 loads.
+  That is the number the architecture separation is worth. A dispatcher does not wait
+  for it; the evidence is produced behind the execution it describes.
+
+──────────────────────────────────────────────────────────────────────────────
+7. SEASONALITY ON TOR-DET — the same signal under two queries
+──────────────────────────────────────────────────────────────────────────────
+  NAIVE: calendar quarter of DELIVERY, arithmetic mean
+    Q1  n= 18  mean 208 min
+    Q2  n= 25  mean 156 min
+    Q3  n= 40  mean 178 min
+    Q4  n= 27  mean 145 min
+    recovers the plant: NO
+  ON THE PLANT'S BASIS: months 11,0 of PICKUP, median and rate above 120 min
+    in season   n= 16  mean 173  median 118  >120min 44%
+    out         n= 94  mean 169  median 0  >120min 35%
+    winters observed: 2 — one cannot tell a season from a one-off
+    recovers the plant: YES
+  VERDICT: RECOVERED
+  The effect IS in the data and the naive query does not see it. Calendar
+  quarters split the plant's 2 months across two of them, a MEAN over
+  bimodal detention follows whichever cell caught an outlier, and a quarter
+  keyed on delivery smears loads across the boundary. Three
+  misdenominations, each sufficient. The remedy is to fix the statistic, not
+  to collect more data — and "unmeasurable at this n" would have prescribed
+  the opposite.
+
+──────────────────────────────────────────────────────────────────────────────
+8. ECONOMICS
+──────────────────────────────────────────────────────────────────────────────
+  loads 900   revenue 821237 CAD   carrier cost 698037
+  gross margin 123200 (15.0%)
+
+──────────────────────────────────────────────────────────────────────────────
+9. PLANT RECOVERY — checked against the world's OWN manifest
+──────────────────────────────────────────────────────────────────────────────
+  OK   PLANT-1  bound CX-012
+       top by rate variance, 11.8% over 49 loads
+  OK   PLANT-2  bound FAC-020
+       worst by late rate FAC-020 (62%), worst by mean detention FAC-020 (296 min)
+  OK   PLANT-3  bound FAC-036,FAC-037
+       14 m apart, same normalized address
+  OK   PLANT-4  bound CX-007,L-0041
+       18 carrier(s) refused for insurance expired at pickup, over 440 load(s)
+  OK   PLANT-5  bound L-0001
+       1 load(s) refused for BOL carrier mismatch
+  OK   PLANT-6  bound L-0003
+       1 breached
+  OK   PLANT-7  bound L-0004
+       unproven/telemetry_gap_exceeds_max x1
+  OK   PLANT-8  bound TOR-DET
+       The effect IS in the data and the naive query does not see it. Calendar quarters split the plant's 2 months across two of them, a MEAN over bimodal detention follows whichever cell caught an outlier, and a quarter keyed on delivery smears loads across the boundary. Three misdenominations, each sufficient. The remedy is to fix the statistic, not to collect more data — and "unmeasurable at this n" would have prescribed the opposite.
+  OK   PLANT-9  bound L-0005
+       unproven/commitment_posted_after_the_fact x1
+  Checked against boundTo, never against an id written into a report. A runner that
+  checks its detector against an advertisement reports finding what is not there.
+
+──────────────────────────────────────────────────────────────────────────────
+10. ADMISSIBILITY
+──────────────────────────────────────────────────────────────────────────────
+  Every figure above derives from records stamped `representative`.
+  isAdmissible() === false, by construction, at every derivation.
+  These numbers demonstrate that the MACHINERY WORKS. They are not claims about the
+  world. The same code paths, fed one real load, produce the same shapes with
+  admissible:true for that record alone.

@@ -123,7 +123,7 @@ export default function GlobalStatusBar() {
             .slice(0, 5);
           setQuakes(majorQuakes);
         }
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
     };
     fetchData();
     const iv = setInterval(fetchData, 60000);
@@ -134,7 +134,6 @@ export default function GlobalStatusBar() {
   // docs links must stay reachable when CoinGecko/USGS are rate-limited or down.
   const hasTicker = crypto.length > 0 || quakes.length > 0;
 
-  const solPrice = crypto.find(c => c.symbol === 'SOL');
 
   return (
     <motion.div

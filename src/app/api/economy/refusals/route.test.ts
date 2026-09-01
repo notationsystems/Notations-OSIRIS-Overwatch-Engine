@@ -22,14 +22,14 @@ describe('researcher-session readiness (work order 3.7)', () => {
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'sea-dog-miss-log-'));
-    process.env.SEA_DOG_FORCE_MISS_LOG = '1';
-    process.env.SEA_DOG_MISS_LOG_DIR = dir;
+    process.env.PAYLOAD_FORCE_MISS_LOG = '1';
+    process.env.PAYLOAD_MISS_LOG_DIR = dir;
     resetSessionTelemetry();
   });
 
   afterAll(() => {
-    delete process.env.SEA_DOG_FORCE_MISS_LOG;
-    delete process.env.SEA_DOG_MISS_LOG_DIR;
+    delete process.env.PAYLOAD_FORCE_MISS_LOG;
+    delete process.env.PAYLOAD_MISS_LOG_DIR;
     rmSync(dir, { recursive: true, force: true });
   });
 

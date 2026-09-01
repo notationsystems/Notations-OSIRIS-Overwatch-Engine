@@ -4,8 +4,8 @@ import { memo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plane, Satellite, Sun, AlertTriangle, Camera,
-  CloudLightning, Ship, Network, Database, Ghost,
-  Flame, Tv, Radio, Mountain, Anchor, Megaphone
+  CloudLightning, Ship, Network, Ghost,
+  Mountain, Megaphone
 } from 'lucide-react';
 
 interface LayerPanelProps {
@@ -15,9 +15,6 @@ interface LayerPanelProps {
   isMobile?: boolean;
   theme?: 'core' | 'ghost';
   setTheme?: (theme: 'core' | 'ghost') => void;
-  /** Server-side capabilities, e.g. { cloudflare: true }. Layers declaring a
-   *  `requires` key stay hidden until the matching capability is present. */
-  capabilities?: Record<string, boolean>;
 }
 
 interface LayerDef {
@@ -27,7 +24,6 @@ interface LayerDef {
   /** Reads a bucket out of data.category_counts instead of a top-level array. */
   catKey?: string;
   /** Capability that must be configured server-side for this layer to appear. */
-  requires?: string;
 }
 
 interface LayerGroupDef {
@@ -52,7 +48,7 @@ const LAYER_GROUPS: LayerGroupDef[] = [
   },
   {
     label: 'SDK',
-    fullLabel: 'OSIRIS SDK',
+    fullLabel: 'Payload Terminal SDK',
     icon: Network,
     layers: [
       { key: 'sdk_sea', label: 'Maritime Lines', dataKey: 'sdk_entities' },
@@ -63,10 +59,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'AVIATION',
     icon: Plane,
     layers: [
-      { key: 'flights', label: 'Commercial', dataKey: 'commercial_flights' },
-      { key: 'private', label: 'Private', dataKey: 'private_flights' },
-      { key: 'jets', label: 'Private Jets', dataKey: 'private_jets' },
-      { key: 'military', label: 'Military', dataKey: 'military_flights' },
     ],
   },
   {
@@ -82,12 +74,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'SPACE TRACKING',
     icon: Satellite,
     layers: [
-      { key: 'satellites', label: 'All Satellites', dataKey: 'satellites' },
-      { key: 'sat_comms', label: 'Starlink / Comms', dataKey: 'satellites', catKey: 'comms' },
-      { key: 'sat_military', label: 'Military / Intel', dataKey: 'satellites', catKey: 'military' },
-      { key: 'sat_navigation', label: 'GPS / Navigation', dataKey: 'satellites', catKey: 'navigation' },
-      { key: 'sat_earth', label: 'Earth Observation', dataKey: 'satellites', catKey: 'earth_obs' },
-      { key: 'sat_science', label: 'Stations / Telescopes', dataKey: 'satellites', catKey: 'science' },
     ],
   },
   {
@@ -95,8 +81,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'SURVEILLANCE',
     icon: Camera,
     layers: [
-      { key: 'cctv', label: 'CCTV Cameras', dataKey: 'cameras' },
-      { key: 'live_news', label: 'Live News Feeds', dataKey: 'live_feeds' },
     ],
   },
   {
@@ -105,7 +89,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: CloudLightning,
     layers: [
       { key: 'earthquakes', label: 'Earthquakes', dataKey: 'earthquakes' },
-      { key: 'fires', label: 'Active Fires', dataKey: 'fires' },
       { key: 'weather', label: 'Severe Weather', dataKey: 'weather_events' },
     ],
   },
@@ -115,8 +98,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     icon: AlertTriangle,
     layers: [
       { key: 'infrastructure', label: 'Nuclear Facilities', dataKey: 'infrastructure' },
-      { key: 'global_incidents', label: 'Global Incidents', dataKey: 'gdelt' },
-      { key: 'gdelt_events', label: 'GDELT Events', dataKey: 'gdelt_events' },
     ],
   },
   {
@@ -124,8 +105,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'NETWORK INTEL',
     icon: Network,
     layers: [
-      { key: 'malware', label: 'Live Malware', dataKey: 'malware_threats' },
-      { key: 'cyber_attacks', label: 'Live Attacks', dataKey: 'cyber_attacks' },
     ],
   },
   {
@@ -133,8 +112,6 @@ const LAYER_GROUPS: LayerGroupDef[] = [
     fullLabel: 'NET & EVENT INTEL',
     icon: Megaphone,
     layers: [
-      { key: 'cf_outages', label: 'Internet Outages', dataKey: 'cf_outages', requires: 'cloudflare' },
-      { key: 'cf_attacks', label: 'Attack Origins', dataKey: 'cf_attack_origins', requires: 'cloudflare' },
     ],
   },
   {
@@ -184,7 +161,7 @@ function ToggleSwitch({ active }: { active: boolean }) {
   );
 }
 
-function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme, capabilities = {} }: LayerPanelProps) {
+function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'core', setTheme }: LayerPanelProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
   /**
    * A pinned group stays open when the pointer leaves. Hover-only flyouts are
@@ -212,12 +189,13 @@ function LayerPanel({ data, activeLayers, setActiveLayers, isMobile, theme = 'co
     });
   };
 
-  /* Drop layers whose backing capability is not configured, then drop any group
-     left with nothing to show. */
-  const visibleGroups = LAYER_GROUPS.map(g => ({
-    ...g,
-    layers: g.layers.filter(l => !l.requires || capabilities[l.requires]),
-  })).filter(g => g.layers.length > 0);
+  /* Phase 70 removed 19 toggles whose feeds were deleted with the
+     general-purpose routes, and with them every layer that declared a
+     `requires` capability — so the capability filter had nothing left to
+     filter and `capabilities` was always `{}`. What remains is the group
+     drop, which still earns its place: a group emptied by a future removal
+     must not render as a heading with nothing under it. */
+  const visibleGroups = LAYER_GROUPS.filter(g => g.layers.length > 0);
 
   const getCount = (dk: string, catKey?: string): number | null => {
     if (!dk) return null;

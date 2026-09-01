@@ -6,7 +6,7 @@ Nothing is deployed today. What exists:
 
 - A `Dockerfile` and a `docker-publish` workflow (inherited with the
   substrate) publishing multi-arch images to
-  `ghcr.io/notationsystems/sea-dog-osiris-terminal-v0` on pushes to
+  `ghcr.io/notationsystems/sea-dog-payload-terminal-v0` on pushes to
   `main` and on `v*.*.*` tags. The workflow's branch trigger referenced a
   `master` that never existed; corrected to `main` in S-1.
 - `next build && next start` serves the full instrument from any host
@@ -15,7 +15,23 @@ Nothing is deployed today. What exists:
 - No hosting target, no credentials to one, in this build environment —
   standing a public URL up is the operator's step, deliberately (see the
   access decision below). One command on any Docker host:
-  `docker run -p 3000:3000 ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest`
+
+  ```
+  docker run -p 3000:3000 ghcr.io/notationsystems/sea-dog-payload-terminal-v0:0.1.0
+  ```
+
+  **PIN THE VERSION TAG, do not deploy `:latest`.** `latest` is published
+  from `main` only. The working branch runs ahead of `main` between
+  merges, so `:latest` can be an older instrument than the one a session
+  was prepared against — the split-commit hazard at the deploy layer, and
+  the same shape as every other "two greens about two different artifacts"
+  in this project. Before a session, confirm the running instance is the
+  intended tree: `/api/economy/guards` reports `version.commit`, which the
+  image now carries. A `commit_source` of `unstamped-build` means the
+  image was built outside the publish workflow; pass the SHA explicitly
+  (`--build-arg PAYLOAD_BUILD_SHA=<sha>` at build, or
+  `-e PAYLOAD_BUILD_SHA=<sha>` at run) rather than accepting a baseline
+  that cannot be attributed to a tree.
 
 ## Configuration seams (fail loudly, never degrade)
 
@@ -28,10 +44,10 @@ configuration layer.
 
 | Key | Required when | Meaning |
 |---|---|---|
-| `SEA_DOG_EDGAR_ENABLED=1` | — | Enables the EDGAR document tier (unbuilt; operator-blocked) |
-| `SEA_DOG_SEC_UA_ORG` | EDGAR enabled | SEC User-Agent organization — never fabricated |
-| `SEA_DOG_SEC_UA_CONTACT` | EDGAR enabled | SEC User-Agent role email — never fabricated |
-| `SEA_DOG_MISS_LOG_DIR` | optional | Miss-log directory (default `<cwd>/data-archive`) |
+| `PAYLOAD_EDGAR_ENABLED=1` | — | Enables the EDGAR document tier (unbuilt; operator-blocked) |
+| `PAYLOAD_SEC_UA_ORG` | EDGAR enabled | SEC User-Agent organization — never fabricated |
+| `PAYLOAD_SEC_UA_CONTACT` | EDGAR enabled | SEC User-Agent role email — never fabricated |
+| `PAYLOAD_MISS_LOG_DIR` | optional | Miss-log directory (default `<cwd>/data-archive`) |
 | `OSIRIS_DISABLE_LIVE=1` | optional | Force snapshot rungs — visible in provenance, never silent |
 
 No built source requires a credential today; the gate is the socket the

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronDown, ChevronUp, MapPin, ExternalLink, AlertTriangle,
+  ChevronDown, ChevronUp, MapPin, AlertTriangle,
   Newspaper, Clock, Radio, Maximize2, Minimize2
 } from 'lucide-react';
-import AiOverview from './AiOverview';
+import { useHydrated } from '@/lib/ui/clientOnly';
 
 interface LiveAlertsProps {
   data: any;
@@ -111,9 +111,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
     }
   };
 
-  // Ensure portal only renders on client
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useHydrated();
 
   const content = (
     <motion.div
@@ -136,7 +134,7 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
           <span className="gotham-tag gotham-tag--info" style={{ fontSize: '9px', padding: '1px 4px' }}>{BUILTIN_FEEDS.length} FEEDS</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#FF4081] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[#FF4081] animate-payload-pulse" />
           <button onClick={(e) => { e.stopPropagation(); setMaximized(!maximized); if (!expanded && !maximized) setExpanded(true); }} className="p-1.5 -m-0.5 rounded hover:text-white hover:bg-white/10 transition-colors" title={maximized ? "Restore" : "Maximize"}>
             {maximized ? <Minimize2 className="w-3 h-3 text-[var(--text-muted)]" /> : <Maximize2 className="w-3 h-3 text-[var(--text-muted)]" />}
           </button>
@@ -168,7 +166,6 @@ export default function LiveAlerts({ data, onLocate, onWatchFeed }: LiveAlertsPr
 
             {/* One-click AI overview of the current alert picture */}
             <div className={`flex-shrink-0 ${maximized ? 'px-6 pt-3' : 'px-3 pt-2'}`}>
-              <AiOverview mode="alerts" payload={data} accent="#FF4081" />
             </div>
 
             {/* Alert List - Internally Scrolling */}

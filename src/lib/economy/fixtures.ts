@@ -12,6 +12,29 @@ export const FIXTURE_PROV: Provenance = {
   retrievedAt: '2026-01-01T00:00:00Z',
 };
 
+/**
+ * Month label for the synthetic inventory series, ZERO-PADDED.
+ *
+ * Exported so the padding can be pinned at lengths the fixture does not yet
+ * use. `2024-0${i + 1}` is correct for the first nine elements and produces
+ * `2024-010-01` at the tenth — and V8's `Date.parse` ACCEPTS that, returning
+ * the right instant, so the defect would be silent.
+ *
+ * Where it bites is string comparison, which this codebase does constantly:
+ * `'2024-010-01'.slice(0, 7)` is `'2024-01'`, so October, November and December
+ * all key as JANUARY. Measured on a twelve-element version that briefly reached
+ * the tree: `extractSeries` returned four points labelled `2024-01` and the
+ * planted structural break moved from position 8 to position 11 of 12.
+ *
+ * The series is eight elements today, so the defect is LATENT, not live. It is
+ * fixed here rather than when someone extends the series, because the person
+ * who extends it will be thinking about inventory levels and not about
+ * `padStart`.
+ */
+export function fixtureMonth(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}
+
 export function syntheticState(): EconomyState {
   return {
     commodity: 'testium',
@@ -36,11 +59,11 @@ export function syntheticState(): EconomyState {
         metric: 'inventory' as const,
         value: v,
         unit: 'kt',
-        period: { start: `2024-0${i + 1}-01`, end: `2024-0${i + 1}-28` },
+        period: { start: `2024-${fixtureMonth(i)}-01`, end: `2024-${fixtureMonth(i)}-28` },
         // Month-end stocks are knowable at period end — stamped so the
         // series has a measurable arrival cadence (the alert gate refuses
         // series whose knowability collapses to a single retrieval date).
-        knownAt: `2024-0${i + 1}-28`,
+        knownAt: `2024-${fixtureMonth(i)}-28`,
         valueKind: 'reported' as const,
         confidence: 'high' as const,
         provenance: FIXTURE_PROV,

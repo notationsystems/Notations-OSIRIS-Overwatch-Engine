@@ -8,6 +8,9 @@ build
 .env
 .env.local
 .env*.local
+data-archive/load-operations.jsonl
+data-archive/carrier-communications.jsonl
+runtime-data
 
 # VCS & tooling
 .git

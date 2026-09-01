@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Stealth Fetch Utility
+ * Payload — Stealth Fetch Utility
  * Generates randomized HTTP headers to distribute API requests
  * across a pool of spoofed residential IP addresses and browser fingerprints.
  */

@@ -3,14 +3,12 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Radar, Satellite, Moon, ExternalLink, AlertTriangle, Activity, Database, Wifi, Play, Network, Crosshair, Bluetooth, Pentagon, Radio , PenLine, Mountain } from 'lucide-react';
+import { Layers, BarChart3, Newspaper, Search, X, Globe, MapPinned, Route, Satellite, Moon, ExternalLink, AlertTriangle, Database, Network, Radio , PenLine, Mountain } from 'lucide-react';
 import IntelFeed from '@/components/IntelFeed';
 import MarketsPanel from '@/components/MarketsPanel';
-import ScmPanel from '@/components/ScmPanel';
 import SearchBar from '@/components/SearchBar';
 import DirectionsBar, { type RouteResult, type LiveLocation } from '@/components/DirectionsBar';
 import NavigationView from '@/components/NavigationView';
-import FlightWatchPanel, { type WatchedFlight, type FlightTelemetry, type AircraftDetail, type Airport } from '@/components/FlightWatchPanel';
 import type { NavProgress } from '@/lib/navigation';
 import ScaleBar from '@/components/ScaleBar';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -19,13 +17,17 @@ import ViewPresets from '@/components/ViewPresets';
 import KeyboardShortcuts from '@/components/KeyboardShortcuts';
 import GlobalStatusBar from '@/components/GlobalStatusBar';
 import LiveAlerts from '@/components/LiveAlerts';
-import WorldRemote from '@/components/WorldRemote';
 import ArcGISPanel from '@/components/ArcGISPanel';
-const OsirisMap = dynamic(() => import('@/components/OsirisMap'), { ssr: false });
+import PayloadCommandBar from '@/components/PayloadCommandBar';
+import PayloadSpatialRail, { type SpatialLayerState } from '@/components/PayloadSpatialRail';
+import { NO_SPATIAL_BACKEND, spatialAvailability } from '@/lib/spatial/registry';
+import {
+  ALL_PANELS, CLOSED_PANELS, applyPanelCommand, slotOccupied,
+  type PanelId, type PanelState,
+} from '@/lib/ui/panels';
+const PayloadMap = dynamic(() => import('@/components/PayloadMap'), { ssr: false });
 const LayerPanel = dynamic(() => import('@/components/LayerPanel'));
 const SpaceCam = dynamic(() => import('@/components/SpaceCam'), { ssr: false });
-const CameraViewer = dynamic(() => import('@/components/CameraViewer'));
-const OsintPanel = dynamic(() => import('@/components/OsintPanel'));
 const DrawingToolbar = dynamic(() => import('@/components/DrawingToolbar'), { ssr: false });
 const DrawHud = dynamic(() => import('@/components/DrawHud'), { ssr: false });
 // The measurement helpers are pure functions — importing them directly keeps
@@ -58,20 +60,6 @@ function useIsMobile() {
   }, []);
   return isMobile;
 }
-const UptimeClock = () => {
-  const [uptime, setUptime] = useState('00:00:00');
-  const startTime = useRef(0);
-  if (startTime.current === 0) startTime.current = Date.now();
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const e = Math.floor((Date.now() - startTime.current) / 1000);
-      setUptime(`${String(Math.floor(e/3600)).padStart(2,'0')}:${String(Math.floor((e%3600)/60)).padStart(2,'0')}:${String(e%60).padStart(2,'0')}`);
-    }, 1000);
-    return () => clearInterval(iv);
-  }, []);
-  return <span className="hidden lg:inline">UPTIME: <span className="text-[var(--gold-primary)]">{uptime}</span></span>;
-};
-
 const ZuluClock = () => {
   const [time, setTime] = useState('');
   useEffect(() => {
@@ -101,36 +89,86 @@ function getYouTubeWatchUrl(url: string): string {
 }
 
 export default function Dashboard() {
-  const dataRef = useRef<any>({});
-  const [dataVersion, setDataVersion] = useState(0);
-  const data = dataRef.current;
+  // THE LAYER STORE IS STATE, NOT A REF READ AT RENDER.
+  //
+  // It was `const data = dataRef.current` beside a `dataVersion` counter — a
+  // half-finished pattern. Mutating a ref does not repaint, so every layer
+  // update relied on some OTHER state change happening to re-render at the
+  // right moment. Two of the four mutation sites (`sdk_entities`) bumped no
+  // counter at all, so that layer was permanently one data-cycle stale, and it
+  // could not bump one: its own effect depended on `dataVersion` and would have
+  // looped. Deriving it (below) removes the write and the staleness together.
+  //
+  // `dataRef` survives only as a MIRROR for async callbacks, which need the
+  // latest value without closing over a stale render. It is written in an
+  // effect, never during render.
+  const [data, setData] = useState<Record<string, any>>({});
+  const dataRef = useRef<Record<string, any>>(data);
+  useEffect(() => { dataRef.current = data; }, [data]);
+  const mergeData = useCallback((patch: Record<string, any>) => {
+    setData(prev => ({ ...prev, ...patch }));
+  }, []);
 
   const [backendStatus, setBackendStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [mapView, setMapView] = useState({ zoom: 2.5, latitude: 20 });
   const [flyToLocation, setFlyToLocation] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
-  const [globalStats, setGlobalStats] = useState<any>(null);
   const mouseCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const coordsDisplayRef = useRef<HTMLDivElement>(null);
   const [locationLabel, setLocationLabel] = useState('');
   const [regionDossier, setRegionDossier] = useState<any>(null);
   const [dossierLoading, setDossierLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [activeCamera, setActiveCamera] = useState<any>(null);
-  const [spaceWeather, setSpaceWeather] = useState<any>(null);
-  const [showLayers, setShowLayers] = useState(true);
-  const [showMarkets, setShowMarkets] = useState(false);
-  const [showEconomy, setShowEconomy] = useState(false);
+  // ── PANEL STATE, THROUGH ONE REGISTRY ──────────────────────────────────────
+  //
+  // These were eleven independent booleans, and every toggle hand-listed the
+  // panels it closed. Extracted and simulated, the nine handlers disagreed:
+  // 19 asymmetric pairs and 24 two-click sequences that left two panels stacked
+  // on the identical `right-12 top-1/2` anchor, so which one you saw depended
+  // on click order. See `src/lib/ui/panels.ts` for the measurement.
+  //
+  // Exclusion is now DERIVED from the slot a panel renders into. The aliases
+  // below keep every existing read and write site working unchanged, so this is
+  // a change of mechanism, not of behaviour — except where the behaviour was
+  // the defect.
+  const [panels, setPanels] = useState<PanelState>({ ...CLOSED_PANELS, layers: true });
+
+  const togglePanel = useCallback(
+    (panel: PanelId) => setPanels(st => applyPanelCommand(st, { kind: 'toggle', panel })), []);
+
+  /** Stable per-panel setters, so referential identity survives re-renders. */
+  const setPanel = useMemo(() => {
+    const make = (panel: PanelId) => (v: boolean | ((prev: boolean) => boolean)) =>
+      setPanels(st => applyPanelCommand(st, {
+        kind: (typeof v === 'function' ? v(st[panel]) : v) ? 'open' : 'close',
+        panel,
+      }));
+    return Object.fromEntries(ALL_PANELS.map(id => [id, make(id)])) as
+      Record<PanelId, (v: boolean | ((prev: boolean) => boolean)) => void>;
+  }, []);
+
+  const showLayers = panels.layers;
+  const showMarkets = panels.markets;
+  const showEconomy = panels.economy;
+  const showEconGraph = panels.econGraph;
+  const showAlerts = panels.alerts;
+  const showSpaceCam = panels.spaceCam;
+  const showDrawing = panels.drawing;
+  const showDesktopSearch = panels.search;
+  const showDirections = panels.directions;
+  const showArcGIS = panels.arcgis;
+  const showSpatial = panels.spatial;
+
+  const setShowEconomy = setPanel.economy;
+  const setShowEconGraph = setPanel.econGraph;
+  const setShowDesktopSearch = setPanel.search;
+  const setShowDirections = setPanel.directions;
+  const setShowSpatial = setPanel.spatial;
+
   const [econSelected, setEconSelected] = useState<string | null>(null);
   /** Temporal playback: evaluation date override (null = present state). */
   const [econAsOf, setEconAsOf] = useState<string | null>(null);
   /** Playback epistemics: hindsight reconstruction vs as-known-then. */
   const [econKnowledge, setEconKnowledge] = useState<'best_known' | 'as_known_then'>('best_known');
-  const [showEconGraph, setShowEconGraph] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
-  const [showSpaceCam, setShowSpaceCam] = useState(false);
-  const [showScmPanel, setShowScmPanel] = useState(true);
-  const [showIntel, setShowIntel] = useState(false);
-  const [showDrawing, setShowDrawing] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode | null>(null);
   const [drawProgress, setDrawProgress] = useState<DrawProgress | null>(null);
   const [drawCommand, setDrawCommand] = useState<{ action: 'undo' | 'finish' | 'cancel'; seq: number } | null>(null);
@@ -142,8 +180,6 @@ export default function Dashboard() {
   const [watchEvents, setWatchEvents] = useState<WatchEvent[]>([]);
   const watchBaselines = useRef<Record<string, WatchBaseline>>({});
   const [selectedPolygon, setSelectedPolygon] = useState<string | null>(null);
-  const [showDesktopSearch, setShowDesktopSearch] = useState(false);
-  const [showDirections, setShowDirections] = useState(false);
   const [activeRoute, setActiveRoute] = useState<
     (RouteResult & {
       from: { lat: number; lng: number };
@@ -158,56 +194,6 @@ export default function Dashboard() {
     { route: RouteResult; label: string; key: number } | null
   >(null);
   const [navProgress, setNavProgress] = useState<NavProgress | null>(null);
-  const [watchedFlights, setWatchedFlights] = useState<WatchedFlight[]>([]);
-  const [aircraftAirports, setAircraftAirports] = useState<Record<string, Airport[]>>({});
-
-  // The popup lives in raw map HTML, so it hands aircraft over through a global.
-  useEffect(() => {
-    (window as unknown as { osirisWatchFlight?: (f: WatchedFlight) => void }).osirisWatchFlight = (f) => {
-      if (!f?.icao24) return;
-      setWatchedFlights((prev) =>
-        prev.some((w) => w.icao24 === f.icao24) ? prev : [...prev, f].slice(-6));
-    };
-  }, []);
-
-  const removeWatched = useCallback((icao24: string) => {
-    setWatchedFlights((prev) => prev.filter((w) => w.icao24 !== icao24));
-    setAircraftAirports((prev) => {
-      const next = { ...prev };
-      delete next[icao24];
-      return next;
-    });
-  }, []);
-
-  const handleAircraftDetail = useCallback((icao24: string, detail: AircraftDetail | null) => {
-    const ports = [detail?.origin, detail?.destination]
-      .filter((a): a is Airport => Boolean(a && Number.isFinite(a.lat) && Number.isFinite(a.lng)));
-    setAircraftAirports((prev) => (ports.length ? { ...prev, [icao24]: ports } : prev));
-  }, []);
-
-  // Telemetry for watched aircraft, refreshed from whatever the feed last gave us.
-  const watchTelemetry = useMemo(() => {
-    const out: Record<string, FlightTelemetry> = {};
-    if (!watchedFlights.length) return out;
-    const buckets = [
-      data?.commercial_flights, data?.private_flights,
-      data?.private_jets, data?.military_flights,
-    ];
-    const wanted = new Set(watchedFlights.map((w) => w.icao24));
-    for (const bucket of buckets) {
-      for (const f of bucket || []) {
-        if (f?.icao24 && wanted.has(f.icao24)) {
-          out[f.icao24] = {
-            lat: f.lat, lng: f.lng, alt: f.alt,
-            speed_knots: f.speed_knots, heading: f.heading,
-            grounded: f.grounded, squawk: f.squawk,
-          };
-        }
-      }
-    }
-    return out;
-  }, [watchedFlights, data]);
-
   // A navigation session owns its own position watch. The planner's watch dies
   // with the planner when guidance takes over the panel, so guidance cannot
   // depend on it — without this the banner sits on "waiting for a fix" forever.
@@ -226,52 +212,35 @@ export default function Dashboard() {
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [navSession]);
-  const [showRemote, setShowRemote] = useState(false);
-  const [showArcGIS, setShowArcGIS] = useState(false);
   const [arcgisLayers, setArcgisLayers] = useState<Array<{ id: string; title: string; url: string; geojson: any; color: string; visible: boolean; opacity: number }>>([]);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number; bounds?: { west: number; south: number; east: number; north: number } } | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|'recon'|'remote'|null>(null);
+  const [mobilePanel, setMobilePanel] = useState<'layers'|'markets'|'intel'|'search'|null>(null);
   const [mapProjection, setMapProjection] = useState<'globe'|'mercator'>('globe');
   const [mapStyle, setMapStyle] = useState<'dark'|'satellite'>('dark');
-  const [sweepData, setSweepData] = useState<any>(null);
-  const [scanTargets, setScanTargets] = useState<any[]>([]);
   const [drawnPolygons, setDrawnPolygons] = useState<DrawnShape[]>([]);
-  const [demoMode, setDemoMode] = useState(false);
-  const [osirisTheme, setOsirisTheme] = useState<'core'|'ghost'>('core');
+  const [payloadTheme, setPayloadTheme] = useState<'core'|'ghost'>('core');
 
   useEffect(() => {
-    document.body.className = osirisTheme === 'core' ? '' : `theme-${osirisTheme}`;
-  }, [osirisTheme]);
+    document.body.className = payloadTheme === 'core' ? '' : `theme-${payloadTheme}`;
+  }, [payloadTheme]);
 
   const isMobile = useIsMobile();
-  const startTime = useRef(Date.now());
+  // `const startTime = useRef(Date.now())` stood here, read by nothing. Its
+  // initialiser also ran Date.now() on EVERY render (the argument is evaluated
+  // each time even though only the first is kept), which is the impurity the
+  // linter flagged. Removed: unused, and impure while unused.
   const geocodeCache = useRef<Map<string, string>>(new Map());
   const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastGeocodedPos = useRef<{ lat: number; lng: number } | null>(null);
 
   // ── DEFAULT: Most layers OFF — fast initial load ──
   const [activeLayers, setActiveLayers] = useState({
-    flights: false,
-    private: false,
-    jets: false,
-    military: false,
     maritime: true,
-    satellites: false,
-    sat_comms: false,
-    sat_military: false,
-    sat_navigation: false,
-    sat_earth: false,
-    sat_science: false,
     balloons: false,
-    cctv: true,
-    live_news: true,
     earthquakes: true,
-    fires: false,
     weather: false,
     radiation: false,
     infrastructure: false,
-    global_incidents: true,
     war_alerts: false,
     day_night: true,
     cables: true,
@@ -279,11 +248,6 @@ export default function Dashboard() {
     sdk_air: true,
     sdk_naval: true,
     terrain_3d: false,
-    malware: false,
-    cyber_attacks: false,
-    gdelt_events: false,
-    cf_outages: false,
-    cf_attacks: false,
     // Physical economy (copper vertical slice) — on by default: it is the
     // Overwatch Engine's primary research surface.
     econ_production: true,
@@ -293,10 +257,64 @@ export default function Dashboard() {
     econ_bottlenecks: true,
   });
   // Server-side capability flags — gate layers that need credentials.
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
+  // ── SPATIAL STATE RAIL ─────────────────────────────────────────────────────
+  //
+  // The rail presents SEMANTIC operations — Route, OD Matrix, Isochrone,
+  // Service Area — never a vendor. Which of them the terminal can actually
+  // answer is the spatial registry's answer, not this component's, and today
+  // it is none of them: no backend is configured, so every operation refuses
+  // rather than falling back to great-circle distance.
+  //
+  // Passing the engine explicitly rather than reading a module-level singleton
+  // keeps the fact visible at the call site: this page is wired to
+  // NO_SPATIAL_BACKEND, and swapping it is a one-line change here.
+  const spatialCompute = useMemo(() => {
+    const byOp = new Map(spatialAvailability(NO_SPATIAL_BACKEND).map(a => [a.operation, a]));
+    return ([
+      ['route', 'route'], ['matrix', 'matrix'],
+      ['isochrone', 'isochrone'], ['service_area', 'service_area'],
+    ] as const).map(([uiKey, op]) => ({
+      operation: uiKey,
+      available: byOp.get(op)?.available ?? false,
+      reason: byOp.get(op)?.reason ?? 'Operation not declared by the registry.',
+    }));
+  }, []);
+
+  // The five layers of the freight spatial corpus. THE CORPUS IS NOT BUILT, so
+  // every one is declared unavailable with a null count. `null` is not `0`:
+  // zero facilities would be a measurement, and nothing has been measured.
+  const NO_CORPUS = 'No spatial corpus is loaded. PostGIS/pgRouting is the intended ' +
+    'backing and is not yet configured — this is a fact about the installation, not a ' +
+    'claim that the network is empty.';
+  const spatialLayers = useMemo<SpatialLayerState[]>(() => ([
+    { key: 'network', label: 'Network' },
+    { key: 'facilities', label: 'Facilities' },
+    { key: 'corridors', label: 'Corridors' },
+    { key: 'restrictions', label: 'Restrictions' },
+    { key: 'temporal', label: 'Temporal state' },
+  ] as const).map(l => ({
+    ...l, count: null, active: false, available: false, unavailableReason: NO_CORPUS,
+  })), [NO_CORPUS]);
+
+  /**
+   * Features actually loaded, summed over the fetched layer arrays.
+   *
+   * NOT `sdk_entities.length` — that array is SAMPLED (every Nth flight, ~60
+   * per domain) for rendering, so its length is a property of the sampler. And
+   * not "entities in the world": this counts what this browser has fetched.
+   * The label in the command bar says `loaded`, which is what the number is.
+   */
+  const loadedFeatureCount = useMemo(() => {
+    const d = data as Record<string, unknown> | null;
+    if (!d) return 0;
+    return Object.entries(d).reduce(
+      (n, [key, v]) => (key === 'sdk_entities' || !Array.isArray(v) ? n : n + v.length),
+      0,
+    );
+  }, [data]);
+
   const [liveFeedUrl, setLiveFeedUrl] = useState<string | null>(null);
   const [liveFeedName, setLiveFeedName] = useState('');
-  const [liveFeedEmbedAllowed, setLiveFeedEmbedAllowed] = useState(true);
 
   // Splash screen
   useEffect(() => {
@@ -305,6 +323,10 @@ export default function Dashboard() {
   }, []);
 
   // On mount: geolocate by IP and fly to user's city (after splash/map init)
+  // Writes state from things only the browser knows — the query string the
+  // reader arrived on, and which credential-gated feeds this deployment has.
+  // Neither is derivable during render: the server renders the same HTML for
+  // every reader, so reading either one earlier would be a hydration mismatch.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -313,19 +335,13 @@ export default function Dashboard() {
     const layers = p.get('layers');
     if (layers) {
       const active = layers.split(',');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveLayers(prev => {
         const next = { ...prev };
         Object.keys(next).forEach(k => { (next as any)[k] = active.includes(k); });
         return next;
       });
     }
-
-    // Probe which credential-gated feeds this deployment has configured, so the
-    // layer panel can hide toggles that could never return data.
-    fetch('/api/cloudflare-radar?probe=1')
-      .then(r => (r.ok ? r.json() : null))
-      .then(p => { if (p) setCapabilities(c => ({ ...c, cloudflare: !!p.configured })); })
-      .catch(() => { /* leave the layer hidden */ });
 
     // Delay geolocation until map is ready (after splash screen clears)
     const geoTimer = setTimeout(() => {
@@ -355,16 +371,6 @@ export default function Dashboard() {
     }, 1500);
   }, [activeLayers]);
 
-  // Global Stats Fetch
-  useEffect(() => {
-    fetch('/api/stats')
-      .then(res => res.json())
-      .then(d => {
-        if (d.stats) setGlobalStats(d.stats);
-      })
-      .catch(console.error);
-  }, []);
-
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -373,22 +379,18 @@ export default function Dashboard() {
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen();
       }
-      if (e.key === 'l') setShowLayers(p => !p);
-      if (e.key === 'm') setShowMarkets(p => !p);
-      if (e.key === 'c') setShowScmPanel(p => !p);
-      if (e.key === 'i') setShowIntel(p => !p);
-      if (e.key === 's') { setShowDesktopSearch(p => !p); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); }
+      if (e.key === 'l') togglePanel('layers');
+      if (e.key === 'm') togglePanel('markets');
+      if (e.key === 's') togglePanel('search');
       if (e.key === 'r') setFlyToLocation({ lat: 20, lng: 0, ts: Date.now() });
       if (e.key === 'g') setMapProjection(p => p === 'globe' ? 'mercator' : 'globe');
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        setShowDesktopSearch(true); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false);
+        setShowDesktopSearch(true);
       }
     };
-    const fsHandler = () => setIsFullscreen(!!document.fullscreenElement);
     window.addEventListener('keydown', handler);
-    document.addEventListener('fullscreenchange', fsHandler);
-    return () => { window.removeEventListener('keydown', handler); document.removeEventListener('fullscreenchange', fsHandler); };
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   // Mouse coords + reverse geocode (Zero-Render)
@@ -416,7 +418,7 @@ export default function Dashboard() {
           setLocationLabel(label);
           lastGeocodedPos.current = coords;
         }
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+      } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
     }, 3000); // 3s debounce (was 1.5s)
   }, []);
 
@@ -426,7 +428,7 @@ export default function Dashboard() {
     try {
       const res = await fetch(`/api/region-dossier?lat=${coords.lat}&lng=${coords.lng}`);
       if (res.ok) setRegionDossier(await res.json());
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
+    } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); } finally { setDossierLoading(false); }
   }, []);
   // Entity click handler (hoisted from JSX to comply with Rules of Hooks - Fixes #113)
   const handleEntityClick = useCallback((entity: any) => {
@@ -434,22 +436,21 @@ export default function Dashboard() {
       setEconSelected(entity.id);
       setShowEconomy(true);
     }
-    if (entity?.type === 'cctv') setActiveCamera(entity);
-    if (entity?.type === 'live_news' && entity.url) {
-      setLiveFeedUrl(entity.url);
-      setLiveFeedName(entity.name);
-      setLiveFeedEmbedAllowed(entity.embed_allowed !== false);
-    }
   }, []);
 
   // ── Drawing / AOI ──
-  // OsirisMap already owns the draw interaction and the polygon rendering;
+  // PayloadMap already owns the draw interaction and the polygon rendering;
   // this only turns a finished ring into a measured, named, coloured record.
   // Restore drawn areas on load. Work that vanishes on refresh is work the
   // operator will not trust the tool with.
+  // Not a lazy `useState` initialiser: that would run during the server
+  // render, where there is no localStorage, and the restored shapes would
+  // then differ from the empty server markup. The effect is the first moment
+  // the store is legible.
   useEffect(() => {
     try {
       const restored = deserializeShapes(localStorage.getItem(STORAGE_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (restored.length) setDrawnPolygons(restored);
     } catch { /* storage unavailable — start empty */ }
   }, []);
@@ -460,8 +461,11 @@ export default function Dashboard() {
 
   // ── Tripwires ──
   // Re-sweep every watched AOI whenever live data refreshes and record what
-  // changed. Keyed off dataVersion rather than `data` so this runs once per
+  // changed. Keyed off the store so this runs once per
   // refresh instead of once per render.
+  // Appends to a log rather than deriving a value, and carries a baseline in a
+  // ref across runs — history, not a function of the current props. There is
+  // no render-phase form of "what changed since last time".
   useEffect(() => {
     if (watched.size === 0) return;
     const now = Date.now();
@@ -470,14 +474,15 @@ export default function Dashboard() {
       if (!watched.has(shape.id)) continue;
       const ring = queryRing(shape);
       if (!ring) continue;
-      const report = selectInPolygon(ring, dataRef.current as any);
+      const report = selectInPolygon(ring, data);
       const prev = watchBaselines.current[shape.id] ?? null;
       const { baseline, events } = diffSweep(shape.id, report, prev, now);
       watchBaselines.current[shape.id] = baseline;
       fresh.push(...events);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (fresh.length) setWatchEvents(log => appendEvents(log, fresh));
-  }, [dataVersion, watched, drawnPolygons]);
+  }, [data, watched, drawnPolygons]);
 
   const toggleWatch = useCallback((id: string) => {
     setWatched(prev => {
@@ -504,7 +509,7 @@ export default function Dashboard() {
 
   const handleExportGeoJSON = useCallback(() => {
     downloadFile(
-      `osiris-aoi-${new Date().toISOString().slice(0, 10)}.geojson`,
+      `payload-aoi-${new Date().toISOString().slice(0, 10)}.geojson`,
       JSON.stringify(shapesToGeoJSON(drawnPolygons), null, 2),
       'application/geo+json',
     );
@@ -528,24 +533,27 @@ export default function Dashboard() {
       if (res.ok) {
         const json = await res.json();
         const d = transform ? transform(json) : json;
-        dataRef.current = { ...dataRef.current, ...d };
-        setDataVersion(v => v + 1);
+        mergeData(d);
         setBackendStatus('connected');
         return true;
       }
       return false;
     } catch (e) {
-      console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e);
+      console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e);
       setBackendStatus('error');
       return false;
     }
   }, []);
 
   // ── PROGRESSIVE DATA LOADING (request-optimized) ──
+  // Every state write here is the arrival of a network response, staged so the
+  // panels that need data first get it first. Fetching is the effect's whole
+  // purpose; the writes are how the answers get in.
   useEffect(() => {
     // Priority 1: Core feeds (always needed for panels)
     const eqUrl = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson';
     const eqTransform = (data: any) => ({ earthquakes: (data.features || []).map((f: any) => ({ id: f.id, lat: f.geometry?.coordinates?.[1] || 0, lng: f.geometry?.coordinates?.[0] || 0, depth: f.geometry?.coordinates?.[2] || 0, magnitude: f.properties?.mag, place: f.properties?.place, time: f.properties?.time, url: f.properties?.url, tsunami: f.properties?.tsunami, type: f.properties?.type, felt: f.properties?.felt, alert: f.properties?.alert })) });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEndpoint(eqUrl, eqTransform);
     fetchEndpoint('/api/news');
     /* A cold start can time out every upstream quote and return an all-empty
@@ -560,13 +568,6 @@ export default function Dashboard() {
     };
     const marketTimer = setTimeout(() => loadMarkets(), 800);
 
-    // Priority 2: Space Weather (needed for MarketsPanel)
-    const spaceTimer = setTimeout(async () => {
-      try {
-        const r = await fetch('/api/space-weather');
-        if (r.ok) setSpaceWeather(await r.json());
-      } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
-    }, 5000);
 
     // Polling — OPTIMIZED intervals to minimize edge requests
     const intervals = [
@@ -577,8 +578,7 @@ export default function Dashboard() {
     return () => {
       clearTimeout(marketTimer);
       marketRetries.forEach(clearTimeout);
-      clearTimeout(spaceTimer);
-      intervals.forEach(clearInterval);
+        intervals.forEach(clearInterval);
     };
   }, [fetchEndpoint]);
 
@@ -586,29 +586,6 @@ export default function Dashboard() {
   const layerFetchedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
 
-    // Flights
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      if (!layerFetchedRef.current.has('flights')) {
-        fetchEndpoint('/api/flights');
-        layerFetchedRef.current.add('flights');
-      }
-    }
-    // Satellites (any satellite sub-layer triggers fetch)
-    const anySatLayer = activeLayers.satellites || activeLayers.sat_comms || activeLayers.sat_military || activeLayers.sat_navigation || activeLayers.sat_earth || activeLayers.sat_science;
-    if (anySatLayer && !layerFetchedRef.current.has('satellites')) {
-      fetchEndpoint('/api/satellites');
-      layerFetchedRef.current.add('satellites');
-    }
-    // Fires
-    if (activeLayers.fires && !layerFetchedRef.current.has('fires')) {
-      fetchEndpoint('/api/fires');
-      layerFetchedRef.current.add('fires');
-    }
-    // CCTV
-    if (activeLayers.cctv && !layerFetchedRef.current.has('cctv')) {
-      fetchEndpoint(`/api/cctv?region=all&_t=${Date.now()}`);
-      layerFetchedRef.current.add('cctv');
-    }
     // Maritime
     if (activeLayers.maritime && !layerFetchedRef.current.has('maritime')) {
       fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships }));
@@ -624,11 +601,6 @@ export default function Dashboard() {
       fetchEndpoint('/api/radiation', d => ({ radiation: d.stations }));
       layerFetchedRef.current.add('radiation');
     }
-    // Live News
-    if (activeLayers.live_news && !layerFetchedRef.current.has('live_news')) {
-      fetchEndpoint('/api/live-news', d => ({ live_feeds: d.feeds }));
-      layerFetchedRef.current.add('live_news');
-    }
     // Weather
     if (activeLayers.weather && !layerFetchedRef.current.has('weather')) {
       fetchEndpoint('/api/weather', d => ({ weather_events: d.events }));
@@ -639,11 +611,6 @@ export default function Dashboard() {
       fetchEndpoint('/api/infrastructure', d => ({ infrastructure: d.infrastructure }));
       layerFetchedRef.current.add('infrastructure');
     }
-    // Global Incidents (GDELT)
-    if (activeLayers.global_incidents && !layerFetchedRef.current.has('gdelt')) {
-      fetchEndpoint('/api/gdelt', d => ({ gdelt: d.events }));
-      layerFetchedRef.current.add('gdelt');
-    }
 
     // Submarine Cables
     if (activeLayers.cables && !layerFetchedRef.current.has('cables')) {
@@ -653,50 +620,17 @@ export default function Dashboard() {
       const res = await fetch(`/data/submarine-cables.json?v=${ts}`);
           if (res.ok) {
              const cablesData = await res.json();
-             dataRef.current = { ...dataRef.current, submarine_cables: cablesData.features };
-             setDataVersion(v => v + 1);
+             mergeData({ submarine_cables: cablesData.features });
           }
-        } catch (e) { console.warn('Cables fetch failed'); }
+        } catch { console.warn('Cables fetch failed'); }
       })();
       layerFetchedRef.current.add('cables');
     }
 
 
-    // Live Malware (abuse.ch)
-    if (activeLayers.malware && !layerFetchedRef.current.has('malware')) {
-      fetchEndpoint('/api/malware', d => ({ malware_threats: d.threats }));
-      layerFetchedRef.current.add('malware');
-    }
 
-    // Live Cyber Attacks (animated arcs)
-    if ((activeLayers as any).cyber_attacks && !layerFetchedRef.current.has('cyber_attacks')) {
-      fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-      layerFetchedRef.current.add('cyber_attacks');
-    }
 
-    /* Mark before awaiting so a re-render mid-flight cannot double-fetch, then
-       release the mark if nothing landed — otherwise one failed request leaves
-       the layer permanently empty. */
-    const loadLayerOnce = (key: string, url: string, transform: (d: any) => any) => {
-      if (layerFetchedRef.current.has(key)) return;
-      layerFetchedRef.current.add(key);
-      fetchEndpoint(url, transform).then(ok => {
-        if (!ok) layerFetchedRef.current.delete(key);
-      });
-    };
 
-    // GDELT 2.0 geocoded events
-    if ((activeLayers as any).gdelt_events) {
-      loadLayerOnce('gdelt_events', '/api/gdelt-events?limit=600', d => ({ gdelt_events: d.events }));
-    }
-
-    // Cloudflare Radar — one request backs both layers
-    if ((activeLayers as any).cf_outages || (activeLayers as any).cf_attacks) {
-      loadLayerOnce('cloudflare_radar', '/api/cloudflare-radar', d => ({
-        cf_outages: d.outages ?? [],
-        cf_attack_origins: d.attack_origins ?? [],
-      }));
-    }
 
 
   }, [activeLayers]);
@@ -704,10 +638,6 @@ export default function Dashboard() {
   // ── LAYER-AWARE POLLING — only poll data for active layers ──
   useEffect(() => {
     const intervals: ReturnType<typeof setInterval>[] = [];
-    if (activeLayers.flights || activeLayers.military || activeLayers.jets || activeLayers.private) {
-      intervals.push(setInterval(() => fetchEndpoint('/api/flights'), 300000)); // 5 min (was 2 min)
-    }
-
     if (activeLayers.balloons) {
       intervals.push(setInterval(() => fetchEndpoint('/api/balloons', d => ({ balloons: d.balloons })), 300000)); // 5m
     }
@@ -716,13 +646,6 @@ export default function Dashboard() {
     }
     if (activeLayers.maritime) {
       intervals.push(setInterval(() => fetchEndpoint('/api/maritime', d => ({ maritime_ports: d.ports, maritime_chokepoints: d.chokepoints, maritime_ships: d.ships })), 10000)); // 10s
-    }
-    if ((activeLayers as any).cyber_attacks) {
-      intervals.push(setInterval(() => {
-        layerFetchedRef.current.delete('cyber_attacks');
-        fetchEndpoint('/api/cyber-attacks', d => ({ cyber_attacks: d.attacks }));
-        layerFetchedRef.current.add('cyber_attacks');
-      }, 10000)); // 10s — rapid refresh
     }
     return () => intervals.forEach(clearInterval);
   }, [activeLayers, fetchEndpoint]);
@@ -758,16 +681,19 @@ export default function Dashboard() {
 
   // Reactive layer fetch: handled by layerFetchedRef above (no duplicate)
 
-  // ── OSIRIS SDK — Intelligence Fusion Layer ──
+  // ── Payload Terminal SDK — Intelligence Fusion Layer ──
   // Produces node coordinates for the SDK network mesh visualization.
   // Does NOT duplicate existing layer visuals — SDK layer is LINES ONLY.
   // Cameras are excluded — they have their own dedicated layer.
-  useEffect(() => {
+  // DERIVED, NOT STORED. This was an effect that wrote `sdk_entities` back into
+  // the shared store and bumped no version, so the layer never triggered a
+  // repaint of its own — and it could not, because the effect depended on the
+  // version counter and would have looped. A value computed from other data is
+  // a derivation; storing it created a cycle that could only be broken by
+  // leaving the layer stale.
+  const sdkEntities = useMemo<any[]>(() => {
     const anyActive = activeLayers.sdk_sea || activeLayers.sdk_air || activeLayers.sdk_naval;
-    if (!anyActive) {
-      dataRef.current = { ...dataRef.current, sdk_entities: [] };
-      return;
-    }
+    if (!anyActive) return [];
 
     const sdkEntities: any[] = [];
 
@@ -834,8 +760,11 @@ export default function Dashboard() {
       }
     }
 
-    dataRef.current = { ...dataRef.current, sdk_entities: sdkEntities };
-  }, [dataVersion, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
+    return sdkEntities;
+  }, [data, activeLayers.sdk_sea, activeLayers.sdk_air, activeLayers.sdk_naval]);
+
+  /** What the map and panels actually read: the store plus what is derived from it. */
+  const mapData = useMemo(() => ({ ...data, sdk_entities: sdkEntities }), [data, sdkEntities]);
 
   const totalFlights = useMemo(() => (
     (data.commercial_flights?.length||0)+(data.private_flights?.length||0)+(data.private_jets?.length||0)+(data.military_flights?.length||0)
@@ -939,9 +868,9 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* ── OSIRIS title — letter-by-letter stagger ── */}
+            {/* ── Payload Terminal title — letter-by-letter stagger ── */}
             <div className="flex items-center gap-[2px] mb-3 z-[2]">
-              {'OSIRIS'.split('').map((letter, i) => (
+              {'Payload Terminal'.split('').map((letter, i) => (
                 <motion.span
                   key={i}
                   initial={{ opacity: 0, y: 20, filter: 'blur(8px)' }}
@@ -1041,9 +970,9 @@ export default function Dashboard() {
 
       {/* ── MAP ── */}
       <ErrorBoundary name="Map">
-        <OsirisMap 
-          key={osirisTheme}
-          data={data} 
+        <PayloadMap 
+          key={payloadTheme}
+          data={mapData} 
           activeLayers={activeLayers} 
           projection={mapProjection} 
           mapStyle={mapStyle === 'satellite' ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}' : 'dark'} 
@@ -1052,10 +981,7 @@ export default function Dashboard() {
           onRightClick={handleRightClick} 
           onViewStateChange={setMapView} 
           flyToLocation={flyToLocation}
-          sweepData={sweepData}
-          scanTargets={scanTargets}
-          demoMode={demoMode}
-          theme={osirisTheme}
+          theme={payloadTheme}
           arcgisLayers={arcgisLayers.filter(l => l.visible).map(l => ({ id: l.id, title: l.title, geojson: l.geojson, color: l.color, opacity: l.opacity }))}
           onMapCenter={setMapCenter}
           route={activeRoute}
@@ -1073,7 +999,6 @@ export default function Dashboard() {
           onDrawCancel={() => { setDrawMode(null); setDrawProgress(null); }}
           onDrawComplete={handleDrawComplete}
           drawnPolygons={drawnPolygons}
-          aircraftAirports={aircraftAirports}
         />
       </ErrorBoundary>
 
@@ -1140,22 +1065,6 @@ export default function Dashboard() {
 
 
       {/* ── FLIGHT WATCH ── */}
-      {watchedFlights.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-          className="absolute top-3 z-[380] w-[min(92vw,290px)] pointer-events-auto
-                     max-h-[calc(100vh-180px)] overflow-y-auto styled-scrollbar"
-          style={{ left: isMobile ? '12px' : '120px' }}
-        >
-          <FlightWatchPanel
-            watched={watchedFlights}
-            telemetry={watchTelemetry}
-            onRemove={removeWatched}
-            onLocate={(lat, lng) => setFlyToLocation({ lat, lng, zoom: 8, ts: Date.now() })}
-            onDetail={handleAircraftDetail}
-          />
-        </motion.div>
-      )}
 
       {/* ── MAP VIEW CONTROLS ── */}
       <motion.div
@@ -1241,13 +1150,13 @@ export default function Dashboard() {
             <path d="m140.86,465.53c-6.7333,0-8.7137-5.4462-12.181-25.899-2.4479-14.774-7.1068-28.463-10.502-43.043-3.0219-13.117-5.6425-20.332-9.6694-26.618-6.5526-10.229-6.3011-20.921,0.71691-30.481,6.33-8.6232,6.827-11.121,6.5471-32.901-0.13783-10.725-0.56403-21.286-0.94711-23.468-0.88077-5.0179-4.6148-7.6923-13.904-9.9586-8.4827-2.0695-16.525-2.2933-41.967-1.1681-18.144,0.80245-20.457,0.72323-22.75-0.77901-5.627-3.687-2.9527-8.8405,12.261-23.626,15.69-15.249,23.876-24.688,38.811-44.75,26.839-36.053,30.927-40.83,57.501-49.189,19.575-6.1582,26.691-9.0119,62.031-10.06,24.654-0.7309,38.767,2.5963,45.357,3.3466,25.219,2.8716,66.247,14.877,91.933,26.083,13.581,5.9249,14.042,6.1723,30.115,16.152,11.981,7.4391,18.733,10.459,35.44,15.034,34.886,9.553,56.753,7.7583,92,10.378,9.2579,0.68808,49.298,3.5149,74.5,4.4784,30.689,1.1732,35.835-2.0376,38.423,0.54994,2.0315,2.0315,0.5636,8.1815,0.6024,14.306,0.0237,3.7378-0.18399,7.6642-0.48569,11.602-8.1923-1.424-8.0353-1.3676-26.54-2.9165-1.6808-0.14069-16.718-1.6695-44.5-4.1726-11.867-1.0692-70.326-2.8448-105.5-3.9248-16.997-0.52189-34.357-4.7228-51-1.2347-5.7624,1.2076,2.387-1.1161-16,7.4812-36.313,14.051-55.853,23.79-104.5,32.83-30.774,4.5201-33.208,4.9745-36.376,7.2909-1.7456,1.2764-1.662,1.6171,1.6767,6.8363,3.5642,5.5717,14.275,15.81,29.699,28.389,51.619,43.564,115.05,77.431,162.89,98.598,22.221,9.5122,37.55,14.655,50.108,16.811,61.892,13.654,134.26-9.4938,136.11-56.959,0.0489-1.256,0.49928-6.001-0.1398-12.079-0.44539-4.2357-0.89625-7.3216-2.2932-11.095-3.9795-10.75-12.413-20.407-28.672-21.755-11.746,0.022-20.375,6.1561-23.95,16.17-4.5622,12.78,1.3185,27.071,14.023,29.565,6.6403,1.3038,11.222-0.5256,14.271-4.4679,3.3424-4.3221,3.72-12.026,1.3559-15.634-2.2757-3.4732-7.2459-5.2754-10.824-3.9248-3.6125,1.3636-4.9933,0.36555-0.6538-3.1839,0.38036-0.24867,0.77844-0.4586,1.191-0.63136,6.6675-2.7918,17.127,4.1226,17.913,14.135,0.7119,11.495-7.7045,20.279-19.249,20.94-6.5659,0.37574-14.594-1.9665-20.026-7.8035-13.425-14.428-9.1712-34.885,2.9586-45.762,4.6131-4.1366,7.7535-6.0583,14.065-7.4773,19.37-4.3554,37.69,4.5134,45.528,24.301,3.5645,8.9992,3.7675,16.201,3.8515,23.221,0.70438,58.895-65.742,87.202-131.95,82.517-28.009-2.4123-46.229-6.8095-80.495-20.915-36.58-12.09-143.44-68.32-207.96-120.33-18.846-15.317-30.511-22.813-33.055-21.24-0.61585,0.38062-0.98989,11.992-0.99221,30.802-0.004,28.758-0.1019,30.352-2.0717,33.583-3.2793,5.3791-4.935,17.725-5.9822,44.608-1.6327,41.914-2.675,60.915-3.4439,62.778-1.3963,3.383-7.0306,4.6642-13.289,4.6642zm221.62-252.27c0.41803-2.1707-4.6044-8.6243-11.231-13.08-10.396-6.9893-22.385-11.512-34.092-15.96-71.934-23.518-145.08-20.065-174.03-4.962-10.593,5.1512-14.126,7.777-22.813,15.582-4.1291,3.7102-9.5939,9.7305-12.144,13.379-5.133,7.3428-10.014,13.339-19.014,23.362-9.3026,10.359-14.5,16.774-14.5,17.897,0,1.5721,7.8962,3.1488,17.5,3.5809,81.15,10.292,230.44,14.198,270.32-39.799zm224.18-69.351c-16.558-0.50003-42.467-2.0158-63.5-4.8954-19.525-2.6732-39.047-6.067-58-11.467-17.982-5.123-35.124-12.85-52.5-19.754-7.7243-3.0694-15.32-6.4533-23-9.6318-8.319-3.4429-16.53-7.1723-25-10.224-15.523-5.5928-30.986-11.946-47.239-14.789-41.988-7.3464-85.261-8.7793-127.76-5.4986-23.554,1.8182-46.695,7.7124-69.5,13.878-17.863,4.8293-35.019,11.972-52.5,18.041-5.069,1.761-10.039,6.841-15.177,5.321-5.396-1.6-10.73-7.749-10.317-13.361,0.434-5.884,7.835-9.014,12.753-12.272,16.823-11.146,36.498-17.485,55.661-23.803,19.219-6.3349,38.923-12.127,59.072-14.001,54.326-5.0532,110.09-3.4301,163.5,7.7269,28.29,5.9098,53.945,20.759,81,30.92,31.437,11.806,61.76,27.444,94.5,34.909,33.045,7.534,83.745,9.6292,101.22,9.5911,6.5425-0.0143,6.7685,0.0708,8.3595,3.1475,1.8515,3.5805,3.1256,14.296,1.7926,15.077-1.3395,0.78418-21.593,1.4453-33.376,1.0894z" />
           </svg>
           <div className="flex flex-col items-start gap-0.5">
-            <h1 className="text-lg md:text-xl font-bold tracking-[0.4em] text-[#D4AF37] font-mono">OSIRIS</h1>
-            <span className="text-[9px] md:text-[10px] font-mono tracking-[0.2em] opacity-80 uppercase text-[#D4AF37]">OPEN SOURCE INTELLIGENCE</span>
+            <h1 className="text-lg md:text-xl font-bold tracking-[0.4em] text-[#D4AF37] font-mono">Payload Terminal</h1>
+            <span className="text-[9px] md:text-[10px] font-mono tracking-[0.2em] opacity-80 uppercase text-[#D4AF37]">FREIGHT · SCM · PHYSICAL COMMERCE</span>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-1.5 pl-[44px] min-w-0 pr-4">
           <span className="text-[9px] md:text-[9px] text-[var(--text-muted)] font-mono tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-40 truncate">
-            REAL-TIME GLOBAL MONITORING <span className="hidden md:inline">· FLIGHTS · MARITIME · SATELLITES · CCTV · WEATHER · CYBER THREATS</span>
+            OPERATING WORLD STATE <span className="hidden md:inline">· LOADS · CARRIERS · LANES · COMMITMENTS · OUTCOMES</span>
           </span>
         </div>
       </motion.div>
@@ -1268,18 +1177,21 @@ export default function Dashboard() {
         </span>
 
         <span className="hidden lg:inline-flex items-center gap-1" title="Tracked entities on map">
-          <ActiveEntityCount data={data} />
+          <ActiveEntityCount data={mapData} />
           <span className="opacity-60">ENTITIES</span>
         </span>
 
-        {spaceWeather && <span className="hidden lg:inline" title={`Geomagnetic Storm Index — Kp${spaceWeather.kp_index}`}>SOLAR: <span style={{ color: spaceWeather.storm_color, fontWeight: 700 }}>Kp{spaceWeather.kp_index}</span></span>}
 
         <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
+
+        <a href="/operations" className="pointer-events-auto rounded border border-[var(--cyan-primary)]/25 bg-[var(--cyan-primary)]/8 px-3 py-1.5 text-[9px] font-bold tracking-[0.16em] text-[var(--cyan-primary)] hover:border-[var(--cyan-primary)]/55">
+          OPS
+        </a>
         
         <TokenPanel />
 
         <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="pointer-events-auto glass-panel px-3 py-1.5 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10 ml-3 shadow-[0_0_10px_rgba(255,215,0,0.1)]">
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--gold-primary)] animate-payload-pulse" />
           <span className="text-[var(--gold-primary)] font-bold">SUPPORT</span>
         </a>
       </motion.div>
@@ -1289,9 +1201,10 @@ export default function Dashboard() {
           place would put the support badge underneath the destination field. */}
       {isMobile && !showDirections && !navSession && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
+          <a href="/operations" className="rounded border border-[var(--cyan-primary)]/25 bg-[var(--cyan-primary)]/8 px-2 py-1 text-[9px] font-bold tracking-[0.14em] text-[var(--cyan-primary)]">OPS</a>
           <TokenPanel />
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
-            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-osiris-pulse" />
+            <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-payload-pulse" />
             <span className="text-[var(--gold-primary)] font-bold">SUPPORT</span>
           </a>
         </motion.div>
@@ -1299,41 +1212,41 @@ export default function Dashboard() {
 
 
 
+      {/* ── COMMAND BAR ──────────────────────────────────────────────────────
+          One control surface over the same panel registry the right tool strip
+          drives, so the two can never disagree about what is open.
+
+          It YIELDS the top slot rather than competing for it: the route planner
+          renders at `absolute top-3` and this bar at `absolute top-3 left-1/2`
+          with a higher z-index, so mounting both would put the command bar over
+          the destination field. `slotOccupied` is the registry answering that,
+          not a hand-listed condition that goes stale when a panel moves. */}
+      {!isMobile && !slotOccupied(panels, 'top_bar') && !navSession && (
+        <PayloadCommandBar
+          backendStatus={backendStatus}
+          entityCount={loadedFeatureCount}
+          showLayers={showLayers}
+          showMarkets={showMarkets}
+          showEconomy={showEconomy}
+          showAlerts={showAlerts}
+          onSearch={() => togglePanel('search')}
+          onLayers={() => togglePanel('layers')}
+          onMarkets={() => togglePanel('markets')}
+          onEconomy={() => togglePanel('economy')}
+          onAlerts={() => togglePanel('alerts')}
+        />
+      )}
+
       {/* ── NEW SIDEBAR (Root Level) ── */}
-      {showLayers && !isMobile && <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />}
+      {showLayers && !isMobile && <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} theme={payloadTheme} setTheme={setPayloadTheme} />}
 
 
 
       {/* ── RIGHT TOOL STRIP (desktop only — mobile uses bottom nav) ── */}
       {!isMobile && <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[250] pointer-events-auto bg-black/40 backdrop-blur-sm p-1 rounded-full border border-white/5">
-        <div className="relative group">
-          <button onClick={() => { setShowIntel(!showIntel); setShowMarkets(false); setShowAlerts(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showIntel ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="OSINT Recon — IP lookup, network sweep, geolocation" aria-label="OSINT Recon" aria-expanded={showIntel}>
-            <Radar className={`w-4 h-4 ${showIntel ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
-            {showIntel && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]"
-              />
-            )}
-          </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[9px] font-mono tracking-wider text-white/80 bg-black/80 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">RECON</span>
-          <AnimatePresence>
-            {showIntel && (
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <OsintPanel onSweepVisualize={setSweepData} onScanGeolocate={(target, data) => {
-                  setScanTargets(prev => {
-                    const existing = prev.filter(t => t.id !== target);
-                    return [{ id: target, timestamp: Date.now(), ...data }, ...existing].slice(0, 10);
-                  });
-                  setFlyToLocation({ lat: data.lat, lng: data.lng, ts: Date.now() });
-                }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowIntel(false); setShowAlerts(false); setShowMarkets(false); setShowSpaceCam(v => !v); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Live from Space — 24/7 video downlink from the ISS" aria-label="Live from Space" aria-expanded={showSpaceCam}>
+          <button onClick={() => togglePanel('spaceCam')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpaceCam ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Live from Space — 24/7 video downlink from the ISS" aria-label="Live from Space" aria-expanded={showSpaceCam}>
             <Radio className={`w-4 h-4 ${showSpaceCam ? 'text-[#00E5FF]' : 'text-white/60'}`} />
             {showSpaceCam && (
               <span
@@ -1353,7 +1266,30 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowEconomy(!showEconomy); setShowIntel(false); setShowAlerts(false); setShowSpaceCam(false); setShowMarkets(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showEconomy ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Physical Economy — copper flows, concentration, bottlenecks" aria-label="Physical Economy" aria-expanded={showEconomy}>
+          <button onClick={() => togglePanel('spatial')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showSpatial ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="Spatial State — network, facilities, corridors, restrictions" aria-label="Spatial State" aria-expanded={showSpatial}>
+            <Network className={`w-4 h-4 ${showSpatial ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
+            {showSpatial && (
+              <span aria-hidden="true" className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]" />
+            )}
+          </button>
+          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[9px] font-mono tracking-wider text-white/80 bg-black/80 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">SPATIAL</span>
+          <AnimatePresence>
+            {showSpatial && (
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2">
+                <PayloadSpatialRail
+                  layers={spatialLayers}
+                  compute={spatialCompute}
+                  onToggle={() => { /* no corpus: every layer is declared unavailable, so this cannot fire */ }}
+                  onInspect={() => togglePanel('search')}
+                  onClose={() => setShowSpatial(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="relative group">
+          <button onClick={() => togglePanel('economy')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showEconomy ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Physical Economy — copper flows, concentration, bottlenecks" aria-label="Physical Economy" aria-expanded={showEconomy}>
             <Mountain className={`w-4 h-4 ${showEconomy ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showEconomy && (
               <span
@@ -1384,7 +1320,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowMarkets(!showMarkets); setShowIntel(false); setShowAlerts(false); setShowSpaceCam(false); setShowEconomy(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
+          <button onClick={() => togglePanel('markets')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showMarkets ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Markets — crypto prices, space weather, global indices" aria-label="Markets" aria-expanded={showMarkets}>
             <BarChart3 className={`w-4 h-4 ${showMarkets ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showMarkets && (
               <span
@@ -1397,14 +1333,14 @@ export default function Dashboard() {
           <AnimatePresence>
             {showMarkets && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <MarketsPanel data={data} spaceWeather={spaceWeather} />
+                <MarketsPanel data={mapData} />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowAlerts(!showAlerts); setShowIntel(false); setShowMarkets(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="Live Alerts — earthquakes, conflicts, breaking news" aria-label="Live Alerts" aria-expanded={showAlerts}>
+          <button onClick={() => togglePanel('alerts')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showAlerts ? 'bg-[#FF3D3D]/20' : 'hover:bg-white/10'}`} title="Live Alerts — earthquakes, conflicts, breaking news" aria-label="Live Alerts" aria-expanded={showAlerts}>
             <AlertTriangle className={`w-4 h-4 ${showAlerts ? 'text-[#FF3D3D]' : 'text-white/60'}`} />
             {showAlerts && (
               <span
@@ -1417,14 +1353,14 @@ export default function Dashboard() {
           <AnimatePresence>
             {showAlerts && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <LiveAlerts data={data} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
+                <LiveAlerts data={mapData} onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })} onWatchFeed={(url, name) => { setLiveFeedUrl(url); setLiveFeedName(name); }} />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDrawing(!showDrawing); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDrawing ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Draw — measure areas of interest on the map" aria-label="Draw" aria-expanded={showDrawing}>
+          <button onClick={() => togglePanel('drawing')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDrawing ? 'bg-[#00E5FF]/20' : 'hover:bg-white/10'}`} title="Draw — measure areas of interest on the map" aria-label="Draw" aria-expanded={showDrawing}>
             <PenLine className={`w-4 h-4 ${showDrawing ? 'text-[#00E5FF]' : 'text-white/60'}`} />
             {showDrawing && (
               <span
@@ -1437,7 +1373,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDirections(!showDirections); if (showDirections) { setActiveRoute(null); } setShowDesktopSearch(false); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDirections ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Directions — turn-by-turn routing" aria-label="Directions" aria-expanded={showDirections}>
+          <button onClick={() => { if (showDirections) setActiveRoute(null); togglePanel('directions'); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDirections ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Directions — turn-by-turn routing" aria-label="Directions" aria-expanded={showDirections}>
             <Route className={`w-4 h-4 ${showDirections ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showDirections && (
               <span
@@ -1450,7 +1386,7 @@ export default function Dashboard() {
         </div>
 
         <div className="relative group">
-          <button onClick={() => { setShowDesktopSearch(!showDesktopSearch); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDesktopSearch ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Search — find locations, cities, coordinates" aria-label="Search" aria-expanded={showDesktopSearch}>
+          <button onClick={() => togglePanel('search')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showDesktopSearch ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="Search — find locations, cities, coordinates" aria-label="Search" aria-expanded={showDesktopSearch}>
             <Search className={`w-4 h-4 ${showDesktopSearch ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showDesktopSearch && (
               <span
@@ -1484,7 +1420,7 @@ export default function Dashboard() {
 
         {/* ── ARCGIS INTEL ── */}
         <div className="relative group">
-          <button onClick={() => { setShowArcGIS(!showArcGIS); setShowRemote(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — search & import geospatial intel layers" aria-label="ArcGIS" aria-expanded={showArcGIS}>
+          <button onClick={() => togglePanel('arcgis')} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showArcGIS ? 'bg-[var(--gold-primary)]/20' : 'hover:bg-white/10'}`} title="ArcGIS — search & import geospatial intel layers" aria-label="ArcGIS" aria-expanded={showArcGIS}>
             <Database className={`w-4 h-4 ${showArcGIS ? 'text-[var(--gold-primary)]' : 'text-white/60'}`} />
             {showArcGIS && (
               <span
@@ -1516,34 +1452,6 @@ export default function Dashboard() {
         {/* Separator */}
         <div className="w-4 h-px bg-white/10 mx-auto" />
 
-        {/* ── WORLD REMOTE ── */}
-        <div className="relative group">
-          <button onClick={() => { setShowRemote(!showRemote); setShowArcGIS(false); setShowIntel(false); setShowMarkets(false); setShowAlerts(false); setShowSpaceCam(false); setShowDrawing(false); setShowDesktopSearch(false); }} className={`relative w-8 h-8 rounded-full flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/50 ${showRemote ? 'bg-[var(--cyan-primary)]/20' : 'hover:bg-white/10'}`} title="World Remote — control nearby Bluetooth devices (TVs, speakers, AC)" aria-label="World Remote" aria-expanded={showRemote}>
-            <Bluetooth className={`w-4 h-4 ${showRemote ? 'text-[var(--cyan-primary)]' : 'text-white/60'}`} />
-            {showRemote && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-current text-[var(--cyan-primary)]"
-              />
-            )}
-          </button>
-          <span className="absolute right-11 top-1/2 -translate-y-1/2 px-2 py-1 text-[9px] font-mono tracking-wider text-white/80 bg-black/80 backdrop-blur-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity pointer-events-none">REMOTE</span>
-          <AnimatePresence>
-            {showRemote && (
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="absolute right-12 top-1/2 -translate-y-1/2 w-80">
-                <WorldRemote onClose={() => setShowRemote(false)} onPlaceOnMap={(devs) => {
-                  setScanTargets(prev => {
-                    const ids = new Set(prev.map((t: any) => t.id));
-                    const next = [...prev];
-                    devs.forEach(d => { if (!ids.has(d.id)) next.unshift({ id: d.id, name: d.name, lat: d.lat, lng: d.lng, type: d.type, color: d.color, timestamp: Date.now(), source: 'BLE' }); });
-                    return next.slice(0, 20);
-                  });
-                  if (devs.length > 0) setFlyToLocation({ lat: devs[0].lat, lng: devs[0].lng, ts: Date.now() });
-                }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
 
 
       </div>}
@@ -1567,12 +1475,9 @@ export default function Dashboard() {
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#111] border-b border-[var(--border-primary)]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-osiris-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-[#FF4081] animate-payload-pulse" />
                   <span className="text-[11px] font-mono font-bold text-white tracking-wider">{liveFeedName}</span>
                   <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-mono text-[10px] font-bold">LIVE STREAM</span>
-                  {!liveFeedEmbedAllowed && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px]">EXTERNAL ONLY</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <a
@@ -1590,48 +1495,21 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Body — iframe or external card */}
-              {liveFeedEmbedAllowed ? (
-                <div className="w-full aspect-video relative bg-black">
-                  <iframe
-                    src={liveFeedUrl}
-                    className="w-full h-full absolute inset-0"
-                    allow="autoplay; encrypted-media"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <div className="w-full aspect-video flex items-center justify-center bg-black/95">
-                  <div className="text-center px-8">
-                    <div className="w-14 h-14 rounded-full bg-[#39FF14]/10 border border-[#39FF14]/20 flex items-center justify-center mx-auto mb-4">
-                      <ExternalLink className="w-6 h-6 text-[#39FF14]" />
-                    </div>
-                    <p className="text-[12px] font-mono font-bold text-white tracking-widest mb-2">EMBED RESTRICTED</p>
-                    <p className="text-[10px] font-mono text-white/50 mb-6 max-w-xs">
-                      {liveFeedName} does not allow third-party embedding. Click below to open the live stream directly.
-                    </p>
-                    <a
-                      href={getYouTubeWatchUrl(liveFeedUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded border border-[#39FF14]/40 text-[#39FF14] font-mono text-[11px] hover:bg-[#39FF14]/10 transition-colors tracking-wider"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      OPEN LIVE STREAM
-                    </a>
-                  </div>
-                </div>
-              )}
+              <div className="w-full aspect-video relative bg-black">
+                <iframe
+                  src={liveFeedUrl}
+                  className="w-full h-full absolute inset-0"
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                />
+              </div>
 
-              {/* Footer — only show for embeddable feeds */}
-              {liveFeedEmbedAllowed && (
-                <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
-                  <span className="text-[10px] font-mono text-white/70 leading-relaxed">
-                    If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">Open in YouTube</strong> above.
-                  </span>
-                </div>
-              )}
+              <div className="bg-[#111]/90 px-4 py-2.5 border-t border-[var(--border-primary)] flex items-center gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-[var(--gold-primary)] shrink-0" />
+                <span className="text-[10px] font-mono text-white/70 leading-relaxed">
+                  If you see &ldquo;Video unavailable&rdquo;, use <strong className="text-[var(--gold-primary)]">Open in YouTube</strong> above.
+                </span>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1647,13 +1525,11 @@ export default function Dashboard() {
                 { id: 'layers' as const, icon: Layers, label: 'LAYERS' },
                 { id: 'markets' as const, icon: BarChart3, label: 'MARKETS' },
                 { id: 'intel' as const, icon: Newspaper, label: 'INTEL' },
-                { id: 'recon' as const, icon: Radar, label: 'RECON' },
                 { id: 'search' as const, icon: Search, label: 'SEARCH' },
                 // Routing was reachable only from the desktop tool rail, so a
                 // phone could not open it at all. It sits next to SEARCH
                 // because both answer "take me somewhere".
                 { id: 'route' as const, icon: Route, label: 'ROUTE' },
-                { id: 'remote' as const, icon: Bluetooth, label: 'REMOTE' },
               ].map(tab => {
                 // Routing opens the planner at the top of the screen rather than
                 // the bottom drawer — it needs the room above the keyboard, and
@@ -1683,8 +1559,8 @@ export default function Dashboard() {
                     disabled={isRoute && Boolean(navSession)}
                     className={`mobile-nav-btn ${active ? 'active' : ''}`}
                   >
-                    <tab.icon className={`w-4 h-4 ${tab.id === 'recon' ? 'text-[var(--cyan-primary)]' : ''}`} />
-                    <span className={tab.id === 'recon' ? 'text-[var(--cyan-primary)]' : ''}>{tab.label}</span>
+                    <tab.icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
@@ -1704,7 +1580,7 @@ export default function Dashboard() {
                 <div className="px-3 pb-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="hud-text text-[10px] text-[var(--text-primary)]">
-                      {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MARKETS & INTEL' : mobilePanel === 'intel' ? 'INTEL FEED' : mobilePanel === 'recon' ? 'OSIRIS RECON' : mobilePanel === 'remote' ? 'WORLD REMOTE' : 'SEARCH'}
+                      {mobilePanel === 'layers' ? 'LAYERS & STATS' : mobilePanel === 'markets' ? 'MARKETS & INTEL' : mobilePanel === 'intel' ? 'INTEL FEED' : 'SEARCH'}
                     </span>
                     <button onClick={() => setMobilePanel(null)} className="text-[var(--text-muted)] p-1"><X className="w-4 h-4" /></button>
                   </div>
@@ -1719,14 +1595,14 @@ export default function Dashboard() {
                           <div><div className="hud-label" style={{fontSize:'9px'}}>NUC</div><div className="hud-value text-[10px]" style={{color:'var(--accent-nuclear)'}}>{(data.infrastructure?.length||0)}</div></div>
                         </div>
                       </div>
-                      <LayerPanel data={data} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={osirisTheme} setTheme={setOsirisTheme} capabilities={capabilities} />
+                      <LayerPanel data={mapData} activeLayers={activeLayers} setActiveLayers={setActiveLayers} isMobile={true} theme={payloadTheme} setTheme={setPayloadTheme} />
                       <div className="mt-8">
                         <ViewPresets onNavigate={(lat, lng, zoom) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMapView(v => ({ ...v, zoom })); setMobilePanel(null); }} />
                       </div>
                     </>
                   )}
-                  {mobilePanel === 'markets' && <MarketsPanel data={data} spaceWeather={spaceWeather} />}
-                  {mobilePanel === 'intel' && <IntelFeed data={data} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
+                  {mobilePanel === 'markets' && <MarketsPanel data={mapData} />}
+                  {mobilePanel === 'intel' && <IntelFeed data={mapData} onLocate={(lat, lng) => { setFlyToLocation({ lat, lng, ts: Date.now() }); setMobilePanel(null); }} />}
                   {mobilePanel === 'search' && (
                     <div className="space-y-2">
                       <SearchBar
@@ -1737,22 +1613,6 @@ export default function Dashboard() {
                       />
                       <SharePanel mapView={mapView} activeLayers={activeLayers} mouseCoords={null} />
                     </div>
-                  )}
-                  {mobilePanel === 'recon' && (
-                    <div className="space-y-2">
-                      <OsintPanel isOpen={true} onClose={() => setMobilePanel(null)} isMobile={true} onSweepVisualize={setSweepData} />
-                    </div>
-                  )}
-                  {mobilePanel === 'remote' && (
-                    <WorldRemote onClose={() => setMobilePanel(null)} onPlaceOnMap={(devs) => {
-                      setScanTargets(prev => {
-                        const ids = new Set(prev.map((t: any) => t.id));
-                        const next = [...prev];
-                        devs.forEach(d => { if (!ids.has(d.id)) next.unshift({ id: d.id, name: d.name, lat: d.lat, lng: d.lng, type: d.type, color: d.color, timestamp: Date.now(), source: 'BLE' }); });
-                        return next.slice(0, 20);
-                      });
-                      if (devs.length > 0) setFlyToLocation({ lat: devs[0].lat, lng: devs[0].lng, ts: Date.now() });
-                    }} />
                   )}
                 </div>
               </motion.div>
@@ -1806,7 +1666,7 @@ export default function Dashboard() {
       {/* ── Region Dossier ── */}
       {(regionDossier || dossierLoading) && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="absolute top-16 md:top-20 left-2 right-2 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[300] md:w-[480px] max-h-[65vh] overflow-y-auto styled-scrollbar">
-          <div className="glass-panel p-5 osiris-glow">
+          <div className="glass-panel p-5 payload-glow">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-mono font-bold text-[var(--gold-primary)] tracking-wider">REGION DOSSIER</h2>
               <button onClick={() => { setRegionDossier(null); setDossierLoading(false); }} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs">✕</button>
@@ -1837,12 +1697,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Camera Viewer ── */}
-      <CameraViewer
-        camera={activeCamera}
-        onClose={() => setActiveCamera(null)}
-        onLocate={(lat, lng) => setFlyToLocation({ lat, lng, ts: Date.now() })}
-      />
 
       {/* ── Entity Graph Panel ── */}
       {/* Guidance belongs over the map, where the clicking happens. */}
@@ -1869,7 +1723,7 @@ export default function Dashboard() {
             selectedPolygon={selectedPolygon}
             onSelectPolygon={setSelectedPolygon}
             onRenamePolygon={(id, name) => setDrawnPolygons(p => p.map(x => x.id === id ? { ...x, name } : x))}
-            data={data}
+            data={mapData}
             onLocateEntity={(lat, lng) => setFlyToLocation({ lat, lng, zoom: 12, ts: Date.now() })}
             watched={watched}
             onToggleWatch={toggleWatch}

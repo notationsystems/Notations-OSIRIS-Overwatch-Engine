@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Information horizon: what the corpus can know, and when.
+ * Payload — Information horizon: what the corpus can know, and when.
  *
  * Alert lead time has a hard ceiling set by the sources, and that ceiling is
  * computable WITHOUT a detector: for every source, the distribution of
@@ -113,6 +113,60 @@ export interface CorpusHealthSignal {
    *  sources — losing it degrades the whole system's warning capability. */
   loadBearing: boolean;
   explanation: string;
+}
+
+/**
+ * The POPULATION corpus health was judged over — because "no signals" is
+ * the reading that matters most and the one most easily wrong.
+ *
+ * Two sources can leave the signal set silently: one whose observations are
+ * none of them knowable at the evaluation date ("not degraded, just early"),
+ * and one whose arrival cadence cannot be measured from a single knownAt
+ * ("cannot judge staleness"). Both are correct exclusions and both are
+ * INVISIBLE in an empty array — which then reads as a clean bill of health.
+ * Measured: at 2017 the panel showed CORPUS HEALTH (0) with no other text,
+ * over a corpus where every source's evidence postdates the date by years.
+ *
+ * A health instrument that cannot distinguish "nothing is wrong" from
+ * "nothing was checked" is the one instrument where that distinction is the
+ * whole product.
+ */
+export interface CorpusHealthAccounting {
+  signals: CorpusHealthSignal[];
+  /** Sources whose staleness could actually be judged at this date. */
+  judged: string[];
+  /** Knowable-at-date is empty — the source's evidence postdates asOf. */
+  notYetKnowable: string[];
+  /** One arrival only (or a zero gap): no cadence to be late against. */
+  cadenceUnmeasurable: string[];
+  /** Set whenever `signals` is empty: which silence this is. */
+  emptyBecause?: string;
+}
+
+export function corpusHealthAccounting(state: EconomyState, asOf: string): CorpusHealthAccounting {
+  const bySource = new Map<string, typeof state.observations>();
+  for (const o of state.observations) {
+    if (o.partnerEntityId) continue;
+    const key = o.provenance.sourceId;
+    if (!bySource.has(key)) bySource.set(key, []);
+    bySource.get(key)!.push(o);
+  }
+  const judged: string[] = [];
+  const notYetKnowable: string[] = [];
+  const cadenceUnmeasurable: string[] = [];
+  for (const [sourceId, obs] of bySource) {
+    const knownAts = obs.map(o => knownAtOf(o)).filter(k => k <= asOf);
+    if (knownAts.length === 0) { notYetKnowable.push(sourceId); continue; }
+    const gap = arrivalGapDays(knownAts);
+    if (gap === null || gap === 0) { cadenceUnmeasurable.push(sourceId); continue; }
+    judged.push(sourceId);
+  }
+  const signals = corpusHealthSignals(state, asOf);
+  const emptyBecause = signals.length > 0 ? undefined
+    : judged.length === 0
+      ? `NOTHING WAS CHECKED at ${asOf}: of ${bySource.size} source(s), ${notYetKnowable.length} had no observation knowable by this date and ${cadenceUnmeasurable.length} carry too few arrivals to measure a cadence against. This is not a healthy corpus — it is a corpus with no staleness question to ask at this evaluation date. Corpus health describes the corpus AS HELD; read it at the present.`
+      : `${judged.length} source(s) were judged at ${asOf} and none is past its own arrival cadence.${notYetKnowable.length > 0 ? ` ${notYetKnowable.length} source(s) had nothing knowable by this date and were not judged.` : ''}${cadenceUnmeasurable.length > 0 ? ` ${cadenceUnmeasurable.length} carry too few arrivals to measure a cadence.` : ''}`;
+  return { signals, judged, notYetKnowable, cadenceUnmeasurable, ...(emptyBecause ? { emptyBecause } : {}) };
 }
 
 export function corpusHealthSignals(state: EconomyState, asOf: string): CorpusHealthSignal[] {
@@ -263,7 +317,7 @@ export function informationHorizons(state: EconomyState): AnalyticalResult<{
 
   return {
     operation: { name: 'informationHorizons', params: { commodity: state.commodity } },
-    execution: { executedAt: new Date().toISOString(), engine: 'osiris-economy-engine/0.1' },
+    execution: { executedAt: new Date().toISOString(), engine: 'payload-economy-engine/0.1' },
     inputs: { observationIds: usedObs },
     result: { sources, events },
   };

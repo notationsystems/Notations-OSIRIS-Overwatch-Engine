@@ -40,7 +40,7 @@ block as the tag.
 ## 3. Stand up a reachable instance
 
 ```bash
-docker run -d -p 3000:3000 --name sea-dog ghcr.io/notationsystems/sea-dog-osiris-terminal-v0:latest
+docker run -d -p 3000:3000 --name sea-dog ghcr.io/notationsystems/sea-dog-payload-terminal-v0:latest
 ```
 
 That is the whole deployment: the image is built and published by CI on
@@ -82,11 +82,11 @@ makes the ninety-day result mean anything in either direction.
 ## Optional: attach a language model to the corpus
 
 ```bash
-npm run mcp    # stdio MCP server; expects the terminal at SEA_DOG_URL (default http://localhost:3000)
+npm run mcp    # stdio MCP server; expects the terminal at PAYLOAD_URL (default http://localhost:3000)
 ```
 
 Configure it in an MCP client as command `npm`, args `["run","mcp"]`,
-`cwd` this repository. It exposes eleven read-only tools over the running
+`cwd` this repository. It exposes 12 read-only tools over the running
 instrument. Stdio means attaching requires local access to the machine —
 **no port is opened, and the external-exposure decision remains untaken**
 (`docs/EXPOSURE_OPTIONS.md`).

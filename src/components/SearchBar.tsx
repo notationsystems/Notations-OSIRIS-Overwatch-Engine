@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, X, MapPin, Navigation, Building2, Globe2, Landmark, Mountain } from 'lucide-react';
+import { userAgent } from '@/lib/identity';
 
 /* ═══════════════════════════════════════════════════════════════
-   OSIRIS — Enhanced Search / Locate Bar
+   Payload — Enhanced Search / Locate Bar
    Street-level geocoding with intelligent zoom levels
    Ctrl+F / Cmd+F keyboard shortcut support
    ═══════════════════════════════════════════════════════════════ */
@@ -132,6 +133,13 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
   const [results, setResults] = useState<SearchResult[]>([]);
   const [econResults, setEconResults] = useState<EconSearchHit[]>([]);
   const [evidenceResults, setEvidenceResults] = useState<EvidenceSearchHit[]>([]);
+  // The evidence layer's own accounting, rendered even when the page is
+  // EMPTY. `refused:basis` — the query the runbook sends a first-time reader
+  // to — has no instances in today's facility topology, and before this the
+  // dropdown simply did not open: a true and unremarkable state of the corpus
+  // presenting as a broken instrument.
+  const [evidenceNote, setEvidenceNote] = useState<string | null>(null);
+  const [evidenceKind, setEvidenceKind] = useState<EvidenceSearchHit['kind'] | null>(null);
   const [econWithheldNote, setEconWithheldNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -205,7 +213,7 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
     }
 
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (q.trim().length < 2) { setResults([]); setEconResults([]); return; }
+    if (q.trim().length < 2) { setResults([]); setEconResults([]); setEvidenceResults([]); setEvidenceNote(null); setEvidenceKind(null); return; }
 
     timerRef.current = setTimeout(async () => {
       setLoading(true);
@@ -219,16 +227,29 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
           if (res.ok) {
             const data = await res.json();
             setEconResults((data.results ?? []).slice(0, 4));
-            setEvidenceResults((data.evidenceResults ?? []).slice(0, 6));
+            const evAll: EvidenceSearchHit[] = data.evidenceResults ?? [];
+            const evShown = evAll.slice(0, 6);
+            setEvidenceResults(evShown);
+            setEvidenceKind(data.evidenceKind ?? null);
+            // The route's note describes ITS page (20 of 30); this bar shows
+            // 6 of that page. A second silent slice on top of the first is
+            // the same omission twice, so the deeper cut is stated here.
+            const routeNote: string | null = data.evidenceNote ?? null;
+            const total: number | undefined = data.evidenceTotal;
+            setEvidenceNote(
+              evShown.length < evAll.length && typeof total === 'number'
+                ? `Showing ${evShown.length} of ${total} — open the refusals digest for the full queue.${routeNote && !data.evidenceTruncated ? ` ${routeNote}` : ''}`
+                : routeNote,
+            );
             setEconWithheldNote(data.withheldNote ?? null);
-          } else { setEconResults([]); setEvidenceResults([]); setEconWithheldNote(null); }
-        } catch { setEconResults([]); setEvidenceResults([]); setEconWithheldNote(null); }
+          } else { setEconResults([]); setEvidenceResults([]); setEvidenceNote(null); setEvidenceKind(null); setEconWithheldNote(null); }
+        } catch { setEconResults([]); setEvidenceResults([]); setEvidenceNote(null); setEvidenceKind(null); setEconWithheldNote(null); }
       }
       try {
         // Use addressdetails=1 for better type detection and limit=8 for more results
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&extratags=1`,
-          { headers: { 'Accept-Language': 'en', 'User-Agent': 'OSIRIS-Intelligence-Platform/1.0' } }
+          { headers: { 'Accept-Language': 'en', 'User-Agent': userAgent('place search') } }
         );
         const data = await res.json();
         interface NominatimRow { display_name: string; lat: string; lon: string; type?: string; class?: string; importance?: number; boundingbox?: string[] }
@@ -357,11 +378,20 @@ export default function SearchBar({ onLocate, onSelectEconEntity, econAsOf, econ
         )}
       </div>
 
-      {(results.length > 0 || econResults.length > 0 || evidenceResults.length > 0 || econWithheldNote) && (
+      {(results.length > 0 || econResults.length > 0 || evidenceResults.length > 0 || evidenceNote || econWithheldNote) && (
         <div
           className="absolute top-full left-0 right-0 mt-1 glass-panel overflow-hidden max-h-[320px] overflow-y-auto styled-scrollbar z-[9999]"
           style={{ boxShadow: '0 12px 40px rgba(0,0,0,0.6), 0 0 1px rgba(212,175,55,0.2)' }}
         >
+          {evidenceNote && (
+            <div
+              className="px-3 py-2 border-b border-[var(--border-secondary)] text-[8px] font-mono leading-tight"
+              style={{ color: 'var(--text-muted)', borderLeft: `2px solid ${evidenceKind ? EVIDENCE_COLOR[evidenceKind] : 'var(--gold-primary)'}` }}
+              data-testid="evidence-note"
+            >
+              {evidenceNote}
+            </div>
+          )}
           {evidenceResults.map((hit, i) => {
             const isSelected = i === selectedIdx;
             const color = EVIDENCE_COLOR[hit.kind];

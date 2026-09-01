@@ -96,7 +96,7 @@ describe('economy store (curated copper assembly)', () => {
     const LIVE_SOURCES = new Set(['usgs-mcs2025-live', 'usgs-mcs2024-vintage', 'un-comtrade-preview', 'yahoo-hg-chart', 'cftc-cot', 'westmetall-lme-stocks']);
     for (const rec of [...state.observations, ...state.flows, ...state.capacities]) {
       if (LIVE_SOURCES.has(rec.provenance.sourceId)) {
-        // 'derived' appears when OSIRIS computes a total the reporter did not
+        // 'derived' appears when Payload Terminal computes a total the reporter did not
         // publish (e.g. a Comtrade world aggregate summed from partner rows).
         expect(['reported', 'estimated', 'derived'], `live record ${rec.id}`).toContain(rec.valueKind);
       } else {
@@ -112,7 +112,7 @@ describe('economy store (curated copper assembly)', () => {
     const escondida = locs.find(d => d.fromEntityId === 'ent:mine:escondida');
     expect(escondida?.toEntityId).toBe('ent:country:cl');
     // Derived records must say they are derived, not sourced.
-    expect(escondida?.provenance.sourceId).toBe('osiris-derived');
+    expect(escondida?.provenance.sourceId).toBe('payload-derived');
   });
 
   describe('graceful source degradation', () => {

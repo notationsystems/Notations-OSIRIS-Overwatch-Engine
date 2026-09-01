@@ -143,17 +143,17 @@ describe('D-3: every response is attributable to a build, a state and a knowledg
   });
 
   it('build identity is never fabricated: an unstamped build says so', () => {
-    const before = process.env.SEA_DOG_BUILD_SHA;
-    delete process.env.SEA_DOG_BUILD_SHA;
+    const before = process.env.PAYLOAD_BUILD_SHA;
+    delete process.env.PAYLOAD_BUILD_SHA;
     try {
       const v = buildVersion();
       expect(v.commit).toBeNull();
       expect(v.commit_source).toBe('unstamped-build');
-      process.env.SEA_DOG_BUILD_SHA = 'abc1234';
-      expect(buildVersion()).toMatchObject({ commit: 'abc1234', commit_source: 'env:SEA_DOG_BUILD_SHA' });
+      process.env.PAYLOAD_BUILD_SHA = 'abc1234';
+      expect(buildVersion()).toMatchObject({ commit: 'abc1234', commit_source: 'env:PAYLOAD_BUILD_SHA' });
     } finally {
-      if (before === undefined) delete process.env.SEA_DOG_BUILD_SHA;
-      else process.env.SEA_DOG_BUILD_SHA = before;
+      if (before === undefined) delete process.env.PAYLOAD_BUILD_SHA;
+      else process.env.PAYLOAD_BUILD_SHA = before;
     }
   });
 });

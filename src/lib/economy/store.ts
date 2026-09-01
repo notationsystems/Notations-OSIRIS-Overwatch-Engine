@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Canonical economy state assembly.
+ * Payload — Canonical economy state assembly.
  *
  * Merges adapter payloads into one validated EconomyState per commodity and
  * derives the relationships that are mechanical consequences of the data
@@ -39,8 +39,8 @@ function deriveLocatedIn(entities: Entity[]): Dependency[] {
       type: 'located_in',
       toEntityId: country.id,
       provenance: {
-        sourceId: 'osiris-derived',
-        sourceName: 'OSIRIS derivation: located_in from entity countryCode',
+        sourceId: 'payload-derived',
+        sourceName: 'Payload Terminal derivation: located_in from entity countryCode',
         retrievedAt: new Date().toISOString(),
       },
     });

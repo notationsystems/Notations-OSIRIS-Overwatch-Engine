@@ -76,7 +76,6 @@ describe('snapToRoute', () => {
 
 describe('computeProgress', () => {
   const along = stepPositions(line, steps);
-  const total = cumulativeDistances(line).at(-1)!;
 
   it('targets the maneuver ahead and counts down to it', () => {
     const p = computeProgress(line, steps, along, 120, { lat: 52.5163, lng: 13.3800 });

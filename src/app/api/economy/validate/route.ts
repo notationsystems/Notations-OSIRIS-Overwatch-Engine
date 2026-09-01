@@ -3,7 +3,7 @@ import { getEconomyState } from '@/lib/economy/store';
 import { validateClaim } from '@/lib/economy/validator';
 
 /**
- * Sea Dog Terminal — the validator as a service (final order F-3).
+ * Payload Terminal — the validator as a service (final order F-3).
  *
  *   GET /api/economy/validate?claim=...&records=obs:a,obs:b
  *       [&commodity=copper][&asOf=YYYY-MM-DD&knowledge=as_known_then]

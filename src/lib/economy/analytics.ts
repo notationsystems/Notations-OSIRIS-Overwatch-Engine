@@ -1,5 +1,5 @@
 /**
- * OSIRIS — First analytical layer over the canonical economy state.
+ * Payload — First analytical layer over the canonical economy state.
  *
  * Deliberately small and interpretable: HHI concentration, flow centrality,
  * candidate bottleneck scoring, and simple anomaly primitives. Every result
@@ -13,20 +13,39 @@ import { measurementClassOf } from './types';
 import type { EconomyGraph } from './graph';
 import { nodeThroughput } from './graph';
 
+/**
+ * OPTIMIZATION: id -> entity index, built once per call instead of a linear
+ * `state.entities.find()` inside per-observation loops. Turns the analytics hot
+ * path from O(observations x entities) into O(observations + entities). Behaviour
+ * is identical; only the lookup cost changes. See docs/optimizations.
+ */
+function entityIndex(state: EconomyState): Map<string, EconomyState['entities'][number]> {
+  const m = new Map<string, EconomyState['entities'][number]>();
+  for (const e of state.entities) m.set(e.id, e);
+  return m;
+}
+
+
 /** knownAt with its conservative fallback: retrieval time bounds knowability. */
 export function knownAtOf(o: Observation): string {
   return o.knownAt ?? o.provenance.retrievedAt.slice(0, 10);
 }
 
-const ENGINE = 'osiris-economy-analytics/0.1';
+const ENGINE = 'payload-economy-analytics/0.1';
 
 function wrap<T>(
   name: string,
   params: Record<string, string | number | undefined>,
   inputs: AnalyticalResult<T>['inputs'],
   result: T,
+  emptyBecause?: string,
 ): AnalyticalResult<T> {
-  return { operation: { name, params }, execution: { executedAt: new Date().toISOString(), engine: ENGINE }, inputs, result };
+  return {
+    operation: { name, params },
+    execution: { executedAt: new Date().toISOString(), engine: ENGINE },
+    inputs, result,
+    ...(emptyBecause ? { emptyBecause } : {}),
+  };
 }
 
 /* ── Concentration (HHI) ── */
@@ -116,6 +135,32 @@ export function weakestInputClass(kinds: Iterable<Observation['valueKind']>): Ob
   return weakest;
 }
 
+/** Evidence classes of the named flows — the inputs a graph-derived row
+ *  stands on. Missing ids contribute nothing rather than a default: an id
+ *  that resolves to no flow is a gap in the graph, not a clean input. */
+function flowKindsOf(state: EconomyState, flowIds: Iterable<string>): Observation['valueKind'][] {
+  const byId = new Map(state.flows.map(f => [f.id, f]));
+  const out: Observation['valueKind'][] = [];
+  for (const id of flowIds) {
+    const f = byId.get(id);
+    if (f) out.push(f.valueKind);
+  }
+  return out;
+}
+
+/** Evidence classes of the named observations. Missing ids contribute
+ *  nothing rather than a default — an id resolving to no observation is a
+ *  gap, not a clean input. */
+function obsKindsOf(state: EconomyState, ids: Iterable<string>): Observation['valueKind'][] {
+  const byId = new Map(state.observations.map(o => [o.id, o]));
+  const out: Observation['valueKind'][] = [];
+  for (const id of ids) {
+    const o = byId.get(id);
+    if (o) out.push(o.valueKind);
+  }
+  return out;
+}
+
 /* ── Structural class profile ── */
 
 /**
@@ -191,7 +236,7 @@ export type AttestationKind = Observation['valueKind'] | 'event_only' | 'structu
 /**
  * The STRONGEST evidence class attesting each entity's existence — the
  * identity-level sibling of per-record valueKind. An entity whose best
- * attesting class is 'representative' (or below) exists, within OSIRIS,
+ * attesting class is 'representative' (or below) exists, within Payload Terminal,
  * purely on curation: a real name carried entirely by synthetic-class
  * numbers, which is the round-3 concern one level up, at identity rather
  * than quantity. (Strongest, not weakest, is the right aggregate here —
@@ -252,11 +297,12 @@ export function observationsAt(
   asOf?: string,
 ): Observation[] {
   const cutoff = asOf ?? '9999-12-31';
+  const idx = entityIndex(state);
   const best = new Map<string, Observation>();
   for (const o of state.observations) {
     if (o.metric !== metric || o.period.end > cutoff) continue;
     if (o.partnerEntityId) continue; // bilateral mirror evidence, not an aggregate
-    const ent = state.entities.find(e => e.id === o.entityId);
+    const ent = idx.get(o.entityId);
     if (ent?.kind !== kind) continue;
     const prev = best.get(o.entityId);
     if (!prev || o.period.end > prev.period.end || (o.period.end === prev.period.end && outranks(o, prev))) {
@@ -285,11 +331,12 @@ export function concentration(
     throw new Error(`concentration() rejects ${cls} metric "${metric}" — physical measurements only`);
   }
   const obs = observationsAt(state, metric, kind, asOf);
+  const idx = entityIndex(state);
   const total = obs.reduce((s, o) => s + o.value, 0);
   const shares: ConcentrationShare[] = obs
     .map(o => ({
       entityId: o.entityId,
-      name: state.entities.find(e => e.id === o.entityId)?.name ?? o.entityId,
+      name: idx.get(o.entityId)?.name ?? o.entityId,
       value: o.value,
       share: total > 0 ? o.value / total : 0,
     }))
@@ -324,6 +371,11 @@ export interface TrajectoryPoint {
   topName: string;
   topShare: number; // 0..1
   participants: number;
+  /** Weakest evidence class among THIS YEAR's observations. Per point, not
+   *  per series: a trajectory whose early years are representative and
+   *  whose late years are reported is two different kinds of number on one
+   *  line, and a single series-level label would hide the transition. */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 /**
@@ -343,6 +395,7 @@ export function concentrationTrajectory(
   }
   const points: TrajectoryPoint[] = [];
   const usedObs = new Set<string>();
+  const idx = entityIndex(state);
   for (const year of [...years].sort()) {
     // Only observations FROM that year — a year where most reporters are
     // stale carry-forwards would fabricate a concentration figure.
@@ -352,7 +405,7 @@ export function concentrationTrajectory(
     const total = obs.reduce((s, o) => s + o.value, 0);
     if (total <= 0) continue;
     const shares = obs.map(o => ({
-      name: state.entities.find(e => e.id === o.entityId)?.name ?? o.entityId,
+      name: idx.get(o.entityId)?.name ?? o.entityId,
       share: o.value / total,
     })).sort((a, b) => b.share - a.share);
     const hhi = Math.round(shares.reduce((s, x) => s + (x.share * 100) ** 2, 0));
@@ -364,6 +417,7 @@ export function concentrationTrajectory(
       topName: shares[0].name,
       topShare: shares[0].share,
       participants: obs.length,
+      weakestInputClass: weakestInputClass(obs.map(o => o.valueKind)),
     });
   }
   return wrap(
@@ -384,11 +438,16 @@ export function capacityConcentration(
   stage: 'smelting' | 'refining' | 'production',
 ): AnalyticalResult<Concentration> {
   const caps = state.capacities.filter(c => c.stage === stage);
+  const idx = entityIndex(state);
+  const countryByCode = new Map<string, EconomyState['entities'][number]>();
+  for (const e of state.entities) {
+    if (e.kind === 'country' && e.countryCode) countryByCode.set(e.countryCode, e);
+  }
   const byCountry = new Map<string, { name: string; value: number; entityId: string }>();
   for (const c of caps) {
-    const ent = state.entities.find(e => e.id === c.entityId);
+    const ent = idx.get(c.entityId);
     const code = ent?.countryCode ?? 'unknown';
-    const country = state.entities.find(e => e.kind === 'country' && e.countryCode === code);
+    const country = countryByCode.get(code);
     const key = country?.id ?? `ent:country:${code}`;
     if (!byCountry.has(key)) byCountry.set(key, { name: country?.name ?? ent?.country ?? code, value: 0, entityId: key });
     byCountry.get(key)!.value += c.value;
@@ -427,7 +486,11 @@ export interface CoverageRow {
   /** rolledUp / direct. ≈1 complete facility model; <1 unmodelled share;
    *  >1 a real contradiction — one side is wrong. */
   ratio: number;
-  status: 'complete' | 'partial' | 'contradiction';
+  /** `uncovered` is the row that used to be missing: a compiled country
+   *  total with NO facility observation behind it — 0% modelled, which is
+   *  the most important coverage fact there is and the one this table was
+   *  silently dropping. */
+  status: 'complete' | 'partial' | 'contradiction' | 'uncovered';
   unit: string;
 }
 
@@ -451,21 +514,44 @@ export function facilityCoverage(
   const entityById = new Map(state.entities.map(e => [e.id, e]));
 
   const rows: CoverageRow[] = [];
+  // The one remaining drop: a country-level observation whose entity has no
+  // countryCode cannot be rolled up by countryCode at all. It is zero on the
+  // real corpus (pinned as a tripwire in analytics.test.ts) — if it ever
+  // fires, the register has a country entity without its own code, which is
+  // a register defect and not a coverage fact.
+  let unrollable = 0;
   for (const d of direct) {
     const country = entityById.get(d.entityId);
-    if (!country?.countryCode) continue;
+    if (!country?.countryCode) { unrollable += 1; continue; }
     const facilities = facilityObs.filter(o => {
       const ent = entityById.get(o.entityId);
       // Units must agree — a gross-weight figure must not roll up against
       // a copper-content denominator.
       return ent?.countryCode === country.countryCode && o.unit === d.unit;
     });
-    if (facilities.length === 0) continue;
+    // A country with NO facility observation was DROPPED here, silently.
+    // That is the silent-filtering class inside the instrument whose entire
+    // job is to measure how much of a compiled total the facility model
+    // accounts for: the rows it discarded were exactly the 0% ones.
+    // Measured on the copper corpus: 10 of 19 mine-production countries
+    // dropped — China 1800 kt/y, Russia 930, Australia 800, Kazakhstan 740,
+    // Canada 450, Poland 410 — and ALL 17 refined-production countries,
+    // because the corpus holds no refinery/smelter production observations
+    // at all, so the refined coverage table was empty rather than a table of
+    // zeroes. "FACILITY COVERAGE (9)" read as nine countries assessed; it
+    // was nine countries that happened to have any facility behind them.
     const rolledUp = facilities.reduce((s, o) => s + o.value, 0);
     // A zero country total with zero facility output (e.g. Panama after the
     // closure) is a COMPLETE model of nothing — not a contradiction. Facilities
     // producing against a zero country figure IS one; keep it finite for JSON.
     const ratio = d.value > 0 ? rolledUp / d.value : (rolledUp === 0 ? 1 : 99.999);
+    // Zero facilities against a zero total stays 'complete' — a complete
+    // model of nothing, the existing documented rule (Panama after the
+    // closure). Zero facilities against a real total is 'uncovered'.
+    const status: CoverageRow['status'] =
+      facilities.length === 0 && d.value > 0 ? 'uncovered'
+        : ratio > 1.02 ? 'contradiction'
+          : ratio >= 0.95 ? 'complete' : 'partial';
     rows.push({
       countryId: d.entityId,
       countryName: country.name,
@@ -476,16 +562,19 @@ export function facilityCoverage(
       facilityCount: facilities.length,
       facilityObservationIds: facilities.map(o => o.id),
       ratio: Number(ratio.toFixed(3)),
-      status: ratio > 1.02 ? 'contradiction' : ratio >= 0.95 ? 'complete' : 'partial',
+      status,
       unit: d.unit,
     });
   }
   rows.sort((a, b) => b.direct - a.direct);
   return wrap(
     'facilityCoverage',
-    { metric, facilityKinds: facilityKinds.join(','), asOf },
+    { metric, facilityKinds: facilityKinds.join(','), asOf, unrollableCountryObservations: unrollable },
     { observationIds: [...new Set([...rows.map(r => r.directObservationId), ...rows.flatMap(r => r.facilityObservationIds)])] },
     rows,
+    rows.length === 0
+      ? `No country carries a compiled ${metric} total at this evaluation date, so there is nothing to measure coverage against — this is an absence of the DENOMINATOR, not a statement that the facility model is complete.`
+      : undefined,
   );
 }
 
@@ -699,6 +788,16 @@ export interface CentralityRow {
   share: number | null;
   /** Flow ids whose tonnage could not be quantified at this node. */
   unquantifiedFlowIds?: string[];
+  /**
+   * Evidence class of the WEAKEST flow this row stands on — contamination
+   * direction, as everywhere else. Added after a measurement found this row
+   * type, BottleneckCandidate, TrajectoryPoint and AnomalySignal shipping
+   * numbers with no attestation at all while standing on representative
+   * flow rows. See attestation.ts: a field beside the number gets stripped
+   * exactly where the number becomes persuasive, and the bottleneck score
+   * paints a dot on the map.
+   */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 export function flowCentrality(state: EconomyState, graph: EconomyGraph): AnalyticalResult<CentralityRow[]> {
@@ -720,6 +819,8 @@ export function flowCentrality(state: EconomyState, graph: EconomyGraph): Analyt
         throughputKt: t.inKt + t.outKt,
         share: refused ? null : grand > 0 ? (t.inKt + t.outKt) / grand : 0,
         ...(refused ? { unquantifiedFlowIds: t.unquantifiedFlowIds } : {}),
+        weakestInputClass: weakestInputClass(
+          flowKindsOf(state, [...t.flowIds, ...t.unquantifiedFlowIds])),
       };
     })
     .sort((a, b) => b.throughputKt - a.throughputKt);
@@ -758,6 +859,10 @@ export interface BottleneckCandidate {
   flowIds: string[];
   capacityIds: string[];
   dependencyIds: string[];
+  /** Weakest evidence class across every flow, capacity and dependency the
+   *  score stands on. A candidate computed over representative topology is
+   *  a representative candidate, and the dot on the map has to say so. */
+  weakestInputClass: Observation['valueKind'] | null;
 }
 
 /**
@@ -844,6 +949,23 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
       entityId, name: ent.name, kind: ent.kind,
       score: refused ? null : Math.min(1, score),
       components: { throughputShare, utilization, redundancy, dependencyLoad },
+      // Every input the score stands on: the flows through the node, the
+      // capacities it is measured against, and the dependencies that load
+      // it. One representative among them makes the candidate
+      // representative — the contamination direction, applied where the
+      // number reaches a map layer.
+      weakestInputClass: weakestInputClass([
+        ...flowKindsOf(state, [...t.flowIds, ...t.unquantifiedFlowIds]),
+        ...caps.map(c => c.valueKind),
+        // Dependency edges carry NO valueKind and are curation-class by
+        // construction (see structuralClassProfile's attributionEdges note),
+        // so each contributes 'representative'. The consequence is
+        // deliberate and is the honest one: a bottleneck standing on curated
+        // topology IS a representative finding, and most of them do. Hiding
+        // that by omitting dependencies from the combine would report the
+        // curated layer as though it were sourced.
+        ...deps.map((): Observation['valueKind'] => 'representative'),
+      ]),
       explanation,
       flowIds: [...t.flowIds, ...t.unquantifiedFlowIds],
       capacityIds: caps.map(c => c.id),
@@ -855,11 +977,31 @@ export function bottleneckCandidates(state: EconomyState, graph: EconomyGraph): 
   candidates.sort((a, b) =>
     Number(b.score === null) - Number(a.score === null)
     || (b.score ?? 0) - (a.score ?? 0));
+  // WHY IT IS EMPTY, when it is. The runbook leads with this list — "find
+  // a constraint" is move #1, the one it says to do if you do nothing else
+  // — and a researcher who has followed move #2 first (set a past date) met
+  // an empty panel at EVERY date the time bar can reach except the present.
+  // 35 candidates today, 0 at 2017, 2019 and 2022. Honest and unexplained:
+  // the historical vintages are country↔country corridors, and countries
+  // are aggregates rather than chokepoints, so there is no sited structure
+  // to rank. That reads as "no bottlenecks" or "broken" unless it is said.
+  let emptyBecause: string | undefined;
+  if (candidates.length === 0) {
+    const carrying = [...throughput.keys()].filter(id => graph.nodes.has(id));
+    const aggregates = carrying.filter(id => {
+      const k = graph.nodes.get(id)!.kind;
+      return k === 'country' || k === 'region';
+    });
+    emptyBecause = carrying.length === 0
+      ? 'No node carries flow in the topology serving this date, so there is nothing to rank. Ranking requires a flow topology; check the topology banner for whether one covers the date at all.'
+      : `All ${carrying.length} node(s) carrying flow at this date are AGGREGATES (${aggregates.length} country/region) — a country is a sink, not a chokepoint, so none is a bottleneck candidate. The topology serving this date is country-granularity; facility-level chokepoints need the country↔facility allocation model (deferred). The MAP draws these corridors.`;
+  }
   return wrap(
     'bottleneckCandidates',
     { commodity: state.commodity },
     { flowIds: [...allFlowIds], capacityIds: [...allCapIds] },
     candidates,
+    emptyBecause,
   );
 }
 
@@ -885,6 +1027,10 @@ export interface AnomalySignal {
   kind: 'rolling-deviation' | 'rate-of-change' | 'revision';
   period: string;
   value: number;
+  /** Weakest evidence class among the observations this signal was
+   *  computed from. An anomaly is what wakes someone up, and one
+   *  computed over representative inputs must say so before it does. */
+  weakestInputClass: Observation['valueKind'] | null;
   /** Standard deviations from the rolling mean, or period-over-period %Δ. */
   magnitude: number;
   observationIds: string[];
@@ -955,6 +1101,7 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
       kind: 'revision', period: o.period.start.slice(0, 7), value: o.value,
       magnitude: Number((delta * 100).toFixed(1)),
       observationIds: [prev.id, o.id],
+      weakestInputClass: weakestInputClass([prev.valueKind, o.valueKind]),
       explanation: `${o.provenance.sourceId} revises ${o.period.start.slice(0, 4)} ${o.metric}: ${prev.value} → ${o.value} (${(delta * 100).toFixed(1)}%). Best estimate moved — knowable ${knownAtOf(o)}.`,
     });
   }
@@ -993,6 +1140,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
             kind: 'rolling-deviation', period: point.period, value: point.value,
             magnitude: Number(z.toFixed(2)),
             observationIds: series.slice(i - window, i + 1).map(p => p.observationId),
+            weakestInputClass: weakestInputClass(
+              obsKindsOf(state, series.slice(i - window, i + 1).map(p => p.observationId))),
             explanation: `${point.period}: ${point.value} is ${z.toFixed(1)}σ from the trailing ${window}-period mean (${mean.toFixed(1)})`,
           });
         }
@@ -1008,6 +1157,8 @@ export function detectAnomalies(state: EconomyState, { window = 6, zThreshold = 
             kind: 'rate-of-change', period: point.period, value: point.value,
             magnitude: Number((roc * 100).toFixed(1)),
             observationIds: [prev.observationId, point.observationId],
+            weakestInputClass: weakestInputClass(
+              obsKindsOf(state, [prev.observationId, point.observationId])),
             explanation: `${point.period}: ${(roc * 100).toFixed(1)}% change vs ${prev.period} (${prev.value} → ${point.value})`,
           });
         }

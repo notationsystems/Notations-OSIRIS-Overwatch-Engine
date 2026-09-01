@@ -8,7 +8,7 @@ import { isMachineClient } from '@/lib/economy/machineClient';
 import type { EconomyState } from '@/lib/economy/types';
 
 /**
- * Sea Dog Terminal — the refused:* queue as an exportable digest
+ * Payload Terminal — the refused:* queue as an exportable digest
  * (work order 3.7).
  *
  *   GET /api/economy/refusals?commodity=copper[&asOf=YYYY-MM-DD][&knowledge=...]

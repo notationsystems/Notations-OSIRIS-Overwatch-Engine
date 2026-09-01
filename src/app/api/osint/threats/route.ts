@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
-// Threat Intelligence — AlienVault OTX public pulse feed + Tor exit nodes
+/**
+ * Payload — Threat intelligence — AlienVault OTX public pulse feed and Tor exit nodes.
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is an indicator: an address, a domain, a pulse. This route exists to attribute infrastructure to the
+ * ORGANISATION that operates it — a carrier's mail domain, a terminal's
+ * network, a broker's hosting — and to no other purpose. It must never be
+ * used to profile, locate, enumerate or identify a natural person, and no
+ * output of it may be joined to a person record.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get('query'); // Optional: IP or domain to check
@@ -39,7 +53,7 @@ export async function GET(req: Request) {
           }));
         }
       }
-    } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+    } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
 
     // 2. Check specific IP/domain if provided
     if (query) {
@@ -73,7 +87,7 @@ export async function GET(req: Request) {
               asn: data.asn,
             };
           }
-        } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+        } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
       } else {
         // Domain check
         try {
@@ -91,7 +105,7 @@ export async function GET(req: Request) {
               } : null,
             };
           }
-        } catch (e) { console.warn('[OSIRIS] Suppressed error:', e instanceof Error ? e.message : e); }
+        } catch (e) { console.warn('[Payload Terminal] Suppressed error:', e instanceof Error ? e.message : e); }
       }
     }
 

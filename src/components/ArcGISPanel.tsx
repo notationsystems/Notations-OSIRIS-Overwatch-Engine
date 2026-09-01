@@ -20,12 +20,10 @@ import {
   Wifi,
   Palette,
   SlidersHorizontal,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
+  } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════════
-   ArcGIS Search & Import Panel — OSIRIS OSINT Dashboard
+   ArcGIS Search & Import Panel — Payload Terminal OSINT Dashboard
    Premium dark-ops glassmorphism aesthetic
    ═══════════════════════════════════════════════════════════════ */
 

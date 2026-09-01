@@ -5,6 +5,7 @@ import { buildVersion } from '@/lib/economy/attribution';
 import { bootReport } from '@/lib/economy/boot';
 import { processReport } from '@/lib/economy/observability';
 import { rateStats } from '@/lib/economy/outboundRate';
+import { spendReport, spendTally } from '@/lib/economy/spendGovernor';
 
 /**
  * Health surface. The substrate's own liveness block is unchanged; the
@@ -36,7 +37,7 @@ export async function GET() {
   if (!warm) {
     return NextResponse.json({
       status: 'operational',
-      platform: 'OSIRIS',
+      platform: 'Payload Terminal',
       version: '1.0.0',
       uptime: process.uptime ? Math.round(process.uptime()) : 0,
       timestamp: new Date().toISOString(),
@@ -52,6 +53,7 @@ export async function GET() {
         },
         process: processReport(),
         outbound: rateStats(),
+        spend: { providers: spendReport(Date.now()), decisions: spendTally() },
       },
     });
   }
@@ -79,7 +81,7 @@ export async function GET() {
 
   return NextResponse.json({
     status: 'operational',
-    platform: 'OSIRIS',
+    platform: 'Payload Terminal',
     version: '1.0.0',
     uptime: process.uptime ? Math.round(process.uptime()) : 0,
     timestamp: new Date().toISOString(),
@@ -91,6 +93,13 @@ export async function GET() {
       process: processReport(),
       // D-10: what the outbound limiter actually did, per host.
       outbound: rateStats(),
+      // What each metered provider has spent this period. `durability` on
+      // every row says whether the cap survives a restart: a ledger in
+      // process memory hands the whole budget back on a crash loop while
+      // the vendor's meter keeps climbing, and reporting it as an enforced
+      // cap would be the claim we cannot make. An EMPTY providers list means
+      // no budget is registered, not that nothing was spent.
+      spend: { providers: spendReport(Date.now()), decisions: spendTally() },
     },
     endpoints: [
       '/api/flights',

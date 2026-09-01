@@ -32,12 +32,16 @@ export function buildPaletteItems(guideSections: { id: string; title: string }[]
   return [...guide, ...endpoints];
 }
 
+/**
+ * Mounted only while open — the parent renders `{open && <CommandPalette …/>}`.
+ * That is what makes `query` and `cursor` start at their initial values on
+ * every opening without an effect to reset them; an `open` prop and a
+ * closed-but-mounted component would need one.
+ */
 export default function CommandPalette({
-  open,
   onClose,
   items,
 }: {
-  open: boolean;
   onClose: () => void;
   items: PaletteItem[];
 }) {
@@ -65,16 +69,21 @@ export default function CommandPalette({
       .map(r => r.it);
   }, [items, query]);
 
-  // Reset per opening, and focus the field.
-  useEffect(() => {
-    if (open) {
-      setQuery('');
-      setCursor(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [open]);
+  // Refining the query re-ranks the list, so the highlight returns to the top
+  // match. Adjusted during render rather than in an effect: an effect leaves
+  // one frame in which the cursor still indexes the PREVIOUS result set, and
+  // Enter pressed in that frame reads `results[cursor]` as undefined and
+  // silently does nothing. A no-op keypress on a list the reader can see is
+  // worse than a crash, because nothing reports it.
+  const [queryAtLastReset, setQueryAtLastReset] = useState(query);
+  if (query !== queryAtLastReset) {
+    setQueryAtLastReset(query);
+    setCursor(0);
+  }
 
-  useEffect(() => setCursor(0), [query]);
+  useEffect(() => {
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   // Keep the highlighted row inside the scroll viewport.
   useEffect(() => {
@@ -105,8 +114,6 @@ export default function CommandPalette({
       onClose();
     }
   };
-
-  if (!open) return null;
 
   return (
     <div

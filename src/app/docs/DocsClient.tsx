@@ -6,6 +6,7 @@ import { API_GROUPS, ENDPOINT_COUNT, endpointId } from './apiCatalog';
 import { Callout, Code, CodeBlock, Pre, Section } from './docsPrimitives';
 import EndpointCard from './EndpointCard';
 import CommandPalette, { buildPaletteItems } from './CommandPalette';
+import { useOrigin } from '@/lib/ui/clientOnly';
 
 const GUIDE_SECTIONS = [
   { id: 'overview', title: 'Overview' },
@@ -22,20 +23,18 @@ const API_SECTIONS = [
 ];
 
 const ALL_SECTIONS = [...GUIDE_SECTIONS, ...API_SECTIONS];
-const FALLBACK_ORIGIN = 'https://osirisai.live';
 
 export default function DocsClient() {
   const [active, setActive] = useState('overview');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [origin, setOrigin] = useState(FALLBACK_ORIGIN);
   const mainRef = useRef<HTMLElement>(null);
 
   const paletteItems = useMemo(() => buildPaletteItems(ALL_SECTIONS), []);
 
   /* Snippets should reference the instance the reader is actually on. */
-  useEffect(() => setOrigin(window.location.origin), []);
+  const origin = useOrigin();
 
   /* Belt-and-braces scroll unlock: globals.css handles this via :has(),
      but release the lock imperatively for engines without :has() support. */
@@ -135,7 +134,7 @@ export default function DocsClient() {
         }}
       />
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} items={paletteItems} />}
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-[300] border-b border-white/[0.06] bg-[var(--bg-void)]/85 backdrop-blur-xl">
@@ -152,7 +151,7 @@ export default function DocsClient() {
             </svg>
             <span className="flex flex-col leading-none">
               <span className="text-[12px] font-bold tracking-[0.3em] text-[var(--gold-primary)] font-mono">
-                OSIRIS
+                Payload Terminal
               </span>
               <span className="text-[9px] font-mono tracking-[0.22em] text-[var(--text-muted)] uppercase mt-[3px]">
                 Docs
@@ -179,7 +178,7 @@ export default function DocsClient() {
           </button>
 
           <a
-            href="https://github.com/simplifaisoul/osiris"
+            href="https://github.com/notationsystems/Payload-Terminal-V0"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
@@ -268,12 +267,12 @@ export default function DocsClient() {
               <span className="text-[var(--text-heading)]">Build on the</span>
               <br />
               <span className="bg-gradient-to-r from-[var(--gold-primary)] via-[#F0D060] to-[var(--cyan-primary)] bg-clip-text text-transparent">
-                OSIRIS platform
+                Payload Terminal platform
               </span>
             </h1>
 
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)] max-w-[42rem]">
-              OSIRIS aggregates aviation, maritime, seismic, conflict, cyber, and OSINT feeds onto a single
+              Payload Terminal aggregates aviation, maritime, seismic, conflict, cyber, and OSINT feeds onto a single
               GPU-rendered map — and exposes every one of them as a plain HTTP endpoint. This is the same API the
               dashboard runs on. There is no separate, privileged internal tier.
             </p>
@@ -326,7 +325,7 @@ export default function DocsClient() {
             </p>
             <Callout tone="good" title="No credentials needed">
               Aviation, maritime, satellites, fires, earthquakes, weather, news, and CVE data all come from public
-              keyless feeds. Keys only matter for the optional RECON scanner and for raising rate limits.
+              keyless feeds. Keys only matter for raising rate limits on a few upstreams.
             </Callout>
           </Section>
 
@@ -373,9 +372,9 @@ print(len(data["commercial_flights"]), "commercial")`,
           </Section>
 
           <Section id="self-hosting" eyebrow="Guide" title="Self-Hosting">
-            <p>OSIRIS needs Node 20+ and no database. A local instance is three commands:</p>
-            <Pre label="Local development" lang="bash">{`git clone https://github.com/simplifaisoul/osiris.git
-cd osiris
+            <p>Payload Terminal needs Node 20+ and no database. A local instance is three commands:</p>
+            <Pre label="Local development" lang="bash">{`git clone https://github.com/notationsystems/Payload-Terminal-V0.git
+cd Payload-Terminal-V0
 npm install
 npm run dev        # http://localhost:3000`}</Pre>
             <p>For a production build, or to run the checks:</p>
@@ -403,20 +402,16 @@ docker compose up -d`}</Pre>
             <div className="space-y-2">
               {[
                 {
-                  k: 'SCANNER_URL / SCANNER_KEY',
-                  v: 'Points at the separate RECON scanner backend. SCANNER_KEY must equal that backend’s OSIRIS_KEY. Leave both empty to disable RECON — /api/scanner then returns 503 by design.',
-                },
-                {
                   k: 'SDK_INGEST_KEY',
                   v: 'Shared secret for /api/sdk/ingest. The endpoint fails closed: while this is unset, ingestion is disabled and returns 503.',
                 },
                 {
-                  k: 'OSIRIS_TELEGRAM_CHANNELS',
-                  v: 'Comma-separated public Telegram channel names (no @) for the Telegram OSINT layer, overriding the curated default set.',
+                  k: 'PAYLOAD_PORT',
+                  v: 'Host port the UI is published on. The container itself always listens on 3000. (OSIRIS_PORT is honoured for one release and warns; it stops being read after v0.2.0.)',
                 },
                 {
-                  k: 'OSIRIS_PORT',
-                  v: 'Host port the UI is published on. The container itself always listens on 3000.',
+                  k: 'PAYLOAD_DISABLE_LIVE',
+                  v: 'Set to 1 to force every source to its snapshot rung. The degradation is visible in provenance, never silent. (OSIRIS_DISABLE_LIVE is honoured for one release and warns.)',
                 },
               ].map(row => (
                 <div
@@ -454,8 +449,8 @@ docker compose up -d`}</Pre>
                   v: 'The left rail. Switches individual feeds on and off, and carries the theme selector.',
                 },
                 {
-                  k: 'RECON Toolkit',
-                  v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, breach checks, sanctions, CVE lookup, port scanning.',
+                  k: 'Infrastructure Attribution',
+                  v: 'DNS, WHOIS, certificate transparency, IP and ASN enrichment, and counterparty sanctions screening. Scoped to organisational attribution: never used to profile a person.',
                 },
                 {
                   k: 'Intel Feed',
@@ -545,11 +540,16 @@ docker compose up -d`}</Pre>
                 </div>
               ))}
             </div>
-            <Callout tone="warn" title="Responsible use">
-              The RECON scanner and <Code>/api/osint/sweep</Code> generate traffic against the targets you name. Only
-              point them at infrastructure you own or have written authorisation to test. The remaining OSINT routes
-              are passive and query third-party datasets rather than the subject itself.
+            {/* collection-policy:begin */}
+            <Callout tone="warn" title="Collection policy">
+              These routes attribute infrastructure to the <em>organisation</em> that operates it — whose domain,
+              whose network, whose ASN — and to nothing else. They must never be used to profile, locate or identify
+              a natural person, and no output of them may be joined to a person record. Sanctions screening covers
+              counterparty organisations, vessels and aircraft; the person path is not served. All of them are
+              passive: they query third-party datasets rather than the subject itself. Host and port scanning,
+              username enumeration, breach lookup and phone research were removed from this application.
             </Callout>
+            {/* collection-policy:end */}
           </Section>
 
           {API_GROUPS.map(group => (
@@ -596,10 +596,10 @@ docker compose up -d`}</Pre>
           {/* Footer */}
           <footer className="border-t border-white/[0.06] pt-6 pb-16 flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] font-mono text-[var(--text-muted)]">
             {[
-              { href: 'https://github.com/simplifaisoul/osiris', label: 'GitHub' },
+              { href: 'https://github.com/notationsystems/Payload-Terminal-V0', label: 'GitHub' },
               { href: 'https://discord.gg/EPaFD5FFKf', label: 'Discord' },
               { href: 'https://x.com/soulsimplifai', label: 'X' },
-              { href: 'https://github.com/simplifaisoul/osiris/issues', label: 'Report an issue' },
+              { href: 'https://github.com/notationsystems/Payload-Terminal-V0/issues', label: 'Report an issue' },
             ].map(l => (
               <a
                 key={l.label}

@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Alert backtest: measure the detector before anyone sees a panel.
+ * Payload — Alert backtest: measure the detector before anyone sees a panel.
  *
  * knownAt + vintages make something rare possible: the detector can be run
  * against history at each historical knowledge state — strictly
@@ -59,7 +59,7 @@ export interface BacktestTruthRow {
    *  series around the event — the market benchmark. Price grades the
    *  detector here; it never feeds physical analytics. Monthly resolution. */
   priceReactionAt?: string;
-  /** priceReactionAt − first detection, days: positive = OSIRIS detected
+  /** priceReactionAt − first detection, days: positive = Payload Terminal detected
    *  before the (month-resolution) price reaction. Lead over journalism and
    *  lead over the market are different claims; this is the second. */
   leadVsPriceDays?: number;
@@ -428,7 +428,7 @@ export async function backtestAlerts(
       'Matching allows one structural hop; the pre-window is PER-EVENT and derived from announcement structure (announcedAt → start — data, not a knob), zero for events without an announcement. Uniform-window effects are published in scorecard.attributionSensitivity as the knob-exposure artifact.',
       'leadVsPrice uses monthly COMEX closes as a benchmark (never an input): its resolution is one month, and a reaction "at" a month-end may have occurred any day inside that month.',
       'Evaluation grid is hybrid: month-ends everywhere plus daily dates where daily evidence exists.',
-      'Comtrade is a single-version source revised in place: as_known_then is blind before the release date of the held version, and pre-revision vintages that predate OSIRIS\'s archive (begun 2026-08) are permanently unrecoverable.',
+      'Comtrade is a single-version source revised in place: as_known_then is blind before the release date of the held version, and pre-revision vintages that predate Payload Terminal\'s archive (begun 2026-08) are permanently unrecoverable.',
     ],
     ledger,
   };

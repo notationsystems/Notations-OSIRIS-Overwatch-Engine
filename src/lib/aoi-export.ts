@@ -2,7 +2,7 @@ import type { DrawnShape } from './draw';
 import type { AoiReport } from './aoi';
 
 /**
- * OSIRIS — AOI persistence and export
+ * Payload — AOI persistence and export
  *
  * Two jobs that sound unrelated but are the same problem: getting a drawn area,
  * and what was found inside it, out of volatile memory. One goes to
@@ -76,7 +76,7 @@ export function contentsToCSV(shape: DrawnShape, report: AoiReport): string {
 
 /* ── Persistence ────────────────────────────────────────────────────────── */
 
-export const STORAGE_KEY = 'osiris.aoi.shapes.v1';
+export const STORAGE_KEY = 'payload.aoi.shapes.v1';
 
 /** Only what is needed to rebuild a shape; derived values are recomputed. */
 interface StoredShape {
@@ -115,8 +115,14 @@ export function deserializeShapes(raw: string | null): DrawnShape[] {
   if (!Array.isArray(parsed)) return [];
 
   const out: DrawnShape[] = [];
-  for (const s of parsed as any[]) {
-    if (!s || typeof s !== 'object') continue;
+  for (const raw of parsed as unknown[]) {
+    if (!raw || typeof raw !== 'object') continue;
+    // `unknown` rather than `any`: every field below is narrowed at its read,
+    // which is what the original cast skipped.
+    // A PARTIAL of the target, not `any`: every field is optional and unknown
+    // until the guards below narrow it, which is exactly the checking the
+    // original cast skipped.
+    const s = raw as Partial<DrawnShape> & { geojson?: Partial<DrawnShape['geojson']> };
     const geom = s.geojson?.geometry;
     if (!geom || (geom.type !== 'Polygon' && geom.type !== 'LineString')) continue;
     if (!Array.isArray(geom.coordinates) || geom.coordinates.length === 0) continue;
@@ -126,7 +132,7 @@ export function deserializeShapes(raw: string | null): DrawnShape[] {
       id: s.id,
       name: s.name,
       kind: s.kind ?? 'polygon',
-      geojson: s.geojson,
+      geojson: s.geojson as DrawnShape['geojson'],
       areaKm2: Number(s.areaKm2) || 0,
       perimeterKm: Number(s.perimeterKm) || 0,
       color: typeof s.color === 'string' ? s.color : '#00E5FF',

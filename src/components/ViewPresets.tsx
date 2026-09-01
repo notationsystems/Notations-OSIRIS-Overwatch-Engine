@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Globe, MapPin } from 'lucide-react';
+import { Globe } from 'lucide-react';
 
 interface ViewPresetsProps {
   onNavigate: (lat: number, lng: number, zoom: number) => void;
@@ -46,7 +46,7 @@ export default function ViewPresets({ onNavigate }: ViewPresetsProps) {
           >
             <span className="text-[10px] flex-shrink-0">{p.icon}</span>
             <span>{p.label}</span>
-            {(p as any).hot && <span className="w-1.5 h-1.5 rounded-full bg-[var(--alert-red)] animate-osiris-pulse ml-auto flex-shrink-0" />}
+            {(p as any).hot && <span className="w-1.5 h-1.5 rounded-full bg-[var(--alert-red)] animate-payload-pulse ml-auto flex-shrink-0" />}
           </button>
         ))}
       </div>

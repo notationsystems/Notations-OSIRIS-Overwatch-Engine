@@ -2,7 +2,7 @@ import { allEntries, type SanctionEntry } from '@/lib/sanctions';
 
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OSIRIS — Daily chain-threat brief
+ *  Payload — Daily chain-threat brief
  *
  *  Three independent keyless feeds, each verified against live data:
  *    exploits   DefiLlama /hacks       — dated on-chain incidents + losses
@@ -76,7 +76,34 @@ let cache: { at: number; days: number; brief: DailyBrief } | null = null;
 
 /* ── collectors ──────────────────────────────────────────────── */
 
-async function getJson(url: string, timeoutMs = 20000): Promise<any> {
+/**
+ * What we actually read from each feed, declared rather than left as `any`.
+ * A shape written down is a shape a reader can check against the vendor's docs;
+ * `any` is a shape nobody can check and that silently absorbs a schema change.
+ */
+interface LlamaHack {
+  date?: number; name?: string; amount?: number;
+  /** The feed sends either a single chain or a list of them. */
+  chain?: string | string[];
+  classification?: string; technique?: string;
+  targetType?: string; bridgeHack?: boolean;
+  returnedFunds?: number; source?: string;
+}
+/** After the date filter, `date` is known present — stated as a predicate so
+ *  the sort and the map below do not have to re-assert it. */
+type DatedHack = LlamaHack & { date: number };
+interface NvdCvssData { baseScore?: number; baseSeverity?: string }
+interface NvdMetric { cvssData?: NvdCvssData; baseSeverity?: string }
+interface NvdResponse { vulnerabilities?: Array<{ cve?: NvdCve }> }
+interface NvdCve {
+  id: string; published?: string;
+  metrics?: {
+    cvssMetricV31?: NvdMetric[]; cvssMetricV30?: NvdMetric[]; cvssMetricV2?: NvdMetric[];
+  };
+  descriptions?: Array<{ lang?: string; value?: string }>;
+}
+
+async function getJson<T>(url: string, timeoutMs = 20000): Promise<T> {
   // Outbound connections here intermittently hit UND_ERR_CONNECT_TIMEOUT on a
   // long-lived server even while the network is healthy. One retry on a fresh
   // connection clears it; without it a blip blanks a whole section.
@@ -88,7 +115,7 @@ async function getJson(url: string, timeoutMs = 20000): Promise<any> {
         headers: { Accept: 'application/json' },
       });
       if (!res.ok) throw new Error(`${new URL(url).host} responded ${res.status}`);
-      return await res.json();
+      return (await res.json()) as T;
     } catch (e) {
       lastError = e;
       if (attempt === 0) await new Promise(r => setTimeout(r, 750));
@@ -99,13 +126,13 @@ async function getJson(url: string, timeoutMs = 20000): Promise<any> {
 
 async function collectExploits(days: number): Promise<{ items: Exploit[]; degraded: string[] }> {
   try {
-    const raw = await getJson('https://api.llama.fi/hacks', 25000);
-    const list: any[] = Array.isArray(raw) ? raw : raw?.hacks || [];
+    const raw = await getJson<LlamaHack[] | { hacks?: LlamaHack[] }>('https://api.llama.fi/hacks', 25000);
+    const list: LlamaHack[] = Array.isArray(raw) ? raw : raw?.hacks ?? [];
     const cutoff = Date.now() - days * 864e5;
 
     const items = list
       // DefiLlama dates are unix seconds.
-      .filter(h => typeof h?.date === 'number' && h.date * 1000 >= cutoff)
+      .filter((h): h is DatedHack => typeof h?.date === 'number' && h.date * 1000 >= cutoff)
       .sort((a, b) => b.date - a.date)
       .map((h): Exploit => ({
         name: String(h.name || 'Unnamed incident'),
@@ -144,9 +171,9 @@ async function collectCves(days: number): Promise<{ items: CveItem[]; degraded: 
       const url =
         `https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=${encodeURIComponent(kw)}` +
         `&pubStartDate=${encodeURIComponent(start)}&pubEndDate=${encodeURIComponent(end)}&resultsPerPage=40`;
-      const d = await getJson(url, 25000);
+      const d = await getJson<NvdResponse>(url, 25000);
 
-      for (const v of d?.vulnerabilities || []) {
+      for (const v of d?.vulnerabilities ?? []) {
         const c = v?.cve;
         if (!c?.id || byId.has(c.id)) continue;
         const m =
@@ -156,7 +183,7 @@ async function collectCves(days: number): Promise<{ items: CveItem[]; degraded: 
           published: c.published || '',
           cvss: typeof m?.cvssData?.baseScore === 'number' ? m.cvssData.baseScore : null,
           severity: m?.cvssData?.baseSeverity || m?.baseSeverity || null,
-          description: ((c.descriptions || []).find((x: any) => x.lang === 'en')?.value || '').slice(0, 400),
+          description: ((c.descriptions ?? []).find(x => x.lang === 'en')?.value || '').slice(0, 400),
           matched: kw,
           url: `https://nvd.nist.gov/vuln/detail/${c.id}`,
         });

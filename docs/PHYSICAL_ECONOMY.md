@@ -1,8 +1,8 @@
 # Sea Dog Terminal — Physical Economy Engine
 
-> Renamed from OSIRIS on 2026-08-27 (work order 3.6). The rename is
+> Renamed from Payload Terminal on 2026-08-27 (work order 3.6). The rename is
 > additive: historical ledger entries, module headers, and provenance
-> records naming OSIRIS were true when written and stay as written — the
+> records naming Payload Terminal were true when written and stay as written — the
 > new name applies forward. The one outbound touch is the SEC document-tier
 > User-Agent, which carries `SeaDogTerminal` when the operator sets the
 > contact identity.
@@ -14,7 +14,7 @@ It covers only executable reality; planned work lives in **Known Limitations**.
 
 An engine-shaped analytical subsystem that turns sourced observations about the
 physical economy into a canonical world state, runs analytical *systems* over that
-state, and serves *projections* of the result to the OSIRIS map and research panel.
+state, and serves *projections* of the result to the Payload Terminal map and research panel.
 
 ```
 External evidence (providers)
@@ -94,7 +94,7 @@ derived indices, where contamination propagates and one representative
 input taints the result. Two questions, opposite directions, both correct —
 the names carry the direction so nobody "fixes" the asymmetry, and neither
 is ever a bare `sourceClass`.
-An entity whose class is representative-or-below exists, within OSIRIS,
+An entity whose class is representative-or-below exists, within Payload Terminal,
 purely on curation: the real-name/synthetic-number concern at identity
 level, now labeled on search hits, the entity API and the inspector.
 Measured: countries are reported-attested (live USGS); **every facility,
@@ -105,7 +105,7 @@ Raw evidence and inference never share an identity: analytics return
 `AnalyticalResult<T>` wrappers that separate **operation** (what was requested),
 **execution** (which run produced it), and **evidence inputs** (the exact
 observation/flow/capacity ids used). Derived relationships (e.g. `located_in`
-from `countryCode`) carry `sourceId: "osiris-derived"` so they are visibly
+from `countryCode`) carry `sourceId: "payload-derived"` so they are visibly
 inference, not sources. **Verification** identity is the test suite
 (`src/lib/economy/*.test.ts`, `src/app/api/economy/route.test.ts`).
 
@@ -443,7 +443,7 @@ All views accept `&asOf=YYYY-MM-DD` and `&knowledge=best_known|as_known_then`.
 ## The MCP tool surface (external models attach; final order F-2)
 
 `npm run mcp` starts a stdio MCP server (`src/mcp/server.ts`) exposing
-eleven read-only tools over the RUNNING terminal's own HTTP routes — one
+12 read-only tools over the RUNNING terminal's own HTTP routes — one
 logic path, so the machine surface cannot drift from what the terminal
 serves. The operator's pivot: external models attach to the substrate
 rather than a reasoning layer being built inside it. That moves the
@@ -461,7 +461,7 @@ interface carries the discipline (`src/lib/economy/mcpTools.ts`):
 - **Refusals return successfully**: `value: null` plus `refusalType` and
   `remedy`. Never an error code — an error invites a retry or a
   workaround, a null-with-remedy invites a report.
-- **Nothing mutates state**, pinned structurally: a sweep of all eleven
+- **Nothing mutates state**, pinned structurally: a sweep of all 12
   tools leaves the canonical state fingerprint unchanged.
 - **Machine traffic is segregated from the frozen S-7 demand instruments**
   (`machineClient.ts`): served identically, never counted as researcher
@@ -555,7 +555,7 @@ exists to refuse. No parameter value ever reaches the log.
 
 - **LayerPanel** — `PHYSICAL ECONOMY` group: Cu Production, Smelting/Refining,
   Ports & Logistics, Material Flows, Bottleneck Candidates (on by default).
-- **Map** (`OsirisMap.tsx`) — entity dots colored by stage and sized by output/capacity;
+- **Map** (`PayloadMap.tsx`) — entity dots colored by stage and sized by output/capacity;
   material flows as great-circle arcs colored by form (concentrate amber,
   blister/anode orange, cathode/refined cyan) and weighted by quantity; red rings
   on bottleneck candidates ≥ 0.45 (kept visible even when their stage layer is
@@ -583,7 +583,7 @@ exists to refuse. No parameter value ever reaches the log.
   operator, country and its evidence headline; selecting one flies the map to
   the entity and opens it in the research panel. Ctrl+F, arrow keys, Enter.
 
-Research workflow this supports end-to-end: open OSIRIS → type a name →
+Research workflow this supports end-to-end: open Payload Terminal → type a name →
 land on the entity (or: copper layers → producing regions →
 processing/refining structure → flows → select a node) → inspect state →
 traverse dependencies → concentration → candidate bottlenecks → inspect
@@ -680,7 +680,7 @@ condition it exists to catch.
   bounds measurable lead now that a daily source exists.
 - Comtrade `as_known_then` is blind before the release date of the held
   version of each dataset (the source revises in place with no upstream
-  archive), and pre-revision vintages that predate OSIRIS's own archive
+  archive), and pre-revision vintages that predate Payload Terminal's own archive
   (begun 2026-08) are permanently unrecoverable — labeled in the backtest
   caveats, never silently interpolated.
 - Flow topology is now TWO-granularity time-resolved: the 2024 facility

@@ -18,14 +18,29 @@ what it refuses to say.
    then — figures change, some disappear, and the count of what was
    withheld is shown rather than hidden. If an answer looks the same in
    both modes, it did not depend on hindsight.
-3. **Read one refusal properly.** Search `refused:basis`. Each hit is a
+3. **Read one refusal properly.** Search `refused:` — the standing
+   queue, typed and counted, with the count of what the page does not
+   fit. Today it is dominated by `refused:resolution`: identifiers a
+   source proposed that the register could not resolve, each with the
+   raw identifier, its source, the row count dropped, near-matches that
+   were **never merged**, and the remedy.
+
+   Then search `refused:basis` and read the empty screen, because it is
+   the more instructive one. Nothing is wrong: a basis refusal is a
    tonnage the system will not state because the number it has is a
    *gross weight* and the question needs *contained metal* — different
-   quantities, and converting between them needs a corridor grade the
-   corpus does not have for that route. The hit names the entity, the
-   mechanism, and the remedy: acquire the grade, or accept the figure in
-   the basis it was measured in. That is what every refusal looks like —
-   a stated gap with a price on closing it, not a failure.
+   quantities, and converting between them needs a corridor grade. Those
+   corridors are country-level, so the type is silent under today's
+   facility topology and fires under a country vintage: **set the date to
+   2017-06-30 and search it again** to see them. The empty result says so
+   itself rather than leaving you guessing, which is the same discipline
+   one layer up — an instrument that declines has to say which of "none
+   exist", "not on this date", and "you mistyped it" it means.
+
+   Either way the hit names the entity, the mechanism, and the remedy:
+   acquire the grade, or accept the figure in the basis it was measured
+   in. That is what every refusal looks like — a stated gap with a price
+   on closing it, not a failure.
 
 ## The one rule that reframes everything else
 
@@ -58,6 +73,8 @@ a work list instead of a shrug.
 | `STRUCTURE HAS MOVED` | Curated events contradict that extrapolation at named entities — figures continue only because nothing better is modeled |
 | `TOPOLOGY OUT OF PERIOD` | No flow map can describe your date; flow-derived tonnage is null (unknown), never zero |
 | `COUNTRY-granularity vintage YYYY` | Historical dates are served by country-level trade corridors; facility detail refuses at these dates (the allocation model is the recorded remedy) |
+| `TOPOLOGY NOT REPRESENTABLE IN THIS VIEW` | The flow-graph explorer draws sited facility structure; at a country-granularity date its corridors are stated between countries, which it excludes as aggregates. The count withheld is stated. **The map draws these corridors** — scrub there instead |
+| `NO FLOW TOPOLOGY DESCRIBES <date>` | Reachable through the API and MCP rather than the time bar (the bar starts at the earliest vintage): no vintage covers the date, so no network is drawn rather than today's wearing a historical label |
 
 ## The search box speaks two languages
 
@@ -75,6 +92,14 @@ token with a colon searches the instrument's *epistemic state*:
 - `contested:` — where independent observers disagree about the same
   quantity, typed by mechanism
 - `vintage` — which source editions the corpus actually holds
+
+A typed query that returns nothing says which kind of nothing it is:
+none of that type in the current topology (with the condition that would
+produce one, and the date where it is live), or a type that does not
+exist — mistyping `refused:bassis` is refused by name against the
+declared taxonomy, never answered with a silent empty list. A page that
+is capped states its own depth (`Showing 6 of 30`); the full queue is at
+`/api/economy/refusals`, and exports whole.
 
 A miss is recorded (see below). A refusal is work. Neither is a bug.
 

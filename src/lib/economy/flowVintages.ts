@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — country-level flow vintages (work order 3.2).
+ * Payload Terminal — country-level flow vintages (work order 3.2).
  *
  * Restores propagation across the historical timeline at COUNTRY
  * granularity: reporter-declared Comtrade bilateral concentrate exports

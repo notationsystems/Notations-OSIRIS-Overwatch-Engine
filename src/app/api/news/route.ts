@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 /**
- * OSIRIS — Military-Grade Intelligence API
+ * Payload — Military-Grade Intelligence API
  * Fetches Telegram OSINT feeds directly, with a failsafe fallback 
  * to traditional intelligence sources if Telegram blocks the IP.
  */
@@ -166,7 +166,7 @@ export async function GET() {
         'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ news: [], error: 'Failed to fetch intel' }, { status: 500 });
   }
 }

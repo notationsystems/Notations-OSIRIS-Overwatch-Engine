@@ -6,7 +6,7 @@ import { DISRUPTIVE_EVENT_TYPES, isEventActive } from '@/lib/economy/propagation
 import type { AnalyticalResult, EconEventType, EconomyState } from '@/lib/economy/types';
 
 /**
- * OSIRIS — Scenario endpoint: counterfactual event injection.
+ * Payload — Scenario endpoint: counterfactual event injection.
  *
  *   POST /api/economy/scenario
  *   {

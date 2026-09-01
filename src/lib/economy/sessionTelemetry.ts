@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — session telemetry (work order 3.7).
+ * Payload Terminal — session telemetry (work order 3.7).
  *
  * Instrument telemetry for the researcher afternoon: what was asked, what
  * missed, what the system refused, which entities were inspected. The

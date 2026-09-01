@@ -1,5 +1,5 @@
 /**
- * Sea Dog Terminal — the claim validator (final order F-3; the round-1
+ * Payload Terminal — the claim validator (final order F-3; the round-1
  * contract, built in phase 36).
  *
  * A claim arrives from whatever model the analyst is using; the verdict

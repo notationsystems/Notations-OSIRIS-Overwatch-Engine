@@ -1,0 +1,58 @@
+──────────────────────────────────────────────────────────────────────────────
+PAYLOAD — SEED SWEEP: is each finding a property, or one world?
+──────────────────────────────────────────────────────────────────────────────
+16 worlds built of 16 seeds requested, evaluated at 2026-09-05T00:00:00.000Z
+0 refused to build.
+
+──────────────────────────────────────────────────────────────────────────────
+PLANT RECOVERY ACROSS WORLDS
+──────────────────────────────────────────────────────────────────────────────
+  ALWAYS    PLANT-1  16/16
+  ALWAYS    PLANT-2  16/16
+  ALWAYS    PLANT-3  16/16
+  ALWAYS    PLANT-4  16/16
+  ALWAYS    PLANT-5  16/16
+  ALWAYS    PLANT-6  16/16
+  ALWAYS    PLANT-7  16/16
+  ALWAYS    PLANT-8  16/16
+  ALWAYS    PLANT-9  16/16
+
+──────────────────────────────────────────────────────────────────────────────
+HEADLINE FINDINGS ACROSS WORLDS
+──────────────────────────────────────────────────────────────────────────────
+  ALWAYS    lifecycle: zero illegal transitions  16/16 = 100%
+            the generator emits only hops TRANSITIONS accepts
+  ALWAYS    notary reaches all three verdicts  16/16 = 100%
+            held, breached and unproven each at least once — a two-valued notary
+            is a broken one
+  ALWAYS    the two unproven reasons are distinct  16/16 = 100%
+            the gap plant and the retroactive plant must be separable, or one
+            detector credits both
+  ALWAYS    authorization reaches all three states  16/16 = 100%
+            authorized, refused and undetermined each at least once
+  ALWAYS    the cover check reaches refuse AND undetermined  16/16 = 100%
+            a check whose effective range is one value has not been exercised
+  ALWAYS    latency excludes inferred instants  16/16 = 100%
+            a geofence crossing is our reconstruction, not a report
+  ALWAYS    the plant-basis query recovers the seasonal effect  16/16 = 100%
+            an INVARIANT: the signal is planted, so a sound estimator must find it
+            in every world
+  RATE ok   the naive calendar-quarter mean MISSES the seasonal effect  9/16 = 56%  band [0.2, 0.85]
+            a RATE, not an invariant. The plant is present in every world and a
+            sound estimator finds it in every world; whether the NAIVE one also
+            stumbles onto it depends on the draw. That is the finding, and it is
+            stronger than "the naive query fails": a query whose correctness
+            depends on the draw gives you no way to tell, from its own output,
+            which kind of world you are in. Both ends of the band are failures —
+            all-miss would be a fixture tuned until it agreed with me, all-hit
+            would be a fixture that cannot separate a sound estimator from an
+            unsound one.
+  ALWAYS    nothing claims admissibility  16/16 = 100%
+            representative in, inadmissible out, at every derivation
+
+──────────────────────────────────────────────────────────────────────────────
+WHAT TO ACT ON
+──────────────────────────────────────────────────────────────────────────────
+  Nothing is SOMETIMES. Every plant and every headline finding held in every
+  world built. That is the only reading under which a single-world report is
+  safe to quote.

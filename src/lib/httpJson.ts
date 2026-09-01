@@ -3,9 +3,9 @@ import zlib from 'zlib';
 import type { Readable } from 'stream';
 
 /**
- * OSIRIS — JSON fetch over Node's https client.
+ * Payload — JSON fetch over Node's https client.
  *
- * Some upstreams OSIRIS depends on cannot be reached with the bundled undici
+ * Some upstreams Payload Terminal depends on cannot be reached with the bundled undici
  * `fetch` from the Next server runtime — it stalls and throws
  * UND_ERR_CONNECT_TIMEOUT after 10s, while `https.get` to the same URL returns
  * in a few hundred ms. This helper is the shared escape hatch.
@@ -15,7 +15,16 @@ import type { Readable } from 'stream';
  * with 406/429 and ask for contact details in their usage policies.
  */
 
-export const OSIRIS_UA = 'OSIRIS-OSINT/1.0 (+https://github.com/simplifaisoul/osiris)';
+/**
+ * The identity this client presents to every upstream. It asserted
+ * `OSINT` to Nominatim, Overpass and every other endpoint on the way
+ * out — a purpose this application does not have and must not claim.
+ */
+export const PAYLOAD_UA =
+  'Payload/1.0 (+https://github.com/notationsystems/notations-osiris-overwatch-engine)';
+
+/** @deprecated Use PAYLOAD_UA. Kept for one release so imports do not break. */
+export const OSIRIS_UA = PAYLOAD_UA;
 
 export function httpJson<T>(
   url: string,
@@ -25,7 +34,7 @@ export function httpJson<T>(
     const req = https.get(
       url,
       {
-        headers: { 'User-Agent': OSIRIS_UA, Accept: 'application/json', 'Accept-Language': 'en', ...headers },
+        headers: { 'User-Agent': PAYLOAD_UA, Accept: 'application/json', 'Accept-Language': 'en', ...headers },
         timeout: timeoutMs,
       },
       (res) => {

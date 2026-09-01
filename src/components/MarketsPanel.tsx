@@ -6,10 +6,10 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronUp, BarChart3,
-  Zap, Shield, Droplets, Gem, Bitcoin, LineChart, Maximize2, Minimize2,
+  Shield, Droplets, Gem, Bitcoin, LineChart, Maximize2, Minimize2,
   DollarSign, ArrowUpDown, AlertTriangle,
 } from 'lucide-react';
-import AiOverview from './AiOverview';
+import { useHydrated } from '@/lib/ui/clientOnly';
 
 // Canvas charting has no business in the server bundle, and it only mounts
 // once a ticker is actually opened.
@@ -26,7 +26,7 @@ interface Quote {
   market_open?: boolean;
 }
 
-interface MarketsPanelProps { data: any; spaceWeather?: any; }
+interface MarketsPanelProps { data: any; }
 
 const SECTIONS = [
   { key: 'indices', label: 'INDICES', icon: LineChart },
@@ -124,7 +124,7 @@ function useFeedAge(timestamp?: string): string | null {
   return `${Math.floor(mins / 60)}h ago`;
 }
 
-export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) {
+export default function MarketsPanel({ data }: MarketsPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const [maximized, setMaximized] = useState(false);
   const [activeSection, setActiveSection] = useState('stocks');
@@ -135,9 +135,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
   const markets = useMemo(() => data.markets || {}, [data.markets]);
   const age = useFeedAge(markets.timestamp);
 
-  // Ensure portal only renders on client
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useHydrated();
 
   // Fullscreen covers the map, so Escape has to get you out of it — closing
   // the chart first, since that is the nearer thing to dismiss.
@@ -200,26 +198,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
     </div>
   );
 
-  const spaceBlock = spaceWeather && (
-    <div className="p-2 rounded-lg border" style={{ borderColor: `${spaceWeather.storm_color}33`, background: `${spaceWeather.storm_color}08` }}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Zap className="w-3 h-3" style={{ color: spaceWeather.storm_color }} />
-          <span className="text-[11px] font-mono tracking-widest text-[var(--text-muted)]">SPACE WEATHER</span>
-        </div>
-        <span className="text-[11px] font-mono font-bold" style={{ color: spaceWeather.storm_color }}>
-          Kp {spaceWeather.kp_index} — {spaceWeather.storm_level}
-        </span>
-      </div>
-      {spaceWeather.solar_flares?.length > 0 && (
-        <div className="mt-1 text-[9px] font-mono text-[var(--text-muted)]">
-          Latest flare: {spaceWeather.solar_flares[0].class}
-        </div>
-      )}
-    </div>
-  );
 
-  const aiBlock = <AiOverview mode="markets" payload={{ markets, spaceWeather }} accent="#D4AF37" />;
 
   const scmBlock = markets.scm_alerts && markets.scm_alerts.length > 0 && (
     <div className="space-y-1">
@@ -328,7 +307,7 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
         </button>
         <div className="flex items-center gap-2">
           {age && <span className="text-[9px] font-mono text-[var(--text-muted)]">{age}</span>}
-          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-osiris-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--alert-green)] animate-payload-pulse" />
           <button onClick={() => { setMaximized(!maximized); if (!expanded && !maximized) setExpanded(true); }} className="p-1.5 -m-0.5 rounded hover:text-white hover:bg-white/10 transition-colors" title={maximized ? "Restore" : "Maximize"}>
             {maximized ? <Minimize2 className="w-3.5 h-3.5 text-[var(--text-muted)]" /> : <Maximize2 className="w-3.5 h-3.5 text-[var(--text-muted)]" />}
           </button>
@@ -363,8 +342,6 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
                   {chartBlock}
                   {breadthBlock}
                   {scmBlock}
-                  {spaceBlock}
-                  {aiBlock}
                 </div>
 
                 <div className="min-h-0 flex flex-col lg:border-l lg:border-[var(--border-primary)] lg:pl-3">
@@ -384,8 +361,6 @@ export default function MarketsPanel({ data, spaceWeather }: MarketsPanelProps) 
                  one you meant to scroll. */
               <div className="space-y-2 overflow-y-auto styled-scrollbar max-h-[calc(100vh-9rem)] pr-0.5">
                 {breadthBlock}
-                {spaceBlock}
-                {aiBlock}
                 {tabsBar}
                 {scmBlock}
                 {chartBlock}

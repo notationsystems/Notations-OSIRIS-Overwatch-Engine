@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
 
-// BGP/ASN Lookup — remplacé après shutdown de bgpview.io
-// Sources: ip-api.com + RIPE Stat
+/**
+ * Payload — BGP / ASN lookup (ip-api.com + RIPE Stat).
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is an autonomous system or prefix. This route exists to attribute infrastructure to the
+ * ORGANISATION that operates it — a carrier's mail domain, a terminal's
+ * network, a broker's hosting — and to no other purpose. It must never be
+ * used to profile, locate, enumerate or identify a natural person, and no
+ * output of it may be joined to a person record.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get('query');
@@ -30,7 +43,8 @@ export async function GET(req: Request) {
         const data = await res.json();
         if (data.status === 'success') {
           // Parse ASN from "AS15169 Google LLC"
-          let asn = 'N/A', asOrg = data.org || data.isp || 'N/A', asCountry = data.countryCode || 'N/A';
+          let asn = 'N/A', asOrg = data.org || data.isp || 'N/A';
+          const asCountry = data.countryCode || 'N/A';
           const asMatch = data.as?.match(/^AS(\d+)\s+(.+)$/);
           if (asMatch) {
             asn = asMatch[1];
@@ -67,7 +81,8 @@ export async function GET(req: Request) {
       }
     } else if (asnNum) {
       // ASN details via RIPE Stat
-      let asnName = 'N/A', asnDesc = 'N/A', asnCountry = 'N/A';
+      let asnName = 'N/A', asnDesc = 'N/A';
+      const asnCountry = 'N/A';
 
       try {
         const ripeRes = await fetch(`https://stat.ripe.net/data/as-overview/data.json?resource=AS${asnNum}`, {

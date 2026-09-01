@@ -5,9 +5,10 @@ import { buildCorpusTable, buildVintageGrid, renderGridMarkdown, renderTableMark
 import { recordExport } from '@/lib/economy/sessionTelemetry';
 import { isMachineClient } from '@/lib/economy/machineClient';
 import type { EconomyState } from '@/lib/economy/types';
+import { env } from '@/lib/economy/envCompat';
 
 /**
- * Sea Dog Terminal — the corpus as a browsable, extractable table.
+ * Payload Terminal — the corpus as a browsable, extractable table.
  *
  *   GET /api/economy/table?commodity=copper[&metric=...][&subject=ent:...]
  *       [&format=json|md][&asOf=YYYY-MM-DD&knowledge=as_known_then]
@@ -35,10 +36,10 @@ const DEFAULT_ROW_LIMIT = 500;
 const MAX_ROW_LIMIT = 10000;
 
 async function archiveExportLog(rec: Record<string, unknown>): Promise<void> {
-  if (process.env.VITEST && process.env.SEA_DOG_FORCE_MISS_LOG !== '1') return;
+  if (process.env.VITEST && env('PAYLOAD_FORCE_MISS_LOG') !== '1') return;
   try {
     const fs = await import('node:fs/promises');
-    const dir = process.env.SEA_DOG_MISS_LOG_DIR ?? `${process.cwd()}/data-archive`;
+    const dir = env('PAYLOAD_MISS_LOG_DIR') ?? `${process.cwd()}/data-archive`;
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(`${dir}/export-log.jsonl`, JSON.stringify(rec) + '\n');
   } catch { /* best-effort by design */ }

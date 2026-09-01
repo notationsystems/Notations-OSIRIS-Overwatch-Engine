@@ -13,7 +13,7 @@
 > see hosting, CI or the access model — measure first and correct the
 > assumption in the report.
 
-Branch `claude/osiris-physical-economy-7o9g2w`, head `c1a60f5`, 574 tests, 34 ledger phases, seven `validWhile` guards.
+Branch `claude/payload-physical-economy-7o9g2w`, head `c1a60f5`, 574 tests, 34 ledger phases, seven `validWhile` guards.
 
 This order takes the system from a green branch to an instrument that is deployed, used, maintained and — if it earns it — kept. It is not feature work. Every item is about the gap between "the code is correct" and "someone opens it on a Tuesday and it is still true."
 

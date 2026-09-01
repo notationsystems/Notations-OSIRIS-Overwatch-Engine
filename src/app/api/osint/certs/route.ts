@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server';
 import { isRateLimited, getClientIp } from '@/lib/ssrf-guard';
+import { userAgent } from '@/lib/identity';
 
-// Certificate Transparency lookup via crt.sh (free, no key)
+/**
+ * Payload — Certificate Transparency lookup via crt.sh (free, no key).
+ *
+ * CONSTRAINT — ORGANISATIONAL INFRASTRUCTURE ATTRIBUTION ONLY.
+ * The subject is a domain's issued certificates. This route exists to attribute infrastructure to the
+ * ORGANISATION that operates it — a carrier's mail domain, a terminal's
+ * network, a broker's hosting — and to no other purpose. It must never be
+ * used to profile, locate, enumerate or identify a natural person, and no
+ * output of it may be joined to a person record.
+ *
+ * The constraint is stated here because the collection policy classifies
+ * this category as CONDITIONAL: permitted only with the condition written
+ * down. A conditional permission with the condition left implicit is an
+ * unconditional permission.
+ */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const domain = searchParams.get('domain');
@@ -19,7 +34,7 @@ export async function GET(req: Request) {
   try {
     const res = await fetch(`https://crt.sh/?q=%25.${encodeURIComponent(domain)}&output=json`, {
       signal: AbortSignal.timeout(10000),
-      headers: { 'User-Agent': 'Osiris-OSINT/3.0' },
+      headers: { 'User-Agent': userAgent('certificate transparency') },
     });
 
     if (!res.ok) {

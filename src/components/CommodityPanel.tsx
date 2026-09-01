@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Mountain, X, ChevronLeft, ChevronDown, ChevronRight, Crosshair, AlertTriangle, Activity, Database, Network } from 'lucide-react';
 
 /**
- * OSIRIS — Physical Economy research panel (phase 1: copper).
+ * Payload — Physical Economy research panel (phase 1: copper).
  *
  * A projection of the canonical economy state served by /api/economy — the
  * panel holds no truth of its own. Overview mode shows concentration,
@@ -71,11 +71,12 @@ interface Analytics {
   providers: string[];
   knowledge?: string;
   concentration: Record<string, ConcentrationBlock> & { trajectory?: { result: TrajectoryPoint[] } };
-  bottlenecks: { result: Bottleneck[] };
+  bottlenecks: { result: Bottleneck[]; emptyBecause?: string };
   anomalies: { result: Anomaly[] };
-  coverage?: { result: { mineProduction: { result: CoverageRow[] }; refinedProduction: { result: CoverageRow[] } } };
+  coverage?: { result: { mineProduction: { result: CoverageRow[]; emptyBecause?: string }; refinedProduction: { result: CoverageRow[]; emptyBecause?: string } } };
   divergence?: { result: DivergenceRec[] };
   corpusHealth?: CorpusHealthRow[];
+  corpusHealthAccounting?: { judged: string[]; notYetKnowable: string[]; cadenceUnmeasurable: string[]; emptyBecause?: string };
   /** Whether the flow topology's period can describe the evaluation date. */
   topology?: { topologyPeriod: { start: string; end: string } | null; evaluatedAt: string; status: 'within' | 'extrapolated' | 'predates'; note?: string };
   events: EconEvent[];
@@ -517,7 +518,7 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                             </div>
                           ))}
                           <div className="text-[8px] font-mono text-[var(--text-muted)] mt-0.5">
-                            evidence: {(block.inputs.observationIds ?? block.inputs.capacityIds ?? []).length} records · derived by OSIRIS analytics
+                            evidence: {(block.inputs.observationIds ?? block.inputs.capacityIds ?? []).length} records · derived by Payload Terminal analytics
                           </div>
                         </div>
                       )}
@@ -528,6 +529,20 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
 
               <Section id="bottlenecks" open={!!openSections['bottlenecks']} onToggle={toggle} title="CANDIDATE BOTTLENECKS" icon={<AlertTriangle className="w-3 h-3 text-[#FF9500]" />} count={analytics.bottlenecks.result.length}>
                 <div className="space-y-1">
+                  {/* The runbook's FIRST move lands here. At every historical
+                      date the time bar can reach, this list is empty — and
+                      an unexplained empty list reads as "no bottlenecks" or
+                      "broken", neither of which is what the corpus said. */}
+                  {analytics.bottlenecks.result.length === 0 && analytics.bottlenecks.emptyBecause && (
+                    <div
+                      data-testid="bottlenecks-empty-because"
+                      className="px-2 py-2 rounded bg-white/[0.03] border-l-2 text-[9px] font-mono leading-relaxed text-[var(--text-muted)]"
+                      style={{ borderLeftColor: '#FF9500' }}
+                    >
+                      <span className="text-[#FF9500]">NO CANDIDATES AT THIS DATE — </span>
+                      {analytics.bottlenecks.emptyBecause}
+                    </div>
+                  )}
                   {analytics.bottlenecks.result.slice(0, 8).map(b => (
                     <div key={b.entityId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
                       <button onClick={() => onSelectEntity(b.entityId)} className="w-full text-left">
@@ -554,12 +569,21 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
                 </div>
               </Section>
 
-              {(analytics.corpusHealth?.length ?? 0) > 0 && (
-                <Section id="corpus-health" open={openSections['corpus-health'] ?? true} onToggle={toggle} title="CORPUS HEALTH" icon={<AlertTriangle className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.corpusHealth!.length}>
+              {((analytics.corpusHealth?.length ?? 0) > 0 || analytics.corpusHealthAccounting?.emptyBecause) && (
+                <Section id="corpus-health" open={openSections['corpus-health'] ?? true} onToggle={toggle} title="CORPUS HEALTH" icon={<AlertTriangle className="w-3 h-3 text-[#FF3D3D]" />} count={analytics.corpusHealth?.length ?? 0}>
                   <div className="space-y-1">
                     <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
                       The instrument watching its own blindness: a source going stale or failing sanity checks degrades the best achievable warning, silently, unless reported here.
                     </div>
+                    {analytics.corpusHealth!.length === 0 && analytics.corpusHealthAccounting?.emptyBecause && (
+                      <div
+                        data-testid="corpus-health-empty-because"
+                        className="px-2 py-2 rounded bg-white/[0.03] border-l-2 text-[9px] font-mono leading-relaxed text-[var(--text-muted)]"
+                        style={{ borderLeftColor: analytics.corpusHealthAccounting.judged.length === 0 ? '#FF9500' : '#00E676' }}
+                      >
+                        {analytics.corpusHealthAccounting.emptyBecause}
+                      </div>
+                    )}
                     {analytics.corpusHealth!.map(s => (
                       <div key={`${s.kind}-${s.sourceId}`} className="px-2 py-1 rounded bg-[#FF3D3D]/5 border-l-2 border-[#FF3D3D]">
                         <div className="text-[9px] font-mono font-bold text-[#FF3D3D]">
@@ -603,23 +627,45 @@ export default function CommodityPanel({ selectedId, onSelectEntity, onClose, on
               )}
 
               {(analytics.coverage?.result?.mineProduction?.result?.length ?? 0) > 0 && (
-                <Section id="coverage" open={!!openSections['coverage']} onToggle={toggle} title="FACILITY COVERAGE" icon={<Database className="w-3 h-3 text-[#00BCD4]" />} count={analytics.coverage!.result.mineProduction.result.length}>
+                <Section id="coverage" open={!!openSections['coverage']} onToggle={toggle} title="FACILITY COVERAGE" icon={<Database className="w-3 h-3 text-[#00BCD4]" />} count={analytics.coverage!.result.mineProduction.result.length + analytics.coverage!.result.refinedProduction.result.length}>
                   <div className="space-y-1">
                     <div className="text-[8px] font-mono text-[var(--text-muted)] opacity-80">
-                      Share of each country total the facility model accounts for (rolled-up facilities ÷ country observation). The gap is unmodelled capacity; a ratio above 1 is a contradiction.
+                      Share of each country total the facility model accounts for (rolled-up facilities ÷ country observation). The gap is unmodelled capacity; a ratio above 1 is a contradiction; 0% means no facility stands behind the compiled total at all.
                     </div>
-                    {analytics.coverage!.result.mineProduction.result.map(r => (
-                      <div key={r.countryId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-mono text-[#E8E6E0]">{r.countryName}</span>
-                          <span className="flex items-center gap-1.5 shrink-0">
-                            <ScoreBar value={Math.min(1, r.ratio)} color={r.status === 'contradiction' ? '#FF3D3D' : r.status === 'complete' ? '#00E676' : '#00BCD4'} />
-                            <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: r.status === 'contradiction' ? '#FF3D3D' : '#00BCD4' }}>{(r.ratio * 100).toFixed(0)}%</span>
-                          </span>
+                    {/* BOTH metrics. Refined coverage was computed and never
+                        rendered, and the countries with NO modelled facility
+                        were dropped before rendering — so the section read
+                        "(9)" when 19 mine-production countries have a
+                        compiled total and all 17 refined-production ones are
+                        0% modelled. The zeroes are the coverage finding. */}
+                    {([['MINE PRODUCTION', analytics.coverage!.result.mineProduction.result],
+                       ['REFINED PRODUCTION', analytics.coverage!.result.refinedProduction.result]] as const).map(([label, rows]) => (
+                      <div key={label} className="space-y-1">
+                        <div className="text-[8px] font-mono tracking-wider pt-1" style={{ color: 'var(--gold-primary)' }}>
+                          {label} · {rows.length} countr{rows.length === 1 ? 'y' : 'ies'} · {rows.filter(r => r.status === 'uncovered').length} with NO modelled facility
                         </div>
-                        <div className="text-[8px] font-mono text-[var(--text-muted)]">
-                          {r.facilityCount} modeled facilit{r.facilityCount === 1 ? 'y' : 'ies'}: {r.rolledUp.toLocaleString()} of {r.direct.toLocaleString()} {r.unit}{r.status === 'contradiction' ? ' — CONTRADICTION: one side is wrong' : ''}
-                        </div>
+                        {rows.length === 0 && (
+                          <div className="text-[9px] font-mono text-[var(--text-muted)]">
+                            {analytics.coverage!.result[label === 'MINE PRODUCTION' ? 'mineProduction' : 'refinedProduction'].emptyBecause
+                              ?? 'No compiled country total at this date.'}
+                          </div>
+                        )}
+                        {rows.map(r => (
+                          <div key={r.countryId} className="px-2 py-1 rounded bg-white/[0.03] border border-white/5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono text-[#E8E6E0]">{r.countryName}</span>
+                              <span className="flex items-center gap-1.5 shrink-0">
+                                <ScoreBar value={Math.min(1, r.ratio)} color={r.status === 'contradiction' ? '#FF3D3D' : r.status === 'uncovered' ? '#FF9500' : r.status === 'complete' ? '#00E676' : '#00BCD4'} />
+                                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: r.status === 'contradiction' ? '#FF3D3D' : r.status === 'uncovered' ? '#FF9500' : '#00BCD4' }}>{(r.ratio * 100).toFixed(0)}%</span>
+                              </span>
+                            </div>
+                            <div className="text-[8px] font-mono text-[var(--text-muted)]">
+                              {r.status === 'uncovered'
+                                ? `NO modelled facility behind ${r.direct.toLocaleString()} ${r.unit} — the compiled total is the only evidence`
+                                : `${r.facilityCount} modeled facilit${r.facilityCount === 1 ? 'y' : 'ies'}: ${r.rolledUp.toLocaleString()} of ${r.direct.toLocaleString()} ${r.unit}${r.status === 'contradiction' ? ' — CONTRADICTION: one side is wrong' : ''}`}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>

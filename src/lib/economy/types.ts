@@ -1,5 +1,5 @@
 /**
- * OSIRIS — Canonical Physical-Economy State
+ * Payload — Canonical Physical-Economy State
  *
  * Identity discipline (do not blur these):
  *  - Entity       persistent real-world object (mine, smelter, port, country…)
@@ -17,12 +17,20 @@
 
 /* ── Provenance ── */
 
+/** ISO 8601 instant, e.g. "2026-08-31T14:05:00Z". A named alias because a
+ *  bare `string` in a timestamp position is how a date and a knownAt get
+ *  swapped without the compiler noticing. */
+export type ISODateTime = string;
+
+/** Lowercase hex digest. */
+export type Hash = string;
+
 export interface Provenance {
   /** Stable id of the source, e.g. "usgs-mcs-2025". */
   sourceId: string;
   sourceName: string;
   sourceUrl?: string;
-  /** When OSIRIS acquired the value (ISO 8601). */
+  /** When Payload Terminal acquired the value (ISO 8601). */
   retrievedAt: string;
   /** Locator within the source: table, page, series id. */
   sourceRef?: string;
@@ -450,6 +458,19 @@ export interface AnalyticalResult<T> {
   /** Evidence identity: exact inputs the result was computed from. */
   inputs: { observationIds?: string[]; flowIds?: string[]; capacityIds?: string[]; entityIds?: string[] };
   result: T;
+  /**
+   * Why the result is EMPTY — set only when it is, and never as a caveat on
+   * a populated one (a note on every result is a note on none).
+   *
+   * An analytical operation that returns nothing has said one of several
+   * different things: nothing qualified, the inputs it needs are absent at
+   * this evaluation date, or the population it ranks over is excluded by
+   * construction here. A bare empty array says none of them, and the reader
+   * supplies the wrong one — usually "the instrument is broken" or "there
+   * are no bottlenecks", when the truth was "no facility structure exists
+   * at this date to rank".
+   */
+  emptyBecause?: string;
 }
 
 /* ── Divergence ── */
