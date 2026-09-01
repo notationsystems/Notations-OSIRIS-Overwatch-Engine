@@ -46,9 +46,16 @@ import type {
   StoredCommercialRecord,
 } from './commercialStore';
 import { commercialRecordHash, verifyCommercialRecords } from './commercialStore';
+import type {
+  ProjectCargoEvent,
+  ProjectCargoEventStore,
+  ProjectCargoStoreAppendResult,
+  StoredProjectCargoRecord,
+} from './projectCargoStore';
+import { projectCargoRecordHash, verifyProjectCargoRecords } from './projectCargoStore';
 import type { Hash, ISODateTime } from './types';
 
-export type PayloadEventStream = 'load_operation' | 'carrier_communication' | 'procurement' | 'commercial';
+export type PayloadEventStream = 'load_operation' | 'carrier_communication' | 'procurement' | 'commercial' | 'project_cargo';
 
 /** Database ordering metadata; domain facts remain typed inside `event`. */
 export type LinearizedPayloadEvent = {
@@ -61,7 +68,7 @@ export type LinearizedPayloadEvent = {
   readonly commandHash: Hash;
   readonly previousHash: Hash | null;
   readonly recordHash: Hash;
-  readonly event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent;
+  readonly event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent | ProjectCargoEvent;
 };
 
 /** Retrieval cursor metadata, not an attestation about the physical world. */
@@ -84,6 +91,7 @@ export type PayloadEventDatabaseSummary = {
   readonly communicationEvents: number;
   readonly procurementEvents: number;
   readonly commercialEvents: number;
+  readonly projectCargoEvents: number;
   readonly proofBatches: number;
 };
 
@@ -96,12 +104,46 @@ export type PayloadProofBatch = {
   readonly root: Hash;
   readonly program: 'payload_event_batch_v1';
   readonly proverSystem: 'sp1';
-  readonly status: 'pending' | 'proved' | 'failed';
+  readonly status: 'pending' | 'proving' | 'proved' | 'failed';
   readonly createdAt: ISODateTime;
   readonly proofId: string | null;
   readonly verificationKey: string | null;
+  readonly proofMode: 'core' | 'compressed' | 'groth16' | 'plonk' | null;
+  readonly proofSha256: Hash | null;
+  readonly publicValues: Readonly<Record<string, unknown>> | null;
+  readonly verifiedAt: ISODateTime | null;
+  readonly leaseOwner: string | null;
+  readonly leaseExpiresAt: ISODateTime | null;
+  readonly attempts: number;
   readonly error: string | null;
 };
+
+export type PayloadProofWitness = {
+  readonly schema: 'payload.event_batch.witness.v1';
+  readonly batchId: string;
+  readonly fromSequence: number;
+  readonly toSequence: number;
+  readonly eventCount: number;
+  readonly expectedRoot: Hash;
+  readonly priorHashes: Readonly<Record<PayloadEventStream, Hash | null>>;
+  readonly events: readonly {
+    readonly sequence: number;
+    readonly stream: PayloadEventStream;
+    readonly eventId: string;
+    readonly operationId: string;
+    readonly kind: string;
+    readonly recordedAt: ISODateTime;
+    readonly commandHash: Hash;
+    readonly previousHash: Hash | null;
+    readonly recordHash: Hash;
+    readonly canonicalEventJson: string;
+  }[];
+};
+
+export type PayloadProofClaimResult =
+  | { readonly kind: 'claimed'; readonly batch: PayloadProofBatch; readonly witness: PayloadProofWitness }
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'refusal'; readonly code: 'PROOF_WORKER_INVALID' | 'PROOF_BATCH_CONCURRENT_WRITE'; readonly detail: string; readonly remedy: string };
 
 export type PayloadProofBatchResult =
   | { readonly kind: 'created'; readonly batch: PayloadProofBatch }
@@ -193,11 +235,11 @@ function proofRefusal(
 }
 
 function rowDefect(row: DbRow): string | null {
-  let event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent;
-  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent; }
+  let event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent | ProjectCargoEvent;
+  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent | ProjectCargoEvent; }
   catch { return `sequence ${row.sequence} has invalid event JSON`; }
   if (!Number.isSafeInteger(row.sequence) || row.sequence < 1) return 'event sequence is invalid';
-  if (!['load_operation', 'carrier_communication', 'procurement', 'commercial'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
+  if (!['load_operation', 'carrier_communication', 'procurement', 'commercial', 'project_cargo'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
   if (event.eventId !== row.event_id || event.operationId !== row.operation_id ||
       event.kind !== row.kind || event.recordedAt !== row.recorded_at || event.commandHash !== row.command_hash) {
     return `sequence ${row.sequence} indexed metadata contradicts its event`;
@@ -222,7 +264,7 @@ function linearized(row: DbRow): LinearizedPayloadEvent {
     commandHash: row.command_hash,
     previousHash: row.previous_hash,
     recordHash: row.record_hash,
-    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent,
+    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent | ProjectCargoEvent,
   });
 }
 
@@ -239,6 +281,13 @@ function proofBatch(row: Record<string, unknown>): PayloadProofBatch {
     createdAt: String(row.created_at),
     proofId: row.proof_id === null ? null : String(row.proof_id),
     verificationKey: row.verification_key === null ? null : String(row.verification_key),
+    proofMode: row.proof_mode === null ? null : row.proof_mode as PayloadProofBatch['proofMode'],
+    proofSha256: row.proof_sha256 === null ? null : String(row.proof_sha256),
+    publicValues: row.public_values_json === null ? null : JSON.parse(String(row.public_values_json)) as Record<string, unknown>,
+    verifiedAt: row.verified_at === null ? null : String(row.verified_at),
+    leaseOwner: row.lease_owner === null ? null : String(row.lease_owner),
+    leaseExpiresAt: row.lease_expires_at === null ? null : String(row.lease_expires_at),
+    attempts: Number(row.attempts ?? 0),
     error: row.error === null ? null : String(row.error),
   });
 }
@@ -264,7 +313,7 @@ export class PayloadEventDatabase {
         VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
       CREATE TABLE IF NOT EXISTS payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial', 'project_cargo')),
         event_id TEXT NOT NULL,
         operation_id TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -291,18 +340,27 @@ export class PayloadEventDatabase {
         root TEXT NOT NULL,
         program TEXT NOT NULL CHECK(program = 'payload_event_batch_v1'),
         prover_system TEXT NOT NULL CHECK(prover_system = 'sp1'),
-        status TEXT NOT NULL CHECK(status IN ('pending', 'proved', 'failed')),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'proving', 'proved', 'failed')),
         created_at TEXT NOT NULL,
         proof_id TEXT,
         verification_key TEXT,
+        proof_mode TEXT CHECK(proof_mode IS NULL OR proof_mode IN ('core', 'compressed', 'groth16', 'plonk')),
+        proof_sha256 TEXT,
+        public_values_json TEXT,
+        verified_at TEXT,
+        lease_owner TEXT,
+        lease_expires_at TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
         error TEXT,
         UNIQUE(from_sequence, to_sequence),
         CHECK(from_sequence > 0 AND to_sequence >= from_sequence AND event_count > 0)
       );
     `);
     const eventTable = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payload_events'").get() as { sql?: string } | undefined;
-    if (eventTable?.sql && !eventTable.sql.includes("'commercial'")) this.migrateEventTableToV3();
-    this.db.prepare("INSERT OR IGNORE INTO payload_schema(version, applied_at) VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run();
+    if (eventTable?.sql && !eventTable.sql.includes("'project_cargo'")) this.migrateEventTableToV4();
+    const proofTable = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payload_proof_batches'").get() as { sql?: string } | undefined;
+    if (proofTable?.sql && (!proofTable.sql.includes("'proving'") || !proofTable.sql.includes('lease_owner'))) this.migrateProofTableToV4();
+    this.db.prepare("INSERT OR IGNORE INTO payload_schema(version, applied_at) VALUES (4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run();
     const integrity = this.db.prepare('PRAGMA quick_check').get() as Record<string, unknown> | undefined;
     if (!integrity || !Object.values(integrity).includes('ok')) {
       this.db.close();
@@ -326,6 +384,10 @@ export class PayloadEventDatabase {
     return new SqliteCommercialStore(this);
   }
 
+  projectCargoStore(): ProjectCargoEventStore {
+    return new SqliteProjectCargoStore(this);
+  }
+
   close(): void {
     this.db.close();
   }
@@ -344,6 +406,7 @@ export class PayloadEventDatabase {
       communicationEvents: count("WHERE stream = 'carrier_communication'"),
       procurementEvents: count("WHERE stream = 'procurement'"),
       commercialEvents: count("WHERE stream = 'commercial'"),
+      projectCargoEvents: count("WHERE stream = 'project_cargo'"),
       proofBatches: Number(batches.total),
     });
   }
@@ -424,8 +487,10 @@ export class PayloadEventDatabase {
       this.db.prepare(`
         INSERT INTO payload_proof_batches(
           batch_id, from_sequence, to_sequence, event_count, root, program,
-          prover_system, status, created_at, proof_id, verification_key, error
-        ) VALUES (?, ?, ?, ?, ?, 'payload_event_batch_v1', 'sp1', 'pending', ?, NULL, NULL, NULL)
+          prover_system, status, created_at, proof_id, verification_key,
+          proof_mode, proof_sha256, public_values_json, verified_at,
+          lease_owner, lease_expires_at, attempts, error
+        ) VALUES (?, ?, ?, ?, ?, 'payload_event_batch_v1', 'sp1', 'pending', ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL)
       `).run(batchId, from, to, bounded.length, root, createdAt);
       this.db.exec('COMMIT');
       return { kind: 'created', batch: this.listProofBatches().at(-1)! };
@@ -437,6 +502,101 @@ export class PayloadEventDatabase {
       }
       throw error;
     }
+  }
+
+  proofWitness(batchId: string): PayloadProofWitness {
+    const batchRow = this.db.prepare('SELECT * FROM payload_proof_batches WHERE batch_id = ?').get(batchId) as Record<string, unknown> | undefined;
+    if (!batchRow) throw new Error(`PROOF_BATCH_NOT_FOUND: ${batchId}`);
+    const batch = proofBatch(batchRow);
+    const rows = this.db.prepare(`
+      SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
+             command_hash, previous_hash, record_hash, event_json
+        FROM payload_events WHERE sequence BETWEEN ? AND ? ORDER BY sequence ASC
+    `).all(batch.fromSequence, batch.toSequence) as DbRow[];
+    const events = rows.map(linearized);
+    if (events.length !== batch.eventCount || events[0]?.sequence !== batch.fromSequence || events.at(-1)?.sequence !== batch.toSequence || payloadEventBatchRoot(events) !== batch.root) {
+      throw new Error('PROOF_BATCH_WITNESS_INVALID: committed range no longer reconstructs the batch root');
+    }
+    const streams: PayloadEventStream[] = ['load_operation', 'carrier_communication', 'procurement', 'commercial', 'project_cargo'];
+    const priorHashes = Object.fromEntries(streams.map(stream => {
+      const row = this.db.prepare('SELECT record_hash FROM payload_events WHERE stream = ? AND sequence < ? ORDER BY sequence DESC LIMIT 1').get(stream, batch.fromSequence) as { record_hash: string } | undefined;
+      return [stream, row?.record_hash ?? null];
+    })) as Record<PayloadEventStream, Hash | null>;
+    return freeze({
+      schema: 'payload.event_batch.witness.v1' as const,
+      batchId: batch.batchId,
+      fromSequence: batch.fromSequence,
+      toSequence: batch.toSequence,
+      eventCount: batch.eventCount,
+      expectedRoot: batch.root,
+      priorHashes,
+      events: events.map(event => ({ sequence: event.sequence, stream: event.stream, eventId: event.eventId, operationId: event.operationId, kind: event.kind, recordedAt: event.recordedAt, commandHash: event.commandHash, previousHash: event.previousHash, recordHash: event.recordHash, canonicalEventJson: canonical(event.event) })),
+    });
+  }
+
+  claimProofBatch(workerId: string, leaseSeconds = 300, now = new Date().toISOString()): PayloadProofClaimResult {
+    if (!workerId.trim() || !Number.isSafeInteger(leaseSeconds) || leaseSeconds < 30 || leaseSeconds > 3600 || !Number.isFinite(Date.parse(now))) {
+      return { kind: 'refusal', code: 'PROOF_WORKER_INVALID', detail: 'Worker identity, lease duration, or time is invalid.', remedy: 'Use a stable worker identity, a 30..3600 second lease, and a valid clock.' };
+    }
+    const expiresAt = new Date(Date.parse(now) + leaseSeconds * 1000).toISOString();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const row = this.db.prepare(`
+        SELECT * FROM payload_proof_batches
+         WHERE status = 'pending' OR (status = 'proving' AND lease_expires_at < ?) OR (status = 'failed' AND attempts < 3)
+         ORDER BY from_sequence ASC LIMIT 1
+      `).get(now) as Record<string, unknown> | undefined;
+      if (!row) { this.db.exec('ROLLBACK'); return { kind: 'idle' }; }
+      const changed = this.db.prepare(`
+        UPDATE payload_proof_batches
+           SET status = 'proving', lease_owner = ?, lease_expires_at = ?, attempts = attempts + 1, error = NULL
+         WHERE batch_id = ? AND (status = 'pending' OR (status = 'proving' AND lease_expires_at < ?) OR (status = 'failed' AND attempts < 3))
+      `).run(workerId, expiresAt, String(row.batch_id), now);
+      if (changed.changes !== 1) { this.db.exec('ROLLBACK'); return { kind: 'refusal', code: 'PROOF_BATCH_CONCURRENT_WRITE', detail: 'Another worker claimed the batch.', remedy: 'Poll for the next pending batch.' }; }
+      this.db.exec('COMMIT');
+      const batch = this.listProofBatches().find(item => item.batchId === String(row.batch_id))!;
+      return { kind: 'claimed', batch, witness: this.proofWitness(batch.batchId) };
+    } catch (error) {
+      try { this.db.exec('ROLLBACK'); } catch { /* transaction already closed */ }
+      throw error;
+    }
+  }
+
+  completeProofBatch(input: {
+    readonly batchId: string;
+    readonly workerId: string;
+    readonly proofId: string;
+    readonly verificationKey: string;
+    readonly proofMode: Exclude<PayloadProofBatch['proofMode'], null>;
+    readonly proofSha256: Hash;
+    readonly publicValues: Readonly<Record<string, unknown>>;
+    readonly verifiedAt: ISODateTime;
+  }): PayloadProofBatch {
+    if (!input.workerId.trim() || !input.proofId.trim() || !input.verificationKey.trim() || !/^[a-f0-9]{64}$/.test(input.proofSha256) || !Number.isFinite(Date.parse(input.verifiedAt))) throw new Error('PROOF_RESULT_INVALID: proof metadata is incomplete');
+    const row = this.db.prepare('SELECT * FROM payload_proof_batches WHERE batch_id = ?').get(input.batchId) as Record<string, unknown> | undefined;
+    if (!row) throw new Error(`PROOF_BATCH_NOT_FOUND: ${input.batchId}`);
+    const batch = proofBatch(row);
+    if (batch.status !== 'proving' || batch.leaseOwner !== input.workerId || !batch.leaseExpiresAt || Date.parse(input.verifiedAt) > Date.parse(batch.leaseExpiresAt)) throw new Error('PROOF_BATCH_LEASE_LOST: worker no longer owns a valid proof lease');
+    if (input.publicValues.program !== batch.program || input.publicValues.batchId !== batch.batchId || input.publicValues.root !== batch.root || Number(input.publicValues.fromSequence) !== batch.fromSequence || Number(input.publicValues.toSequence) !== batch.toSequence || Number(input.publicValues.eventCount) !== batch.eventCount) throw new Error('PROOF_PUBLIC_VALUES_MISMATCH: verified public values do not bind the committed batch');
+    const result = this.db.prepare(`
+      UPDATE payload_proof_batches
+         SET status = 'proved', proof_id = ?, verification_key = ?, proof_mode = ?, proof_sha256 = ?,
+             public_values_json = ?, verified_at = ?, lease_owner = NULL, lease_expires_at = NULL, error = NULL
+       WHERE batch_id = ? AND status = 'proving' AND lease_owner = ?
+    `).run(input.proofId, input.verificationKey, input.proofMode, input.proofSha256, canonical(input.publicValues), input.verifiedAt, input.batchId, input.workerId);
+    if (result.changes !== 1) throw new Error('PROOF_BATCH_LEASE_LOST: proof result was not committed');
+    return this.listProofBatches().find(item => item.batchId === input.batchId)!;
+  }
+
+  failProofBatch(batchId: string, workerId: string, error: string): PayloadProofBatch {
+    const detail = error.trim().slice(0, 2000);
+    if (!workerId.trim() || !detail) throw new Error('PROOF_RESULT_INVALID: worker identity and failure detail are required');
+    const result = this.db.prepare(`
+      UPDATE payload_proof_batches SET status = 'failed', error = ?, lease_owner = NULL, lease_expires_at = NULL
+       WHERE batch_id = ? AND status = 'proving' AND lease_owner = ?
+    `).run(detail, batchId, workerId);
+    if (result.changes !== 1) throw new Error('PROOF_BATCH_LEASE_LOST: failure was not committed');
+    return this.listProofBatches().find(item => item.batchId === batchId)!;
   }
 
   readOperations(): readonly StoredLoadOperationRecord[] {
@@ -480,6 +640,17 @@ export class PayloadEventDatabase {
     }));
     const defect = verifyCommercialRecords(records);
     if (defect) throw new Error(`COMMERCIAL_STORE_CORRUPT: ${defect}`);
+    return freeze(records);
+  }
+
+  readProjectCargo(): readonly StoredProjectCargoRecord[] {
+    const records = this.rowsFor('project_cargo').map(row => ({
+      event: JSON.parse(row.event_json) as ProjectCargoEvent,
+      previousHash: row.previous_hash,
+      recordHash: row.record_hash,
+    }));
+    const defect = verifyProjectCargoRecords(records);
+    if (defect) throw new Error(`PROJECT_CARGO_STORE_CORRUPT: ${defect}`);
     return freeze(records);
   }
 
@@ -549,6 +720,21 @@ export class PayloadEventDatabase {
     });
   }
 
+  appendProjectCargo(
+    event: ProjectCargoEvent,
+    expectedPreviousHash?: Hash | null,
+  ): ProjectCargoStoreAppendResult {
+    const result = this.append('project_cargo', event, expectedPreviousHash, projectCargoRecordHash);
+    if ('record' in result) return { kind: result.kind, record: result.record as StoredProjectCargoRecord };
+    return Object.freeze({
+      kind: 'refusal' as const,
+      code: result.kind === 'conflict' ? 'PROJECT_CARGO_EVENT_ID_CONFLICT' as const
+        : result.kind === 'concurrent' ? 'PROJECT_CARGO_STORE_CONCURRENT_WRITE' as const : 'PROJECT_CARGO_STORE_CORRUPT' as const,
+      detail: result.detail,
+      remedy: result.remedy,
+    });
+  }
+
   private rowsFor(stream: PayloadEventStream): DbRow[] {
     const rows = this.db.prepare(`
       SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
@@ -562,7 +748,7 @@ export class PayloadEventDatabase {
     return rows;
   }
 
-  private append<E extends LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent>(
+  private append<E extends LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent | ProjectCargoEvent>(
     stream: PayloadEventStream,
     event: E,
     expectedPreviousHash: Hash | null | undefined,
@@ -626,13 +812,13 @@ export class PayloadEventDatabase {
     }
   }
 
-  private migrateEventTableToV3(): void {
+  private migrateEventTableToV4(): void {
     this.db.exec(`
       BEGIN IMMEDIATE;
-      ALTER TABLE payload_events RENAME TO payload_events_before_v3;
+      ALTER TABLE payload_events RENAME TO payload_events_before_v4;
       CREATE TABLE payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial', 'project_cargo')),
         event_id TEXT NOT NULL,
         operation_id TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -651,11 +837,50 @@ export class PayloadEventDatabase {
       )
       SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
              command_hash, previous_hash, record_hash, event_json, inserted_at
-        FROM payload_events_before_v3 ORDER BY sequence ASC;
-      DROP TABLE payload_events_before_v3;
+        FROM payload_events_before_v4 ORDER BY sequence ASC;
+      DROP TABLE payload_events_before_v4;
       CREATE INDEX payload_events_operation_sequence ON payload_events(operation_id, sequence);
       CREATE INDEX payload_events_stream_sequence ON payload_events(stream, sequence);
       CREATE INDEX payload_events_recorded_sequence ON payload_events(recorded_at, sequence);
+      COMMIT;
+    `);
+  }
+
+  private migrateProofTableToV4(): void {
+    this.db.exec(`
+      BEGIN IMMEDIATE;
+      ALTER TABLE payload_proof_batches RENAME TO payload_proof_batches_before_v4;
+      CREATE TABLE payload_proof_batches (
+        batch_id TEXT PRIMARY KEY,
+        from_sequence INTEGER NOT NULL,
+        to_sequence INTEGER NOT NULL,
+        event_count INTEGER NOT NULL,
+        root TEXT NOT NULL,
+        program TEXT NOT NULL CHECK(program = 'payload_event_batch_v1'),
+        prover_system TEXT NOT NULL CHECK(prover_system = 'sp1'),
+        status TEXT NOT NULL CHECK(status IN ('pending', 'proving', 'proved', 'failed')),
+        created_at TEXT NOT NULL,
+        proof_id TEXT,
+        verification_key TEXT,
+        proof_mode TEXT CHECK(proof_mode IS NULL OR proof_mode IN ('core', 'compressed', 'groth16', 'plonk')),
+        proof_sha256 TEXT,
+        public_values_json TEXT,
+        verified_at TEXT,
+        lease_owner TEXT,
+        lease_expires_at TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        UNIQUE(from_sequence, to_sequence),
+        CHECK(from_sequence > 0 AND to_sequence >= from_sequence AND event_count > 0)
+      );
+      INSERT INTO payload_proof_batches(
+        batch_id, from_sequence, to_sequence, event_count, root, program,
+        prover_system, status, created_at, proof_id, verification_key, error
+      )
+      SELECT batch_id, from_sequence, to_sequence, event_count, root, program,
+             prover_system, status, created_at, proof_id, verification_key, error
+        FROM payload_proof_batches_before_v4 ORDER BY from_sequence ASC;
+      DROP TABLE payload_proof_batches_before_v4;
       COMMIT;
     `);
   }
@@ -694,5 +919,14 @@ class SqliteCommercialStore implements CommercialEventStore {
   async readAll(): Promise<readonly StoredCommercialRecord[]> { return this.database.readCommercials(); }
   async append(event: CommercialEvent, expectedPreviousHash?: Hash | null): Promise<CommercialStoreAppendResult> {
     return this.database.appendCommercial(event, expectedPreviousHash);
+  }
+}
+
+class SqliteProjectCargoStore implements ProjectCargoEventStore {
+  readonly durability = 'sqlite_wal' as const;
+  constructor(private readonly database: PayloadEventDatabase) {}
+  async readAll(): Promise<readonly StoredProjectCargoRecord[]> { return this.database.readProjectCargo(); }
+  async append(event: ProjectCargoEvent, expectedPreviousHash?: Hash | null): Promise<ProjectCargoStoreAppendResult> {
+    return this.database.appendProjectCargo(event, expectedPreviousHash);
   }
 }

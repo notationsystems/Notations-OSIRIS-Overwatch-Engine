@@ -49,6 +49,10 @@ scripts/*
 # archive manifest generator is imported by archiveManifest.test.ts.
 !scripts/archive-manifest.mjs
 !scripts/smoke.mjs
+!scripts/run-sp1-proof-worker.ts
+
+# Rust/SP1 build output
+/zk/payload-event-batch/target/
 
 # AI agent config files
 CLAUDE.md

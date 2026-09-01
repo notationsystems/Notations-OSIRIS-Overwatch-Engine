@@ -12,6 +12,7 @@
     "test:live": "RUN_LIVE_TESTS=1 vitest run",
     "mcp": "tsx src/mcp/server.ts",
     "migrate:operations-db": "tsx scripts/migrate-operations-to-sqlite.ts",
+    "prove:event-batch": "tsx scripts/run-sp1-proof-worker.ts",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

@@ -7,6 +7,7 @@ import { FileLoadOperationStore, stableValue } from '../src/lib/economy/loadOper
 import { PayloadEventDatabase } from '../src/lib/economy/payloadEventDatabase';
 import { FileProcurementStore } from '../src/lib/economy/procurementStore';
 import { FileCommercialStore } from '../src/lib/economy/commercialStore';
+import { FileProjectCargoStore } from '../src/lib/economy/projectCargoStore';
 
 function option(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -27,7 +28,8 @@ async function main(): Promise<void> {
   const communicationsPath = resolve(option('communications') ?? process.env.PAYLOAD_CARRIER_COMMUNICATIONS_LOG ?? 'data-archive/carrier-communications.jsonl');
   const procurementPath = resolve(option('procurement') ?? process.env.PAYLOAD_PROCUREMENT_LOG ?? 'data-archive/procurement.jsonl');
   const commercialPath = resolve(option('commercial') ?? process.env.PAYLOAD_COMMERCIAL_LOG ?? 'data-archive/commercial.jsonl');
-  if (!existsSync(operationsPath) && !existsSync(communicationsPath) && !existsSync(procurementPath) && !existsSync(commercialPath)) {
+  const projectCargoPath = resolve(option('project-cargo') ?? process.env.PAYLOAD_PROJECT_CARGO_LOG ?? 'data-archive/project-cargo.jsonl');
+  if (!existsSync(operationsPath) && !existsSync(communicationsPath) && !existsSync(procurementPath) && !existsSync(commercialPath) && !existsSync(projectCargoPath)) {
     throw new Error('No legacy journal exists. Start a new database directly, or point the migration at the deployment volume.');
   }
 
@@ -35,11 +37,13 @@ async function main(): Promise<void> {
   const communicationRecords = await new FileCarrierCommunicationStore(communicationsPath).readAll();
   const procurementRecords = await new FileProcurementStore(procurementPath).readAll();
   const commercialRecords = await new FileCommercialStore(commercialPath).readAll();
+  const projectCargoRecords = await new FileProjectCargoStore(projectCargoPath).readAll();
   const legacy = [
     ...operationRecords.map((record, index) => ({ stream: 'load_operation' as const, index, event: record.event })),
     ...communicationRecords.map((record, index) => ({ stream: 'carrier_communication' as const, index, event: record.event })),
     ...procurementRecords.map((record, index) => ({ stream: 'procurement' as const, index, event: record.event })),
     ...commercialRecords.map((record, index) => ({ stream: 'commercial' as const, index, event: record.event })),
+    ...projectCargoRecords.map((record, index) => ({ stream: 'project_cargo' as const, index, event: record.event })),
   ].sort((left, right) => {
     const time = Date.parse(left.event.recordedAt) - Date.parse(right.event.recordedAt);
     if (time) return time;
@@ -77,17 +81,20 @@ async function main(): Promise<void> {
           ? database.appendCommunication(item.event)
           : item.stream === 'procurement'
             ? database.appendProcurement(item.event)
-            : database.appendCommercial(item.event);
+            : item.stream === 'commercial'
+              ? database.appendCommercial(item.event)
+              : database.appendProjectCargo(item.event);
       if (result.kind === 'refusal') throw new Error(`${result.code}: ${result.detail}`);
     }
     const summary = database.summary();
     if (summary.operationEvents !== operationRecords.length || summary.communicationEvents !== communicationRecords.length ||
-        summary.procurementEvents !== procurementRecords.length || summary.commercialEvents !== commercialRecords.length) {
+        summary.procurementEvents !== procurementRecords.length || summary.commercialEvents !== commercialRecords.length ||
+        summary.projectCargoEvents !== projectCargoRecords.length) {
       throw new Error('Migration count verification failed; leave legacy journals in place and inspect the destination.');
     }
     console.log(JSON.stringify({
       kind: 'migration_complete',
-      source: { operationsPath, communicationsPath, procurementPath, commercialPath },
+      source: { operationsPath, communicationsPath, procurementPath, commercialPath, projectCargoPath },
       database: summary,
     }, null, 2));
   } finally {

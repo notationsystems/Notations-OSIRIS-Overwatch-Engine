@@ -1,0 +1,22 @@
+[package]
+name = "payload-event-batch-script"
+version = "0.1.0"
+edition = "2021"
+default-run = "payload-sp1-worker"
+
+[[bin]]
+name = "payload-sp1-worker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+hex = "0.4.3"
+payload-event-batch-lib = { path = "../lib" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10.9"
+sp1-sdk = { version = "6.0.1", features = ["blocking", "native-gnark", "network"] }
+
+[build-dependencies]
+sp1-build = { version = "6.0.1" }

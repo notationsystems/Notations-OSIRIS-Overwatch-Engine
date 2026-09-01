@@ -27,6 +27,7 @@ services:
       - PAYLOAD_CARRIER_COMMUNICATIONS_LOG=${PAYLOAD_CARRIER_COMMUNICATIONS_LOG:-/app/runtime-data/carrier-communications.jsonl}
       - PAYLOAD_PROCUREMENT_LOG=${PAYLOAD_PROCUREMENT_LOG:-/app/runtime-data/procurement.jsonl}
       - PAYLOAD_COMMERCIAL_LOG=${PAYLOAD_COMMERCIAL_LOG:-/app/runtime-data/commercial.jsonl}
+      - PAYLOAD_PROJECT_CARGO_LOG=${PAYLOAD_PROJECT_CARGO_LOG:-/app/runtime-data/project-cargo.jsonl}
       - PAYLOAD_DATABASE_PATH=${PAYLOAD_DATABASE_PATH:-}
     volumes:
       - payload-runtime:/app/runtime-data

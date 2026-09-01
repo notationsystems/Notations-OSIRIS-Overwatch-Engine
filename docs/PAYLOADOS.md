@@ -208,8 +208,10 @@ external timestamp.
 ## SP1 / zkVM program family
 
 The first generic program is `payload_event_batch_v1`, specified in
-`event-ledger.sp1.md`. It proves an exact contiguous global range, every embedded
-domain chains, and the committed Merkle root.
+`event-ledger.sp1.md`. Its checked-in Rust guest proves an exact contiguous
+global range, every embedded domain chain, and the committed Merkle root. The
+leased host worker separately verifies against a pinned verification key before
+the database can mark a batch proved.
 
 Specialized programs should disclose only the statement a counterparty needs:
 
@@ -248,14 +250,17 @@ only create a larger silo.
    append-only settlement revisions; procurement-origin inventory lots,
    customer commitments, allocation, sale contracts, freight-bound fulfillment,
    delivery, margin exposure, and sell-side settlement revisions.
-3. **Project cargo:** asset policies, multimodal plans, custody, condition,
-   telemetry, compliance, and exception remedies.
+3. **Project cargo (implemented):** canonical asset policies, dependent
+   multimodal plans and permits, exact custody, OTel-aligned condition telemetry,
+   deterministic exceptions and typed remedies, delivery verification,
+   external adapters, and closed project economics.
 4. **Corpus and spatial state:** canonical organization/facility/material IDs,
    temporal graph, PostGIS projection, and evidence-aware retrieval.
 5. **Market and risk:** read-only market/reference feeds, exposure and hedge
    proposals, then separately authorized execution and reconciliation.
-6. **Verification workers:** SP1 batch proving, specialized proof programs,
-   verification-key governance, proof-result events, and selective anchoring.
+6. **Verification workers (generic batch implemented):** leased SP1 batch
+   proving and independent verification are checked in; specialized proof
+   programs, key-ceremony governance, and selective anchoring remain.
 
 Each stage must close the loop from proposal through verified outcome before the
 next domain is allowed to expand the action surface.

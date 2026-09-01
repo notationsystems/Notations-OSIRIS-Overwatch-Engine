@@ -1,0 +1,29 @@
+{
+  "schema": "payload.event_batch.witness.v1",
+  "batchId": "proof-batch:fixture:1",
+  "fromSequence": 1,
+  "toSequence": 1,
+  "eventCount": 1,
+  "expectedRoot": "b380cc66d03a208cc786b4a439fab881306725e1967225b95f3c23841efde1a5",
+  "priorHashes": {
+    "load_operation": null,
+    "carrier_communication": null,
+    "procurement": null,
+    "commercial": null,
+    "project_cargo": null
+  },
+  "events": [
+    {
+      "sequence": 1,
+      "stream": "load_operation",
+      "eventId": "fixture:event:1",
+      "operationId": "fixture:operation:1",
+      "kind": "fixture_event",
+      "recordedAt": "2026-09-01T00:00:00.000Z",
+      "commandHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "previousHash": null,
+      "recordHash": "26416603ae557ba155f9c628d1dc949b7aec053e159e2d84661a894e1d78d535",
+      "canonicalEventJson": "{\"commandHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"eventId\":\"fixture:event:1\",\"kind\":\"fixture_event\",\"operationId\":\"fixture:operation:1\",\"recordedAt\":\"2026-09-01T00:00:00.000Z\"}"
+    }
+  ]
+}

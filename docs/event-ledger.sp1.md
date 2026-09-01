@@ -4,7 +4,7 @@
 
 Prove that a disclosed Payload event-batch root represents an exact contiguous
 slice of the globally ordered PayloadOS database and that its load,
-carrier-communication, procurement, and commercial domain chains are internally consistent.
+carrier-communication, procurement, commercial, and project-cargo domain chains are internally consistent.
 The proof is evidence about recorded history;
 it never authorizes, assigns, dispatches, or delays a load.
 
@@ -21,6 +21,9 @@ it never authorizes, assigns, dispatches, or delays a load.
   contains procurement events;
 - the commercial-chain root before and after the batch, when the batch contains
   inventory, customer-commitment, sale, fulfillment, or settlement events;
+- the project-cargo-chain root before and after the batch, when the batch
+  contains asset, journey, custody, telemetry, exception, delivery, integration,
+  or project-economic events;
 - optional disclosed statement output for a specialized program.
 
 ## Private witness
@@ -39,7 +42,7 @@ facts and evidence references rather than source documents.
 2. Every event's indexed identity equals the identity in canonical event JSON.
 3. Every command hash is 32 bytes and every domain record hash reconstructs
    from its versioned domain, previous hash, and canonical event.
-4. Operation, communication, procurement, and commercial events extend only their named
+4. Operation, communication, procurement, commercial, and project-cargo events extend only their named
    domain chain.
 5. Batch leaves are
    `sha256("payload.event_batch.leaf.v1|sequence|stream|recordHash")`.
@@ -48,8 +51,9 @@ facts and evidence references rather than source documents.
 7. The computed batch root and event count equal the public values.
 
 The TypeScript reference is `payloadEventBatchRoot` in
-`src/lib/economy/payloadEventDatabase.ts`. Circuit and reference equivalence
-must be pinned with shared fixtures before a proof may be called valid.
+`src/lib/economy/payloadEventDatabase.ts`. The pure Rust verifier shares
+fixtures with that reference; the SP1 guest in `zk/payload-event-batch/program`
+reconstructs the five domain chains and root before committing public values.
 
 ## High-value specialized proofs
 
@@ -70,15 +74,23 @@ programs that reveal only the commercial statement a counterparty needs:
 - `payload_condition_v1`: the existing reefer/condition program described in
   `docs/notary.program.md`.
 
-## Worker lifecycle (not implemented in this increment)
+## Worker lifecycle
 
 1. claim a `pending` batch with a database lease;
 2. build the canonical witness from the exact committed range;
 3. prove with SP1 outside the request/dispatch path;
 4. verify locally against the configured verification key;
-5. append a proof-result event and set the batch to `proved`, or retain a typed
+5. persist the verified proof digest and set the batch to `proved`, or retain a typed
    failure and retry policy;
 6. anchor selected roots outside Payload when independent timestamping matters.
 
-Until that worker and verification-key ceremony exist, a pending batch is a
-Merkle commitment prepared for proving, not a zk proof and not described as one.
+The TypeScript worker, Rust host, and Rust guest are checked in. The host can
+produce core, compressed, Groth16, or PLONK proofs and always runs an independent
+SDK verification before emitting its result. The application then compares the
+exact public values and pinned verification key before changing durable status.
+
+The official SP1 SDK currently requires a Linux build/runtime; native Windows
+is not a supported production prover boundary. Build and run the host under a
+Linux worker or container. Until a batch has status `proved` with a proof digest
+and verified timestamp, `pending`, `proving`, and `failed` rows remain Merkle
+commitments or job state—not zk proofs.

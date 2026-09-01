@@ -22,14 +22,14 @@ export async function GET(req: Request) {
   const limit = Number(url.searchParams.get('limit') ?? '100');
   const operationId = url.searchParams.get('operationId')?.trim() || undefined;
   const rawStream = url.searchParams.get('stream')?.trim();
-  const stream = rawStream === 'load_operation' || rawStream === 'carrier_communication' || rawStream === 'procurement' || rawStream === 'commercial'
+  const stream = rawStream === 'load_operation' || rawStream === 'carrier_communication' || rawStream === 'procurement' || rawStream === 'commercial' || rawStream === 'project_cargo'
     ? rawStream as PayloadEventStream
     : undefined;
   if (rawStream && !stream) {
     return NextResponse.json({
       kind: 'refusal', code: 'PAYLOAD_DATABASE_QUERY_INVALID',
       detail: `Unknown event stream ${rawStream}.`,
-      remedy: 'Use load_operation, carrier_communication, procurement, or commercial.',
+      remedy: 'Use load_operation, carrier_communication, procurement, commercial, or project_cargo.',
     }, { status: 400 });
   }
   try {

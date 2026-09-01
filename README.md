@@ -33,7 +33,7 @@ settlement, an index whose coverage is unstated — each is a wrong number
 that looks exactly like a right one. Payload is built so those cannot be
 produced silently.
 
-Two verticals run on the same substrate:
+The operating practices run on the same substrate:
 
 - **Commodities** — copper and aluminium: live acquisition from USGS, UN
   Comtrade, COMEX and CFTC behind a snapshot degradation ladder, a directed
@@ -51,6 +51,9 @@ Two verticals run on the same substrate:
   commitments, reservation without oversell, sale contracts, freight-bound
   fulfillment, delivery, settlement and margin exposure. Operate the workflow
   at `/commercial`.
+- **Specialized project logistics** — canonical high-value assets, multimodal
+  journeys, permits, custody, condition telemetry, exception remedies, delivery
+  verification, and project profitability. Operate the workflow at `/projects`.
 
 See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
@@ -64,6 +67,7 @@ See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 | **Markets** | Benchmark price, positioning, warehouse stocks | COMEX (Yahoo), CFTC COT, LME via Westmetall |
 | **Freight book** | Loads, quotes, invoices, transit, appointments | Operator entry, append-only ledger |
 | **Commercial book** | Inventory lots, customer commitments, allocations, sales, fulfillment | Procurement outcomes, operator entry, append-only ledger |
+| **Project cargo** | Constrained assets, journeys, permits, custody, telemetry, remedies, project margin | Operator actions, OTLP sensors, provider adapters, append-only ledger |
 | **Lane memory** | Residuals by carrier, lane and season, with a trials floor | Derived, admissibility-stamped |
 | **Carrier vetting** | Three-state verdicts: cleared, blocked, undetermined | Regulator records, insurer confirmation |
 | **Routing** | Truck-legal mileage, geocoding, basemap | Valhalla / OSRM profiles, Nominatim |
@@ -291,7 +295,7 @@ operations bearer token.
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in
-WAL mode: operation, carrier-communication, procurement, and commercial hash chains remain independently
+WAL mode: operation, carrier-communication, procurement, commercial, and project-cargo hash chains remain independently
 verifiable, while every committed event also receives one global sequence.
 `GET /api/freight/event-ledger` pages that sequence by cursor and may filter by
 operation or stream. Existing JSONL deployments migrate once, before enabling
@@ -301,11 +305,20 @@ the database:
 PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operations-db
 ```
 
-The migration validates every source chain, including `PAYLOAD_PROCUREMENT_LOG` and `PAYLOAD_COMMERCIAL_LOG`, refuses a non-empty divergent
+The migration validates every source chain, including `PAYLOAD_PROCUREMENT_LOG`, `PAYLOAD_COMMERCIAL_LOG`, and `PAYLOAD_PROJECT_CARGO_LOG`, refuses a non-empty divergent
 destination, and is safe to rerun against an exact completed migration.
 `POST /api/freight/proof-batches` freezes the next unbatched sequence range as
 a deterministic Merkle root for the asynchronous SP1 `payload_event_batch_v1`
 program; it does not put proving on the dispatch path.
+
+`/projects` is the specialized-logistics action cockpit. It registers canonical
+cargo and constraint profiles, plans dependent multimodal legs and permits,
+records custody/evidence/condition timelines, detects excursions, authorizes
+typed remedies, verifies delivery, and reconciles project economics. Sensor
+gateways post OTLP/HTTP JSON logs to `/api/projects/telemetry/v1/logs` using the
+separate `PAYLOAD_TELEMETRY_TOKEN`. Carrier, EDI, accounting, and payment calls
+cross a provider-neutral, idempotent adapter at `/api/projects/integrations`.
+See [`docs/PROJECT_CARGO.md`](docs/PROJECT_CARGO.md).
 `GET /api/freight/sources?usdot=<number>&carrierId=<internal-id>&includeDiesel=1`
 pulls current FMCSA identity/authority/out-of-service evidence and the fixed EIA
 weekly U.S. diesel benchmark. It returns a gate-ready `authorizationCarrier`

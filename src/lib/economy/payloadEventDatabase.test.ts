@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -11,6 +11,8 @@ import { ProcurementWorkflow } from './procurement';
 import { ProcurementActions } from './procurementActions';
 import type { CommercialEvent } from './commercialStore';
 import { attestationOf } from './attestation';
+import { ProjectCargoWorkflow } from './projectCargo';
+import { ProjectCargoActions } from './projectCargoActions';
 
 const directories: string[] = [];
 
@@ -68,6 +70,14 @@ async function databasePath(): Promise<string> {
 }
 
 describe('globally ordered Payload event database', () => {
+  it('matches the SP1 guest Merkle root on the shared cross-language fixture', async () => {
+    const fixture = JSON.parse(await readFile(join(process.cwd(), 'zk/payload-event-batch/fixtures/event-batch.json'), 'utf8')) as {
+      expectedRoot: string;
+      events: Array<Record<string, unknown>>;
+    };
+    expect(payloadEventBatchRoot(fixture.events as unknown as Parameters<typeof payloadEventBatchRoot>[0])).toBe(fixture.expectedRoot);
+  });
+
   it('linearizes both domain journals, preserves each hash chain, and recovers after restart', async () => {
     const path = await databasePath();
     const database = new PayloadEventDatabase(path);
@@ -123,6 +133,24 @@ describe('globally ordered Payload event database', () => {
     database.close();
   });
 
+  it('leases a proof batch and records it as proved only when verified public values bind the range', async () => {
+    const database = new PayloadEventDatabase(await databasePath());
+    await database.loadOperationStore().append(operationEvent('event:proof:1', '2026-09-01T10:00:00.000Z'), null);
+    const created = database.createProofBatch(undefined, '2026-09-01T10:01:00.000Z');
+    if (created.kind === 'refusal') throw new Error(created.detail);
+    const claim = database.claimProofBatch('worker:test:001', 300, '2026-09-01T10:02:00.000Z');
+    expect(claim).toMatchObject({ kind: 'claimed', batch: { status: 'proving', attempts: 1 }, witness: { schema: 'payload.event_batch.witness.v1', eventCount: 1, events: [{ stream: 'load_operation' }] } });
+    if (claim.kind !== 'claimed') throw new Error('proof batch was not claimed');
+    expect(() => database.completeProofBatch({ batchId: claim.batch.batchId, workerId: 'worker:other', proofId: 'sp1:bad', verificationKey: 'vkey:test', proofMode: 'core', proofSha256: 'a'.repeat(64), publicValues: {}, verifiedAt: '2026-09-01T10:03:00.000Z' })).toThrow(/LEASE_LOST/);
+    const proved = database.completeProofBatch({
+      batchId: claim.batch.batchId, workerId: 'worker:test:001', proofId: 'sp1:proof:001', verificationKey: 'vkey:test', proofMode: 'core', proofSha256: 'b'.repeat(64),
+      publicValues: { program: 'payload_event_batch_v1', batchId: claim.batch.batchId, root: claim.batch.root, fromSequence: 1, toSequence: 1, eventCount: 1 },
+      verifiedAt: '2026-09-01T10:03:00.000Z',
+    });
+    expect(proved).toMatchObject({ status: 'proved', proofId: 'sp1:proof:001', verificationKey: 'vkey:test', proofMode: 'core', proofSha256: 'b'.repeat(64), leaseOwner: null });
+    database.close();
+  });
+
   it('refuses logical tampering even when SQLite itself remains structurally healthy', async () => {
     const path = await databasePath();
     const database = new PayloadEventDatabase(path);
@@ -170,6 +198,20 @@ describe('globally ordered Payload event database', () => {
     database.close();
   });
 
+  it('linearizes project cargo as the fifth domain chain', async () => {
+    const database = new PayloadEventDatabase(await databasePath());
+    const actions = new ProjectCargoActions(new ProjectCargoWorkflow(database.projectCargoStore()), () => '2026-09-01T10:00:00.000Z');
+    const registered = await actions.execute({
+      action: 'register_project', requestId: 'request:db:project', actorId: 'desk:projects', submittedAt: '2026-09-01T10:00:00.000Z',
+      payload: { projectId: 'project:db:1', projectReference: 'project-ref:db:1', customerId: 'customer:db', originLocationId: 'facility:origin', destinationLocationId: 'facility:destination', sourceReference: 'project-order:db:1', cargoItems: [{ cargoItemId: 'cargo:db:1', assetId: 'asset:db:1', category: 'heavy_machinery', description: 'Machine', serialOrLotIds: ['serial:db:1'], quantity: 1, quantityUnit: 'unit', declaredValueCurrency: 'CAD', sourceReference: 'packing-list:db:1', constraints: { allowedOrientations: ['upright'], handlingRequirements: ['rigging'], securityRequirements: [], regulatoryRequirements: [], requiredDocumentTypes: [], requiredTelemetrySignals: [], continuousCustodyRequired: true } }] },
+    });
+    expect(registered).toMatchObject({ kind: 'accepted' });
+    expect(database.queryEvents({ stream: 'project_cargo' }).events).toMatchObject([{ sequence: 1, operationId: 'project:db:1', kind: 'project_registered' }]);
+    expect(database.summary()).toMatchObject({ totalEvents: 1, projectCargoEvents: 1 });
+    expect(database.readProjectCargo()).toHaveLength(1);
+    database.close();
+  });
+
   it('upgrades a pre-commercial event table without changing prior sequences', async () => {
     const path = await databasePath();
     const legacy = new Database(path);
@@ -196,8 +238,9 @@ describe('globally ordered Payload event database', () => {
     const table = new Database(path, { readonly: true });
     const sql = table.prepare("SELECT sql FROM sqlite_master WHERE name = 'payload_events'").pluck().get() as string;
     expect(sql).toContain("'commercial'");
+    expect(sql).toContain("'project_cargo'");
     table.close();
-    expect(upgraded.summary()).toMatchObject({ totalEvents: 1, lastSequence: 1, procurementEvents: 0, commercialEvents: 0 });
+    expect(upgraded.summary()).toMatchObject({ totalEvents: 1, lastSequence: 1, procurementEvents: 0, commercialEvents: 0, projectCargoEvents: 0 });
     expect(upgraded.queryEvents().events[0]).toMatchObject({ sequence: 1, eventId: 'operation-event:legacy' });
     upgraded.close();
   });

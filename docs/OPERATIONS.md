@@ -6,9 +6,9 @@ what postures have been taken about external clients.
 
 ## Freight-operation journals
 
-The load-operation, carrier-communication, procurement, and commercial journals
+The load-operation, carrier-communication, procurement, commercial, and project-cargo journals
 are append-only, hash-chained commercial evidence. Docker Compose mounts
-`payload-runtime` at `/app/runtime-data` and points all four journal variables there, so rebuilds and container replacement
+`payload-runtime` at `/app/runtime-data` and points all five journal variables there, so rebuilds and container replacement
 preserve them. They are excluded from Git, Docker build
 contexts, and the static archive manifest.
 
@@ -22,7 +22,7 @@ must honor that key to make a retry side-effect safe.
 ### Canonical event database and migration
 
 Set `PAYLOAD_DATABASE_PATH` to place load operations, carrier communication,
-procurement, and commercial positions in one SQLite/WAL database. Each stream retains its own
+procurement, commercial positions, and project cargo in one SQLite/WAL database. Each stream retains its own
 append-only hash chain and replay rules; the database adds a global `sequence`
 across all accepted events. This makes the whole history linearly pageable
 without pretending the domain state machines are one state machine.
@@ -37,8 +37,9 @@ PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operation
 Optional source overrides are
 `--operations=<load-operations.jsonl>` and
 `--communications=<carrier-communications.jsonl>` and
-`--procurement=<procurement.jsonl>`. The migrator verifies every
-legacy chains, orders their records by recorded time while preserving each
+`--procurement=<procurement.jsonl>`, `--commercial=<commercial.jsonl>`, and
+`--project-cargo=<project-cargo.jsonl>`. The migrator verifies every
+legacy chain, orders records by recorded time while preserving each
 stream's internal order, writes through the same SQLite append guards, checks
 counts, and refuses a destination containing any divergent history. Keep the
 legacy files until backup and restore have been tested.
@@ -47,7 +48,8 @@ Authenticated retrieval:
 
 - `GET /api/freight/event-ledger?after=0&limit=100` returns the global sequence;
 - add `operationId=...` for one load or `stream=load_operation` /
-  `carrier_communication` / `procurement` for one domain journal;
+  `carrier_communication` / `procurement` / `commercial` / `project_cargo` for
+  one domain journal;
 - every page carries the next cursor and database totals.
 
 SQLite structural health is checked at open. Reads then validate indexed
@@ -63,11 +65,20 @@ records a deterministic root with program `payload_event_batch_v1`, prover
 system `sp1`, and status `pending`. `GET` retrieves all batch commitments.
 
 This endpoint prepares public inputs; it does not accept a caller-supplied proof
-or verification key. A separate prover worker will consume pending batches,
-run SP1, verify locally, and append the proof reference. Authorization remains a
+or verification key. The checked-in leased worker consumes pending batches,
+runs SP1, verifies locally against the pinned key, hashes the durable proof, and
+marks the exact batch proved. Authorization remains a
 microsecond blocking gate; proving remains asynchronous evidence about what
-executed. See `docs/event-ledger.sp1.md` for the program boundary and planned
-selective-disclosure statements.
+executed.
+
+Build `zk/payload-event-batch` on Linux with the official SP1 toolchain, then set
+absolute `PAYLOAD_SP1_EXECUTABLE` and `PAYLOAD_SP1_PROOF_DIR` paths plus the
+pinned `PAYLOAD_SP1_VERIFICATION_KEY`. `PAYLOAD_SP1_PROOF_MODE` accepts `core`,
+`compressed`, `groth16`, or `plonk`. Run `npm run prove:event-batch` under a
+supervisor. The worker leases one batch for the prover timeout; an expired lease
+is recoverable, and three verified failures stop for operator review. Native
+Windows is not a supported SP1 host because current SDK/JIT dependencies require
+Unix facilities. See `docs/event-ledger.sp1.md`.
 
 ---
 
