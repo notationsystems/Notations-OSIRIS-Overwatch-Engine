@@ -63,6 +63,7 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'freight/demo': 'freight',
   'freight/carrier-events': 'freight',
   'freight/communications': 'freight',
+  'freight/control-tower': 'freight',
   'freight/operations': 'freight',
   'freight/sources': 'freight',
   'freight/world': 'freight',

@@ -167,6 +167,9 @@ Registration was never the only door.
 - **Persistent operating loop** — opportunity intake, carrier alternatives,
   authorization, assignment, dispatch delivery, acknowledgement, tracking,
   settlement, and outcome capture remain replayable after restart
+- **Control-tower workspace** — `/operations` joins those durable records into
+  an exception-first desk queue with exact load/carrier/lane identity,
+  deadlines, evidence counts, and explicit operator remedies
 
 ### Commodity analytics
 - Concentration (HHI with remainder and effective groups), flow centrality,
@@ -255,6 +258,10 @@ AIS_API_KEY=                  # aisstream.io maritime
 `GET /api/freight/operations` reads the current load-operation projections;
 `POST /api/freight/operations` advances opportunity intake, alternatives,
 authorization, assignment, dispatch evidence, and settlement outcome capture.
+`GET /api/freight/control-tower` joins those projections to tender delivery,
+carrier acknowledgements, tracking freshness, delivery windows, and settlement
+state. The `/operations` workspace refreshes that private view every 30 seconds
+and keeps its bearer credential only in the active browser tab's memory.
 `GET /api/freight/sources?usdot=<number>&carrierId=<internal-id>&includeDiesel=1`
 pulls current FMCSA identity/authority/out-of-service evidence and the fixed EIA
 weekly U.S. diesel benchmark. It returns a gate-ready `authorizationCarrier`

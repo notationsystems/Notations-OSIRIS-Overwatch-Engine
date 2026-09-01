@@ -21,6 +21,36 @@ must honor that key to make a retry side-effect safe.
 
 ---
 
+## Brokerage control tower
+
+Open `/operations` and supply the same `PAYLOAD_OPERATIONS_TOKEN` used by the
+private freight APIs. The credential remains in the active tab's memory; it is
+not written to local storage, session storage, URLs, or the server-rendered
+page. Locking or closing the workspace clears it.
+
+The workspace reads `GET /api/freight/control-tower` every 30 seconds. This is a
+projection over the two journals, not a third mutable record. It joins:
+
+- opportunity, route, equipment, load, carrier, lane, episode, and action IDs;
+- authorization, assignment, dispatch, tender delivery, acknowledgement, and
+  tracking state;
+- pickup and delivery commitments plus tracking freshness;
+- quoted carrier cost, captured invoice, gross margin, and outcome status.
+
+The default queue is exception-first. Every queue item exposes a named issue,
+severity, applicable deadline, evidence-reference count, and operator remedy.
+There is no opaque composite score. Missing tracking is not treated as on time,
+and journal corruption or unavailability makes the entire view refuse rather
+than silently showing an empty desk.
+
+Operational policy is currently fixed in code: 30 minutes to acknowledge a
+delivered tender, 120 minutes before in-motion tracking is stale, and 24 hours
+after delivered evidence before settlement becomes high priority. Change those
+values through a reviewed deployment until per-customer policies have their own
+authenticated configuration ledger.
+
+---
+
 ## Authoritative freight-source pulls
 
 The private `/api/freight/sources` route pulls two fixed official APIs: FMCSA
