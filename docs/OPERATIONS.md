@@ -7,9 +7,10 @@ what postures have been taken about external clients.
 ## Freight-operation journals
 
 The load-operation and carrier-communication journals are append-only,
-hash-chained commercial evidence. Docker Compose mounts `payload-runtime` at
-`/app/runtime-data` and points both journal variables there, so rebuilds and
-container replacement preserve them. They are excluded from Git, Docker build
+hash-chained commercial evidence. The procurement journal follows the same
+rule. Docker Compose mounts `payload-runtime` at `/app/runtime-data` and points
+all three journal variables there, so rebuilds and container replacement
+preserve them. They are excluded from Git, Docker build
 contexts, and the static archive manifest.
 
 Use one application writer and back up the volume independently. Restoring only
@@ -21,11 +22,11 @@ must honor that key to make a retry side-effect safe.
 
 ### Canonical event database and migration
 
-Set `PAYLOAD_DATABASE_PATH` to place both journal streams in one SQLite/WAL
-database. Each stream retains its own append-only hash chain and replay rules;
-the database adds a global `sequence` across operation and carrier-communication
-events. This makes the whole history linearly pageable without pretending the
-two stream state machines are one state machine.
+Set `PAYLOAD_DATABASE_PATH` to place load operations, carrier communication,
+and procurement in one SQLite/WAL database. Each stream retains its own
+append-only hash chain and replay rules; the database adds a global `sequence`
+across all accepted events. This makes the whole history linearly pageable
+without pretending the domain state machines are one state machine.
 
 For an existing deployment, stop application writers and migrate before setting
 the variable on the application service:
@@ -36,7 +37,8 @@ PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operation
 
 Optional source overrides are
 `--operations=<load-operations.jsonl>` and
-`--communications=<carrier-communications.jsonl>`. The migrator verifies both
+`--communications=<carrier-communications.jsonl>` and
+`--procurement=<procurement.jsonl>`. The migrator verifies every
 legacy chains, orders their records by recorded time while preserving each
 stream's internal order, writes through the same SQLite append guards, checks
 counts, and refuses a destination containing any divergent history. Keep the
@@ -46,11 +48,11 @@ Authenticated retrieval:
 
 - `GET /api/freight/event-ledger?after=0&limit=100` returns the global sequence;
 - add `operationId=...` for one load or `stream=load_operation` /
-  `carrier_communication` for one domain journal;
+  `carrier_communication` / `procurement` for one domain journal;
 - every page carries the next cursor and database totals.
 
 SQLite structural health is checked at open. Reads then validate indexed
-metadata, canonical event hashes, and both previous-hash chains. A database can
+metadata, canonical event hashes, and all previous-hash chains. A database can
 be structurally valid but semantically tampered; that second validation is why
 `quick_check` alone is not treated as evidence of an intact journal.
 
@@ -124,6 +126,31 @@ delivered tender, 120 minutes before in-motion tracking is stale, and 24 hours
 after delivered evidence before settlement becomes high priority. Change those
 values through a reviewed deployment until per-customer policies have their own
 authenticated configuration ledger.
+
+---
+
+## Procurement and physical positions
+
+Open `/procurement` with `PAYLOAD_OPERATIONS_TOKEN`. The authenticated
+`/api/procurement/actions` route operates this replayable aggregate:
+
+```text
+requirement -> supplier alternatives -> five-check qualification
+            -> frozen feasible set -> selection -> purchase / position
+            -> logistics requirement -> receipt -> settlement
+```
+
+Supplier qualification covers counterparty eligibility, sanctions screening,
+specification match, credit terms, and authority to buy. A supplier enters the
+feasible set only when all five are satisfied. Purchase binds the selected
+supplier action to the signed contract and a server-derived physical-position
+identity. Receipts may be partial but cannot exceed purchased quantity.
+
+Settlement records purchase invoice, freight, duty, insurance, storage,
+financing, loss, and revenue as observed values or typed absences. Landed cost
+remains unavailable until every cost is observed; enter an evidenced zero only
+when the actual cost is zero. Later evidence appends a settlement revision
+linked to the prior event rather than overwriting history.
 
 ---
 

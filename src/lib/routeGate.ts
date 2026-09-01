@@ -104,6 +104,7 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'osint/threats': 'infrastructure-conditional',
   'osint/whois': 'infrastructure-conditional',
   'proxy-tiles': 'ops',
+  'procurement/actions': 'freight',
   radar: 'general-purpose',
   'region-dossier': 'general-purpose',
   satellites: 'general-purpose',

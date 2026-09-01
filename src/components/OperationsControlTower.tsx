@@ -432,6 +432,12 @@ export default function OperationsControlTower() {
           </div>
           <div className="flex items-center gap-2">
             <p className="hidden font-mono text-[10px] text-[var(--text-muted)] sm:block">As of {formatInstant(tower.asOf)}</p>
+            <Link
+              href="/procurement"
+              className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs text-[var(--text-secondary)] hover:border-[var(--cyan-primary)]/30 hover:text-[var(--cyan-primary)]"
+            >
+              <Database size={15} /> Procurement
+            </Link>
             <button
               type="button"
               onClick={() => setCockpitOperationId(null)}

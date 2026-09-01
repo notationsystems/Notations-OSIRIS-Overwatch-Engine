@@ -7,6 +7,8 @@ import type { CarrierCommunicationEvent } from './carrierCommunicationsStore';
 import type { LoadOperationEvent } from './loadOperationsStore';
 import { hashCommand } from './loadOperationsStore';
 import { PayloadEventDatabase, payloadEventBatchRoot } from './payloadEventDatabase';
+import { ProcurementWorkflow } from './procurement';
+import { ProcurementActions } from './procurementActions';
 
 const directories: string[] = [];
 
@@ -116,5 +118,51 @@ describe('globally ordered Payload event database', () => {
     const reopened = new PayloadEventDatabase(path);
     expect(() => reopened.readOperations()).toThrow(/PAYLOAD_DATABASE_CORRUPT|OPERATION_STORE_CORRUPT/);
     reopened.close();
+  });
+
+  it('linearizes procurement beside freight and preserves the procurement domain chain', async () => {
+    const database = new PayloadEventDatabase(await databasePath());
+    const workflow = new ProcurementWorkflow(database.procurementStore());
+    const actions = new ProcurementActions(workflow, () => '2026-09-01T10:00:00.000Z');
+    const created = await actions.execute({
+      action: 'register_requirement', requestId: 'request:db:procurement', actorId: 'desk:procurement',
+      submittedAt: '2026-09-01T10:00:00.000Z', payload: {
+        procurementId: 'procurement:db:1', sourceReference: 'rfq:db:1', materialId: 'material:db', specificationId: 'spec:db',
+        quantity: 20, unit: 'tonne', destinationId: 'facility:db', deliveryStart: '2026-09-10T00:00:00.000Z',
+        deliveryEnd: '2026-09-20T00:00:00.000Z', currency: 'CAD',
+      },
+    });
+    expect(created).toMatchObject({ kind: 'accepted' });
+    expect(database.queryEvents({ stream: 'procurement' }).events).toMatchObject([
+      { sequence: 1, stream: 'procurement', operationId: 'procurement:db:1', kind: 'procurement_requirement_registered' },
+    ]);
+    expect(database.summary()).toMatchObject({ totalEvents: 1, procurementEvents: 1 });
+    expect(database.readProcurements()).toHaveLength(1);
+    database.close();
+  });
+
+  it('upgrades a version-one event table without changing prior sequences', async () => {
+    const path = await databasePath();
+    const legacy = new Database(path);
+    legacy.exec(`
+      CREATE TABLE payload_schema(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+      INSERT INTO payload_schema VALUES (1, '2026-09-01T00:00:00.000Z');
+      CREATE TABLE payload_events (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication')),
+        event_id TEXT NOT NULL, operation_id TEXT NOT NULL, kind TEXT NOT NULL,
+        recorded_at TEXT NOT NULL, command_hash TEXT NOT NULL, previous_hash TEXT,
+        record_hash TEXT NOT NULL, event_json TEXT NOT NULL, inserted_at TEXT NOT NULL,
+        UNIQUE(stream, event_id), UNIQUE(stream, record_hash)
+      );
+    `);
+    legacy.close();
+    const upgraded = new PayloadEventDatabase(path);
+    const table = new Database(path, { readonly: true });
+    const sql = table.prepare("SELECT sql FROM sqlite_master WHERE name = 'payload_events'").pluck().get() as string;
+    expect(sql).toContain("'procurement'");
+    table.close();
+    expect(upgraded.summary()).toMatchObject({ totalEvents: 0, procurementEvents: 0 });
+    upgraded.close();
   });
 });

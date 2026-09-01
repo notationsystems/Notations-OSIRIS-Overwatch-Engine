@@ -25,6 +25,7 @@ services:
       - HOSTNAME=0.0.0.0
       - PAYLOAD_OPERATIONS_LOG=${PAYLOAD_OPERATIONS_LOG:-/app/runtime-data/load-operations.jsonl}
       - PAYLOAD_CARRIER_COMMUNICATIONS_LOG=${PAYLOAD_CARRIER_COMMUNICATIONS_LOG:-/app/runtime-data/carrier-communications.jsonl}
+      - PAYLOAD_PROCUREMENT_LOG=${PAYLOAD_PROCUREMENT_LOG:-/app/runtime-data/procurement.jsonl}
       - PAYLOAD_DATABASE_PATH=${PAYLOAD_DATABASE_PATH:-}
     volumes:
       - payload-runtime:/app/runtime-data

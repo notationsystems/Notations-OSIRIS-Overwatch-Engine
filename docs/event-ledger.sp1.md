@@ -3,8 +3,9 @@
 ## Purpose
 
 Prove that a disclosed Payload event-batch root represents an exact contiguous
-slice of the globally ordered freight database and that the two embedded domain
-chains are internally consistent. The proof is evidence about recorded history;
+slice of the globally ordered PayloadOS database and that its load,
+carrier-communication, and procurement domain chains are internally consistent.
+The proof is evidence about recorded history;
 it never authorizes, assigns, dispatches, or delays a load.
 
 ## Public values
@@ -16,6 +17,8 @@ it never authorizes, assigns, dispatches, or delays a load.
   operation events;
 - the communication-chain root before and after the batch, when the batch
   contains communication events;
+- the procurement-chain root before and after the batch, when the batch
+  contains procurement events;
 - optional disclosed statement output for a specialized program.
 
 ## Private witness
@@ -34,8 +37,8 @@ facts and evidence references rather than source documents.
 2. Every event's indexed identity equals the identity in canonical event JSON.
 3. Every command hash is 32 bytes and every domain record hash reconstructs
    from its versioned domain, previous hash, and canonical event.
-4. Operation events extend only the operation chain; communication events
-   extend only the communication chain.
+4. Operation, communication, and procurement events extend only their named
+   domain chain.
 5. Batch leaves are
    `sha256("payload.event_batch.leaf.v1|sequence|stream|recordHash")`.
 6. Internal nodes are

@@ -32,9 +32,16 @@ import {
   stableValue,
   verifyLoadOperationRecords,
 } from './loadOperationsStore';
+import type {
+  ProcurementEvent,
+  ProcurementEventStore,
+  ProcurementStoreAppendResult,
+  StoredProcurementRecord,
+} from './procurementStore';
+import { procurementRecordHash, verifyProcurementRecords } from './procurementStore';
 import type { Hash, ISODateTime } from './types';
 
-export type PayloadEventStream = 'load_operation' | 'carrier_communication';
+export type PayloadEventStream = 'load_operation' | 'carrier_communication' | 'procurement';
 
 /** Database ordering metadata; domain facts remain typed inside `event`. */
 export type LinearizedPayloadEvent = {
@@ -47,7 +54,7 @@ export type LinearizedPayloadEvent = {
   readonly commandHash: Hash;
   readonly previousHash: Hash | null;
   readonly recordHash: Hash;
-  readonly event: LoadOperationEvent | CarrierCommunicationEvent;
+  readonly event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent;
 };
 
 /** Retrieval cursor metadata, not an attestation about the physical world. */
@@ -68,6 +75,7 @@ export type PayloadEventDatabaseSummary = {
   readonly lastSequence: number;
   readonly operationEvents: number;
   readonly communicationEvents: number;
+  readonly procurementEvents: number;
   readonly proofBatches: number;
 };
 
@@ -177,11 +185,11 @@ function proofRefusal(
 }
 
 function rowDefect(row: DbRow): string | null {
-  let event: LoadOperationEvent | CarrierCommunicationEvent;
-  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent; }
+  let event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent;
+  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent; }
   catch { return `sequence ${row.sequence} has invalid event JSON`; }
   if (!Number.isSafeInteger(row.sequence) || row.sequence < 1) return 'event sequence is invalid';
-  if (!['load_operation', 'carrier_communication'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
+  if (!['load_operation', 'carrier_communication', 'procurement'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
   if (event.eventId !== row.event_id || event.operationId !== row.operation_id ||
       event.kind !== row.kind || event.recordedAt !== row.recorded_at || event.commandHash !== row.command_hash) {
     return `sequence ${row.sequence} indexed metadata contradicts its event`;
@@ -206,7 +214,7 @@ function linearized(row: DbRow): LinearizedPayloadEvent {
     commandHash: row.command_hash,
     previousHash: row.previous_hash,
     recordHash: row.record_hash,
-    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent,
+    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent,
   });
 }
 
@@ -248,7 +256,7 @@ export class PayloadEventDatabase {
         VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
       CREATE TABLE IF NOT EXISTS payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement')),
         event_id TEXT NOT NULL,
         operation_id TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -284,6 +292,9 @@ export class PayloadEventDatabase {
         CHECK(from_sequence > 0 AND to_sequence >= from_sequence AND event_count > 0)
       );
     `);
+    const eventTable = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payload_events'").get() as { sql?: string } | undefined;
+    if (eventTable?.sql && !eventTable.sql.includes("'procurement'")) this.migrateEventTableToV2();
+    this.db.prepare("INSERT OR IGNORE INTO payload_schema(version, applied_at) VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run();
     const integrity = this.db.prepare('PRAGMA quick_check').get() as Record<string, unknown> | undefined;
     if (!integrity || !Object.values(integrity).includes('ok')) {
       this.db.close();
@@ -297,6 +308,10 @@ export class PayloadEventDatabase {
 
   carrierCommunicationStore(): CarrierCommunicationEventStore {
     return new SqliteCarrierCommunicationStore(this);
+  }
+
+  procurementStore(): ProcurementEventStore {
+    return new SqliteProcurementStore(this);
   }
 
   close(): void {
@@ -315,6 +330,7 @@ export class PayloadEventDatabase {
       lastSequence: Number(last.maximum ?? 0),
       operationEvents: count("WHERE stream = 'load_operation'"),
       communicationEvents: count("WHERE stream = 'carrier_communication'"),
+      procurementEvents: count("WHERE stream = 'procurement'"),
       proofBatches: Number(batches.total),
     });
   }
@@ -432,6 +448,17 @@ export class PayloadEventDatabase {
     return freeze(records);
   }
 
+  readProcurements(): readonly StoredProcurementRecord[] {
+    const records = this.rowsFor('procurement').map(row => ({
+      event: JSON.parse(row.event_json) as ProcurementEvent,
+      previousHash: row.previous_hash,
+      recordHash: row.record_hash,
+    }));
+    const defect = verifyProcurementRecords(records);
+    if (defect) throw new Error(`PROCUREMENT_STORE_CORRUPT: ${defect}`);
+    return freeze(records);
+  }
+
   appendOperation(
     event: LoadOperationEvent,
     expectedPreviousHash?: Hash | null,
@@ -464,6 +491,23 @@ export class PayloadEventDatabase {
     );
   }
 
+  appendProcurement(
+    event: ProcurementEvent,
+    expectedPreviousHash?: Hash | null,
+  ): ProcurementStoreAppendResult {
+    const result = this.append('procurement', event, expectedPreviousHash, procurementRecordHash);
+    if ('record' in result) {
+      return { kind: result.kind, record: result.record as StoredProcurementRecord };
+    }
+    return Object.freeze({
+      kind: 'refusal' as const,
+      code: result.kind === 'conflict' ? 'PROCUREMENT_EVENT_ID_CONFLICT' as const
+        : result.kind === 'concurrent' ? 'PROCUREMENT_STORE_CONCURRENT_WRITE' as const : 'PROCUREMENT_STORE_CORRUPT' as const,
+      detail: result.detail,
+      remedy: result.remedy,
+    });
+  }
+
   private rowsFor(stream: PayloadEventStream): DbRow[] {
     const rows = this.db.prepare(`
       SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
@@ -477,7 +521,7 @@ export class PayloadEventDatabase {
     return rows;
   }
 
-  private append<E extends LoadOperationEvent | CarrierCommunicationEvent>(
+  private append<E extends LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent>(
     stream: PayloadEventStream,
     event: E,
     expectedPreviousHash: Hash | null | undefined,
@@ -540,6 +584,40 @@ export class PayloadEventDatabase {
       };
     }
   }
+
+  private migrateEventTableToV2(): void {
+    this.db.exec(`
+      BEGIN IMMEDIATE;
+      ALTER TABLE payload_events RENAME TO payload_events_v1;
+      CREATE TABLE payload_events (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement')),
+        event_id TEXT NOT NULL,
+        operation_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        recorded_at TEXT NOT NULL,
+        command_hash TEXT NOT NULL,
+        previous_hash TEXT,
+        record_hash TEXT NOT NULL,
+        event_json TEXT NOT NULL,
+        inserted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        UNIQUE(stream, event_id),
+        UNIQUE(stream, record_hash)
+      );
+      INSERT INTO payload_events(
+        sequence, stream, event_id, operation_id, kind, recorded_at,
+        command_hash, previous_hash, record_hash, event_json, inserted_at
+      )
+      SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
+             command_hash, previous_hash, record_hash, event_json, inserted_at
+        FROM payload_events_v1 ORDER BY sequence ASC;
+      DROP TABLE payload_events_v1;
+      CREATE INDEX payload_events_operation_sequence ON payload_events(operation_id, sequence);
+      CREATE INDEX payload_events_stream_sequence ON payload_events(stream, sequence);
+      CREATE INDEX payload_events_recorded_sequence ON payload_events(recorded_at, sequence);
+      COMMIT;
+    `);
+  }
 }
 
 class SqliteLoadOperationStore implements LoadOperationEventStore {
@@ -557,5 +635,14 @@ class SqliteCarrierCommunicationStore implements CarrierCommunicationEventStore 
   async readAll(): Promise<readonly StoredCarrierCommunicationRecord[]> { return this.database.readCommunications(); }
   async append(event: CarrierCommunicationEvent, expectedPreviousHash?: Hash | null): Promise<CarrierCommunicationAppendResult> {
     return this.database.appendCommunication(event, expectedPreviousHash);
+  }
+}
+
+class SqliteProcurementStore implements ProcurementEventStore {
+  readonly durability = 'sqlite_wal' as const;
+  constructor(private readonly database: PayloadEventDatabase) {}
+  async readAll(): Promise<readonly StoredProcurementRecord[]> { return this.database.readProcurements(); }
+  async append(event: ProcurementEvent, expectedPreviousHash?: Hash | null): Promise<ProcurementStoreAppendResult> {
+    return this.database.appendProcurement(event, expectedPreviousHash);
   }
 }

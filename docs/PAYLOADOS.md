@@ -208,7 +208,7 @@ external timestamp.
 ## SP1 / zkVM program family
 
 The first generic program is `payload_event_batch_v1`, specified in
-`event-ledger.sp1.md`. It proves an exact contiguous global range, both embedded
+`event-ledger.sp1.md`. It proves an exact contiguous global range, every embedded
 domain chains, and the committed Merkle root.
 
 Specialized programs should disclose only the statement a counterparty needs:
@@ -242,9 +242,11 @@ only create a larger silo.
 
 1. **Terminal operations:** typed opportunity-to-settlement cockpit, carrier
    communication, linear database, replay, migration, and proof commitments.
-2. **Procurement core:** requirement, supplier quote, specification, decision,
-   purchase/sale contract, physical position, inventory, landed cost, and
-   settlement aggregates.
+2. **Procurement core (implemented through purchase receipt and settlement):**
+   requirement, supplier quote, specification, five-check qualification,
+   decision, purchase contract, physical position, logistics, landed cost, and
+   append-only settlement revisions. Sale contracts and inventory lots remain
+   the next extension.
 3. **Project cargo:** asset policies, multimodal plans, custody, condition,
    telemetry, compliance, and exception remedies.
 4. **Corpus and spatial state:** canonical organization/facility/material IDs,

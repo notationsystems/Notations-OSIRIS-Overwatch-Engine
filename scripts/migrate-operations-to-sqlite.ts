@@ -5,6 +5,7 @@ import { existsSync } from 'node:fs';
 import { FileCarrierCommunicationStore } from '../src/lib/economy/carrierCommunicationsStore';
 import { FileLoadOperationStore, stableValue } from '../src/lib/economy/loadOperationsStore';
 import { PayloadEventDatabase } from '../src/lib/economy/payloadEventDatabase';
+import { FileProcurementStore } from '../src/lib/economy/procurementStore';
 
 function option(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -23,15 +24,18 @@ async function main(): Promise<void> {
   const databasePath = resolve(databaseValue);
   const operationsPath = resolve(option('operations') ?? process.env.PAYLOAD_OPERATIONS_LOG ?? 'data-archive/load-operations.jsonl');
   const communicationsPath = resolve(option('communications') ?? process.env.PAYLOAD_CARRIER_COMMUNICATIONS_LOG ?? 'data-archive/carrier-communications.jsonl');
-  if (!existsSync(operationsPath) && !existsSync(communicationsPath)) {
-    throw new Error('Neither legacy journal exists. Start a new database directly, or point the migration at the deployment volume.');
+  const procurementPath = resolve(option('procurement') ?? process.env.PAYLOAD_PROCUREMENT_LOG ?? 'data-archive/procurement.jsonl');
+  if (!existsSync(operationsPath) && !existsSync(communicationsPath) && !existsSync(procurementPath)) {
+    throw new Error('No legacy journal exists. Start a new database directly, or point the migration at the deployment volume.');
   }
 
   const operationRecords = await new FileLoadOperationStore(operationsPath).readAll();
   const communicationRecords = await new FileCarrierCommunicationStore(communicationsPath).readAll();
+  const procurementRecords = await new FileProcurementStore(procurementPath).readAll();
   const legacy = [
     ...operationRecords.map((record, index) => ({ stream: 'load_operation' as const, index, event: record.event })),
     ...communicationRecords.map((record, index) => ({ stream: 'carrier_communication' as const, index, event: record.event })),
+    ...procurementRecords.map((record, index) => ({ stream: 'procurement' as const, index, event: record.event })),
   ].sort((left, right) => {
     const time = Date.parse(left.event.recordedAt) - Date.parse(right.event.recordedAt);
     if (time) return time;
@@ -65,16 +69,19 @@ async function main(): Promise<void> {
     for (const item of legacy) {
       const result = item.stream === 'load_operation'
         ? database.appendOperation(item.event)
-        : database.appendCommunication(item.event);
+        : item.stream === 'carrier_communication'
+          ? database.appendCommunication(item.event)
+          : database.appendProcurement(item.event);
       if (result.kind === 'refusal') throw new Error(`${result.code}: ${result.detail}`);
     }
     const summary = database.summary();
-    if (summary.operationEvents !== operationRecords.length || summary.communicationEvents !== communicationRecords.length) {
+    if (summary.operationEvents !== operationRecords.length || summary.communicationEvents !== communicationRecords.length ||
+        summary.procurementEvents !== procurementRecords.length) {
       throw new Error('Migration count verification failed; leave legacy journals in place and inspect the destination.');
     }
     console.log(JSON.stringify({
       kind: 'migration_complete',
-      source: { operationsPath, communicationsPath },
+      source: { operationsPath, communicationsPath, procurementPath },
       database: summary,
     }, null, 2));
   } finally {
