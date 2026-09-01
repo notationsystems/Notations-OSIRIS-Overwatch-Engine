@@ -1151,12 +1151,12 @@ export default function Dashboard() {
           </svg>
           <div className="flex flex-col items-start gap-0.5">
             <h1 className="text-lg md:text-xl font-bold tracking-[0.4em] text-[#D4AF37] font-mono">Payload Terminal</h1>
-            <span className="text-[9px] md:text-[10px] font-mono tracking-[0.2em] opacity-80 uppercase text-[#D4AF37]">OPEN SOURCE INTELLIGENCE</span>
+            <span className="text-[9px] md:text-[10px] font-mono tracking-[0.2em] opacity-80 uppercase text-[#D4AF37]">FREIGHT · SCM · PHYSICAL COMMERCE</span>
           </div>
         </div>
         <div className="flex items-center gap-3 mt-1.5 pl-[44px] min-w-0 pr-4">
           <span className="text-[9px] md:text-[9px] text-[var(--text-muted)] font-mono tracking-[0.2em] md:tracking-[0.3em] uppercase opacity-40 truncate">
-            REAL-TIME GLOBAL MONITORING <span className="hidden md:inline">· FLIGHTS · MARITIME · SATELLITES · CCTV · WEATHER · CYBER THREATS</span>
+            OPERATING WORLD STATE <span className="hidden md:inline">· LOADS · CARRIERS · LANES · COMMITMENTS · OUTCOMES</span>
           </span>
         </div>
       </motion.div>
@@ -1183,6 +1183,10 @@ export default function Dashboard() {
 
 
         <span className="text-[11px] font-bold tracking-[0.2em] text-[var(--text-muted)] opacity-50">V.4.1</span>
+
+        <a href="/operations" className="pointer-events-auto rounded border border-[var(--cyan-primary)]/25 bg-[var(--cyan-primary)]/8 px-3 py-1.5 text-[9px] font-bold tracking-[0.16em] text-[var(--cyan-primary)] hover:border-[var(--cyan-primary)]/55">
+          OPS
+        </a>
         
         <TokenPanel />
 
@@ -1197,6 +1201,7 @@ export default function Dashboard() {
           place would put the support badge underneath the destination field. */}
       {isMobile && !showDirections && !navSession && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="absolute top-3 right-3 z-[200] pointer-events-auto flex items-center gap-2">
+          <a href="/operations" className="rounded border border-[var(--cyan-primary)]/25 bg-[var(--cyan-primary)]/8 px-2 py-1 text-[9px] font-bold tracking-[0.14em] text-[var(--cyan-primary)]">OPS</a>
           <TokenPanel />
           <a href='https://ko-fi.com/M8D41ZYW4Z' target='_blank' rel='noopener noreferrer' className="glass-panel px-2 py-1 flex items-center gap-1.5 text-[9px] font-mono tracking-widest hover:opacity-80 transition-opacity border-[var(--gold-primary)]/40 bg-[var(--gold-primary)]/10">
             <div className="w-1 h-1 rounded-full bg-[var(--gold-primary)] animate-payload-pulse" />
