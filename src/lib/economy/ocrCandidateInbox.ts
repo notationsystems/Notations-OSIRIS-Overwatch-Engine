@@ -233,6 +233,23 @@ function candidateDefect(candidate: OcrCanonicalStateCandidate): OcrCandidateRef
       );
     }
   }
+  for (const conflict of bundle.conflicts) {
+    if (conflict.observationIds.length < 2) {
+      return refusal(
+        'OCR_CANDIDATE_WARRANT_INVALID',
+        `Conflict ${conflict.conflictId} cites fewer than two observations.`,
+        'A conflict must retain every incompatible observation; do not manufacture a conflict from one claim.',
+      );
+    }
+    const missing = conflict.observationIds.filter(id => !seen.has(id));
+    if (missing.length > 0) {
+      return refusal(
+        'OCR_CANDIDATE_WARRANT_INVALID',
+        `Conflict ${conflict.conflictId} cites observations absent from bundle ${bundle.bundleId}: ${missing.join(', ')}.`,
+        'Return the complete evidence set with the conflict; Terminal will not accept an orphaned relation.',
+      );
+    }
+  }
   return null;
 }
 
@@ -264,6 +281,13 @@ export class OcrCandidateInbox {
   register(candidate: OcrCanonicalStateCandidate, registeredAt: ISODateTime): OcrRegistrationResult {
     const defect = candidateDefect(candidate);
     if (defect) return defect;
+    if (registeredAt < candidate.bundle.temporal.extractedAt) {
+      return refusal(
+        'OCR_CANDIDATE_WARRANT_INVALID',
+        `Registration time ${registeredAt} precedes extraction time ${candidate.bundle.temporal.extractedAt}.`,
+        'Correct the host clock or the extraction frame; do not rewrite either timestamp silently.',
+      );
+    }
 
     const key = `${candidate.bundle.artifact.contentHash}|${candidate.bundle.extraction.executionKey}`;
     const existing = this.byExecution.get(key);

@@ -75,12 +75,18 @@ describe('OCR candidate inbox', () => {
   it('stages conflicting documents for review without choosing a winner', () => {
     const inbox = new OcrCandidateInbox();
     const base = candidate();
+    const second = {
+      ...base.bundle.observations[0],
+      observationId: 'observation:rate:second',
+      value: { kind: 'value' as const, raw: '$1,950.00', normalized: 1950, unit: 'USD' },
+    };
     const result = inbox.register({
       ...base,
       bundle: {
         ...base.bundle,
+        observations: [...base.bundle.observations, second],
         conflicts: [{
-          conflictId: 'conflict:1', observationIds: ['observation:rate'], relation: 'contradiction',
+          conflictId: 'conflict:1', observationIds: ['observation:rate', 'observation:rate:second'], relation: 'contradiction',
           detail: 'Two rates disagree.', remedy: 'Review both source documents.',
         }],
       },
