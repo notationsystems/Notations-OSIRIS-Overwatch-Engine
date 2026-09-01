@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Sea Dog Terminal — archive manifest generator (shipping order S-2).
  *
@@ -81,6 +80,16 @@ export function walk(dir) {
   return out;
 }
 
+/**
+ * Git stores these text captures with LF even when a Windows checkout exposes
+ * them as CRLF. Hash the repository representation so one manifest verifies
+ * identically on Windows workstations and Linux CI runners.
+ */
+export function canonicalArchiveBytes(bytes) {
+  if (bytes.includes(0)) return bytes;
+  return Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
+}
+
 export function buildManifest(cwd = process.cwd()) {
   const files = [];
   for (const root of ARCHIVE_ROOTS) {
@@ -88,7 +97,7 @@ export function buildManifest(cwd = process.cwd()) {
       const rel = relative(cwd, full).split(sep).join('/');
       if (rel === MANIFEST_PATH) continue;
       if (LIVE_LOGS.includes(rel)) continue; // named exclusion — see LIVE_LOGS
-      const bytes = readFileSync(full);
+      const bytes = canonicalArchiveBytes(readFileSync(full));
       const cls = durabilityClassOf(rel);
       if (!cls) throw new Error(`No durability rule covers ${rel} — add one; an unclassified archive file is an unlabelled risk.`);
       files.push({

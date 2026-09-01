@@ -1,0 +1,151 @@
+name: SP1 proof ceremony
+
+on:
+  push:
+    branches: ["codex/payloados-project-cargo-execution", main]
+    paths:
+      - ".github/workflows/sp1-ceremony.yml"
+      - "zk/payload-event-batch/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sp1-ceremony-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  SP1_VERSION: "6.5.0"
+
+jobs:
+  prove:
+    name: Build guest, prove fixture, verify proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: zk/payload-event-batch
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang protobuf-compiler
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.91.0
+        with:
+          components: rustfmt
+
+      - name: Cache Rust build inputs
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zk/payload-event-batch
+          cache-on-failure: true
+
+      - name: Install the pinned SP1 toolchain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL https://sp1up.succinct.xyz -o /tmp/sp1up.sh
+          bash /tmp/sp1up.sh
+          "$HOME/.sp1/bin/sp1up" --version "$SP1_VERSION" --token "$GITHUB_TOKEN"
+          echo "$HOME/.sp1/bin" >> "$GITHUB_PATH"
+
+      - name: Record toolchain versions
+        run: |
+          rustc --version
+          cargo --version
+          cargo prove --version
+
+      - name: Test the deterministic event-batch model
+        run: |
+          cargo fmt --all -- --check
+          cargo test --locked -p payload-event-batch-lib
+
+      - name: Build the guest and host
+        run: cargo build --locked --release -p payload-event-batch-script
+
+      - name: Derive and check the program verification key
+        id: vkey
+        shell: bash
+        run: |
+          vkey="$(./target/release/payload-sp1-worker vkey | tail -n 1)"
+          if [[ ! "$vkey" =~ ^0x[0-9a-f]{64}$ ]]; then
+            echo "Invalid SP1 verification key: $vkey" >&2
+            exit 1
+          fi
+          if [[ -f verification-key.json ]]; then
+            pinned="$(jq -er '.verificationKey' verification-key.json)"
+            if [[ "$vkey" != "$pinned" ]]; then
+              echo "Verification key mismatch: pinned=$pinned actual=$vkey" >&2
+              exit 1
+            fi
+          else
+            echo "Bootstrap ceremony: no verification-key.json is committed yet."
+          fi
+          echo "value=$vkey" >> "$GITHUB_OUTPUT"
+          echo "PAYLOAD_SP1_VKEY=$vkey"
+
+      - name: Generate and verify the first-class proof artifact
+        env:
+          VKEY: ${{ steps.vkey.outputs.value }}
+          SP1_PROVER: cpu
+        run: |
+          mkdir -p proof-output
+          ./target/release/payload-sp1-worker prove \
+            --witness fixtures/event-batch.json \
+            --proof proof-output/payload-event-batch.core.proof \
+            --mode core
+          ./target/release/payload-sp1-worker verify \
+            --proof proof-output/payload-event-batch.core.proof \
+            --result proof-output/verified.json \
+            --expected-vkey "$VKEY"
+
+      - name: Seal the ceremony record
+        env:
+          VKEY: ${{ steps.vkey.outputs.value }}
+        shell: bash
+        run: |
+          proof_sha256="$(sha256sum proof-output/payload-event-batch.core.proof | cut -d ' ' -f 1)"
+          guest_sha256="$(sha256sum program/src/main.rs | cut -d ' ' -f 1)"
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg program "payload_event_batch_v1" \
+            --arg sp1Version "$SP1_VERSION" \
+            --arg verificationKey "$VKEY" \
+            --arg proofSha256 "$proof_sha256" \
+            --arg guestSourceSha256 "$guest_sha256" \
+            --arg sourceCommit "$GITHUB_SHA" \
+            --arg runUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg generatedAt "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --slurpfile verified proof-output/verified.json \
+            '{
+              schemaVersion: ($schemaVersion | tonumber),
+              program: $program,
+              sp1Version: $sp1Version,
+              verificationKey: $verificationKey,
+              proofSha256: $proofSha256,
+              guestSourceSha256: $guestSourceSha256,
+              sourceCommit: $sourceCommit,
+              runUrl: $runUrl,
+              generatedAt: $generatedAt,
+              verifiedResult: $verified[0]
+            }' > proof-output/ceremony.json
+          echo "PAYLOAD_SP1_PROOF_SHA256=$proof_sha256"
+          cat proof-output/ceremony.json
+
+      - name: Publish ceremony artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: payload-event-batch-sp1-${{ github.sha }}
+          path: |
+            zk/payload-event-batch/proof-output/payload-event-batch.core.proof
+            zk/payload-event-batch/proof-output/verified.json
+            zk/payload-event-batch/proof-output/ceremony.json
+          if-no-files-found: error
+          retention-days: 90

@@ -53,6 +53,7 @@ scripts/*
 
 # Rust/SP1 build output
 /zk/payload-event-batch/target/
+/zk/payload-event-batch/proof-output/
 
 # AI agent config files
 CLAUDE.md

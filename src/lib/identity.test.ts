@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { PRODUCT, VERSION, REPO_URL, userAgent, isWellFormedUserAgent } from './identity';
 
 const SRC = join(process.cwd(), 'src');
@@ -23,7 +23,7 @@ function walk(dir: string, out: string[] = []): string[] {
  * safe rather than convenient.
  */
 const SELF = ['identity.ts', 'identity.test.ts'];
-const FILES = walk(SRC).filter(f => !SELF.some(s => f.endsWith(`/${s}`)));
+const FILES = walk(SRC).filter(f => !SELF.includes(basename(f)));
 
 describe('the product token', () => {
   it('is one token — the defect this module exists for', () => {

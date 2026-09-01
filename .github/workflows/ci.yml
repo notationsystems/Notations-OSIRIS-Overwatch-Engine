@@ -16,7 +16,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**", "ci-verify/**"]
+    branches: [main, "claude/**", "ci-verify/**", "codex/**"]
   pull_request:
   workflow_dispatch:
 

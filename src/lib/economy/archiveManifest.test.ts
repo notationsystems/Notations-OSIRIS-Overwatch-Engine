@@ -5,7 +5,14 @@ import { join } from 'node:path';
 // The generator module is the single source of the walk and the rules —
 // the test verifies the COMMITTED manifest against the tree using the
 // same walk, so the two cannot drift apart.
-import { ARCHIVE_ROOTS, LIVE_LOGS, MANIFEST_PATH, buildManifest, durabilityClassOf } from '../../../scripts/archive-manifest.mjs';
+import {
+  ARCHIVE_ROOTS,
+  LIVE_LOGS,
+  MANIFEST_PATH,
+  buildManifest,
+  canonicalArchiveBytes,
+  durabilityClassOf,
+} from '../../../scripts/archive-manifest.mjs';
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 
 /**
@@ -27,7 +34,7 @@ describe('archive manifest (S-2)', () => {
 
   it('every manifest entry resolves to bytes whose hash matches', () => {
     for (const f of manifest.files) {
-      const bytes = readFileSync(join(process.cwd(), f.path));
+      const bytes = canonicalArchiveBytes(readFileSync(join(process.cwd(), f.path)));
       expect(bytes.length, `${f.path} byte count`).toBe(f.bytes);
       expect(createHash('sha256').update(bytes).digest('hex'), `${f.path} sha256`).toBe(f.sha256);
       expect(f.class, `${f.path} durability class`).toBeTruthy();
