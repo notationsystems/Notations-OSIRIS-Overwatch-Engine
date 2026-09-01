@@ -4,7 +4,7 @@ use payload_event_batch_lib::PublicValues;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sp1_sdk::{
-    blocking::{EnvProver, EnvProvingKey, Prover, ProverClient},
+    blocking::{EnvProver, EnvProvingKey, ProveRequest, Prover, ProverClient},
     include_elf, Elf, HashableKey, ProvingKey, SP1ProofWithPublicValues, SP1Stdin,
 };
 use std::{fs, path::PathBuf};
