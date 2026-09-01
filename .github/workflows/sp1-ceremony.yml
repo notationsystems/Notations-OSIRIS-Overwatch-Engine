@@ -34,7 +34,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends clang protobuf-compiler
+          sudo apt-get install --yes --no-install-recommends clang libprotobuf-dev protobuf-compiler
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@1.94.1
