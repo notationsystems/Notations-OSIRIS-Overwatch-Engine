@@ -4,6 +4,21 @@ What the instance does between deploys: what survives a restart, where
 the backup is, how a change gets checked before a researcher sees it, and
 what postures have been taken about external clients.
 
+## Freight-operation journals
+
+The load-operation and carrier-communication journals are append-only,
+hash-chained commercial evidence. Docker Compose mounts `payload-runtime` at
+`/app/runtime-data` and points both journal variables there, so rebuilds and
+container replacement preserve them. They are excluded from Git, Docker build
+contexts, and the static archive manifest.
+
+Use one application writer and back up the volume independently. Restoring only
+one journal is not sufficient: carrier receipts and events bind to immutable
+dispatch identities in the load journal, and the communications API refuses an
+orphan or mismatched history. Outbound tender delivery is at-least-once across a
+process crash and sends a stable attempt `Idempotency-Key`; the carrier adapter
+must honor that key to make a retry side-effect safe.
+
 ---
 
 ## Restart and persistence semantics (D-8)

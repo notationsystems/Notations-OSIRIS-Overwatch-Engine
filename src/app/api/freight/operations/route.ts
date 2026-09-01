@@ -1,6 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { env } from '../../../../lib/economy/envCompat';
 import {
   type AuthorizeAlternativeCommand,
   type CaptureOperationOutcomeCommand,
@@ -13,6 +11,7 @@ import {
   type RegisterOpportunityCommand,
 } from '../../../../lib/economy/loadOperations';
 import { loadOperationsWorkflow } from '../../../../lib/economy/loadOperationsRuntime';
+import { authorizeOperationsSurface } from '../../../../lib/economy/operationsHttpAuth';
 import {
   settlementOutcomeCommand,
   type OperationalSettlementEvidence,
@@ -21,38 +20,6 @@ import {
 export const runtime = 'nodejs';
 
 const MAX_COMMAND_BYTES = 1_000_000;
-
-function configuredToken(): string | null {
-  const token = env('PAYLOAD_OPERATIONS_TOKEN');
-  return token?.trim() ? token : null;
-}
-
-function tokenMatches(req: Request, expected: string): boolean {
-  const header = req.headers.get('authorization');
-  if (!header?.startsWith('Bearer ')) return false;
-  const supplied = Buffer.from(header.slice('Bearer '.length));
-  const wanted = Buffer.from(expected);
-  return supplied.length === wanted.length && timingSafeEqual(supplied, wanted);
-}
-
-function authorizeSurface(req: Request): NextResponse | null {
-  const token = configuredToken();
-  if (!token) {
-    return NextResponse.json({
-      error: 'operations_not_configured',
-      detail: 'Persistent load operations are fail-closed until PAYLOAD_OPERATIONS_TOKEN is configured.',
-      remedy: 'Set a deployment secret and send it as a Bearer token; never expose this route anonymously.',
-    }, { status: 503 });
-  }
-  if (!tokenMatches(req, token)) {
-    return NextResponse.json({
-      error: 'operations_unauthorized',
-      detail: 'The request did not carry the configured operations authority.',
-      remedy: 'Authenticate as an authorized Terminal operator.',
-    }, { status: 401 });
-  }
-  return null;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -69,7 +36,7 @@ function statusFor(result: LoadOperationCommandResult): number {
 }
 
 export async function GET(req: Request) {
-  const denied = authorizeSurface(req);
+  const denied = authorizeOperationsSurface(req);
   if (denied) return denied;
   const operationId = new URL(req.url).searchParams.get('operationId');
   const workflow = loadOperationsWorkflow();
@@ -82,7 +49,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const denied = authorizeSurface(req);
+  const denied = authorizeOperationsSurface(req);
   if (denied) return denied;
   let bodyText: string;
   try { bodyText = await req.text(); }

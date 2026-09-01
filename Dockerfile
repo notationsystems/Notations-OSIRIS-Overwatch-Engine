@@ -25,7 +25,9 @@ ARG SEA_DOG_BUILD_SHA=""
 ENV SEA_DOG_BUILD_SHA=$SEA_DOG_BUILD_SHA
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p /app/runtime-data && \
+    chown nextjs:nodejs /app/runtime-data
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

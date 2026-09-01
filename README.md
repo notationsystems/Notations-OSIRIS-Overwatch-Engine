@@ -164,6 +164,9 @@ Registration was never the only door.
 - **Exception queue** — loads where the tender and the bill of lading name
   different carriers, with uncaptured bills of lading surfaced rather than
   counted clean
+- **Persistent operating loop** — opportunity intake, carrier alternatives,
+  authorization, assignment, dispatch delivery, acknowledgement, tracking,
+  settlement, and outcome capture remain replayable after restart
 
 ### Commodity analytics
 - Concentration (HHI with remainder and effective groups), flow centrality,
@@ -226,7 +229,15 @@ PAYLOAD_DISABLE_LIVE=
 
 # Authorize persistent freight-operation commands; leave empty to disable the API
 PAYLOAD_OPERATIONS_TOKEN=
-PAYLOAD_OPERATIONS_LOG=./data-archive/load-operations.jsonl
+PAYLOAD_OPERATIONS_LOG=
+
+# Outbound carrier adapter and authenticated inbound carrier events
+PAYLOAD_CARRIER_DISPATCH_URL=
+PAYLOAD_CARRIER_DISPATCH_TOKEN=
+PAYLOAD_CARRIER_DISPATCH_PROVIDER=carrier-webhook
+PAYLOAD_CARRIER_DISPATCH_TIMEOUT_MS=10000
+PAYLOAD_CARRIER_WEBHOOK_SECRET=
+PAYLOAD_CARRIER_COMMUNICATIONS_LOG=
 
 # Optional, for higher rate limits (see DOCKER.md for signup links)
 FIRMS_API_KEY=                # NASA FIRMS
@@ -239,9 +250,19 @@ AIS_API_KEY=                  # aisstream.io maritime
 `GET /api/freight/operations` reads the current load-operation projections;
 `POST /api/freight/operations` advances opportunity intake, alternatives,
 authorization, assignment, dispatch evidence, and settlement outcome capture.
-Both require `Authorization: Bearer <PAYLOAD_OPERATIONS_TOKEN>`. The dispatch
-step records an authorized operational event; it does not contact a carrier.
-Run the journal on persistent, backed-up storage with one application writer.
+`POST /api/freight/communications` delivers the journal-derived tender to the
+configured carrier adapter with a stable `Idempotency-Key`; its corresponding
+`GET` exposes delivery and carrier-event projections. These routes require
+`Authorization: Bearer <PAYLOAD_OPERATIONS_TOKEN>`.
+
+The carrier adapter must return JSON containing `receiptId` and optionally
+`acceptedAt`. It receives only the selected carrier rate and sanitized load
+facts—not the shipper target rate or source-message identity. Carriers post
+acknowledgements and tracking updates to `/api/freight/carrier-events`, signed
+as `HMAC-SHA256(timestamp + "." + rawBody)` using
+`PAYLOAD_CARRIER_WEBHOOK_SECRET` (at least 32 random bytes). Run both journals
+on persistent, backed-up storage with one application writer; Compose
+provisions that volume by default.
 
 > **Renamed from `OSIRIS_*`.** The old spellings are still read for one
 > release and log a deprecation warning naming the replacement, so a running

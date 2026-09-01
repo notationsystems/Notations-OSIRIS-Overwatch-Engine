@@ -200,6 +200,7 @@ describe('every number-bearing type in the layer is accounted for', () => {
     // negotiating_position); these are its parts.
     Field: 'one stated value, or why it could not become one',
     Opportunity: 'carries its own attestation; completeness counts fields WE could read',
+    WebhookCarrierDispatchGatewayOptions: 'timeoutMs is a delivery-adapter configuration cap, not a measurement of carrier performance',
     RawEmail: 'the message as it arrived; what it asserts is the senders claim',
     ExtractionReview: 'counts of fields two instances agreed on',
     BoundaryDecision: 'which vendors a document passed through — a decision record, not a measurement',

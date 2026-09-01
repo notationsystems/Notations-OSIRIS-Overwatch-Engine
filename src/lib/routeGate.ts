@@ -61,6 +61,8 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   earthquakes: 'general-purpose',
   economy: 'freight',
   'freight/demo': 'freight',
+  'freight/carrier-events': 'freight',
+  'freight/communications': 'freight',
   'freight/operations': 'freight',
   'freight/world': 'freight',
   'economy/entity': 'freight',
