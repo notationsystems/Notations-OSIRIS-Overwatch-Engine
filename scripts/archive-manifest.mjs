@@ -33,7 +33,8 @@ export const MANIFEST_PATH = 'data-archive/MANIFEST.json';
 /**
  * LIVE journals (final order, F-4 finding): the running instrument
  * appends search-misses.jsonl, export-log.jsonl, mcp-sessions.jsonl,
- * load-operations.jsonl and carrier-communications.jsonl into data-archive/
+ * load-operations.jsonl, carrier-communications.jsonl, procurement.jsonl,
+ * and commercial.jsonl into data-archive/
  * — so on any machine where the instrument has been USED, an unruled path
  * would fail buildManifest and a growing file can never hash-match a static
  * manifest. They are excluded from the manifest contract BY NAME (an
@@ -48,6 +49,8 @@ export const LIVE_LOGS = [
   'data-archive/mcp-sessions.jsonl',
   'data-archive/load-operations.jsonl',
   'data-archive/carrier-communications.jsonl',
+  'data-archive/procurement.jsonl',
+  'data-archive/commercial.jsonl',
 ];
 
 /** First matching rule wins. Paths are repo-relative with forward slashes. */

@@ -6,10 +6,9 @@ what postures have been taken about external clients.
 
 ## Freight-operation journals
 
-The load-operation and carrier-communication journals are append-only,
-hash-chained commercial evidence. The procurement journal follows the same
-rule. Docker Compose mounts `payload-runtime` at `/app/runtime-data` and points
-all three journal variables there, so rebuilds and container replacement
+The load-operation, carrier-communication, procurement, and commercial journals
+are append-only, hash-chained commercial evidence. Docker Compose mounts
+`payload-runtime` at `/app/runtime-data` and points all four journal variables there, so rebuilds and container replacement
 preserve them. They are excluded from Git, Docker build
 contexts, and the static archive manifest.
 
@@ -23,7 +22,7 @@ must honor that key to make a retry side-effect safe.
 ### Canonical event database and migration
 
 Set `PAYLOAD_DATABASE_PATH` to place load operations, carrier communication,
-and procurement in one SQLite/WAL database. Each stream retains its own
+procurement, and commercial positions in one SQLite/WAL database. Each stream retains its own
 append-only hash chain and replay rules; the database adds a global `sequence`
 across all accepted events. This makes the whole history linearly pageable
 without pretending the domain state machines are one state machine.
@@ -151,6 +150,40 @@ financing, loss, and revenue as observed values or typed absences. Landed cost
 remains unavailable until every cost is observed; enter an evidenced zero only
 when the actual cost is zero. Later evidence appends a settlement revision
 linked to the prior event rather than overwriting history.
+
+---
+
+## Inventory, customer commitments, and sales
+
+Open `/commercial` with `PAYLOAD_OPERATIONS_TOKEN`. The authenticated
+`/api/commercial/actions` route operates the sell-side physical position:
+
+```text
+accepted procurement position -> inventory lot
+customer purchase order -> commitment -> compatible lot allocation
+-> sale contract -> freight-bound dispatch -> delivery -> settlement
+```
+
+An inventory lot can only be opened from the exact fully accepted procurement
+position snapshot. Material, specification, quantity, custody location, and
+landed-cost evidence are imported server-side instead of retyped. A source
+position can open only one lot.
+If invoices were still pending when the lot opened, `refresh_inventory_cost`
+appends the complete cost from a newer exact procurement snapshot and
+supersedes the prior cost-basis source without rewriting the lot history.
+
+Reservations use the current commercial-book fingerprint and refuse stale or
+incompatible allocations, inventory oversell, and allocation beyond customer
+demand. A sale contract is accepted only when the customer commitment is fully
+allocated and the contract binds the exact allocation set. An evidenced minimum
+revenue is enforced before contract acceptance.
+
+Dispatch binds that allocation set to one identified freight load operation.
+Deliveries are captured per allocation so partial delivery, quarantine, and
+rejection remain visible. Expected margin uses a disclosed proportional
+received-quantity cost basis. Realized margin remains typed as incomplete until
+gross revenue, deductions, source landed cost, and one currency are evidenced.
+Settlement corrections append and supersede the prior settlement event.
 
 ---
 

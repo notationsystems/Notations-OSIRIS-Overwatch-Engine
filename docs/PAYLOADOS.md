@@ -78,8 +78,8 @@ to landed cost, position risk, and outcome evidence.
 ### Truth plane
 
 Owns evidence, identity, time, canonical state, provenance, and durable event
-history. The edge implementation in this repository now persists load-operation
-and carrier-communication streams in a single SQLite/WAL database with one
+history. The edge implementation in this repository now persists load-operation,
+carrier-communication, procurement, and commercial streams in a single SQLite/WAL database with one
 global sequence. Additional domain streams must enter through versioned,
 validated event contracts; the database is not a generic JSON dumping ground.
 
@@ -242,11 +242,12 @@ only create a larger silo.
 
 1. **Terminal operations:** typed opportunity-to-settlement cockpit, carrier
    communication, linear database, replay, migration, and proof commitments.
-2. **Procurement core (implemented through purchase receipt and settlement):**
+2. **Procurement and commercial positions (implemented through customer settlement):**
    requirement, supplier quote, specification, five-check qualification,
    decision, purchase contract, physical position, logistics, landed cost, and
-   append-only settlement revisions. Sale contracts and inventory lots remain
-   the next extension.
+   append-only settlement revisions; procurement-origin inventory lots,
+   customer commitments, allocation, sale contracts, freight-bound fulfillment,
+   delivery, margin exposure, and sell-side settlement revisions.
 3. **Project cargo:** asset policies, multimodal plans, custody, condition,
    telemetry, compliance, and exception remedies.
 4. **Corpus and spatial state:** canonical organization/facility/material IDs,

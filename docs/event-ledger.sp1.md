@@ -4,7 +4,7 @@
 
 Prove that a disclosed Payload event-batch root represents an exact contiguous
 slice of the globally ordered PayloadOS database and that its load,
-carrier-communication, and procurement domain chains are internally consistent.
+carrier-communication, procurement, and commercial domain chains are internally consistent.
 The proof is evidence about recorded history;
 it never authorizes, assigns, dispatches, or delays a load.
 
@@ -19,6 +19,8 @@ it never authorizes, assigns, dispatches, or delays a load.
   contains communication events;
 - the procurement-chain root before and after the batch, when the batch
   contains procurement events;
+- the commercial-chain root before and after the batch, when the batch contains
+  inventory, customer-commitment, sale, fulfillment, or settlement events;
 - optional disclosed statement output for a specialized program.
 
 ## Private witness
@@ -37,7 +39,7 @@ facts and evidence references rather than source documents.
 2. Every event's indexed identity equals the identity in canonical event JSON.
 3. Every command hash is 32 bytes and every domain record hash reconstructs
    from its versioned domain, previous hash, and canonical event.
-4. Operation, communication, and procurement events extend only their named
+4. Operation, communication, procurement, and commercial events extend only their named
    domain chain.
 5. Batch leaves are
    `sha256("payload.event_batch.leaf.v1|sequence|stream|recordHash")`.
@@ -61,6 +63,10 @@ programs that reveal only the commercial statement a counterparty needs:
 - `payload_settlement_margin_v1`: disclosed gross margin equals shipper revenue
   less carrier invoice and accessorial cost in one currency, while underlying
   amounts may remain private;
+- `payload_inventory_allocation_v1`: a disclosed customer quantity was reserved
+  from compatible inventory without exceeding the committed lot balance;
+- `payload_sale_margin_v1`: disclosed expected or realized sale margin follows
+  the committed allocation cost basis and one evidenced revenue currency;
 - `payload_condition_v1`: the existing reefer/condition program described in
   `docs/notary.program.md`.
 

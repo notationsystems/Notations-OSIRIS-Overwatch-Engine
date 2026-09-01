@@ -47,6 +47,10 @@ Two verticals run on the same substrate:
   quotes, five-check qualification, frozen feasible sets, purchase contracts,
   logistics requirements, receipt condition, landed cost and margin. Operate
   the workflow at `/procurement`.
+- **Inventory and commercial positions** — procurement-origin lots, customer
+  commitments, reservation without oversell, sale contracts, freight-bound
+  fulfillment, delivery, settlement and margin exposure. Operate the workflow
+  at `/commercial`.
 
 See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
@@ -59,6 +63,7 @@ See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 | **Physical economy** | Entities, observations, flows, capacities, dependencies | USGS MCS, UN Comtrade, curated topology |
 | **Markets** | Benchmark price, positioning, warehouse stocks | COMEX (Yahoo), CFTC COT, LME via Westmetall |
 | **Freight book** | Loads, quotes, invoices, transit, appointments | Operator entry, append-only ledger |
+| **Commercial book** | Inventory lots, customer commitments, allocations, sales, fulfillment | Procurement outcomes, operator entry, append-only ledger |
 | **Lane memory** | Residuals by carrier, lane and season, with a trials floor | Derived, admissibility-stamped |
 | **Carrier vetting** | Three-state verdicts: cleared, blocked, undetermined | Regulator records, insurer confirmation |
 | **Routing** | Truck-legal mileage, geocoding, basemap | Valhalla / OSRM profiles, Nominatim |
@@ -286,7 +291,7 @@ operations bearer token.
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in
-WAL mode: operation, carrier-communication, and procurement hash chains remain independently
+WAL mode: operation, carrier-communication, procurement, and commercial hash chains remain independently
 verifiable, while every committed event also receives one global sequence.
 `GET /api/freight/event-ledger` pages that sequence by cursor and may filter by
 operation or stream. Existing JSONL deployments migrate once, before enabling
@@ -296,7 +301,7 @@ the database:
 PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operations-db
 ```
 
-The migration validates every source chain, including `PAYLOAD_PROCUREMENT_LOG`, refuses a non-empty divergent
+The migration validates every source chain, including `PAYLOAD_PROCUREMENT_LOG` and `PAYLOAD_COMMERCIAL_LOG`, refuses a non-empty divergent
 destination, and is safe to rerun against an exact completed migration.
 `POST /api/freight/proof-batches` freezes the next unbatched sequence range as
 a deterministic Merkle root for the asynchronous SP1 `payload_event_batch_v1`

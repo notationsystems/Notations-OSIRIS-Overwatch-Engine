@@ -39,9 +39,16 @@ import type {
   StoredProcurementRecord,
 } from './procurementStore';
 import { procurementRecordHash, verifyProcurementRecords } from './procurementStore';
+import type {
+  CommercialEvent,
+  CommercialEventStore,
+  CommercialStoreAppendResult,
+  StoredCommercialRecord,
+} from './commercialStore';
+import { commercialRecordHash, verifyCommercialRecords } from './commercialStore';
 import type { Hash, ISODateTime } from './types';
 
-export type PayloadEventStream = 'load_operation' | 'carrier_communication' | 'procurement';
+export type PayloadEventStream = 'load_operation' | 'carrier_communication' | 'procurement' | 'commercial';
 
 /** Database ordering metadata; domain facts remain typed inside `event`. */
 export type LinearizedPayloadEvent = {
@@ -54,7 +61,7 @@ export type LinearizedPayloadEvent = {
   readonly commandHash: Hash;
   readonly previousHash: Hash | null;
   readonly recordHash: Hash;
-  readonly event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent;
+  readonly event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent;
 };
 
 /** Retrieval cursor metadata, not an attestation about the physical world. */
@@ -76,6 +83,7 @@ export type PayloadEventDatabaseSummary = {
   readonly operationEvents: number;
   readonly communicationEvents: number;
   readonly procurementEvents: number;
+  readonly commercialEvents: number;
   readonly proofBatches: number;
 };
 
@@ -185,11 +193,11 @@ function proofRefusal(
 }
 
 function rowDefect(row: DbRow): string | null {
-  let event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent;
-  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent; }
+  let event: LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent;
+  try { event = JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent; }
   catch { return `sequence ${row.sequence} has invalid event JSON`; }
   if (!Number.isSafeInteger(row.sequence) || row.sequence < 1) return 'event sequence is invalid';
-  if (!['load_operation', 'carrier_communication', 'procurement'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
+  if (!['load_operation', 'carrier_communication', 'procurement', 'commercial'].includes(row.stream)) return `sequence ${row.sequence} has an unknown stream`;
   if (event.eventId !== row.event_id || event.operationId !== row.operation_id ||
       event.kind !== row.kind || event.recordedAt !== row.recorded_at || event.commandHash !== row.command_hash) {
     return `sequence ${row.sequence} indexed metadata contradicts its event`;
@@ -214,7 +222,7 @@ function linearized(row: DbRow): LinearizedPayloadEvent {
     commandHash: row.command_hash,
     previousHash: row.previous_hash,
     recordHash: row.record_hash,
-    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent,
+    event: JSON.parse(row.event_json) as LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent,
   });
 }
 
@@ -256,7 +264,7 @@ export class PayloadEventDatabase {
         VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
       CREATE TABLE IF NOT EXISTS payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial')),
         event_id TEXT NOT NULL,
         operation_id TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -293,8 +301,8 @@ export class PayloadEventDatabase {
       );
     `);
     const eventTable = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payload_events'").get() as { sql?: string } | undefined;
-    if (eventTable?.sql && !eventTable.sql.includes("'procurement'")) this.migrateEventTableToV2();
-    this.db.prepare("INSERT OR IGNORE INTO payload_schema(version, applied_at) VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run();
+    if (eventTable?.sql && !eventTable.sql.includes("'commercial'")) this.migrateEventTableToV3();
+    this.db.prepare("INSERT OR IGNORE INTO payload_schema(version, applied_at) VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))").run();
     const integrity = this.db.prepare('PRAGMA quick_check').get() as Record<string, unknown> | undefined;
     if (!integrity || !Object.values(integrity).includes('ok')) {
       this.db.close();
@@ -314,6 +322,10 @@ export class PayloadEventDatabase {
     return new SqliteProcurementStore(this);
   }
 
+  commercialStore(): CommercialEventStore {
+    return new SqliteCommercialStore(this);
+  }
+
   close(): void {
     this.db.close();
   }
@@ -331,6 +343,7 @@ export class PayloadEventDatabase {
       operationEvents: count("WHERE stream = 'load_operation'"),
       communicationEvents: count("WHERE stream = 'carrier_communication'"),
       procurementEvents: count("WHERE stream = 'procurement'"),
+      commercialEvents: count("WHERE stream = 'commercial'"),
       proofBatches: Number(batches.total),
     });
   }
@@ -459,6 +472,17 @@ export class PayloadEventDatabase {
     return freeze(records);
   }
 
+  readCommercials(): readonly StoredCommercialRecord[] {
+    const records = this.rowsFor('commercial').map(row => ({
+      event: JSON.parse(row.event_json) as CommercialEvent,
+      previousHash: row.previous_hash,
+      recordHash: row.record_hash,
+    }));
+    const defect = verifyCommercialRecords(records);
+    if (defect) throw new Error(`COMMERCIAL_STORE_CORRUPT: ${defect}`);
+    return freeze(records);
+  }
+
   appendOperation(
     event: LoadOperationEvent,
     expectedPreviousHash?: Hash | null,
@@ -508,6 +532,23 @@ export class PayloadEventDatabase {
     });
   }
 
+  appendCommercial(
+    event: CommercialEvent,
+    expectedPreviousHash?: Hash | null,
+  ): CommercialStoreAppendResult {
+    const result = this.append('commercial', event, expectedPreviousHash, commercialRecordHash);
+    if ('record' in result) {
+      return { kind: result.kind, record: result.record as StoredCommercialRecord };
+    }
+    return Object.freeze({
+      kind: 'refusal' as const,
+      code: result.kind === 'conflict' ? 'COMMERCIAL_EVENT_ID_CONFLICT' as const
+        : result.kind === 'concurrent' ? 'COMMERCIAL_STORE_CONCURRENT_WRITE' as const : 'COMMERCIAL_STORE_CORRUPT' as const,
+      detail: result.detail,
+      remedy: result.remedy,
+    });
+  }
+
   private rowsFor(stream: PayloadEventStream): DbRow[] {
     const rows = this.db.prepare(`
       SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
@@ -521,7 +562,7 @@ export class PayloadEventDatabase {
     return rows;
   }
 
-  private append<E extends LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent>(
+  private append<E extends LoadOperationEvent | CarrierCommunicationEvent | ProcurementEvent | CommercialEvent>(
     stream: PayloadEventStream,
     event: E,
     expectedPreviousHash: Hash | null | undefined,
@@ -585,13 +626,13 @@ export class PayloadEventDatabase {
     }
   }
 
-  private migrateEventTableToV2(): void {
+  private migrateEventTableToV3(): void {
     this.db.exec(`
       BEGIN IMMEDIATE;
-      ALTER TABLE payload_events RENAME TO payload_events_v1;
+      ALTER TABLE payload_events RENAME TO payload_events_before_v3;
       CREATE TABLE payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement', 'commercial')),
         event_id TEXT NOT NULL,
         operation_id TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -610,8 +651,8 @@ export class PayloadEventDatabase {
       )
       SELECT sequence, stream, event_id, operation_id, kind, recorded_at,
              command_hash, previous_hash, record_hash, event_json, inserted_at
-        FROM payload_events_v1 ORDER BY sequence ASC;
-      DROP TABLE payload_events_v1;
+        FROM payload_events_before_v3 ORDER BY sequence ASC;
+      DROP TABLE payload_events_before_v3;
       CREATE INDEX payload_events_operation_sequence ON payload_events(operation_id, sequence);
       CREATE INDEX payload_events_stream_sequence ON payload_events(stream, sequence);
       CREATE INDEX payload_events_recorded_sequence ON payload_events(recorded_at, sequence);
@@ -644,5 +685,14 @@ class SqliteProcurementStore implements ProcurementEventStore {
   async readAll(): Promise<readonly StoredProcurementRecord[]> { return this.database.readProcurements(); }
   async append(event: ProcurementEvent, expectedPreviousHash?: Hash | null): Promise<ProcurementStoreAppendResult> {
     return this.database.appendProcurement(event, expectedPreviousHash);
+  }
+}
+
+class SqliteCommercialStore implements CommercialEventStore {
+  readonly durability = 'sqlite_wal' as const;
+  constructor(private readonly database: PayloadEventDatabase) {}
+  async readAll(): Promise<readonly StoredCommercialRecord[]> { return this.database.readCommercials(); }
+  async append(event: CommercialEvent, expectedPreviousHash?: Hash | null): Promise<CommercialStoreAppendResult> {
+    return this.database.appendCommercial(event, expectedPreviousHash);
   }
 }

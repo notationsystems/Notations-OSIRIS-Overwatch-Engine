@@ -5,10 +5,12 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CarrierCommunicationEvent } from './carrierCommunicationsStore';
 import type { LoadOperationEvent } from './loadOperationsStore';
-import { hashCommand } from './loadOperationsStore';
+import { hashCommand, loadOperationRecordHash } from './loadOperationsStore';
 import { PayloadEventDatabase, payloadEventBatchRoot } from './payloadEventDatabase';
 import { ProcurementWorkflow } from './procurement';
 import { ProcurementActions } from './procurementActions';
+import type { CommercialEvent } from './commercialStore';
+import { attestationOf } from './attestation';
 
 const directories: string[] = [];
 
@@ -40,6 +42,22 @@ function communicationEvent(eventId: string, recordedAt: string): CarrierCommuni
     requestedAt: recordedAt,
     recordedAt,
     commandHash: hashCommand(command),
+  };
+}
+
+function commercialEvent(eventId: string, recordedAt: string): CommercialEvent {
+  const command = { eventId, operationId: 'inventory-lot:db:1', recordedAt, source: 'test' };
+  const attestation = attestationOf('reported', 'medium', 'self_reported', 'database test');
+  return {
+    kind: 'inventory_lot_opened', eventId, operationId: command.operationId, recordedAt, commandHash: hashCommand(command),
+    lot: {
+      lotId: command.operationId, sourceProcurementId: 'procurement:db:1', sourcePositionId: 'position:db:1',
+      sourceSnapshotId: 'procurement-state:db:1', materialId: 'material:db', specificationId: 'spec:db',
+      initialQuantity: { amount: 5, unit: 'tonne', attestation, evidenceIds: ['evidence:db:quantity'] },
+      locationId: 'warehouse:db', receivedAt: recordedAt,
+      totalLandedCost: { kind: 'observed', value: { amountMinor: 50_000, currency: 'CAD', attestation, evidenceIds: ['evidence:db:cost'] } },
+      openedAt: recordedAt, evidenceIds: ['evidence:db:lot'],
+    },
   };
 }
 
@@ -141,28 +159,46 @@ describe('globally ordered Payload event database', () => {
     database.close();
   });
 
-  it('upgrades a version-one event table without changing prior sequences', async () => {
+  it('linearizes commercial inventory beside procurement and preserves the commercial domain chain', async () => {
+    const database = new PayloadEventDatabase(await databasePath());
+    expect((await database.commercialStore().append(commercialEvent('commercial-event:1', '2026-09-01T10:00:00.000Z'), null)).kind).toBe('appended');
+    expect(database.queryEvents({ stream: 'commercial' }).events).toMatchObject([
+      { sequence: 1, stream: 'commercial', operationId: 'inventory-lot:db:1', kind: 'inventory_lot_opened' },
+    ]);
+    expect(database.summary()).toMatchObject({ totalEvents: 1, commercialEvents: 1 });
+    expect(database.readCommercials()).toHaveLength(1);
+    database.close();
+  });
+
+  it('upgrades a pre-commercial event table without changing prior sequences', async () => {
     const path = await databasePath();
     const legacy = new Database(path);
+    const prior = operationEvent('operation-event:legacy', '2026-09-01T00:00:00.000Z');
     legacy.exec(`
       CREATE TABLE payload_schema(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
-      INSERT INTO payload_schema VALUES (1, '2026-09-01T00:00:00.000Z');
+      INSERT INTO payload_schema VALUES (2, '2026-09-01T00:00:00.000Z');
       CREATE TABLE payload_events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication')),
+        stream TEXT NOT NULL CHECK(stream IN ('load_operation', 'carrier_communication', 'procurement')),
         event_id TEXT NOT NULL, operation_id TEXT NOT NULL, kind TEXT NOT NULL,
         recorded_at TEXT NOT NULL, command_hash TEXT NOT NULL, previous_hash TEXT,
         record_hash TEXT NOT NULL, event_json TEXT NOT NULL, inserted_at TEXT NOT NULL,
         UNIQUE(stream, event_id), UNIQUE(stream, record_hash)
       );
     `);
+    legacy.prepare(`INSERT INTO payload_events(
+      sequence, stream, event_id, operation_id, kind, recorded_at, command_hash,
+      previous_hash, record_hash, event_json, inserted_at
+    ) VALUES (1, 'load_operation', ?, ?, ?, ?, ?, NULL, ?, ?, ?)`)
+      .run(prior.eventId, prior.operationId, prior.kind, prior.recordedAt, prior.commandHash, loadOperationRecordHash(prior, null), JSON.stringify(prior), prior.recordedAt);
     legacy.close();
     const upgraded = new PayloadEventDatabase(path);
     const table = new Database(path, { readonly: true });
     const sql = table.prepare("SELECT sql FROM sqlite_master WHERE name = 'payload_events'").pluck().get() as string;
-    expect(sql).toContain("'procurement'");
+    expect(sql).toContain("'commercial'");
     table.close();
-    expect(upgraded.summary()).toMatchObject({ totalEvents: 0, procurementEvents: 0 });
+    expect(upgraded.summary()).toMatchObject({ totalEvents: 1, lastSequence: 1, procurementEvents: 0, commercialEvents: 0 });
+    expect(upgraded.queryEvents().events[0]).toMatchObject({ sequence: 1, eventId: 'operation-event:legacy' });
     upgraded.close();
   });
 });
