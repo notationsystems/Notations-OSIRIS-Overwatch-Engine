@@ -44,7 +44,8 @@ Two verticals run on the same substrate:
   carrier vetting, and an exception queue where two claims about one movement
   disagree.
 
-See [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md) and
+See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
+[`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
 [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
 
 ### Key Capabilities
@@ -170,6 +171,10 @@ Registration was never the only door.
 - **Control-tower workspace** — `/operations` joins those durable records into
   an exception-first desk queue with exact load/carrier/lane identity,
   deadlines, evidence counts, and explicit operator remedies
+- **Typed operator cockpit** — every straight-through load step in
+  `/operations` is a guided action. The server derives journal identities and
+  exact load/carrier/message bindings; the browser never constructs a raw
+  workflow command
 
 ### Commodity analytics
 - Concentration (HHI with remainder and effective groups), flow centrality,
@@ -233,6 +238,7 @@ PAYLOAD_DISABLE_LIVE=
 # Authorize persistent freight-operation commands; leave empty to disable the API
 PAYLOAD_OPERATIONS_TOKEN=
 PAYLOAD_OPERATIONS_LOG=
+PAYLOAD_DATABASE_PATH=
 
 # Pull carrier authority/status and the weekly diesel benchmark
 FMCSA_WEB_KEY=
@@ -262,6 +268,33 @@ authorization, assignment, dispatch evidence, and settlement outcome capture.
 carrier acknowledgements, tracking freshness, delivery windows, and settlement
 state. The `/operations` workspace refreshes that private view every 30 seconds
 and keeps its bearer credential only in the active browser tab's memory.
+
+`GET /api/freight/operator-actions?operationId=...` resolves the actions that
+are safe in the load's current durable phase. `POST /api/freight/operator-actions`
+accepts only the cockpit's discriminated business intents: create opportunity,
+add quote, authorize, freeze the decision set, assign, dispatch, send tender,
+record carrier response/tracking, and capture settlement. Event IDs, evidence
+IDs, episode IDs, selected load IDs, and carrier-message bindings are derived
+server-side. Extra raw journal fields are rejected. This route uses the same
+operations bearer token.
+
+For a single retrievable operational timeline, configure
+`PAYLOAD_DATABASE_PATH`. Both domain streams then use one SQLite database in
+WAL mode: operation and carrier-communication hash chains remain independently
+verifiable, while every committed event also receives one global sequence.
+`GET /api/freight/event-ledger` pages that sequence by cursor and may filter by
+operation or stream. Existing JSONL deployments migrate once, before enabling
+the database:
+
+```bash
+PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operations-db
+```
+
+The migration validates both source chains, refuses a non-empty divergent
+destination, and is safe to rerun against an exact completed migration.
+`POST /api/freight/proof-batches` freezes the next unbatched sequence range as
+a deterministic Merkle root for the asynchronous SP1 `payload_event_batch_v1`
+program; it does not put proving on the dispatch path.
 `GET /api/freight/sources?usdot=<number>&carrierId=<internal-id>&includeDiesel=1`
 pulls current FMCSA identity/authority/out-of-service evidence and the fixed EIA
 weekly U.S. diesel benchmark. It returns a gate-ready `authorizationCarrier`

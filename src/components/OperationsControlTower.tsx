@@ -11,11 +11,14 @@ import {
   Clock3,
   Database,
   LogOut,
+  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
   Truck,
+  Wrench,
 } from 'lucide-react';
+import OperatorActionCockpit from './OperatorActionCockpit';
 import type {
   ControlTowerIssue,
   ControlTowerLoad,
@@ -137,11 +140,13 @@ function LoadCard({
   asOf,
   expanded,
   onToggle,
+  onOperate,
 }: {
   readonly load: ControlTowerLoad;
   readonly asOf: string;
   readonly expanded: boolean;
   readonly onToggle: () => void;
+  readonly onOperate: () => void;
 }) {
   const nextDeadline = timeTo(load.nextAction?.deadlineAt ?? null, asOf);
   return (
@@ -222,6 +227,15 @@ function LoadCard({
             <span>Action {load.actionId ?? '—'}</span>
             <span>Last known {formatInstant(load.timing.lastTrackingKnownAt)}</span>
           </div>
+          {!load.state.outcomeCaptured && (
+            <button
+              type="button"
+              onClick={onOperate}
+              className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--gold-primary)]/35 bg-[var(--gold-primary)]/10 px-3 py-2 text-xs font-semibold text-[var(--gold-light)] hover:bg-[var(--gold-primary)]/15"
+            >
+              <Wrench size={14} /> Take typed action
+            </button>
+          )}
         </div>
       )}
     </article>
@@ -261,6 +275,7 @@ export default function OperationsControlTower() {
   const [filter, setFilter] = useState<TowerFilter>('attention');
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [cockpitOperationId, setCockpitOperationId] = useState<string | null | undefined>(undefined);
 
   const loadTower = useCallback(async (credential: string, silent = false) => {
     if (!credential) return;
@@ -314,6 +329,7 @@ export default function OperationsControlTower() {
     setTower(null);
     setError(null);
     setExpanded(new Set());
+    setCockpitOperationId(undefined);
   };
 
   const filteredLoads = useMemo(() => {
@@ -418,6 +434,13 @@ export default function OperationsControlTower() {
             <p className="hidden font-mono text-[10px] text-[var(--text-muted)] sm:block">As of {formatInstant(tower.asOf)}</p>
             <button
               type="button"
+              onClick={() => setCockpitOperationId(null)}
+              className="flex items-center gap-2 rounded-lg border border-[var(--gold-primary)]/30 bg-[var(--gold-primary)]/8 px-3 py-2 text-xs font-semibold text-[var(--gold-light)]"
+            >
+              <Plus size={15} /> New load
+            </button>
+            <button
+              type="button"
               onClick={() => void loadTower(token)}
               disabled={loading}
               className="rounded-lg border border-white/10 p-2 text-[var(--text-secondary)] hover:text-[var(--cyan-primary)] disabled:opacity-40"
@@ -501,6 +524,7 @@ export default function OperationsControlTower() {
                 else next.add(load.operationId);
                 return next;
               })}
+              onOperate={() => setCockpitOperationId(load.operationId)}
             />
           ))}
           {filteredLoads.length === 0 && (
@@ -514,6 +538,14 @@ export default function OperationsControlTower() {
           )}
         </section>
       </div>
+      {cockpitOperationId !== undefined && (
+        <OperatorActionCockpit
+          token={token}
+          operationId={cockpitOperationId}
+          onClose={() => setCockpitOperationId(undefined)}
+          onCommitted={() => void loadTower(token)}
+        />
+      )}
     </main>
   );
 }

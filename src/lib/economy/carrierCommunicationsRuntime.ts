@@ -15,6 +15,7 @@ import {
 import { loadOperationsJournalPath, loadOperationsWorkflow } from './loadOperationsRuntime';
 import { hashCommand } from './loadOperationsStore';
 import { processSingleton } from './processSingleton';
+import { payloadEventDatabase, payloadEventDatabasePath } from './payloadEventDatabaseRuntime';
 
 export function carrierCommunicationsJournalPath(): string {
   const configured = env('PAYLOAD_CARRIER_COMMUNICATIONS_LOG') ??
@@ -61,6 +62,7 @@ function carrierGateway(): CarrierDispatchGateway {
 export function carrierCommunicationsWorkflow(): CarrierCommunicationsWorkflow {
   const communicationPath = carrierCommunicationsJournalPath();
   const operationPath = loadOperationsJournalPath();
+  const databasePath = payloadEventDatabasePath();
   const gatewayIdentity = hashCommand({
     endpoint: env('PAYLOAD_CARRIER_DISPATCH_URL') ?? null,
     token: env('PAYLOAD_CARRIER_DISPATCH_TOKEN') ?? null,
@@ -68,10 +70,16 @@ export function carrierCommunicationsWorkflow(): CarrierCommunicationsWorkflow {
     timeout: env('PAYLOAD_CARRIER_DISPATCH_TIMEOUT_MS') ?? null,
   });
   return processSingleton(
-    `carrier-communications:${operationPath}:${communicationPath}:${gatewayIdentity}`,
+    `carrier-communications:${databasePath ?? 'jsonl'}:${operationPath}:${communicationPath}:${gatewayIdentity}`,
     () => new CarrierCommunicationsWorkflow(
       loadOperationsWorkflow(),
-      new FileCarrierCommunicationStore(communicationPath),
+      databasePath
+        ? (() => {
+            const database = payloadEventDatabase();
+            if (!database) throw new Error('PAYLOAD_DATABASE_PATH resolved without a database owner');
+            return database.carrierCommunicationStore();
+          })()
+        : new FileCarrierCommunicationStore(communicationPath),
       carrierGateway(),
     ),
   );

@@ -86,7 +86,7 @@ export type CarrierCommunicationAppendResult =
     };
 
 export interface CarrierCommunicationEventStore {
-  readonly durability: 'memory' | 'local_jsonl_single_writer';
+  readonly durability: 'memory' | 'local_jsonl_single_writer' | 'sqlite_wal';
   readAll(): Promise<readonly StoredCarrierCommunicationRecord[]>;
   append(
     event: CarrierCommunicationEvent,
@@ -96,7 +96,7 @@ export interface CarrierCommunicationEventStore {
 
 const DOMAIN = 'payload.carrier_communications.record.v1';
 
-function hashRecord(event: CarrierCommunicationEvent, previousHash: Hash | null): Hash {
+export function carrierCommunicationRecordHash(event: CarrierCommunicationEvent, previousHash: Hash | null): Hash {
   return createHash('sha256')
     .update(`${DOMAIN}|${previousHash ?? 'GENESIS'}|${JSON.stringify(stableValue(event))}`)
     .digest('hex');
@@ -120,7 +120,7 @@ function refusal(
   return Object.freeze({ kind: 'refusal' as const, code, detail, remedy });
 }
 
-function verifyRecords(records: readonly StoredCarrierCommunicationRecord[]): string | null {
+export function verifyCarrierCommunicationRecords(records: readonly StoredCarrierCommunicationRecord[]): string | null {
   let previous: Hash | null = null;
   const ids = new Set<string>();
   for (const record of records) {
@@ -133,7 +133,7 @@ function verifyRecords(records: readonly StoredCarrierCommunicationRecord[]): st
     if (record.previousHash !== previous) {
       return `record ${record.event.eventId} does not extend the preceding hash`;
     }
-    if (record.recordHash !== hashRecord(record.event, previous)) {
+    if (record.recordHash !== carrierCommunicationRecordHash(record.event, previous)) {
       return `record ${record.event.eventId} hash does not match its canonical event`;
     }
     if (!Number.isFinite(Date.parse(record.event.recordedAt))) {
@@ -170,7 +170,7 @@ function appendTo(
     );
   }
   const sealedEvent = freeze(event);
-  const record = freeze({ event: sealedEvent, previousHash, recordHash: hashRecord(sealedEvent, previousHash) });
+  const record = freeze({ event: sealedEvent, previousHash, recordHash: carrierCommunicationRecordHash(sealedEvent, previousHash) });
   records.push(record);
   return { kind: 'appended', record };
 }
@@ -227,7 +227,7 @@ export class FileCarrierCommunicationStore implements CarrierCommunicationEventS
       try { records.push(JSON.parse(line) as StoredCarrierCommunicationRecord); }
       catch { throw new Error(`COMMUNICATION_STORE_CORRUPT: journal line ${index + 1} is not valid JSON`); }
     }
-    const defect = verifyRecords(records);
+    const defect = verifyCarrierCommunicationRecords(records);
     if (defect) throw new Error(`COMMUNICATION_STORE_CORRUPT: ${defect}`);
     return freeze(records);
   }

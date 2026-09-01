@@ -19,6 +19,55 @@ orphan or mismatched history. Outbound tender delivery is at-least-once across a
 process crash and sends a stable attempt `Idempotency-Key`; the carrier adapter
 must honor that key to make a retry side-effect safe.
 
+### Canonical event database and migration
+
+Set `PAYLOAD_DATABASE_PATH` to place both journal streams in one SQLite/WAL
+database. Each stream retains its own append-only hash chain and replay rules;
+the database adds a global `sequence` across operation and carrier-communication
+events. This makes the whole history linearly pageable without pretending the
+two stream state machines are one state machine.
+
+For an existing deployment, stop application writers and migrate before setting
+the variable on the application service:
+
+```bash
+PAYLOAD_DATABASE_PATH=/app/runtime-data/payload.sqlite npm run migrate:operations-db
+```
+
+Optional source overrides are
+`--operations=<load-operations.jsonl>` and
+`--communications=<carrier-communications.jsonl>`. The migrator verifies both
+legacy chains, orders their records by recorded time while preserving each
+stream's internal order, writes through the same SQLite append guards, checks
+counts, and refuses a destination containing any divergent history. Keep the
+legacy files until backup and restore have been tested.
+
+Authenticated retrieval:
+
+- `GET /api/freight/event-ledger?after=0&limit=100` returns the global sequence;
+- add `operationId=...` for one load or `stream=load_operation` /
+  `carrier_communication` for one domain journal;
+- every page carries the next cursor and database totals.
+
+SQLite structural health is checked at open. Reads then validate indexed
+metadata, canonical event hashes, and both previous-hash chains. A database can
+be structurally valid but semantically tampered; that second validation is why
+`quick_check` alone is not treated as evidence of an intact journal.
+
+### SP1 / zkVM proof batches
+
+`POST /api/freight/proof-batches` commits the next exact, non-overlapping global
+sequence range. Leaves bind `(sequence, stream, recordHash)` and the response
+records a deterministic root with program `payload_event_batch_v1`, prover
+system `sp1`, and status `pending`. `GET` retrieves all batch commitments.
+
+This endpoint prepares public inputs; it does not accept a caller-supplied proof
+or verification key. A separate prover worker will consume pending batches,
+run SP1, verify locally, and append the proof reference. Authorization remains a
+microsecond blocking gate; proving remains asynchronous evidence about what
+executed. See `docs/event-ledger.sp1.md` for the program boundary and planned
+selective-disclosure statements.
+
 ---
 
 ## Brokerage control tower
@@ -42,6 +91,33 @@ severity, applicable deadline, evidence-reference count, and operator remedy.
 There is no opaque composite score. Missing tracking is not treated as on time,
 and journal corruption or unavailability makes the entire view refuse rather
 than silently showing an empty desk.
+
+### Typed action cockpit
+
+Use **New load** to create a sanitized opportunity, or expand a load and choose
+**Take typed action**. The side cockpit exposes only actions permitted by the
+current durable phase:
+
+1. create the opportunity;
+2. add one or more evidenced carrier quotes;
+3. run the exact carrier/load authorization gate;
+4. freeze the candidate set, assign, and record dispatch;
+5. send the immutable carrier tender;
+6. record carrier acceptance and physical tracking;
+7. close the load from settlement/POD evidence.
+
+Operators enter business facts and source references. They do not enter event,
+episode, evidence, dispatch-message, or carrier-event identities. The server
+derives those identities, resolves carrier and load bindings from the two
+journals, and delegates to the existing authorization and decision gates. A
+request with extra internal command fields is refused before either journal is
+touched. Each browser submission gets a stable request ID, so an exact retry is
+append-only idempotent rather than a second physical action.
+
+The first cockpit increment covers the straight-through lifecycle. Re-covering
+a carrier rejection and amending blocked intake require explicit superseding
+workflow events; they remain visible control-tower remedies and are not silently
+treated as completed actions.
 
 Operational policy is currently fixed in code: 30 minutes to acknowledge a
 delivered tender, 120 minutes before in-motion tracking is stale, and 24 hours
