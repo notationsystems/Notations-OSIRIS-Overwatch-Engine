@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "program": "payload_event_batch_v1",
+  "sp1Version": "6.5.0",
+  "verificationKey": "0x008b44279df6f73c35aedf6de5145496d7b6364124ed46620bf4d4d222c54368",
+  "guestSourceSha256": "0d6ad392653d90c7f202c712609d5bea029aaae657c757fcd308eda279be468b",
+  "ceremony": {
+    "sourceCommit": "cddb9814757bd2e51937f51e60b4713596077f04",
+    "runUrl": "https://github.com/notationsystems/Payload-Terminal-V0/actions/runs/33547289579",
+    "artifactId": 9816481392,
+    "artifactDigest": "sha256:6df289121786faeeb0e2894fa17fbbfa7381a4878d53d4d412c01cfabdc6e14c",
+    "proofSha256": "8bfb652174293233bd865b20af8d7c6dc7dc901ba6dd5fccabb64a2ad26595ed",
+    "generatedAt": "2026-09-01T19:17:12Z"
+  }
+}

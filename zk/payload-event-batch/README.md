@@ -6,6 +6,21 @@ global sequence, and Merkle root before committing public values. The host
 binary generates an SP1 proof and separately verifies the saved artifact
 against the locally built, pinned program verification key.
 
+## Verification-key ceremony
+
+The program identity is pinned in [`verification-key.json`](verification-key.json).
+It was derived by SP1 6.5.0 from a Linux release build and first exercised by a
+real CPU proof in [ceremony run 33547289579](https://github.com/notationsystems/Payload-Terminal-V0/actions/runs/33547289579).
+That run verified the proof before sealing its proof digest, guest-source
+digest, source commit, and artifact provenance into the committed record.
+
+Every ceremony workflow run rebuilds the guest, derives its verification key,
+and fails before proving if the result differs from the committed pin. It then
+generates and verifies a fresh fixture proof and retains the proof, verified
+public values, and sealed ceremony record as a GitHub Actions artifact for 90
+days. Any intentional guest-program change therefore requires a new, reviewed
+key-rotation ceremony rather than silently changing the trusted program.
+
 Build and run this boundary on Linux. Current SP1 SDK/JIT dependencies require
 Unix file-descriptor and shared-memory facilities and do not compile as a
 native Windows prover.
