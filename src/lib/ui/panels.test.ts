@@ -57,8 +57,9 @@ describe('no reachable state stacks two panels on one anchor', () => {
   });
 
   it('pins the roster size, so the count above cannot drift silently', () => {
-    // 12 before the BLE panel was removed as a person-targeting surface.
-    expect(ALL_PANELS.length).toBe(11);
+    // 12 before the BLE panel was removed as a person-targeting surface;
+    // the Information-OS architecture modal restores a twelfth, non-personal surface.
+    expect(ALL_PANELS.length).toBe(12);
     expect(new Set(ALL_PANELS).size).toBe(ALL_PANELS.length);
   });
 
@@ -113,6 +114,7 @@ describe('the declaration matches where the panels actually render', () => {
       directions: 'showDirections', search: 'showDesktopSearch',
       arcgis: 'showArcGIS', econGraph: 'showEconGraph',
       spatial: 'showSpatial',
+      architecture: 'showArchitecture',
     };
     for (const id of ALL_PANELS) {
       expect(PAGE, `${id} has no state`).toMatch(new RegExp(`\\b${NAME[id]}\\b`));

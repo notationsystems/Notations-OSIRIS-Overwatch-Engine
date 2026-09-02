@@ -145,7 +145,7 @@ them only if you extend the relevant route or hit rate limits.
 | `AIS_API_KEY` | aisstream.io maritime | Sign up at <https://aisstream.io/>, create a key on the **API Keys** page. Used over `wss://stream.aisstream.io/v0/stream`. |
 
 > Keep `.env` out of version control — it is already in `.gitignore`. Only
-> `.env.template` (no secrets) is committed.
+> `.env.example` (no secrets) is committed.
 
 ### Optional runtime overrides
 
@@ -153,6 +153,9 @@ them only if you extend the relevant route or hit rate limits.
 |----------|---------|---------|
 | `PAYLOAD_PORT` | Host port the compose file publishes (container itself always listens on 3000). `OSIRIS_PORT` is honoured for one release and warns. | `3000` |
 | `PAYLOAD_OPERATIONS_TOKEN` | Bearer authority for private freight-operation and carrier-delivery routes. Empty disables them. | none |
+| `PAYLOAD_DATABASE_PATH` | Shared SQLite/WAL file for ordered operational events and, by default, corpus records. Use the named runtime volume. | none |
+| `PAYLOAD_CORPUS_DATABASE_PATH` | Optional separate SQLite/WAL file for the physical-economy corpus. | `PAYLOAD_DATABASE_PATH` |
+| `PAYLOAD_CORPUS_INGEST_TOKEN` | Dedicated bearer authority for immutable corpus append and raw cursor replay. | none |
 | `PAYLOAD_OPERATIONS_LOG` | Append-only load-operation journal. Compose places it on `payload-runtime`. | `data-archive/load-operations.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_COMMUNICATIONS_LOG` | Append-only delivery, receipt, acknowledgement, and tracking journal. | `data-archive/carrier-communications.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_DISPATCH_URL` | Provider-neutral HTTPS endpoint that accepts carrier tenders. | none |

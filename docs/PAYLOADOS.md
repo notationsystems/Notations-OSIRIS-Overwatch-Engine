@@ -2,21 +2,25 @@
 
 ## Thesis
 
-PayloadOS is a provenance-first operating system for physical-economic state,
-decision, execution, and verification. Payload Terminal is its human operating
-instrument and an edge node; it is not a separate source of truth.
+PayloadOS is a provenance-first **information operating system for the physical
+economy**. Its primary asset is a high-integrity computational corpus. Payload
+Earth is the spatial query surface, Tradewind is the analytical surface,
+Payload API is the machine surface, agents consume compiled context, and
+Payload Terminal remains the human evidence and domain-workflow instrument.
+None is a separate source of truth.
 
-The common operating loop is:
+The critical corpus loop is:
 
 ```text
-observe -> represent -> reason -> decide -> authorize -> execute
-        -> capture outcome -> verify -> update state
+Acquire -> Extract -> Normalize -> Resolve -> Structure -> Relate
+        -> Index -> Compress -> Retrieve -> Compute -> Prove
 ```
 
-The commercial business can activate procurement, physical trading, project
-logistics, or freight brokerage without changing that substrate. Logistics is
-therefore both a service and an internal execution capability that contributes
-to landed cost, position risk, and outcome evidence.
+The operational loop—observe, represent, reason, decide, authorize, execute,
+capture outcome, verify, update state—remains implemented domain capability.
+Freight, procurement, physical positions, and project logistics now inform what
+the corpus must understand; operating those businesses is not on the critical
+path to building the information company.
 
 ## Non-negotiable invariants
 
@@ -41,36 +45,35 @@ to landed cost, position risk, and outcome evidence.
 ## System topology
 
 ```text
-                         PayloadOS
-                            |
-             +--------------+--------------+
-             |                             |
-         world state                    operations
-             |                             |
-   +---------+---------+          +--------+--------+
-   |         |         |          |        |        |
- spatial   market   evidence      buy      move     sell
-   |         |         |          |        |        |
-   +---------+---------+----------+--------+--------+
-                            |
-                       decision engine
-                            |
-                       authorization
-                            |
-          +-----------------+-----------------+
-          |                 |                 |
-     procurement         trading          logistics
-          |                 |                 |
-       suppliers       exchange/broker      carriers
-          +-----------------+-----------------+
-                            |
-                       physical world
-                            |
-                     outcome + evidence
-                            |
-                  replay / audit / zk proof
-                            |
-                       state update
+                          PayloadOS
+                              |
+                 Physical-Economy Corpus
+                              |
+          +-------------------+-------------------+
+          |                   |                   |
+       Evidence            Identity            Ontology
+          +-------------------+-------------------+
+                              |
+                       Canonical State
+                              |
+          +-------------------+-------------------+
+          |                   |                   |
+      Relational             Graph              Spatial
+          +-------------------+-------------------+
+                              |
+                    Temporal + Vector Index
+                              |
+                       Retrieval Engine
+                              |
+                           GraphRAG
+                              |
+                       Context Compiler
+                              |
+             +----------------+----------------+
+             |                |                |
+            APIs         Intelligence         Agents
+                              |
+                   Earth / Tradewind / Terminal
 ```
 
 ## Four operating planes and one cross-cutting plane
@@ -78,10 +81,17 @@ to landed cost, position risk, and outcome evidence.
 ### Truth plane
 
 Owns evidence, identity, time, canonical state, provenance, and durable event
-history. The edge implementation in this repository now persists load-operation,
-carrier-communication, procurement, and commercial streams in a single SQLite/WAL database with one
-global sequence. Additional domain streams must enter through versioned,
-validated event contracts; the database is not a generic JSON dumping ground.
+history. The corpus implementation persists evidence, entities, explicit
+aliases, typed relationships, and observations as immutable records in
+SQLite/WAL. Every record receives a global sequence and a scope-local hash
+chain. Public knowledge composes with exactly one authorized customer scope;
+private customer scopes can never compose with one another.
+
+The existing edge event database persists load-operation,
+carrier-communication, procurement, commercial, and project-cargo streams with
+the same ordered/replayable discipline. Additional domain streams enter through
+versioned, validated contracts; neither database is a generic JSON dumping
+ground.
 
 The long-term central deployment may use PostgreSQL/PostGIS, but it must retain
 the same ordered event contract and replay semantics. SQLite remains a useful
@@ -112,7 +122,27 @@ The systems harness, assertions, replay, audits, and zkVM programs cross all
 other planes. Verification records what was checked and against which committed
 inputs; it never silently upgrades reported evidence into observed truth.
 
-## Canonical commercial objects
+## Canonical corpus objects
+
+Corpus V0 generalizes the existing commodity state into six related physical-
+economy identities plus geography:
+
+```text
+Organization <-> Facility <-> Material <-> Process <-> Network <-> Market
+```
+
+Its immutable record types are `evidence`, `entity`, `alias`, `relationship`,
+and `observation`. A stable domain identity can change only through a new record
+that explicitly supersedes the prior record, with a strictly later `knownAt`.
+Similarity never creates identity and an answer cannot be knowable before its
+supporting evidence.
+
+The global corpus (`K_G`) contains generally reusable knowledge. A customer
+scope (`K_C`) contains that customer's internal state. Authorized retrieval may
+compute `K_G + K_C`; the public Earth query surface is structurally restricted
+to `K_G`.
+
+## Preserved domain capability
 
 The freight `LoadOperation` is the first production aggregate, not the final
 universal object. PayloadOS grows around these related roots:
@@ -242,25 +272,25 @@ only create a larger silo.
 
 ## Delivery sequence
 
-1. **Terminal operations:** typed opportunity-to-settlement cockpit, carrier
-   communication, linear database, replay, migration, and proof commitments.
-2. **Procurement and commercial positions (implemented through customer settlement):**
-   requirement, supplier quote, specification, five-check qualification,
-   decision, purchase contract, physical position, logistics, landed cost, and
-   append-only settlement revisions; procurement-origin inventory lots,
-   customer commitments, allocation, sale contracts, freight-bound fulfillment,
-   delivery, margin exposure, and sell-side settlement revisions.
-3. **Project cargo (implemented):** canonical asset policies, dependent
-   multimodal plans and permits, exact custody, OTel-aligned condition telemetry,
-   deterministic exceptions and typed remedies, delivery verification,
-   external adapters, and closed project economics.
-4. **Corpus and spatial state:** canonical organization/facility/material IDs,
-   temporal graph, PostGIS projection, and evidence-aware retrieval.
-5. **Market and risk:** read-only market/reference feeds, exposure and hedge
-   proposals, then separately authorized execution and reconciliation.
-6. **Verification workers (generic batch implemented):** leased SP1 batch
-   proving and independent verification are checked in; specialized proof
-   programs, key-ceremony governance, and selective anchoring remain.
+1. **Corpus V0 (implemented substrate):** immutable evidence/entity/alias/
+   relationship/observation records, global linear retrieval, independent scope
+   chains, public/private composition boundary, temporal revisions, and the
+   first `find_facilities(material)` computation.
+2. **Corpus Factory:** API and document acquisition, artifact preservation,
+   OCR/perception candidates, review queues, resolution, and continuous
+   evidence-linked publication.
+3. **Spatial and graph projections:** PostGIS, typed graph traversal, historical
+   state, and Payload Earth query composition over facilities, ports, flows,
+   dependencies, disruptions, and customer-authorized overlays.
+4. **Hybrid retrieval:** relational + graph + spatial + temporal + semantic
+   indexes with an evidence-preserving Context Compiler for GraphRAG and agents.
+5. **Computational products:** supplier discovery, substitution, dependency,
+   landed-cost, physical-risk, historical-state, and relationship-explanation
+   APIs; Tradewind packages these into intelligence products.
+6. **Verification:** extend the implemented SP1 event proof boundary to selected
+   corpus builds, transformations, retrieval manifests, and disclosed
+   calculations with ceremonially pinned program identities.
 
-Each stage must close the loop from proposal through verified outcome before the
-next domain is allowed to expand the action surface.
+Freight, procurement, commercial-book, and project-cargo implementations remain
+maintained capability and test data for the corpus. Their action surfaces expand
+only when an operating use case justifies the execution risk.

@@ -53,6 +53,22 @@ interface PayloadMapProps {
   /** Live navigation: tighter zoom and the map turned to face travel direction. */
   navigating?: boolean;
   /** Corroborated endpoint airports for watched aircraft, keyed by icao24. */
+  /** Evidence-bearing facilities returned by the public corpus query surface. */
+  corpusFacilities?: Array<{
+    entityId: string;
+    name: string;
+    countryCode?: string;
+    location?: { lat: number; lng: number; precision: string };
+    operator?: { entityId: string; name: string };
+    confidence: 'high' | 'medium' | 'low';
+    evidence: Array<{ evidenceId: string; title: string; retrievedAt: string }>;
+  }>;
+}
+
+function escapePopup(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]!);
 }
 
 function computeSolarTerminator(): [number, number][] {
@@ -110,7 +126,7 @@ function greatCircleArc(from: [number, number], to: [number, number], segments =
   return coords;
 }
 
-function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false }: PayloadMapProps) {
+function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightClick, onViewStateChange, flyToLocation, projection = 'globe', mapStyle = 'dark', sweepData, theme = 'core', drawnPolygons = [], arcgisLayers = [], drawMode = null, onDrawComplete, onDrawProgress, onDrawCancel, drawCommand = null, onMapCenter, route = null, userLocation = null, followUser = false, onFollowInterrupt, navigating = false, corpusFacilities = [] }: PayloadMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -234,7 +250,7 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       createDot(map, 'dot-fire', isGhost ? phantomPurple : '#E65100', 10);
       createDot(map, 'dot-cctv', cameraColor, 10);
 
-      const sources = ['earthquakes', 'day-night', 'weather', 'infrastructure', 'maritime', 'maritime-choke', 'maritime-ships', 'conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'sdk-entities', 'sdk-links', 'econ-entities', 'econ-flows'];
+      const sources = ['earthquakes', 'day-night', 'weather', 'infrastructure', 'maritime', 'maritime-choke', 'maritime-ships', 'conflict-zones', 'war-alerts-targets', 'war-alerts-lines', 'balloons', 'radiation', 'sdk-entities', 'sdk-links', 'econ-entities', 'econ-flows', 'corpus-facilities'];
       sources.forEach(s => map.addSource(s, { type: 'geojson', data: EMPTY_FC }));
 
       // ── PHYSICAL ECONOMY (copper vertical slice) ──
@@ -315,6 +331,22 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       map.addLayer({ id: 'econ-labels', type: 'symbol', source: 'econ-entities', minzoom: 3,
         layout: { 'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-optional': true },
         paint: { 'text-color': '#E8E6E0', 'text-halo-color': '#000000', 'text-halo-width': 1 } });
+
+      // Corpus queries are visually distinct from the legacy commodity slice:
+      // they are the answer to one evidence-bearing question, not a permanent
+      // claim that the browser has loaded the whole industrial world.
+      map.addLayer({ id: 'corpus-facility-halo', type: 'circle', source: 'corpus-facilities', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 9, 6, 14, 12, 22],
+        'circle-color': '#00E5FF', 'circle-opacity': 0.09, 'circle-blur': 0.7,
+      } });
+      map.addLayer({ id: 'corpus-facility-dots', type: 'circle', source: 'corpus-facilities', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 3.5, 6, 5, 12, 8],
+        'circle-color': '#00E5FF', 'circle-opacity': 0.9,
+        'circle-stroke-color': '#D4AF37', 'circle-stroke-width': 1.5,
+      } });
+      map.addLayer({ id: 'corpus-facility-labels', type: 'symbol', source: 'corpus-facilities', minzoom: 3,
+        layout: { 'text-field': ['get', 'name'], 'text-size': 10, 'text-offset': [0, 1.35], 'text-anchor': 'top', 'text-optional': true },
+        paint: { 'text-color': '#00E5FF', 'text-halo-color': '#000000', 'text-halo-width': 1.2 } });
 
       // ── FLIGHT ROUTE VISUALIZATION SOURCES & LAYERS ──
 
@@ -959,6 +991,22 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
     map.on('mouseenter', 'econ-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'econ-dots', () => { map.getCanvas().style.cursor = ''; });
 
+    map.on('click', 'corpus-facility-dots', e => {
+      const p = e.features?.[0]?.properties;
+      const geometry = e.features?.[0]?.geometry;
+      if (!p || geometry?.type !== 'Point') return;
+      const coords = geometry.coordinates as [number, number];
+      popup(coords, `<div style="${pStyle}border:1px solid #00E5FF55;">
+        <div style="color:#00E5FF;font-weight:bold;font-size:11px;margin-bottom:2px;">${escapePopup(p.name)}</div>
+        <div style="color:#999;font-size:9px;margin-bottom:5px;">CORPUS FACILITY${p.countryCode ? ` — ${escapePopup(p.countryCode)}` : ''}</div>
+        ${p.operator ? `<div style="font-size:9px;color:#aaa;">Operator: <span style="color:#fff;">${escapePopup(p.operator)}</span></div>` : ''}
+        <div style="font-size:9px;color:#aaa;">Confidence: <span style="color:#00E676;">${escapePopup(p.confidence)}</span></div>
+        <div style="font-size:8px;color:#777;margin-top:5px;">${escapePopup(p.evidenceCount)} evidence record(s) · inspect the query panel for sources</div>
+      </div>`);
+    });
+    map.on('mouseenter', 'corpus-facility-dots', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'corpus-facility-dots', () => { map.getCanvas().style.cursor = ''; });
+
     // ── Physical economy flows ──
     // One handler for both flow layers: a disrupted flow moves to its own
     // (dashed red) layer, and losing its popup there would hide exactly the
@@ -1162,6 +1210,19 @@ function PayloadMap({ data, activeLayers, onEntityClick, onMouseCoords, onRightC
       : [];
     setGeo('econ-flows', flows);
   }, [mapReady, data.econ_entities, data.econ_flows, (activeLayers as any).econ_production, (activeLayers as any).econ_processing, (activeLayers as any).econ_ports, (activeLayers as any).econ_flows, (activeLayers as any).econ_bottlenecks, setGeo]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    setGeo('corpus-facilities', corpusFacilities.flatMap(facility => facility.location ? [{
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [facility.location.lng, facility.location.lat] },
+      properties: {
+        id: facility.entityId, name: facility.name, countryCode: facility.countryCode ?? '',
+        operator: facility.operator?.name ?? '', confidence: facility.confidence,
+        precision: facility.location.precision, evidenceCount: facility.evidence.length,
+      },
+    }] : []));
+  }, [mapReady, corpusFacilities, setGeo]);
 
   useEffect(() => {
     if (!mapReady) return;

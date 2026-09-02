@@ -53,6 +53,8 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'chain/daily': 'freight',
   'cloudflare-radar': 'general-purpose',
   conflicts: 'general-purpose',
+  'corpus/facilities': 'freight',
+  'corpus/records': 'freight',
   'country-risk': 'general-purpose',
   crypto: 'general-purpose',
   'cyber-attacks': 'general-purpose',

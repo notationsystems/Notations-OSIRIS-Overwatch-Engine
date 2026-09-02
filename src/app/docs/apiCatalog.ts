@@ -58,6 +58,41 @@ export interface ApiGroup {
 
 export const API_GROUPS: ApiGroup[] = [
   {
+    id: 'corpus',
+    title: 'Physical-Economy Corpus',
+    blurb: 'Evidence-bearing computational queries plus authenticated, linearly replayable corpus administration.',
+    endpoints: [
+      {
+        path: '/api/corpus/facilities',
+        method: 'GET',
+        summary: 'Resolves a material identity and returns active producing facilities with coordinates, operators, confidence and exact evidence.',
+        params: [
+          { name: 'q', required: true, desc: 'Canonical material ID, explicit alias, or “<material> production”.', example: 'polypropylene production' },
+          { name: 'asOf', desc: 'Relationship-validity time in ISO UTC form.' },
+          { name: 'knowledgeCutoff', desc: 'Latest knowledge time admitted to the answer.' },
+        ],
+        returns: ['kind', 'material', 'scope', 'asOf', 'knowledgeCutoff', 'facilities'],
+        notes: 'Read-only and structurally restricted to the global corpus. Missing or ambiguous identity returns a typed refusal; customer scope cannot be requested here.',
+      },
+      {
+        path: '/api/corpus/records',
+        method: ['GET', 'POST'],
+        summary: 'Appends immutable corpus records or replays the global sequence by cursor.',
+        params: [
+          { name: 'scope', desc: 'global or one authorized customer:<id> scope.', example: 'global' },
+          { name: 'afterSequence', desc: 'Exclusive global cursor.', example: '0' },
+          { name: 'limit', desc: 'Page size from 1 to 500.', example: '100' },
+          { name: 'view', desc: 'Use summary for record counts and the last sequence.' },
+        ],
+        returns: ['kind', 'scope', 'nextAfterSequence', 'hasMore', 'records'],
+        notes: 'Requires the dedicated corpus-administration bearer token. Exact POST replay is idempotent; immutable identity conflicts are refused.',
+        env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_INGEST_TOKEN'],
+        requiresAuth: true,
+        bodyExample: '{\n  "scope": "global",\n  "records": [{ "schema": "payload.corpus.record.v1", "...": "..." }],\n  "recordedAt": "2026-09-02T12:00:00.000Z"\n}',
+      },
+    ],
+  },
+  {
     id: 'system',
     title: 'System',
     blurb: 'Liveness and aggregate counters. Safe to poll from monitoring.',

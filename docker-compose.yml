@@ -29,6 +29,7 @@ services:
       - PAYLOAD_COMMERCIAL_LOG=${PAYLOAD_COMMERCIAL_LOG:-/app/runtime-data/commercial.jsonl}
       - PAYLOAD_PROJECT_CARGO_LOG=${PAYLOAD_PROJECT_CARGO_LOG:-/app/runtime-data/project-cargo.jsonl}
       - PAYLOAD_DATABASE_PATH=${PAYLOAD_DATABASE_PATH:-}
+      - PAYLOAD_CORPUS_DATABASE_PATH=${PAYLOAD_CORPUS_DATABASE_PATH:-}
     volumes:
       - payload-runtime:/app/runtime-data
     extra_hosts:
@@ -82,15 +83,14 @@ x-casaos:
   category: Productivity
   description:
     en_us: >-
-      Payload is a freight and physical-commerce instrument. It holds a
-      provenance-preserving world state for loads, lanes, carriers and
-      commitments, in which every figure carries its source, its basis and
-      the date it became knowable, and an unanswerable question returns a
-      typed refusal rather than a zero. Commodity and freight verticals run
-      on one substrate, rendered on a GPU-accelerated MapLibre interface.
-      Most features work with no API keys.
+      PayloadOS is a physical-economy information system. It holds an
+      evidence-linked corpus of organizations, facilities, materials,
+      processes and networks, then exposes spatial queries, intelligence and
+      typed refusals on a GPU-accelerated Payload Earth interface. Freight,
+      procurement and logistics remain domain capabilities over the same
+      provenance-preserving state.
   tagline:
-    en_us: Freight and physical-commerce operating system
+    en_us: Physical-economy information operating system
   title:
     en_us: Payload
   icon: https://raw.githubusercontent.com/simplifaisoul/osiris/master/public/casaos-icon.png

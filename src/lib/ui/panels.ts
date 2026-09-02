@@ -46,7 +46,8 @@ export type PanelId =
   | 'search'
   | 'arcgis'
   | 'spatial'
-  | 'econGraph';
+  | 'econGraph'
+  | 'architecture';
 
 /**
  * Where a panel physically renders. Two panels in the same slot cannot both be
@@ -85,6 +86,7 @@ export const PANEL_SLOT: Record<PanelId, PanelSlot> = {
   spatial: 'right_rail',
   directions: 'top_bar',
   econGraph: 'modal',
+  architecture: 'modal',
 };
 
 export const ALL_PANELS = Object.keys(PANEL_SLOT) as PanelId[];

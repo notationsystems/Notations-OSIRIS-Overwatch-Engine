@@ -4,11 +4,11 @@ import { ENDPOINT_COUNT } from './apiCatalog';
 
 export const metadata: Metadata = {
   title: 'Documentation & API Reference',
-  description: `Official Payload Terminal documentation — self-hosting guide, interface reference, and the complete API reference for all ${ENDPOINT_COUNT} endpoints covering aviation, maritime, seismic, conflict, cyber, and OSINT feeds. No API key required.`,
+  description: `Official PayloadOS documentation — physical-economy corpus, visual queries, self-hosting, and the complete API reference for all ${ENDPOINT_COUNT} public and authenticated endpoints.`,
   alternates: { canonical: '/docs' },
   openGraph: {
     title: 'Payload — Documentation & API Reference',
-    description: `Self-hosting guide, interface reference, and the complete API reference for all ${ENDPOINT_COUNT} Payload Terminal endpoints.`,
+    description: `Physical-economy corpus, self-hosting guide, and the complete API reference for all ${ENDPOINT_COUNT} PayloadOS endpoints.`,
     url: '/docs',
     type: 'article',
   },

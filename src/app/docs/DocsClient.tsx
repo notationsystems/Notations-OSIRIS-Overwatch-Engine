@@ -246,7 +246,7 @@ export default function DocsClient() {
 
           <div className="mt-8 mx-2 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
             <div className="text-[11px] font-mono text-[var(--text-secondary)] leading-relaxed">
-              <span className="text-[var(--gold-primary)] font-bold">{ENDPOINT_COUNT}</span> endpoints, no key
+              <span className="text-[var(--gold-primary)] font-bold">{ENDPOINT_COUNT}</span> public + authenticated endpoints
               required.
             </div>
           </div>
@@ -267,14 +267,14 @@ export default function DocsClient() {
               <span className="text-[var(--text-heading)]">Build on the</span>
               <br />
               <span className="bg-gradient-to-r from-[var(--gold-primary)] via-[#F0D060] to-[var(--cyan-primary)] bg-clip-text text-transparent">
-                Payload Terminal platform
+                PayloadOS corpus
               </span>
             </h1>
 
             <p className="text-[15px] leading-[1.75] text-[var(--text-secondary)] max-w-[42rem]">
-              Payload Terminal aggregates aviation, maritime, seismic, conflict, cyber, and OSINT feeds onto a single
-              GPU-rendered map — and exposes every one of them as a plain HTTP endpoint. This is the same API the
-              dashboard runs on. There is no separate, privileged internal tier.
+              PayloadOS builds an evidence-linked physical-economy corpus and projects it through Payload Earth,
+              computational APIs, analytics and bounded agent context. The same typed answers and refusals used by
+              the globe are available through HTTP; private corpus administration remains separately authenticated.
             </p>
 
             <div className="flex flex-wrap gap-3 mt-8">
@@ -298,8 +298,8 @@ export default function DocsClient() {
             <div className="grid grid-cols-3 gap-3 mt-10">
               {[
                 { n: String(ENDPOINT_COUNT), l: 'Endpoints' },
-                { n: '20+', l: 'Live feeds' },
-                { n: '0', l: 'Keys required' },
+                { n: '11', l: 'Corpus stages' },
+                { n: 'Typed', l: 'Refusals' },
               ].map(s => (
                 <div key={s.l} className="rounded-xl border border-white/[0.07] bg-white/[0.015] px-4 py-3">
                   <div className="text-[24px] font-bold text-[var(--gold-primary)] font-mono leading-none">{s.n}</div>
@@ -331,8 +331,8 @@ export default function DocsClient() {
 
           <Section id="quickstart" eyebrow="Guide" title="Quick Start">
             <p>
-              Every read endpoint is a plain <Code>GET</Code> returning JSON. Nothing below needs authentication —
-              paste any of it into a terminal.
+              Public read endpoints are plain <Code>GET</Code> requests returning JSON. Private operating and corpus-
+              administration routes are marked and fail closed without their dedicated bearer authority.
             </p>
             <CodeBlock
               label="Fetch live aircraft"
@@ -372,7 +372,7 @@ print(len(data["commercial_flights"]), "commercial")`,
           </Section>
 
           <Section id="self-hosting" eyebrow="Guide" title="Self-Hosting">
-            <p>Payload Terminal needs Node 20+ and no database. A local instance is three commands:</p>
+            <p>PayloadOS needs Node 20+. The public map can start without storage; persistent corpus and operating records use a configured SQLite/WAL database.</p>
             <Pre label="Local development" lang="bash">{`git clone https://github.com/notationsystems/Payload-Terminal-V0.git
 cd Payload-Terminal-V0
 npm install
@@ -384,7 +384,7 @@ npm test           # vitest
 npm run test:live  # includes tests that hit live upstream feeds`}</Pre>
             <p>
               A <Code>Dockerfile</Code> and <Code>docker-compose.yml</Code> ship with the repository. The container
-              always listens on port 3000 internally; <Code>OSIRIS_PORT</Code> controls the host port it is published
+              always listens on port 3000 internally; <Code>PAYLOAD_PORT</Code> controls the host port it is published
               on.
             </p>
             <Pre label="Docker" lang="bash">{`cp .env.example .env

@@ -61,7 +61,7 @@ export default function PayloadCommandBar({
           >
             <Search className="h-4 w-4 shrink-0 text-[var(--cyan-primary)]" />
             <span className="hidden truncate text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--text-secondary)] sm:block">
-              Search entities, lanes, ports, carriers
+              Query materials, facilities, evidence, or places
             </span>
             <span className="truncate text-[10px] font-mono text-[var(--text-secondary)] sm:hidden">Search</span>
             <kbd className="ml-auto hidden rounded border border-white/[0.08] bg-black/30 px-1.5 py-0.5 text-[9px] font-mono text-white/35 md:block">⌘K</kbd>

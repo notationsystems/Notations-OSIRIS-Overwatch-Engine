@@ -2,18 +2,19 @@
 
 # ⬡ Payload Terminal V0
 
-### Payload Supply Chain Management — the physical-commerce operating system
+### PayloadOS — the physical-economy information operating system
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
 [![MapLibre](https://img.shields.io/badge/MapLibre_GL-GPU_Rendered-396CB2?style=for-the-badge)](https://maplibre.org)
 [![License](https://img.shields.io/badge/License-GPLv3-D4AF37?style=for-the-badge)](LICENSE)
 
-**A freight and physical-commerce instrument: a provenance-preserving world
-state for loads, lanes, carriers and commitments, with every claim carrying
-where it came from, when it was known, and what it refuses to say.**
+**A high-integrity computational corpus of the physical economy: organizations,
+facilities, materials, processes, networks and markets, with every answer
+carrying where it came from, when it was known, and what it refuses to say.**
 
-**Payload Terminal** is the operator surface.
+**Payload Earth** is the visual query surface. **Payload Terminal** is the human
+evidence and domain-workflow surface.
 
 </div>
 
@@ -21,11 +22,11 @@ where it came from, when it was known, and what it refuses to say.**
 
 ## Overview
 
-Payload holds the physical economy as a record rather than a dashboard. Its
-core is a canonical world state — entities, observations, flows, capacities,
-dependencies, events — in which **every figure carries its provenance, its
-basis, and the date it became knowable**, and in which a question the data
-cannot answer returns a typed refusal with a remedy instead of a zero.
+Payload builds high-integrity computational corpora of the physical economy,
+then exposes evidence-bearing spatial queries, APIs, intelligence products and
+agent context. Its core is a canonical world state in which **every claim
+carries its provenance, basis and knowledge time**, and in which a question the
+data cannot answer returns a typed refusal with a remedy instead of a zero.
 
 That discipline is the product. A mean computed over a partition that does
 not exist, a residual that silently drops the half of the book with no
@@ -33,7 +34,9 @@ settlement, an index whose coverage is unstated — each is a wrong number
 that looks exactly like a right one. Payload is built so those cannot be
 produced silently.
 
-The operating practices run on the same substrate:
+The first corpus connects `Organization ↔ Facility ↔ Material ↔ Process ↔
+Network ↔ Market`. The freight, procurement, commercial and project-logistics
+systems remain maintained domain capability over the same epistemic discipline:
 
 - **Commodities** — copper and aluminium: live acquisition from USGS, UN
   Comtrade, COMEX and CFTC behind a snapshot degradation ladder, a directed
@@ -56,6 +59,7 @@ The operating practices run on the same substrate:
   verification, and project profitability. Operate the workflow at `/projects`.
 
 See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
+[`Physical-Economy Corpus V0`](docs/PHYSICAL_ECONOMY_CORPUS.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
 [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
 
@@ -63,6 +67,7 @@ See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 
 | Domain | What it holds | Sources |
 |--------|---------------|---------|
+| **Physical-economy corpus** | Evidence, identities, aliases, relationships, observations, temporal revisions | Public research + customer-authorized private records |
 | **Physical economy** | Entities, observations, flows, capacities, dependencies | USGS MCS, UN Comtrade, curated topology |
 | **Markets** | Benchmark price, positioning, warehouse stocks | COMEX (Yahoo), CFTC COT, LME via Westmetall |
 | **Freight book** | Loads, quotes, invoices, transit, appointments | Operator entry, append-only ledger |
@@ -127,15 +132,16 @@ Registration was never the only door.
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                 PAYLOAD TERMINAL                 │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────┐ │
-│  │ MapLibre  │  │ Evidence │  │ Operations    │ │
-│  │  GL (GPU) │  │ Panels   │  │ Queue         │ │
-│  │  WebGL    │  │ Refusals │  │ Exceptions    │ │
-│  │  Render   │  │ Vintages │  │ Vetting       │ │
-│  └──────────┘  └──────────┘  └───────────────┘ │
+│                    PAYLOADOS                    │
+│          PHYSICAL-ECONOMY CORPUS                │
+│  Evidence  ·  Identity  ·  Ontology             │
+│              CANONICAL STATE                    │
+│  Relational  ·  Graph  ·  Spatial  ·  Temporal  │
 ├─────────────────────────────────────────────────┤
-│               NEXT.JS API ROUTES                 │
+│       RETRIEVAL · COMPUTE · CONTEXT · PROOF      │
+├─────────────────────────────────────────────────┤
+│          PAYLOAD EARTH / API / TERMINAL          │
+│  /api/corpus/*   facility query + linear replay │
 │  /api/economy/*   state, search, table, guards, │
 │                   refusals, scenario, validate  │
 │  /api/directions  /api/geo      /api/geosearch  │
@@ -145,7 +151,7 @@ Registration was never the only door.
 │                 mac, threats, sanctions)        │
 │                 — organisational attribution     │
 ├─────────────────────────────────────────────────┤
-│              EXTERNAL DATA SOURCES               │
+│       DOMAIN LENSES + EXTERNAL DATA SOURCES      │
 │  USGS · UN Comtrade · CFTC · COMEX · LME        │
 │  NASA EONET · OpenSanctions · RDAP · RIPE Stat  │
 └─────────────────────────────────────────────────┘
@@ -227,7 +233,7 @@ npx tsc --noEmit  # types
 ### Docker / Self-Hosting
 
 ```bash
-cp .env.template .env     # optional — configure keys / port
+cp .env.example .env     # optional — configure keys / port
 docker compose up -d
 ```
 
@@ -240,7 +246,7 @@ in `.env` to change the published host port.
 ### Environment Variables
 
 Payload works **partially without any API keys** — the core feeds use public,
-keyless sources. Copy [`.env.template`](.env.template) to `.env` and set only
+keyless sources. Copy [`.env.example`](.env.example) to `.env` and set only
 what you need:
 
 ```env
@@ -254,6 +260,11 @@ PAYLOAD_DISABLE_LIVE=
 PAYLOAD_OPERATIONS_TOKEN=
 PAYLOAD_OPERATIONS_LOG=
 PAYLOAD_DATABASE_PATH=
+
+# Physical-economy corpus; falls back to PAYLOAD_DATABASE_PATH when omitted
+PAYLOAD_CORPUS_DATABASE_PATH=
+# Dedicated bearer authority for corpus append and raw cursor replay
+PAYLOAD_CORPUS_INGEST_TOKEN=
 
 # Pull carrier authority/status and the weekly diesel benchmark
 FMCSA_WEB_KEY=
@@ -292,6 +303,15 @@ record carrier response/tracking, and capture settlement. Event IDs, evidence
 IDs, episode IDs, selected load IDs, and carrier-message bindings are derived
 server-side. Extra raw journal fields are rejected. This route uses the same
 operations bearer token.
+
+`GET /api/corpus/facilities?q=polypropylene%20production` is the first public,
+read-only computational corpus endpoint. It resolves only canonical material
+IDs or explicit aliases, returns evidence-linked producing facilities, and is
+structurally fixed to the global corpus. The result becomes a dedicated
+facility layer on Payload Earth. `POST /api/corpus/records` and cursor-based
+`GET /api/corpus/records` require `PAYLOAD_CORPUS_INGEST_TOKEN`; exact replay is
+idempotent and changed immutable record IDs are refused. See
+[`docs/PHYSICAL_ECONOMY_CORPUS.md`](docs/PHYSICAL_ECONOMY_CORPUS.md).
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in

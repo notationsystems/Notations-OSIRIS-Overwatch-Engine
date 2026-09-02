@@ -4,8 +4,8 @@ import "./globals.css";
 
 const SITE_URL = "https://payload-terminal.app";
 const SITE_NAME = "Payload Terminal";
-const SITE_TITLE = "Payload Terminal — Freight & Physical-Commerce Operating System";
-const SITE_DESCRIPTION = "A provenance-preserving instrument for freight and physical commerce. Loads, lanes, carriers, commitments and outcomes, where every figure carries its source, its basis and the date it became knowable — and an unanswerable question returns a typed refusal with a remedy rather than a zero. Commodity and freight verticals on one canonical world state, with as-known-then playback for bid post-mortems.";
+const SITE_TITLE = "PayloadOS — Physical-Economy Information Operating System";
+const SITE_DESCRIPTION = "A provenance-preserving physical-economy corpus and visual query system for facilities, materials, organizations and networks. Every answer carries evidence and knowledge time; an unanswerable question returns a typed refusal with a remedy rather than an invented result.";
 
 export const viewport: Viewport = {
   themeColor: "#D4AF37",
@@ -24,6 +24,8 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   keywords: [
     // What this instrument is for
+    "physical economy data", "industrial intelligence", "facility intelligence",
+    "materials intelligence", "supplier discovery", "physical economy knowledge graph",
     "freight operating system", "supply chain operating system", "physical commerce",
     "load management", "lane analytics", "carrier vetting", "freight brokerage software",
     "landed cost", "truck-legal routing", "transit time variance", "appointment slippage",
@@ -32,7 +34,7 @@ export const metadata: Metadata = {
     // The discipline
     "data provenance", "knownAt", "as-known-then replay", "typed refusals",
     "measurement basis", "coverage annotation", "append-only ledger",
-    "commodity intelligence", "supply chain concentration", "HHI concentration",
+    "commodity intelligence", "GraphRAG", "evidence API", "supply chain concentration", "HHI concentration",
 
     // Brand
     "payload", "payload terminal",
@@ -74,8 +76,8 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: "Payload Terminal — Freight & Physical-Commerce Operating System",
-    description: "Loads, lanes, carriers and commitments on a provenance-preserving world state. Every figure carries its source, its basis and the date it became knowable.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     type: "website",
     siteName: SITE_NAME,
     locale: "en_US",
@@ -85,15 +87,15 @@ export const metadata: Metadata = {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Payload Terminal — freight and physical-commerce operating system",
+        alt: "PayloadOS physical-economy information operating system",
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Payload Terminal — Freight & Physical-Commerce Operating System",
-    description: "A freight instrument that refuses to guess: provenance on every claim, and a typed refusal where a number would be a fabrication.",
+    title: SITE_TITLE,
+    description: "Query the physical economy through evidence-linked facilities, materials, organizations, networks and historical state.",
     images: [`${SITE_URL}/og-image.png`],
   },
   category: "technology",
@@ -112,8 +114,8 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "Payload Terminal — Freight & Physical-Commerce Operating System",
-  alternateName: ["Payload", "Payload Terminal", "Payload Supply Chain Management"],
+  name: SITE_TITLE,
+  alternateName: ["Payload", "PayloadOS", "Payload Earth", "Payload Terminal"],
   url: SITE_URL,
   description: SITE_DESCRIPTION,
   applicationCategory: "BusinessApplication",
@@ -126,6 +128,11 @@ const jsonLd = {
     availability: "https://schema.org/InStock",
   },
   featureList: [
+    "Immutable physical-economy corpus for organizations, facilities, materials, processes, networks and markets",
+    "Evidence-linked facility discovery rendered as a visual query on Payload Earth",
+    "Strict separation between the reusable global corpus and customer-private corpus scopes",
+    "Temporal record revisions and as-known-then retrieval over a global linear sequence",
+    "Computational APIs that return evidence-bearing answers or typed refusals",
     "Append-only freight book with supersession, never in-place edits",
     "Lane residuals by carrier, lane and season, with a minimum-trials floor",
     "Three-state carrier vetting — cleared, blocked, and undetermined",
