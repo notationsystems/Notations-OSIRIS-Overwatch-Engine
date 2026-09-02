@@ -316,9 +316,13 @@ operations bearer token.
 read-only computational corpus endpoint. It reads only the separate,
 policy-filtered `public:global` read model—never canonical write tables—resolves
 canonical material IDs or explicit aliases, returns evidence-linked producing
-facilities, and carries an authorized projection warrant. The result becomes a
-dedicated facility layer on Payload Earth. `POST /api/corpus/projections`
-deterministically rebuilds that read model; stale projections are refused.
+facilities, and carries a proof-shaped answer warrant. The warrant binds
+canonical identities, evidence hashes, computation digests, uncertainty,
+joined information-flow policy, and a privacy-safe corpus-build identity. The
+result becomes a dedicated facility layer on Payload Earth.
+`POST /api/corpus/projections` deterministically rebuilds that read model;
+stale projections are refused. Every build is version-bound to canonical
+state, schema, ontology, policy, compiler, embedding and representation spec.
 Compilation requires `PAYLOAD_CORPUS_COMPILER_TOKEN`; append and cursor replay
 require `PAYLOAD_CORPUS_INGEST_TOKEN`. The credentials are intentionally not
 interchangeable. Exact replay/recompilation is idempotent and changed immutable

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buildFacilityAnswerWarrant, publicCorpusBuildReference } from '@/lib/economy/corpusAnswer';
 import { projectionMatchesSource } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
@@ -63,13 +64,12 @@ export async function GET(request: Request) {
   if (!projectionMatchesSource(projection.manifest, current)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_STALE', detail: `Public projection ends at canonical sequence ${projection.manifest.sourceSequence}; canonical global state now ends at ${current.sourceSequence}.`, remedy: 'Recompile the public/global projection before returning corpus answers.' }, { status: 503 });
   if (knowledgeCutoff && Date.parse(knowledgeCutoff) !== Date.parse(projection.manifest.knowledgeCutoff)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_TIME_UNAVAILABLE', detail: `The active public read model is pinned to ${projection.manifest.knowledgeCutoff}.`, remedy: 'Omit knowledgeCutoff or compile and address a versioned historical projection.' }, { status: 409 });
   const result = store.findFacilities(materialRef, asOf);
-  return NextResponse.json({ ...result, query, interpretedAs: materialRef, warrant: {
-    projectionId: projection.manifest.projectionId,
-    projectionDigest: projection.manifest.projectionDigest,
-    projectionRecordCount: projection.manifest.recordCount,
-    compilerVersion: projection.manifest.compilerVersion,
-    compiledAt: projection.manifest.compiledAt,
-  } }, {
+  if (result.kind === 'facility_discovery') {
+    const answer = buildFacilityAnswerWarrant(materialRef, result, projection.records, projection.manifest);
+    if (answer.kind === 'refusal') return NextResponse.json(answer, { status: 403, headers: { 'Cache-Control': 'private, no-store' } });
+    return NextResponse.json({ ...result, query, interpretedAs: materialRef, warrant: answer.warrant }, { status: 200, headers: { 'Cache-Control': 'private, no-store' } });
+  }
+  return NextResponse.json({ ...result, query, interpretedAs: materialRef, warrant: { corpusBuild: publicCorpusBuildReference(projection.manifest) } }, {
     status: result.kind === 'refusal' ? statusFor(result.code) : 200,
     headers: { 'Cache-Control': 'private, no-store' },
   });

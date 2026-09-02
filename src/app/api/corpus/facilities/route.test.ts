@@ -119,10 +119,22 @@ describe('GET /api/corpus/facilities', () => {
     expect(body).toMatchObject({
       kind: 'facility_discovery', query: 'polypropylene production', interpretedAs: 'polypropylene', scope: 'global',
       facilities: [{ entityId: 'pe:facility:global-pp', name: 'Global PP Plant', evidence: [{ evidenceId: evidence }] }],
-      warrant: { projectionId: 'public:global', projectionRecordCount: 5, compilerVersion: '1.0.0' },
+      warrant: {
+        schema: 'payload.corpus.answer-warrant.v1',
+        basis: 'evidence_linked_canonical_records',
+        canonicalIdentities: ['pe:facility:global-pp', 'pe:material:polypropylene'],
+        projectionId: 'public:global',
+        projectionRecordCount: 5,
+        compilerVersion: '1.0.0',
+        policy: { inputCount: 5, effective: { classification: 'PUBLIC', externalRelease: 'PERMITTED' } },
+        corpusBuild: { projectionId: 'public:global', embeddingVersion: null, ontologyVersion: 'payload.physical-economy.v1' },
+      },
     });
+    expect(body.warrant.computation[0].inputDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.warrant.computation[0].outputDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(body.warrant).not.toHaveProperty('sourceSequence');
     expect(body.warrant).not.toHaveProperty('sourceDigest');
+    expect(body.warrant.corpusBuild).not.toHaveProperty('canonicalStateFingerprint');
   });
 
   it('returns typed input and resolution refusals', async () => {

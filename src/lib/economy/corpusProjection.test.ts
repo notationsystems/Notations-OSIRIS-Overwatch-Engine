@@ -45,7 +45,27 @@ describe('Corpus Compiler public projection', () => {
     const { corpus, store } = await setup();
     try {
       const first = compilePublicProjection(corpus, store, recordedAt, '2026-04-01T00:02:00.000Z');
-      expect(first).toMatchObject({ kind: 'projection_stored', idempotent: false, manifest: { recordCount: 5, excludedRecords: 2, sourceSequence: 7 } });
+      expect(first).toMatchObject({
+        kind: 'projection_stored',
+        idempotent: false,
+        manifest: {
+          recordCount: 5,
+          excludedRecords: 2,
+          sourceSequence: 7,
+          canonicalStateFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+          corpusBuildId: expect.stringMatching(/^corpus-build:[a-f0-9]{64}$/),
+          recordSchemaVersion: 'payload.corpus.record.v1',
+          ontologyVersion: 'payload.physical-economy.v1',
+          policyVersion: 'payload.corpus.policy.v1',
+          embeddingVersion: null,
+          representationSpecification: {
+            outputs: ['search_index', 'spatial_projection', 'statistics'],
+            omitted: ['graph_projection', 'semantic_index', 'summaries'],
+          },
+          policyInputCount: 5,
+          effectivePolicy: { classification: 'PUBLIC', externalRelease: 'PERMITTED' },
+        },
+      });
       expect(first.manifest.exclusions).toContainEqual({ code: 'CORPUS_PERMISSION_DENIED', count: 2 });
       const replay = compilePublicProjection(corpus, store, recordedAt, '2026-04-01T00:03:00.000Z');
       expect(replay).toMatchObject({ idempotent: true, manifest: { projectionDigest: first.manifest.projectionDigest, compiledAt: '2026-04-01T00:02:00.000Z' } });
@@ -83,6 +103,8 @@ describe('Corpus Compiler public projection', () => {
       const one = buildPublicProjection(source, '2026-04-01T00:02:00.000Z');
       const two = buildPublicProjection(source, '2026-04-01T00:03:00.000Z');
       expect(one.manifest.projectionDigest).toBe(two.manifest.projectionDigest);
+      expect(one.manifest.corpusBuildId).toBe(two.manifest.corpusBuildId);
+      expect(one.manifest.generatedAt).not.toBe(two.manifest.generatedAt);
     } finally { store.close(); corpus.close(); }
   });
 });

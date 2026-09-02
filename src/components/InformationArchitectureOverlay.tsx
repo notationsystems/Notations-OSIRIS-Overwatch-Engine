@@ -23,19 +23,19 @@ export default function InformationArchitectureOverlay({ onClose }: { onClose: (
 
         <div className="mx-auto mt-6 grid max-w-3xl gap-2">
           <Node accent>Physical-Economy Corpus</Node>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>Evidence</Node><Node>Identity</Node><Node>Ontology</Node><Node>Classification</Node></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5"><Node>Evidence</Node><Node>Identity</Node><Node>Ontology</Node><Node>Classification</Node><Node>Policy lineage</Node></div>
           <div className="text-center text-white/20">↓</div>
           <Node accent>Canonical State · one authority</Node>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>SQLite / WAL V0</Node><Node planned>PostgreSQL + PostGIS</Node><Node planned>Object artifacts</Node><Node planned>Parquet / Iceberg</Node></div>
           <div className="text-center text-white/20">↓</div>
           <Node>Corpus Compiler</Node>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>Public read model</Node><Node planned>Graph projection</Node><Node planned>Spatial projection</Node><Node planned>Vector projection</Node></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5"><Node>Public read model</Node><Node>Spatial projection</Node><Node>Search index</Node><Node planned>Graph projection</Node><Node planned>Vector projection</Node></div>
           <div className="text-center text-white/20">↓</div>
           <Node>Retrieval Engine</Node>
-          <Node>Identity · Policy · Allowed use</Node>
+          <Node>Authorize before retrieval · join policies · authorize before emission</Node>
           <Node planned>GraphRAG</Node>
           <Node planned>Context Compiler</Node>
-          <div className="grid grid-cols-3 gap-2"><Node>APIs</Node><Node planned>Intelligence products</Node><Node planned>Corpus agents</Node></div>
+          <div className="grid grid-cols-3 gap-2"><Node>Proof-carrying APIs</Node><Node planned>Intelligence products</Node><Node planned>Corpus agents</Node></div>
           <div className="text-center text-white/20">↓</div>
           <div className="grid grid-cols-3 gap-2"><Node accent>Payload Earth</Node><Node planned>Tradewind</Node><Node>Terminal</Node></div>
         </div>

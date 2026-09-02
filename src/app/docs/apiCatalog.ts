@@ -72,7 +72,7 @@ export const API_GROUPS: ApiGroup[] = [
           { name: 'knowledgeCutoff', desc: 'Optional exact cutoff of the active compiled projection; other historical cutoffs are refused in V0.' },
         ],
         returns: ['kind', 'material', 'scope', 'asOf', 'knowledgeCutoff', 'facilities', 'warrant'],
-        notes: 'Reads only the compiled, policy-filtered public/global read model. Missing, ambiguous, stale, corrupt, or historically unavailable state returns a typed refusal; customer scope cannot be requested here.',
+        notes: 'Reads only the compiled, policy-filtered public/global read model. Successful answers carry canonical identities, evidence hashes, computation digests, uncertainty, joined policy lineage, and a privacy-safe corpus-build reference. Missing, ambiguous, stale, corrupt, unauthorized, or historically unavailable state returns a typed refusal; customer scope cannot be requested here.',
         env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_READ_MODEL_PATH'],
       },
       {
@@ -80,7 +80,7 @@ export const API_GROUPS: ApiGroup[] = [
         method: ['GET', 'POST'],
         summary: 'Compiles or inspects the deterministic public/global corpus read model.',
         returns: ['kind', 'idempotent', 'manifest'],
-        notes: 'Requires corpus-administration authority. Compilation admits only explicitly public, redistributable records and prunes denied dependencies. The resulting database is disposable and digest-bound to canonical source state.',
+        notes: 'Requires corpus-compiler authority. Compilation admits only explicitly public, redistributable records, prunes denied dependencies, joins input policy lineage, and emits a content-addressed build manifest bound to canonical, schema, ontology, policy, compiler, embedding, and representation versions. The resulting database is disposable.',
         env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_READ_MODEL_PATH', 'PAYLOAD_CORPUS_COMPILER_TOKEN'],
         requiresAuth: true,
         bodyExample: '{\n  "audience": "public",\n  "scope": "global",\n  "knowledgeCutoff": "2026-09-02T12:00:00.000Z"\n}',

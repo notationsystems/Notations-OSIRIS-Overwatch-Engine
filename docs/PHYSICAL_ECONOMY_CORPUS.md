@@ -17,7 +17,8 @@ find_facilities(material)
   -> apply object classification and allowed-use policy
   -> select active produces relationships at asOf
   -> retrieve facility and operator identities
-  -> return exact supporting evidence
+  -> join the policy of every answer input
+  -> authorize emission and return exact supporting evidence
   -> project resolved coordinates onto Payload Earth
 ```
 
@@ -39,10 +40,16 @@ facility exists.
 
 Every record also has an immutable `recordId`, `knownAt`, optional
 `supersedes`, optional V0-compatible `access` classification, and canonical
-JSON. New publishable records must classify visibility, licence,
-redistribution, retention, allowed uses, and—where applicable—tenant, owner,
-entitlements, and jurisdiction. Missing classification is accepted only so old
-ledgers can replay; it is denied from every public projection.
+JSON. New publishable records must classify visibility, licence class and
+source-licence identity, redistribution, retention, permitted/prohibited uses, derivation policy and—
+where applicable—tenant, owner, entitlements, and jurisdiction. Missing
+classification is accepted only so old ledgers can replay; it is denied from
+every public projection.
+
+Derived answers carry `payload.corpus.policy-lineage.v1`. The join intersects
+permitted uses, unions prohibitions and obligations, inherits the most
+restrictive release constraints, and refuses cross-tenant composition. Being
+authorized for two inputs separately does not authorize their combination.
 
 Evidence records may include `artifactId`, `storageUri`, `mediaType`, and
 `parserVersion`. The database holds this metadata and the content hash, never
@@ -112,10 +119,12 @@ The small intent grammar removes only an explicit suffix such as `production`,
 canonical ID or an explicit alias. The response includes facility coordinates,
 operator, relationship identity, confidence, and exact evidence records. It is
 rendered by the Search surface as a dedicated query layer on Payload Earth.
-Every successful response also carries the authorized projection digest, record
-count, compiler version, and compile time. Canonical source sequence/digest stay
-inside the authenticated compiler manifest so restricted-record cadence is not
-leaked through a public warrant. The active V0 read model has one pinned
+Every successful response carries a `payload.corpus.answer-warrant.v1` with
+canonical identities, knowledge time, evidence artifact hashes, deterministic
+computation input/output digests, explicit uncertainty, policy lineage, and a
+privacy-safe corpus-build reference. Canonical source sequence and fingerprint
+stay inside the authenticated compiler manifest so restricted-record cadence is
+not leaked through a public warrant. The active V0 read model has one pinned
 knowledge cutoff; arbitrary historical cutoffs require versioned projections
 and are refused rather than reconstructed from incomplete state.
 
@@ -130,8 +139,11 @@ Content-Type: application/json
 ```
 
 The compiler reads active canonical global records, applies object policy,
-prunes claims with denied evidence or endpoints, computes a deterministic
-projection digest, and atomically replaces the disposable read model. Exact
+prunes claims with denied evidence or endpoints, joins admitted input policies,
+computes deterministic corpus-build and projection identities, and atomically
+replaces the disposable read model. Its manifest binds the canonical state,
+record schema, ontology, policy, compiler, embedding and representation
+versions. Exact
 recompilation is idempotent. `GET /api/corpus/projections` returns its manifest
 to an authenticated administrator; it never returns the database path.
 
@@ -164,9 +176,9 @@ The summary does not expose the server filesystem path.
 
 Implemented now: the durable corpus contract, validation, append/replay API,
 scope isolation, temporal revisions, tamper detection, object classification,
-actor/purpose policy, a deterministic Corpus Compiler, a separate public read
-model, stale-model refusal, typed facility discovery, and evidence-bearing
-Earth projection.
+actor/purpose policy, deterministic information-flow joins and policy lineage,
+a version-bound Corpus Compiler, a separate public read model, stale-model
+refusal, typed facility discovery, and proof-carrying Earth answers.
 
 Not yet implemented: automated API/document acquisition, raw artifact object
 storage, append-only security-audit export, OAuth/OIDC, database RLS,

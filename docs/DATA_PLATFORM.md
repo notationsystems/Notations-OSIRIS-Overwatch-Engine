@@ -3,13 +3,28 @@
 ## Architectural rule
 
 ```text
-Canonical Core -> Rebuildable Projections -> Controlled APIs
+Canonical Core -> Rebuildable Representations -> Controlled Retrieval -> Products/APIs
 ```
 
 PayloadOS has one canonical identity/evidence model and multiple specialized
 storage or compute representations. PostgreSQL, PostGIS, object storage,
 Parquet/Iceberg, graph stores, and vector indexes may each serve a workload;
 none becomes an independent source of truth.
+
+This topology is locked. Infrastructure changes require measured workload or
+reliability evidence; they do not change the information model.
+
+## Five planes
+
+```text
+Ingestion -> Truth -> Storage -> Representation -> Access
+   DAF      identity   PostgreSQL    graph          retrieval
+ OCR/API    evidence   object vault  spatial        context compilation
+ files/GIS  time/state lakehouse     vector/search  API / GraphRAG / MCP
+```
+
+Security and information-flow control cut vertically through all five planes.
+They are not a perimeter-only service.
 
 ## Target topology
 
@@ -69,9 +84,12 @@ Every newly publishable `payload.corpus.record.v1` object carries:
 access
 |- visibility
 |- licenseClass
+|- sourceLicenseId?
 |- redistributionClass
 |- retentionClass
 |- allowedUses[]
+|- prohibitedUses[]?
+|- derivationPolicy?
 |- tenantId?
 |- ownerId?
 |- entitlements[]?
@@ -92,6 +110,23 @@ The edge API already separates the research-worker ingestion identity
 (`PAYLOAD_CORPUS_COMPILER_TOKEN`). Possession of one credential grants no
 authority at the other service boundary.
 
+### Information-flow control
+
+Authorization to read two inputs does not imply permission to combine and
+export them. Every derived result therefore carries a deterministic
+`payload.corpus.policy-lineage.v1` object. Its effective policy is the join of
+all input policies:
+
+```text
+Policy(output) = Join(Policy(input 1), ..., Policy(input n))
+```
+
+The join intersects permitted uses; unions explicit prohibitions,
+jurisdictions, retention duties and entitlements; inherits the most restrictive
+classification, redistribution and derivation controls; and refuses implicit
+cross-tenant composition. A missing label or derivation prohibition fails the
+computation closed. Input order does not change the lineage identifier.
+
 ## Corpus Compiler
 
 The compiler performs the expensive identity/evidence work once and publishes
@@ -103,7 +138,8 @@ Canonical records
   -> apply actor/object/allowed-use policy
   -> prune denied evidence and dangling endpoints
   -> build typed read model
-  -> compute projection digest and source warrant
+  -> join input policy lineage
+  -> compute corpus-build, projection and source fingerprints
   -> atomically publish
 ```
 
@@ -111,6 +147,27 @@ The implemented `public:global` projection is stored in a separate SQLite/WAL
 database. Public APIs query it exclusively. If canonical global state advances,
 the API returns `CORPUS_PROJECTION_STALE` until the compiler runs again. The
 read-model file can be deleted and rebuilt; canonical state cannot.
+
+Every manifest now carries the strict build identity needed to answer “which
+corpus produced this answer?”:
+
+```text
+corpusBuildId
+canonicalStateFingerprint
+recordSchemaVersion
+ontologyVersion
+policyVersion
+compilerVersion
+embeddingVersion
+representationSpecification
+policyLineageId
+generatedAt
+```
+
+The current representation specification truthfully declares spatial, search
+and statistics outputs as built, and graph, semantic and summary outputs as
+omitted. Identical canonical state, cutoff and versions produce the same
+content-addressed build ID regardless of compile time.
 
 Graph, spatial, vector, search, entity-summary, and relationship-summary
 projectors must follow the same rule: carry canonical IDs and representation
@@ -136,18 +193,42 @@ deployment without changing canonical IDs.
 Customers never connect to storage directly. Terminal is the first client of
 the same controlled API surface sold externally.
 
-Planned API families:
+Target versioned API families (the implemented routes remain
+`/api/corpus/*` V0):
 
-- Data API: canonical entities, facilities, materials, suppliers, ports, and
-  evidence-bearing observations.
-- Intelligence API: supplier search, dependency traces, concentration,
-  bottlenecks, substitutes, network exposure, landed cost, and spatial queries.
-- Agent API: bounded research requests returning claims, entities, evidence,
-  confidence, and missing information.
+- `/v1/entities/*`: canonical entities, facilities, materials and organizations.
+- `/v1/evidence/*`: warrants, source artifacts and explanation.
+- `/v1/spatial/*`: nearby, within, route and exposure computation.
+- `/v1/intelligence/*`: dependencies, suppliers, substitutes and concentration.
+- `/v1/research`: authorization-bounded context compilation for people and agents.
 
-Every response preserves basis, value kind, confidence, knowledge cutoff,
-evidence identifiers, and projection/source warrants. The contract never
-collapses an evidenced assertion into an unwarranted scalar.
+The V0 facility endpoint now returns a
+`payload.corpus.answer-warrant.v1`: canonical identities, knowledge time,
+evidence hashes, deterministic computation input/output digests, explicit
+uncertainty, joined policy lineage and a privacy-safe corpus-build reference.
+The public reference does not expose the private canonical fingerprint or
+sequence. The contract never collapses an evidenced assertion into an
+unwarranted scalar.
+
+## Temporal and graph doctrine
+
+Temporal semantics remain canonical rather than moving to a separate database.
+`knownAt`, `recordedAt`, relationship validity and observation periods are
+preserved through projections; the PostgreSQL target will index event,
+knowledge and validity time directly. A dedicated time-series engine is added
+only if measured AIS, telemetry or market workloads require one.
+
+The logical graph exists in canonical relationships now. A dedicated graph
+database remains disposable infrastructure and will be introduced only when
+the compiler-backed relational representation fails demonstrated traversal
+requirements.
+
+## Evidence vault doctrine
+
+Raw evidence bytes remain physically separate from canonical knowledge.
+Canonical records hold content identity and governed locators. The target vault
+is content-addressed, encrypted, object-versioned where practical, independently
+backed up, and more tightly permissioned than derived representations.
 
 Before broad external access, the gateway must add OAuth/OIDC, scoped service
 keys, quotas, pagination and response caps, timeouts, query-complexity limits,
@@ -164,9 +245,10 @@ maximum graph depth, immutable access audits, and upstream-source isolation.
    from the write authority.
 6. Move high-volume observations into partitioned columnar history only after
    measured query and lifecycle requirements justify it.
-7. Add graph, spatial, vector, and search projections through the compiler.
-8. Add the authorization-before-retrieval and authorization-before-emission
-   Context Compiler boundary for model/agent access.
+7. Add graph and vector projections through the compiler; spatial and search
+   already have an initial deterministic public representation.
+8. Extend the implemented authorization-before-emission policy join into the
+   authorization-before-retrieval Context Compiler for model/agent access.
 
 No step permits dual truth. A migration is complete only when the new backend
 replays the canonical contract and produces equivalent projection warrants.

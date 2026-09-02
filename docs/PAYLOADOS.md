@@ -46,48 +46,40 @@ path to building the information company.
 9. Canonical state is the only authority. Graph, vector, spatial, search, and
    API read models are versioned, disposable projections built by the Corpus
    Compiler. Customers and agents never query database tables directly.
+10. Derived information inherits the joined policy of every input. Permission
+    to read inputs separately never implies permission to combine or emit them.
 
 ## System topology
 
 ```text
-                          PayloadOS
-                              |
-                 Physical-Economy Corpus
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-       Evidence            Identity     Ontology + Classification
-          +-------------------+-------------------+
-                              |
-                       Canonical State
-                              |
-       +----------+-----------+-----------+----------+
-       |          |           |           |          |
-   Structured  Artifacts  Analytical   Spatial    Temporal
-      state               history
-       +----------+-----------+-----------+----------+
-                              |
-                       Corpus Compiler
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-       Relational           Graph        Spatial / Vector
-        read model        projection        projections
-                              |
-                       Retrieval Engine
-                              |
-                           GraphRAG
-                              |
-                       Context Compiler
-                              |
-             +----------------+----------------+
-             |                |                |
-            APIs         Intelligence         Agents
-                              |
-                   Earth / Tradewind / Terminal
+                         PAYLOADOS
+                             |
+        +--------------------+--------------------+
+        |                    |                    |
+     INGESTION             TRUTH                STORAGE
+  DAF/OCR/APIs/GIS   Identity/Evidence/Time   SQL/Objects/Lake
+        +--------------------+--------------------+
+                             |
+                   REPRESENTATION PLANE
+             Graph / Spatial / Search / Vector
+                             |
+                        ACCESS PLANE
+          Retrieval / Context Compiler / Policy Join
+                             |
+                 API / GraphRAG / MCP contracts
+                             |
+                  Earth / Tradewind / Terminal
+
+ Security, tenancy, information-flow control and verification are vertical.
 ```
 
-## Four operating planes and one cross-cutting plane
+## Five data-platform planes and vertical security
+
+### Ingestion plane
+
+Owns DAF, OCR, source APIs, files, GIS and telemetry intake. It produces typed
+source artifacts and candidate records; it cannot silently grant canonical
+identity or publication authority.
 
 ### Truth plane
 
@@ -99,7 +91,8 @@ chain. Public knowledge composes with exactly one authorized customer scope;
 private customer scopes can never compose with one another.
 
 Canonical records may carry object-level visibility, licence, redistribution,
-retention, allowed-use, tenant, owner, entitlement, and jurisdiction metadata.
+retention, permitted/prohibited use, derivation, tenant, owner, entitlement,
+and jurisdiction metadata.
 The public Corpus Compiler admits only explicitly public and redistributable
 records, removes claims whose evidence or endpoints are denied, and writes a
 separate digest-bound read model. The public API refuses a stale projection
@@ -115,29 +108,33 @@ The long-term central deployment may use PostgreSQL/PostGIS, but it must retain
 the same ordered event contract and replay semantics. SQLite remains a useful
 offline-capable Terminal edge store and replication source.
 
-### Compute plane
+### Storage plane
 
-Owns deterministic transforms, optimization, graph computation, routing,
-simulation, pricing, forecasting, scenario propagation, and risk. CPU, native,
-GPU, or CUDA implementations are interchangeable only when fixtures establish
-semantic equivalence.
+Owns PostgreSQL/PostGIS structured state, the raw Evidence Vault, and analytical
+history. SQLite/WAL is the implemented edge authority. Object storage,
+PostgreSQL/PostGIS and Parquet/Iceberg remain workload-specific production
+targets, never alternate truth owners.
 
-### Intelligence plane
+### Representation plane
 
-Tradewind, GraphRAG, analytics, and bounded model providers consume evidence
-and canonical state. They return derived results, inferences, proposals, or tool
-requests with their input state and knowledge cutoff preserved.
+Owns deterministic graph, spatial, vector, search, statistics and summary
+builds. The Corpus Compiler creates a content-addressed build bound to
+canonical, schema, ontology, policy, compiler and representation versions.
+Every derived build carries joined input-policy lineage and is disposable.
 
-### Action plane
+### Access plane
 
-Owns procurement, contracts, orders, dispatch, custody transfer, tracking,
-settlement, and other physical or financial execution. Every external adapter
-accepts a narrow semantic command only after policy and human/role authorization.
+Owns authorization-aware retrieval, context compilation, APIs, GraphRAG and MCP
+contracts. Payload Earth, Terminal, Tradewind, customers and agents all consume
+this semantic boundary. Facility answers now carry canonical identities,
+evidence hashes, computation digests, uncertainty, policy lineage and their
+corpus-build identity.
 
-### Verification plane
+### Vertical security and verification
 
-The systems harness, assertions, replay, audits, and zkVM programs cross all
-other planes. Verification records what was checked and against which committed
+Identity, least privilege, classification, tenancy, information-flow control,
+encryption, audit, quotas, assertions, replay and zkVM programs cross all five
+planes. Verification records what was checked and against which committed
 inputs; it never silently upgrades reported evidence into observed truth.
 
 ## Canonical corpus objects

@@ -13,7 +13,10 @@ import Database from 'better-sqlite3';
 import { stableValue } from './loadOperationsStore';
 import {
   authorizeCorpusObject,
+  CORPUS_POLICY_VERSION,
+  joinCorpusPolicies,
   PUBLIC_PROJECTION_ACTOR,
+  type DerivedCorpusPolicy,
 } from './corpusPolicy';
 import {
   findFacilitiesInRecords,
@@ -24,10 +27,30 @@ import {
 } from './physicalEconomyCorpus';
 
 export const CORPUS_COMPILER_VERSION = '1.0.0';
+export const CORPUS_ONTOLOGY_VERSION = 'payload.physical-economy.v1';
+export const CORPUS_RECORD_SCHEMA_VERSION = 'payload.corpus.record.v1';
+export const CORPUS_REPRESENTATION_SPEC_VERSION = 'payload.corpus.public-read-model.v1';
 export const PUBLIC_GLOBAL_PROJECTION_ID = 'public:global';
+
+export const PUBLIC_REPRESENTATION_SPECIFICATION = Object.freeze({
+  specificationId: CORPUS_REPRESENTATION_SPEC_VERSION,
+  outputs: Object.freeze(['search_index', 'spatial_projection', 'statistics'] as const),
+  omitted: Object.freeze(['graph_projection', 'semantic_index', 'summaries'] as const),
+});
 
 export type CorpusProjectionManifest = {
   readonly schema: 'payload.corpus.projection.v1';
+  readonly corpusBuildId: string;
+  readonly canonicalStateFingerprint: string;
+  readonly recordSchemaVersion: typeof CORPUS_RECORD_SCHEMA_VERSION;
+  readonly ontologyVersion: typeof CORPUS_ONTOLOGY_VERSION;
+  readonly policyVersion: typeof CORPUS_POLICY_VERSION;
+  readonly embeddingVersion: null;
+  readonly representationSpecification: typeof PUBLIC_REPRESENTATION_SPECIFICATION;
+  readonly generatedAt: string;
+  readonly policyLineageId: string;
+  readonly policyInputCount: number;
+  readonly effectivePolicy: DerivedCorpusPolicy | null;
   readonly projectionId: typeof PUBLIC_GLOBAL_PROJECTION_ID;
   readonly audience: 'public';
   readonly scope: 'global';
@@ -78,6 +101,16 @@ function freeze<T>(value: T): T {
 function manifestBasis(manifest: Omit<CorpusProjectionManifest, 'projectionDigest'> | CorpusProjectionManifest) {
   return {
     schema: manifest.schema,
+    corpusBuildId: manifest.corpusBuildId,
+    canonicalStateFingerprint: manifest.canonicalStateFingerprint,
+    recordSchemaVersion: manifest.recordSchemaVersion,
+    ontologyVersion: manifest.ontologyVersion,
+    policyVersion: manifest.policyVersion,
+    embeddingVersion: manifest.embeddingVersion,
+    representationSpecification: manifest.representationSpecification,
+    policyLineageId: manifest.policyLineageId,
+    policyInputCount: manifest.policyInputCount,
+    effectivePolicy: manifest.effectivePolicy,
     projectionId: manifest.projectionId,
     audience: manifest.audience,
     scope: manifest.scope,
@@ -97,8 +130,22 @@ function projectionDigest(manifest: Omit<CorpusProjectionManifest, 'projectionDi
   return sha(canonical({ manifest: manifestBasis(manifest), records }));
 }
 
+function corpusBuildIdFor(canonicalStateFingerprint: string, knowledgeCutoff: string, policyLineageId: string): string {
+  return `corpus-build:${sha(canonical({
+    canonicalStateFingerprint,
+    knowledgeCutoff,
+    recordSchemaVersion: CORPUS_RECORD_SCHEMA_VERSION,
+    ontologyVersion: CORPUS_ONTOLOGY_VERSION,
+    policyVersion: CORPUS_POLICY_VERSION,
+    compilerVersion: CORPUS_COMPILER_VERSION,
+    embeddingVersion: null,
+    representationSpecification: PUBLIC_REPRESENTATION_SPECIFICATION,
+    policyLineageId,
+  }))}`;
+}
+
 function policyCode(record: StoredCorpusRecord): string | null {
-  for (const use of ['PROJECTION', 'SEARCH', 'REDISTRIBUTION'] as const) {
+  for (const use of ['PROJECTION', 'SEARCH', 'DERIVATION', 'REDISTRIBUTION'] as const) {
     const decision = authorizeCorpusObject(record, PUBLIC_PROJECTION_ACTOR, use);
     if (decision.kind === 'denied') return decision.code;
   }
@@ -144,8 +191,23 @@ export function buildPublicProjection(source: CorpusProjectionSource, compiledAt
 
   const recordsByType: Record<string, number> = {};
   for (const record of accepted) recordsByType[record.recordType] = (recordsByType[record.recordType] ?? 0) + 1;
+  const policyJoin = accepted.length > 0 ? joinCorpusPolicies(accepted) : null;
+  if (policyJoin?.kind === 'refusal') throw new Error(`${policyJoin.code}: ${policyJoin.detail}`);
+  const policyLineageId = policyJoin?.lineage.lineageId ?? sha(canonical({ schema: 'payload.corpus.policy-lineage.v1', inputs: [] }));
+  const corpusBuildId = corpusBuildIdFor(source.sourceDigest, source.knowledgeCutoff, policyLineageId);
   const withoutDigest: Omit<CorpusProjectionManifest, 'projectionDigest'> = {
     schema: 'payload.corpus.projection.v1',
+    corpusBuildId,
+    canonicalStateFingerprint: source.sourceDigest,
+    recordSchemaVersion: CORPUS_RECORD_SCHEMA_VERSION,
+    ontologyVersion: CORPUS_ONTOLOGY_VERSION,
+    policyVersion: CORPUS_POLICY_VERSION,
+    embeddingVersion: null,
+    representationSpecification: PUBLIC_REPRESENTATION_SPECIFICATION,
+    generatedAt: compiledAt,
+    policyLineageId,
+    policyInputCount: policyJoin?.lineage.inputCount ?? 0,
+    effectivePolicy: policyJoin?.lineage.effective ?? null,
     projectionId: PUBLIC_GLOBAL_PROJECTION_ID,
     audience: 'public',
     scope: 'global',
@@ -168,7 +230,7 @@ function parseManifest(row: ManifestRow): CorpusProjectionManifest {
   let manifest: CorpusProjectionManifest;
   try { manifest = JSON.parse(row.manifest_json) as CorpusProjectionManifest; }
   catch { throw new Error('CORPUS_PROJECTION_CORRUPT: manifest JSON is invalid'); }
-  if (row.projection_id !== PUBLIC_GLOBAL_PROJECTION_ID || manifest.projectionId !== row.projection_id || row.audience !== 'public' || manifest.audience !== row.audience || row.scope !== 'global' || manifest.scope !== row.scope || Number(row.source_sequence) !== manifest.sourceSequence || row.source_digest !== manifest.sourceDigest || row.projection_digest !== manifest.projectionDigest || row.knowledge_cutoff !== manifest.knowledgeCutoff || manifest.schema !== 'payload.corpus.projection.v1' || manifest.compilerVersion !== CORPUS_COMPILER_VERSION || manifest.compiledBy !== PUBLIC_PROJECTION_ACTOR.actorId || !HASH.test(manifest.sourceDigest) || !HASH.test(manifest.projectionDigest) || !validTime(manifest.compiledAt) || !validTime(manifest.knowledgeCutoff)) {
+  if (row.projection_id !== PUBLIC_GLOBAL_PROJECTION_ID || manifest.projectionId !== row.projection_id || row.audience !== 'public' || manifest.audience !== row.audience || row.scope !== 'global' || manifest.scope !== row.scope || Number(row.source_sequence) !== manifest.sourceSequence || row.source_digest !== manifest.sourceDigest || row.projection_digest !== manifest.projectionDigest || row.knowledge_cutoff !== manifest.knowledgeCutoff || manifest.schema !== 'payload.corpus.projection.v1' || manifest.compilerVersion !== CORPUS_COMPILER_VERSION || manifest.compiledBy !== PUBLIC_PROJECTION_ACTOR.actorId || manifest.canonicalStateFingerprint !== manifest.sourceDigest || manifest.recordSchemaVersion !== CORPUS_RECORD_SCHEMA_VERSION || manifest.ontologyVersion !== CORPUS_ONTOLOGY_VERSION || manifest.policyVersion !== CORPUS_POLICY_VERSION || manifest.embeddingVersion !== null || manifest.representationSpecification?.specificationId !== CORPUS_REPRESENTATION_SPEC_VERSION || canonical(manifest.representationSpecification) !== canonical(PUBLIC_REPRESENTATION_SPECIFICATION) || manifest.corpusBuildId !== corpusBuildIdFor(manifest.canonicalStateFingerprint, manifest.knowledgeCutoff, manifest.policyLineageId) || !HASH.test(manifest.policyLineageId) || !Number.isSafeInteger(manifest.policyInputCount) || manifest.policyInputCount < 0 || !HASH.test(manifest.sourceDigest) || !HASH.test(manifest.projectionDigest) || !validTime(manifest.compiledAt) || !validTime(manifest.generatedAt) || manifest.generatedAt !== manifest.compiledAt || !validTime(manifest.knowledgeCutoff)) {
     throw new Error('CORPUS_PROJECTION_CORRUPT: manifest contradicts its indexed metadata');
   }
   return manifest;
