@@ -2,7 +2,7 @@
 
 # ⬡ Payload Terminal V0
 
-### PayloadOS — the physical-economy information operating system
+### Payload — physical-economy intelligence, built by PayloadOS
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
@@ -22,9 +22,10 @@ evidence and domain-workflow surface.
 
 ## Overview
 
-Payload builds high-integrity computational corpora of the physical economy,
-then exposes evidence-bearing spatial queries, APIs, intelligence products and
-agent context. Its core is a canonical world state in which **every claim
+Notation Systems uses its internal **PayloadOS** corpus machinery to build
+**Payload**, a high-integrity computational corpus of the physical economy.
+Payload exposes evidence-bearing spatial queries, APIs, intelligence products
+and agent context. Its core is a canonical world state in which **every claim
 carries its provenance, basis and knowledge time**, and in which a question the
 data cannot answer returns a typed refusal with a remedy instead of a zero.
 
@@ -34,8 +35,9 @@ settlement, an index whose coverage is unstated — each is a wrong number
 that looks exactly like a right one. Payload is built so those cannot be
 produced silently.
 
-The first corpus connects `Organization ↔ Facility ↔ Material ↔ Process ↔
-Network ↔ Market`. The freight, procurement, commercial and project-logistics
+The Payload corpus spans `companies → facilities → commodities → suppliers →
+trade → logistics → ports → vessels → infrastructure → markets → flows →
+events`. The freight, procurement, commercial and project-logistics
 systems remain maintained domain capability over the same epistemic discipline:
 
 - **Commodities** — copper and aluminium: live acquisition from USGS, UN
@@ -58,7 +60,8 @@ systems remain maintained domain capability over the same epistemic discipline:
   journeys, permits, custody, condition telemetry, exception remedies, delivery
   verification, and project profitability. Operate the workflow at `/projects`.
 
-See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
+See the [`Notation Systems product boundaries`](docs/PRODUCT_BOUNDARIES.md),
+[`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 [`Physical-Economy Corpus V0`](docs/PHYSICAL_ECONOMY_CORPUS.md),
 [`data-platform contract`](docs/DATA_PLATFORM.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
@@ -134,7 +137,10 @@ Registration was never the only door.
 ```
 ┌─────────────────────────────────────────────────┐
 │                    PAYLOADOS                    │
-│          PHYSICAL-ECONOMY CORPUS                │
+│      INTERNAL CORPUS / MINING / VERIFICATION    │
+│        DOMAIN SPECIFICATION → PRODUCT BUILD     │
+├─────────────────────────────────────────────────┤
+│             PAYLOAD — PRODUCT CORPUS            │
 │  Evidence · Identity · Ontology · Classification│
 │          CANONICAL STATE — ONE AUTHORITY        │
 │ Structured · Artifacts · Analytics · Spatial    │
@@ -142,7 +148,7 @@ Registration was never the only door.
 │      CORPUS COMPILER → REBUILDABLE READ MODELS  │
 │  Relational · Graph · Spatial · Vector · Search │
 ├─────────────────────────────────────────────────┤
-│       PAYLOAD MINER → CANDIDATE KNOWLEDGE       │
+│      PAYLOADOS MINER → CANDIDATE KNOWLEDGE      │
 │ Dependencies · Patterns · Provenance · Registry │
 ├─────────────────────────────────────────────────┤
 │   IDENTITY · POLICY · RETRIEVAL · CONTEXT · PROOF│
@@ -336,10 +342,12 @@ record IDs are refused. See
 [`docs/PHYSICAL_ECONOMY_CORPUS.md`](docs/PHYSICAL_ECONOMY_CORPUS.md).
 
 Successful corpus writes now include a deterministic Corpus Builder manifest
-bound to the committed record hashes. Its scope is deliberately
+bound to the Payload product ID, physical-economy CorpusDefinition fingerprint,
+and committed record hashes. Its scope is deliberately
 `CANONICAL_WRITE_ONLY`: upstream discovery, acquisition, extraction, and review
 remain separate attestations. `POST /api/corpus/mining/dependencies` runs the
-first deterministic Payload Miner algorithm over a current public CorpusBuild.
+first deterministic PayloadOS Miner algorithm over a current public Payload
+CorpusBuild.
 It detects shared fan-in only among explicit depth-1 `depends_on` records and
 stores evidence- and policy-linked `CANDIDATE` objects in a separate append-only
 Pattern Registry. It never promotes a pattern into canonical state. The route

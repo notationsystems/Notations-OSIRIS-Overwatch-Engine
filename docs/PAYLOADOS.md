@@ -2,12 +2,21 @@
 
 ## Thesis
 
-PayloadOS is a provenance-first **information operating system for the physical
-economy**. Its primary asset is a high-integrity computational corpus. Payload
-Earth is the spatial query surface, Tradewind is the analytical surface,
-Payload API is the machine surface, agents consume compiled context, and
-Payload Terminal remains the human evidence and domain-workflow instrument.
-None is a separate source of truth.
+PayloadOS is Notation Systems' internal, provenance-first machinery for
+manufacturing, maintaining, mining and serving high-integrity computational
+corpora. It is domain-capable infrastructure, not the customer data product.
+Payload is the first product built with it: a physical-economy dataset,
+knowledge graph, retrieval system and intelligence API. Payload Earth is that
+product's spatial query surface, Tradewind its analytical surface, Payload API
+its machine surface, and Payload Terminal its human evidence and domain-workflow
+instrument. None is a separate source of truth.
+
+```text
+Notation Systems -> PayloadOS -> Payload -> APIs / PayloadRAG / intelligence
+```
+
+See [`PRODUCT_BOUNDARIES.md`](PRODUCT_BOUNDARIES.md) for the corporate,
+technology and data-asset boundary.
 
 The critical corpus-production loop is:
 
@@ -54,6 +63,10 @@ path to building the information company.
     to read inputs separately never implies permission to combine or emit them.
 11. A mined pattern is candidate knowledge. Validation and warranted canonical
     writing mediate every transition back into truth.
+12. Every product build binds a CorpusDefinition: ontology, entity/relation/
+    observation types, source registry, extraction/resolution/validation rules,
+    mining programs, access policy and publication contract. Reusing the engine
+    never merges domain or product identity.
 
 ## System topology
 
@@ -73,11 +86,13 @@ path to building the information company.
               Patterns / Dependencies / Anomalies
                              |
                         ACCESS PLANE
-          Retrieval / Context Compiler / Policy Join
+       Generic Retrieval / Context Compiler / Policy Join
                              |
-                 API / GraphRAG / MCP contracts
+                       PRODUCT BUILD
                              |
-                  Earth / Tradewind / Terminal
+              Payload Corpus / Graph / Vector / Spatial
+                             |
+        Payload API / PayloadRAG / Earth / Tradewind / Terminal
 
  Security, tenancy, information-flow control and verification are vertical.
 ```
@@ -131,10 +146,10 @@ builds. The Corpus Compiler creates a content-addressed build bound to
 canonical, schema, ontology, policy, compiler and representation versions.
 Every derived build carries joined input-policy lineage and is disposable.
 
-### Mining plane
+### Mining subsystem
 
 Owns deterministic/statistical knowledge discovery over controlled
-representations. Payload Miner V0 detects explicit depth-1 shared-dependency
+representations. PayloadOS Miner V0 detects explicit depth-1 shared-dependency
 fan-in in a current public CorpusBuild, records the exact algorithm, parameters,
 inputs, outputs, time boundary, evidence and policy lineage, and appends the run
 to a separately hash-chained Pattern Registry. Its output is always
@@ -165,16 +180,43 @@ encryption, audit, quotas, assertions, replay and zkVM programs cross all five
 planes. Verification records what was checked and against which committed
 inputs; it never silently upgrades reported evidence into observed truth.
 
-## Canonical corpus objects
+## CorpusDefinition and product build
 
-Corpus V0 generalizes the existing commodity state into six related physical-
-economy identities plus geography:
+PayloadOS Corpus Engine consumes a typed CorpusDefinition rather than
+hard-coding the assumption that every corpus is Payload:
 
 ```text
-Organization <-> Facility <-> Material <-> Process <-> Network <-> Market
+D = (Ontology, EntityTypes, RelationTypes, ObservationTypes,
+     SourceRegistry, ExtractionRules, ResolutionRules, ValidationRules,
+     MiningPrograms, AccessPolicy, PublicationContract)
+CorpusEngine(D) -> Corpus(D)
 ```
 
-Its immutable record types are `evidence`, `entity`, `alias`, `relationship`,
+The implemented `payloados.corpus.definition.v1` is normalized,
+content-fingerprinted and immutable. Payload's definition binds product ID
+`notation-systems.product.payload`, domain `physical-economy`, ontology version,
+entity/relation/observation types, registered-source-only admission, extraction,
+resolution and validation rules, mining programs, access policy and publication
+contract. Corpus Builder manifests and CorpusBuild identities include this
+fingerprint. Changing a CorpusDefinition therefore produces a different build identity
+and forces disposable read models to be recompiled.
+
+## Payload canonical corpus objects
+
+Payload's physical-economy definition remains deliberately broad:
+
+```text
+companies -> facilities -> commodities -> suppliers -> trade -> logistics
+          -> ports -> vessels -> infrastructure -> markets -> flows -> events
+```
+
+The typed substrate currently expresses these through organization, facility,
+material, commodity, supplier, port, vessel, infrastructure, process, network,
+market, flow, event and geography entities; explicit relation types; and typed
+metric, capacity, production, inventory, price, trade-flow, vessel-position,
+shipment, infrastructure, market and event observations.
+
+Its immutable record classes are `evidence`, `entity`, `alias`, `relationship`,
 and `observation`. A stable domain identity can change only through a new record
 that explicitly supersedes the prior record, with a strictly later `knownAt`.
 Similarity never creates identity and an answer cannot be knowable before its

@@ -1,5 +1,5 @@
 /**
- * Payload Miner V0.
+ * PayloadOS Miner V0, specialized by the Payload physical-economy build.
  *
  * Mining consumes one verified CorpusBuild and emits candidate knowledge. It
  * never writes relationships back into canonical state. Algorithms operate on
@@ -8,6 +8,11 @@
  */
 
 import { createHash } from 'node:crypto';
+import {
+  PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION,
+  PAYLOAD_PRODUCT_ID,
+  PAYLOAD_SHARED_DEPENDENCY_MINING_PROGRAM_ID,
+} from './payloadCorpusDefinition';
 import { stableValue } from './loadOperationsStore';
 import { joinCorpusPolicies, type CorpusPolicyLineage } from './corpusPolicy';
 import type { CompiledCorpusProjection } from './corpusProjection';
@@ -94,6 +99,12 @@ export function mineSharedDependencies(
   projection: CompiledCorpusProjection,
   options: { readonly minimumDependents?: number; readonly entityId?: string; readonly depth?: 1; readonly executedAt?: string } = {},
 ): CorpusMiningResult {
+  if (projection.manifest.productId !== PAYLOAD_PRODUCT_ID
+    || projection.manifest.corpusDefinitionId !== PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionId
+    || projection.manifest.corpusDefinitionFingerprint !== PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionFingerprint
+    || !PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.miningPrograms.includes(PAYLOAD_SHARED_DEPENDENCY_MINING_PROGRAM_ID)) {
+    throw new Error('CORPUS_MINING_DOMAIN_MISMATCH: this mining program is not authorized by the projection CorpusDefinition');
+  }
   const minimumDependents = options.minimumDependents ?? 2;
   const depth = options.depth ?? 1;
   const entityId = options.entityId?.trim();

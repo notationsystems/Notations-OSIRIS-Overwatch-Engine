@@ -2,8 +2,10 @@
 
 ## Product boundary
 
-The corpus is PayloadOS's authoritative information substrate for organizations,
-facilities, materials, processes, networks, markets, and geography. It is not a
+The corpus is the canonical data asset of the **Payload** product, built and
+maintained by Notation Systems' internal PayloadOS machinery. It covers
+companies, facilities, commodities, suppliers, trade, logistics, ports,
+vessels, infrastructure, markets, flows, events, and geography. It is not a
 supplier directory and it is not the legacy copper state copied into a broader
 table. It is a durable record of claims, their identities, their evidence, and
 when Payload could first have known them.
@@ -25,6 +27,15 @@ find_facilities(material)
 If any required link is absent or ambiguous, the computation returns a typed
 refusal and a remedy. An empty database is never interpreted as evidence that no
 facility exists.
+
+Payload's domain is intentionally larger than facility discovery:
+
+```text
+companies -> facilities -> commodities -> suppliers -> trade -> logistics
+          -> ports -> vessels -> infrastructure -> markets -> flows -> events
+```
+
+Facility discovery is only the first published computation over this graph.
 
 ## Immutable records
 
@@ -150,6 +161,11 @@ record schema, ontology, policy, compiler, embedding and representation
 versions. Exact
 recompilation is idempotent. `GET /api/corpus/projections` returns its manifest
 to an authenticated administrator; it never returns the database path.
+
+The manifest also binds the PayloadOS Corpus Engine identity, Payload product
+identity, and exact `payload.corpus-definition.physical-economy.v1` definition
+fingerprint. A future corpus can reuse the engine but cannot produce a build
+that is mistaken for Payload.
 
 ### Administrative ingestion and replay
 

@@ -6,13 +6,23 @@
 Canonical Core -> Rebuildable Representations -> Controlled Retrieval -> Products/APIs
 ```
 
-PayloadOS has one canonical identity/evidence model and multiple specialized
-storage or compute representations. PostgreSQL, PostGIS, object storage,
+PayloadOS supplies one canonical identity/evidence contract and multiple
+specialized storage or compute representations for each domain product.
+Payload is the first such product, covering the physical economy. PostgreSQL,
+PostGIS, object storage,
 Parquet/Iceberg, graph stores, and vector indexes may each serve a workload;
 none becomes an independent source of truth.
 
 This topology is locked. Infrastructure changes require measured workload or
 reliability evidence; they do not change the information model.
+
+The product hierarchy is also locked:
+
+```text
+Notation Systems -> PayloadOS machinery -> Payload product corpus -> APIs
+```
+
+See [`PRODUCT_BOUNDARIES.md`](PRODUCT_BOUNDARIES.md).
 
 ## Five planes
 
@@ -65,7 +75,7 @@ emits candidate knowledge into a separate Pattern Registry. Mining is not an
 inverse compiler and cannot write canonical truth:
 
 ```text
-CorpusBuild -> Payload Miner -> PatternCandidate -> validation -> governed write
+CorpusBuild -> PayloadOS Miner -> PatternCandidate -> validation -> governed write
                                   |
                                   +-> Pattern Registry + MiningRun provenance
 ```
@@ -185,6 +195,9 @@ corpus produced this answer?”:
 ```text
 corpusBuildId
 canonicalStateFingerprint
+corpusEngineId + corpusEngineVersion
+productId
+corpusDefinitionId + corpusDefinitionFingerprint
 recordSchemaVersion
 ontologyVersion
 policyVersion
@@ -206,7 +219,8 @@ versions, remain reproducible, and never acquire identity authority.
 
 ## Data Miner and Pattern Registry
 
-Payload Miner V0 implements one deliberately narrow graph algorithm:
+PayloadOS Miner V0 implements one deliberately narrow graph algorithm authorized
+by the Payload CorpusDefinition:
 `shared_dependency_fan_in` version `1.0.0`. It reads the current verified
 `public:global` CorpusBuild, selects explicit active `depends_on` relationships,
 and emits a `SHARED_DEPENDENCY` candidate when at least the configured number of

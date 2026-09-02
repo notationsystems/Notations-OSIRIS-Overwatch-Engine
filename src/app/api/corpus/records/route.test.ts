@@ -51,7 +51,15 @@ describe('/api/corpus/records', () => {
     const body = { scope: 'global', records: [record], recordedAt: '2026-01-01T00:01:00.000Z' };
     const created = await POST(request('POST', 'http://localhost/api/corpus/records', token, body));
     expect(created.status).toBe(201);
-    expect(await created.json()).toMatchObject({ kind: 'committed', idempotent: false, records: [{ sequence: 1 }] });
+    expect(await created.json()).toMatchObject({
+      kind: 'committed', idempotent: false, records: [{ sequence: 1 }],
+      builderManifest: {
+        corpusEngineId: 'notation-systems.payloados.corpus-engine',
+        productId: 'notation-systems.product.payload',
+        corpusDefinitionId: 'payload.corpus-definition.physical-economy.v1',
+        corpusDefinitionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      },
+    });
     const replay = await POST(request('POST', 'http://localhost/api/corpus/records', token, body));
     expect(replay.status).toBe(200);
     expect(await replay.json()).toMatchObject({ kind: 'committed', idempotent: true });

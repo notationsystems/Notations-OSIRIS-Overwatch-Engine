@@ -67,6 +67,27 @@ afterEach(async () => {
 });
 
 describe('Physical-Economy Corpus V0', () => {
+  it('represents the wider company-to-flow graph declared by Payload', async () => {
+    const { database } = await corpus();
+    const evidence = globalFixture()[0];
+    const evidenceIds = ['evidence:datasheet:hdpe'];
+    const wideRecords: CorpusRecordInput[] = [
+      evidence,
+      { schema: 'payload.corpus.record.v1', recordId: 'rec:entity:supplier:v1', recordType: 'entity', knownAt: known, entityId: 'pe:supplier:one', entityKind: 'supplier', canonicalName: 'Supplier One', evidenceIds },
+      { schema: 'payload.corpus.record.v1', recordId: 'rec:entity:port:v1', recordType: 'entity', knownAt: known, entityId: 'pe:port:one', entityKind: 'port', canonicalName: 'Port One', evidenceIds },
+      { schema: 'payload.corpus.record.v1', recordId: 'rec:entity:vessel:v1', recordType: 'entity', knownAt: known, entityId: 'pe:vessel:one', entityKind: 'vessel', canonicalName: 'Vessel One', evidenceIds },
+      { schema: 'payload.corpus.record.v1', recordId: 'rec:relation:vessel-port:v1', recordType: 'relationship', knownAt: known, relationshipId: 'relationship:vessel-calls-port', subjectEntityId: 'pe:vessel:one', predicate: 'calls_at', objectEntityId: 'pe:port:one', valueKind: 'reported', confidence: 'high', evidenceIds },
+      { schema: 'payload.corpus.record.v1', recordId: 'rec:observation:vessel-position:v1', recordType: 'observation', knownAt: known, observationId: 'observation:vessel-position', entityId: 'pe:vessel:one', observationType: 'vessel_position', metric: 'latitude', value: 43.2, unit: 'degrees', valueKind: 'reported', confidence: 'high', evidenceIds },
+    ];
+    try {
+      expect(database.append('global', wideRecords, recorded)).toMatchObject({ kind: 'committed', records: expect.arrayContaining([
+        expect.objectContaining({ entityKind: 'supplier' }), expect.objectContaining({ entityKind: 'port' }),
+        expect.objectContaining({ entityKind: 'vessel' }), expect.objectContaining({ predicate: 'calls_at' }),
+        expect.objectContaining({ observationType: 'vessel_position' }),
+      ]) });
+    } finally { database.close(); }
+  });
+
   it('commits an immutable linear sequence and answers evidence-linked facility discovery', async () => {
     const { database } = await corpus();
     try {

@@ -16,14 +16,23 @@ import { stableValue } from './loadOperationsStore';
 import { corpusAccessDefect, corpusAccessScopeDefect, type CorpusAccess } from './corpusPolicy';
 
 export type CorpusScope = 'global' | `customer:${string}`;
-export type CorpusEntityKind = 'organization' | 'facility' | 'material' | 'process' | 'network' | 'market' | 'geography';
+export type CorpusEntityKind =
+  | 'organization' | 'facility' | 'material' | 'commodity' | 'supplier' | 'port'
+  | 'vessel' | 'infrastructure' | 'process' | 'network' | 'market' | 'flow'
+  | 'event' | 'geography';
 export type CorpusRecordType = 'evidence' | 'entity' | 'alias' | 'relationship' | 'observation';
 export type CorpusValueKind = 'reported' | 'estimated' | 'derived';
 export type CorpusConfidence = 'high' | 'medium' | 'low';
 export type CorpusRelationshipPredicate =
   | 'operated_by' | 'owned_by' | 'located_in' | 'produces' | 'consumes'
   | 'transforms' | 'supplies' | 'connects_to' | 'ships_via' | 'trades_in'
-  | 'substitutes_for' | 'depends_on';
+  | 'substitutes_for' | 'depends_on' | 'calls_at' | 'carries' | 'loads_at'
+  | 'unloads_at' | 'moves_between' | 'routes_via' | 'affected_by'
+  | 'observed_at' | 'priced_by';
+export type CorpusObservationType =
+  | 'metric' | 'capacity' | 'production' | 'inventory' | 'price' | 'trade_flow'
+  | 'vessel_position' | 'shipment' | 'infrastructure_status' | 'market_state'
+  | 'event_signal';
 
 type CommonRecord = {
   readonly schema: 'payload.corpus.record.v1';
@@ -90,6 +99,7 @@ export type CorpusObservationRecord = CommonRecord & {
   readonly recordType: 'observation';
   readonly observationId: string;
   readonly entityId: string;
+  readonly observationType?: CorpusObservationType;
   readonly metric: string;
   readonly value: number | string | boolean;
   readonly unit?: string;
@@ -159,8 +169,9 @@ const HASH = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._/-]{2,255}$/;
 const CUSTOMER_SCOPE = /^customer:[a-z0-9][a-z0-9._-]{1,63}$/;
 const CORPUS_HASH_DOMAIN = 'payload.physical_economy.corpus.record.v1';
-const ENTITY_KINDS: readonly CorpusEntityKind[] = ['organization', 'facility', 'material', 'process', 'network', 'market', 'geography'];
-const PREDICATES: readonly CorpusRelationshipPredicate[] = ['operated_by', 'owned_by', 'located_in', 'produces', 'consumes', 'transforms', 'supplies', 'connects_to', 'ships_via', 'trades_in', 'substitutes_for', 'depends_on'];
+const ENTITY_KINDS: readonly CorpusEntityKind[] = ['organization', 'facility', 'material', 'commodity', 'supplier', 'port', 'vessel', 'infrastructure', 'process', 'network', 'market', 'flow', 'event', 'geography'];
+const PREDICATES: readonly CorpusRelationshipPredicate[] = ['operated_by', 'owned_by', 'located_in', 'produces', 'consumes', 'transforms', 'supplies', 'connects_to', 'ships_via', 'trades_in', 'substitutes_for', 'depends_on', 'calls_at', 'carries', 'loads_at', 'unloads_at', 'moves_between', 'routes_via', 'affected_by', 'observed_at', 'priced_by'];
+const OBSERVATION_TYPES: readonly CorpusObservationType[] = ['metric', 'capacity', 'production', 'inventory', 'price', 'trade_flow', 'vessel_position', 'shipment', 'infrastructure_status', 'market_state', 'event_signal'];
 const VALUE_KINDS: readonly CorpusValueKind[] = ['reported', 'estimated', 'derived'];
 const CONFIDENCE: readonly CorpusConfidence[] = ['high', 'medium', 'low'];
 const LOCATION_PRECISIONS = ['exact', 'site', 'city', 'region', 'country'] as const;
@@ -217,7 +228,7 @@ function recordDefect(record: CorpusRecordInput): string | null {
   } else if (record.recordType === 'relationship') {
     if (typeof record.relationshipId !== 'string' || !ID.test(record.relationshipId) || !PREDICATES.includes(record.predicate) || !VALUE_KINDS.includes(record.valueKind) || !CONFIDENCE.includes(record.confidence) || typeof record.subjectEntityId !== 'string' || !ID.test(record.subjectEntityId) || typeof record.objectEntityId !== 'string' || !ID.test(record.objectEntityId) || record.subjectEntityId === record.objectEntityId || (record.validFrom !== undefined && !validTime(record.validFrom)) || (record.validTo !== undefined && !validTime(record.validTo)) || (record.validFrom && record.validTo && Date.parse(record.validTo) < Date.parse(record.validFrom))) return `${record.recordId} has invalid relationship metadata`;
   } else if (record.recordType === 'observation') {
-    if (typeof record.observationId !== 'string' || !ID.test(record.observationId) || typeof record.entityId !== 'string' || !ID.test(record.entityId) || !nonEmpty(record.metric) || !['number', 'string', 'boolean'].includes(typeof record.value) || (typeof record.value === 'number' && !Number.isFinite(record.value)) || !VALUE_KINDS.includes(record.valueKind) || !CONFIDENCE.includes(record.confidence) || (record.period && (!validTime(record.period.start) || !validTime(record.period.end) || Date.parse(record.period.end) < Date.parse(record.period.start)))) return `${record.recordId} has invalid observation metadata`;
+    if (typeof record.observationId !== 'string' || !ID.test(record.observationId) || typeof record.entityId !== 'string' || !ID.test(record.entityId) || (record.observationType !== undefined && !OBSERVATION_TYPES.includes(record.observationType)) || !nonEmpty(record.metric) || !['number', 'string', 'boolean'].includes(typeof record.value) || (typeof record.value === 'number' && !Number.isFinite(record.value)) || !VALUE_KINDS.includes(record.valueKind) || !CONFIDENCE.includes(record.confidence) || (record.period && (!validTime(record.period.start) || !validTime(record.period.end) || Date.parse(record.period.end) < Date.parse(record.period.start)))) return `${record.recordId} has invalid observation metadata`;
   } else return 'record has an unknown record type';
   if (new Set(evidenceIds(record)).size !== evidenceIds(record).length || evidenceIds(record).some(id => typeof id !== 'string' || !ID.test(id))) return `${record.recordId} has invalid evidence references`;
   return null;

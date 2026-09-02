@@ -183,6 +183,12 @@ Payload Earth refuses facility queries until this succeeds, and refuses again
 if canonical global state advances without a rebuild. Do not back up the read-
 model file as an authority; recreate it from the canonical corpus.
 
+Corpus Compiler `1.1.0` binds the PayloadOS engine, Payload product and
+`payload.corpus-definition.physical-economy.v1` fingerprint into representation
+specification `payload.corpus.public-read-model.v2`. After upgrading from an
+older build, remove only the disposable read-model database and then run this
+compile endpoint. Do not remove the canonical corpus database.
+
 With the public build current, the miner can register explicit shared-dependency
 candidates:
 

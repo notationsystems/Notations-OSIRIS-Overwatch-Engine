@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from './corpusPolicy';
 import { mineSharedDependencies } from './corpusMining';
-import { buildPublicProjection } from './corpusProjection';
+import { buildPublicProjection, type CompiledCorpusProjection } from './corpusProjection';
 import { PhysicalEconomyCorpus, type CorpusRecordInput } from './physicalEconomyCorpus';
 
 const directories: string[] = [];
@@ -69,6 +69,17 @@ describe('Payload Miner shared-dependency discovery', () => {
     try {
       expect(mineSharedDependencies(projection, { executedAt })).toEqual(mineSharedDependencies(projection, { executedAt }));
       expect(mineSharedDependencies(projection, { minimumDependents: 3, executedAt })).toMatchObject({ candidates: [], run: { outputPatternIds: [] } });
+    } finally { corpus.close(); }
+  });
+
+  it('refuses a projection whose product-domain binding does not authorize the rule', async () => {
+    const { corpus, projection } = await setup();
+    try {
+      const forged = {
+        ...projection,
+        manifest: { ...projection.manifest, corpusDefinitionFingerprint: '0'.repeat(64) },
+      } as CompiledCorpusProjection;
+      expect(() => mineSharedDependencies(forged, { executedAt })).toThrow(/CORPUS_MINING_DOMAIN_MISMATCH/);
     } finally { corpus.close(); }
   });
 });

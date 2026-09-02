@@ -10,6 +10,15 @@ import { createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import Database from 'better-sqlite3';
+import {
+  CORPUS_ENGINE_ID,
+  CORPUS_ENGINE_VERSION,
+} from './corpusDefinition';
+import {
+  CORPUS_ONTOLOGY_VERSION,
+  PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION,
+  PAYLOAD_PRODUCT_ID,
+} from './payloadCorpusDefinition';
 import { stableValue } from './loadOperationsStore';
 import {
   authorizeCorpusObject,
@@ -26,10 +35,10 @@ import {
   type StoredCorpusRecord,
 } from './physicalEconomyCorpus';
 
-export const CORPUS_COMPILER_VERSION = '1.0.0';
-export const CORPUS_ONTOLOGY_VERSION = 'payload.physical-economy.v1';
+export { CORPUS_ONTOLOGY_VERSION } from './payloadCorpusDefinition';
+export const CORPUS_COMPILER_VERSION = '1.1.0';
 export const CORPUS_RECORD_SCHEMA_VERSION = 'payload.corpus.record.v1';
-export const CORPUS_REPRESENTATION_SPEC_VERSION = 'payload.corpus.public-read-model.v1';
+export const CORPUS_REPRESENTATION_SPEC_VERSION = 'payload.corpus.public-read-model.v2';
 export const PUBLIC_GLOBAL_PROJECTION_ID = 'public:global';
 
 export const PUBLIC_REPRESENTATION_SPECIFICATION = Object.freeze({
@@ -42,6 +51,11 @@ export type CorpusProjectionManifest = {
   readonly schema: 'payload.corpus.projection.v1';
   readonly corpusBuildId: string;
   readonly canonicalStateFingerprint: string;
+  readonly corpusEngineId: typeof CORPUS_ENGINE_ID;
+  readonly corpusEngineVersion: typeof CORPUS_ENGINE_VERSION;
+  readonly productId: typeof PAYLOAD_PRODUCT_ID;
+  readonly corpusDefinitionId: typeof PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionId;
+  readonly corpusDefinitionFingerprint: string;
   readonly recordSchemaVersion: typeof CORPUS_RECORD_SCHEMA_VERSION;
   readonly ontologyVersion: typeof CORPUS_ONTOLOGY_VERSION;
   readonly policyVersion: typeof CORPUS_POLICY_VERSION;
@@ -103,6 +117,11 @@ function manifestBasis(manifest: Omit<CorpusProjectionManifest, 'projectionDiges
     schema: manifest.schema,
     corpusBuildId: manifest.corpusBuildId,
     canonicalStateFingerprint: manifest.canonicalStateFingerprint,
+    corpusEngineId: manifest.corpusEngineId,
+    corpusEngineVersion: manifest.corpusEngineVersion,
+    productId: manifest.productId,
+    corpusDefinitionId: manifest.corpusDefinitionId,
+    corpusDefinitionFingerprint: manifest.corpusDefinitionFingerprint,
     recordSchemaVersion: manifest.recordSchemaVersion,
     ontologyVersion: manifest.ontologyVersion,
     policyVersion: manifest.policyVersion,
@@ -134,6 +153,11 @@ function corpusBuildIdFor(canonicalStateFingerprint: string, knowledgeCutoff: st
   return `corpus-build:${sha(canonical({
     canonicalStateFingerprint,
     knowledgeCutoff,
+    corpusEngineId: CORPUS_ENGINE_ID,
+    corpusEngineVersion: CORPUS_ENGINE_VERSION,
+    productId: PAYLOAD_PRODUCT_ID,
+    corpusDefinitionId: PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionId,
+    corpusDefinitionFingerprint: PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionFingerprint,
     recordSchemaVersion: CORPUS_RECORD_SCHEMA_VERSION,
     ontologyVersion: CORPUS_ONTOLOGY_VERSION,
     policyVersion: CORPUS_POLICY_VERSION,
@@ -199,6 +223,11 @@ export function buildPublicProjection(source: CorpusProjectionSource, compiledAt
     schema: 'payload.corpus.projection.v1',
     corpusBuildId,
     canonicalStateFingerprint: source.sourceDigest,
+    corpusEngineId: CORPUS_ENGINE_ID,
+    corpusEngineVersion: CORPUS_ENGINE_VERSION,
+    productId: PAYLOAD_PRODUCT_ID,
+    corpusDefinitionId: PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionId,
+    corpusDefinitionFingerprint: PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionFingerprint,
     recordSchemaVersion: CORPUS_RECORD_SCHEMA_VERSION,
     ontologyVersion: CORPUS_ONTOLOGY_VERSION,
     policyVersion: CORPUS_POLICY_VERSION,
@@ -230,7 +259,7 @@ function parseManifest(row: ManifestRow): CorpusProjectionManifest {
   let manifest: CorpusProjectionManifest;
   try { manifest = JSON.parse(row.manifest_json) as CorpusProjectionManifest; }
   catch { throw new Error('CORPUS_PROJECTION_CORRUPT: manifest JSON is invalid'); }
-  if (row.projection_id !== PUBLIC_GLOBAL_PROJECTION_ID || manifest.projectionId !== row.projection_id || row.audience !== 'public' || manifest.audience !== row.audience || row.scope !== 'global' || manifest.scope !== row.scope || Number(row.source_sequence) !== manifest.sourceSequence || row.source_digest !== manifest.sourceDigest || row.projection_digest !== manifest.projectionDigest || row.knowledge_cutoff !== manifest.knowledgeCutoff || manifest.schema !== 'payload.corpus.projection.v1' || manifest.compilerVersion !== CORPUS_COMPILER_VERSION || manifest.compiledBy !== PUBLIC_PROJECTION_ACTOR.actorId || manifest.canonicalStateFingerprint !== manifest.sourceDigest || manifest.recordSchemaVersion !== CORPUS_RECORD_SCHEMA_VERSION || manifest.ontologyVersion !== CORPUS_ONTOLOGY_VERSION || manifest.policyVersion !== CORPUS_POLICY_VERSION || manifest.embeddingVersion !== null || manifest.representationSpecification?.specificationId !== CORPUS_REPRESENTATION_SPEC_VERSION || canonical(manifest.representationSpecification) !== canonical(PUBLIC_REPRESENTATION_SPECIFICATION) || manifest.corpusBuildId !== corpusBuildIdFor(manifest.canonicalStateFingerprint, manifest.knowledgeCutoff, manifest.policyLineageId) || !HASH.test(manifest.policyLineageId) || !Number.isSafeInteger(manifest.policyInputCount) || manifest.policyInputCount < 0 || !HASH.test(manifest.sourceDigest) || !HASH.test(manifest.projectionDigest) || !validTime(manifest.compiledAt) || !validTime(manifest.generatedAt) || manifest.generatedAt !== manifest.compiledAt || !validTime(manifest.knowledgeCutoff)) {
+  if (row.projection_id !== PUBLIC_GLOBAL_PROJECTION_ID || manifest.projectionId !== row.projection_id || row.audience !== 'public' || manifest.audience !== row.audience || row.scope !== 'global' || manifest.scope !== row.scope || Number(row.source_sequence) !== manifest.sourceSequence || row.source_digest !== manifest.sourceDigest || row.projection_digest !== manifest.projectionDigest || row.knowledge_cutoff !== manifest.knowledgeCutoff || manifest.schema !== 'payload.corpus.projection.v1' || manifest.compilerVersion !== CORPUS_COMPILER_VERSION || manifest.compiledBy !== PUBLIC_PROJECTION_ACTOR.actorId || manifest.canonicalStateFingerprint !== manifest.sourceDigest || manifest.corpusEngineId !== CORPUS_ENGINE_ID || manifest.corpusEngineVersion !== CORPUS_ENGINE_VERSION || manifest.productId !== PAYLOAD_PRODUCT_ID || manifest.corpusDefinitionId !== PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionId || manifest.corpusDefinitionFingerprint !== PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionFingerprint || manifest.recordSchemaVersion !== CORPUS_RECORD_SCHEMA_VERSION || manifest.ontologyVersion !== CORPUS_ONTOLOGY_VERSION || manifest.policyVersion !== CORPUS_POLICY_VERSION || manifest.embeddingVersion !== null || manifest.representationSpecification?.specificationId !== CORPUS_REPRESENTATION_SPEC_VERSION || canonical(manifest.representationSpecification) !== canonical(PUBLIC_REPRESENTATION_SPECIFICATION) || manifest.corpusBuildId !== corpusBuildIdFor(manifest.canonicalStateFingerprint, manifest.knowledgeCutoff, manifest.policyLineageId) || !HASH.test(manifest.policyLineageId) || !Number.isSafeInteger(manifest.policyInputCount) || manifest.policyInputCount < 0 || !HASH.test(manifest.sourceDigest) || !HASH.test(manifest.projectionDigest) || !validTime(manifest.compiledAt) || !validTime(manifest.generatedAt) || manifest.generatedAt !== manifest.compiledAt || !validTime(manifest.knowledgeCutoff)) {
     throw new Error('CORPUS_PROJECTION_CORRUPT: manifest contradicts its indexed metadata');
   }
   return manifest;

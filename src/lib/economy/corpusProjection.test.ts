@@ -54,11 +54,17 @@ describe('Corpus Compiler public projection', () => {
           sourceSequence: 7,
           canonicalStateFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
           corpusBuildId: expect.stringMatching(/^corpus-build:[a-f0-9]{64}$/),
+          corpusEngineId: 'notation-systems.payloados.corpus-engine',
+          corpusEngineVersion: '1.0.0',
+          productId: 'notation-systems.product.payload',
+          corpusDefinitionId: 'payload.corpus-definition.physical-economy.v1',
+          corpusDefinitionFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
           recordSchemaVersion: 'payload.corpus.record.v1',
           ontologyVersion: 'payload.physical-economy.v1',
           policyVersion: 'payload.corpus.policy.v1',
           embeddingVersion: null,
           representationSpecification: {
+            specificationId: 'payload.corpus.public-read-model.v2',
             outputs: ['search_index', 'spatial_projection', 'statistics'],
             omitted: ['graph_projection', 'semantic_index', 'summaries'],
           },
@@ -92,6 +98,20 @@ describe('Corpus Compiler public projection', () => {
     const path = join(directory, 'read-model.sqlite');
     const raw = new Database(path);
     raw.prepare("UPDATE corpus_projection_records SET record_json = '{}' WHERE ordinal = 2").run();
+    raw.close();
+    expect(() => new CorpusProjectionStore(path)).toThrow(/CORPUS_PROJECTION_CORRUPT/);
+  });
+
+  it('refuses a projection whose product-domain binding was changed', async () => {
+    const { directory, corpus, store } = await setup();
+    compilePublicProjection(corpus, store, recordedAt, '2026-04-01T00:02:00.000Z');
+    store.close(); corpus.close();
+    const path = join(directory, 'read-model.sqlite');
+    const raw = new Database(path);
+    const row = raw.prepare('SELECT manifest_json FROM corpus_projection_manifests WHERE projection_id = ?').get('public:global') as { manifest_json: string };
+    const manifest = JSON.parse(row.manifest_json) as Record<string, unknown>;
+    manifest.corpusDefinitionFingerprint = '0'.repeat(64);
+    raw.prepare('UPDATE corpus_projection_manifests SET manifest_json = ? WHERE projection_id = ?').run(JSON.stringify(manifest), 'public:global');
     raw.close();
     expect(() => new CorpusProjectionStore(path)).toThrow(/CORPUS_PROJECTION_CORRUPT/);
   });
