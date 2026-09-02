@@ -16,6 +16,7 @@ import {
 import { stableValue } from './loadOperationsStore';
 import { joinCorpusPolicies, type CorpusPolicyLineage } from './corpusPolicy';
 import type { CompiledCorpusProjection } from './corpusProjection';
+import { corpusEvidenceClosure, corpusRecordReferenceIds } from './physicalEconomyCorpus';
 import type { CorpusEvidenceRecord, CorpusEntityRecord, CorpusRelationshipRecord, StoredCorpusRecord } from './physicalEconomyCorpus';
 
 export const CORPUS_MINER_VERSION = '1.0.0';
@@ -84,8 +85,7 @@ function freeze<T>(value: T): T {
 }
 
 function recordsWithEvidence(records: readonly StoredCorpusRecord[], selected: readonly StoredCorpusRecord[]): readonly StoredCorpusRecord[] {
-  const evidenceIds = new Set(selected.flatMap(record => record.recordType === 'evidence' ? [] : record.evidenceIds));
-  return [...selected, ...records.filter(record => record.recordType === 'evidence' && evidenceIds.has(record.evidenceId))]
+  return [...selected, ...corpusEvidenceClosure(records, selected)]
     .filter((record, index, all) => all.findIndex(candidate => candidate.recordId === record.recordId) === index)
     .sort((a, b) => a.sequence - b.sequence);
 }
@@ -156,7 +156,7 @@ export function mineSharedDependencies(
     const policy = joinCorpusPolicies(selected, { outputForm: 'RECORD_LEVEL' });
     if (policy.kind === 'refusal') throw new Error(`${policy.code}: ${policy.detail}`);
     const relationshipIds = grouped.map(record => record.relationshipId).sort();
-    const evidenceIds = [...new Set(selected.flatMap(record => record.recordType === 'evidence' ? [record.evidenceId] : record.evidenceIds))]
+    const evidenceIds = [...new Set(selected.flatMap(record => record.recordType === 'evidence' ? [record.evidenceId] : corpusRecordReferenceIds(record)))]
       .filter(id => evidence.has(id)).sort();
     const patternId = `pattern:${digest({ miningRunId, patternType: 'SHARED_DEPENDENCY', focalEntityId: dependencyId, dependentIds, relationshipIds })}`;
     candidates.push(freeze({

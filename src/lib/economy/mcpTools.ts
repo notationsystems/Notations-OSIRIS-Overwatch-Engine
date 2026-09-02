@@ -533,13 +533,27 @@ export const MCP_TOOLS: McpToolDef[] = [
       const delta = get(data, 'delta') as Record<string, unknown>;
       const newly = (get(delta, 'newlyDisrupted') as unknown[]) ?? [];
       const kt = get(delta, 'disruptedKtPerYear');
+      const unobserved = (get(data, 'unobservedStates') as Array<{
+        observability?: { reasonCode?: string };
+        metric?: { name?: string; value?: null };
+        acquisition?: { remedy?: string };
+      }>) ?? [];
       const claims = [
-        `Counterfactual "${args.label ?? 'mcp scenario'}" at ${k.asOf} (${k.mode}): ${newly.length} newly disrupted entit${newly.length === 1 ? 'y' : 'ies'}${typeof kt === 'number' ? `, ~${kt.toLocaleString()} kt/y newly touched` : kt === null ? ', tonnage REFUSED at this date' : ''}. This is a HYPOTHETICAL — the frame is counterfactual, never a reconstruction.`,
+        `Counterfactual "${args.label ?? 'mcp scenario'}" at ${k.asOf} (${k.mode}): ${newly.length} newly disrupted entit${newly.length === 1 ? 'y' : 'ies'}${typeof kt === 'number' ? `, ~${kt.toLocaleString()} kt/y newly touched` : kt === null ? `, tonnage REFUSED with ${unobserved.length} typed unobserved state${unobserved.length === 1 ? '' : 's'}` : ''}. This is a HYPOTHETICAL — the frame is counterfactual, never a reconstruction.`,
       ];
       return result(k, {
         claims,
         record_ids: [],
-        refusals: kt === null ? [{ subject: 'delta.disruptedKtPerYear', value: null, refusalType: 'topology', remedy: 'the flow topology serving this date cannot state the tonnage; move asOf inside a topology period' }] : [],
+        refusals: unobserved.length > 0
+          ? unobserved.map(state => ({
+            subject: `unobservedStates.${state.metric?.name ?? 'disruptedKtPerYear'}`,
+            value: null,
+            refusalType: state.observability?.reasonCode ?? 'impact_evidence_unobserved',
+            remedy: state.acquisition?.remedy ?? 'Acquire the missing evidence and replay the scenario.',
+          }))
+          : kt === null
+            ? [{ subject: 'delta.disruptedKtPerYear', value: null, refusalType: 'impact_evidence_unobserved', remedy: 'Acquire the missing impact evidence and replay the scenario.' }]
+            : [],
         data,
         caveats: ['Counterfactual frame: nothing in this result describes the observed world.'],
       });

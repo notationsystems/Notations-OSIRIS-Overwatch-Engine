@@ -171,6 +171,21 @@ describe('F-2: the MCP tool surface (pre-registered criteria)', () => {
     }
   });
 
+  it('carries scenario unobserved states into the machine refusal envelope', async () => {
+    const res = await tool('scenario').handler({
+      asOf: '2020-04-15', mode: 'best_known', label: 'allocation gap',
+      events: [{ entityId: 'ent:mine:escondida', type: 'outage', title: 'Facility interruption', start: '2020-04-01', severity: 'high' }],
+    }, inProcessCtx);
+    expect(res.claims[0]).toContain('1 typed unobserved state');
+    expect(res.refusals).toEqual([expect.objectContaining({
+      value: null,
+      refusalType: 'facility_allocation_unobserved',
+    })]);
+    const states = (res.data as { unobservedStates: Array<Record<string, unknown>> }).unobservedStates;
+    expect(states).toHaveLength(1);
+    expect(states[0]).toMatchObject({ kind: 'unobserved_state' });
+  });
+
   // ── Criterion 4: no tool mutates state — verified structurally by
   //    fingerprinting canonical state across a full sweep of every tool. ──
   it('a full sweep of every tool leaves the canonical state fingerprint unchanged', async () => {

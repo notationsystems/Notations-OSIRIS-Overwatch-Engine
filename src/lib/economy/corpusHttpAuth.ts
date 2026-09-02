@@ -4,9 +4,9 @@ import { env } from './envCompat';
 
 function authorizeDedicatedBearer(
   request: Request,
-  environmentName: 'PAYLOAD_CORPUS_INGEST_TOKEN' | 'PAYLOAD_CORPUS_COMPILER_TOKEN' | 'PAYLOAD_CORPUS_MINER_TOKEN',
-  unavailableCode: 'CORPUS_ADMIN_NOT_CONFIGURED' | 'CORPUS_COMPILER_NOT_CONFIGURED' | 'CORPUS_MINER_NOT_CONFIGURED',
-  unauthorizedCode: 'CORPUS_ADMIN_UNAUTHORIZED' | 'CORPUS_COMPILER_UNAUTHORIZED' | 'CORPUS_MINER_UNAUTHORIZED',
+  environmentName: 'PAYLOAD_CORPUS_INGEST_TOKEN' | 'PAYLOAD_CORPUS_COMPILER_TOKEN' | 'PAYLOAD_CORPUS_MINER_TOKEN' | 'PAYLOAD_CORPUS_QUERY_TOKEN' | 'PAYLOAD_CORPUS_PROJECTOR_TOKEN',
+  unavailableCode: 'CORPUS_ADMIN_NOT_CONFIGURED' | 'CORPUS_COMPILER_NOT_CONFIGURED' | 'CORPUS_MINER_NOT_CONFIGURED' | 'CORPUS_QUERY_NOT_CONFIGURED' | 'CORPUS_PROJECTOR_NOT_CONFIGURED',
+  unauthorizedCode: 'CORPUS_ADMIN_UNAUTHORIZED' | 'CORPUS_COMPILER_UNAUTHORIZED' | 'CORPUS_MINER_UNAUTHORIZED' | 'CORPUS_QUERY_UNAUTHORIZED' | 'CORPUS_PROJECTOR_UNAUTHORIZED',
   remedy: string,
 ): NextResponse | null {
   const expected = env(environmentName);
@@ -44,5 +44,21 @@ export function authorizeCorpusMining(request: Request): NextResponse | null {
   return authorizeDedicatedBearer(
     request, 'PAYLOAD_CORPUS_MINER_TOKEN', 'CORPUS_MINER_NOT_CONFIGURED', 'CORPUS_MINER_UNAUTHORIZED',
     'Set a dedicated miner-service secret; do not reuse ingestion, compiler, or public query credentials.',
+  );
+}
+
+/** Context compilation is a bounded read capability, separate from ingest, compile, and mining. */
+export function authorizeCorpusQuery(request: Request): NextResponse | null {
+  return authorizeDedicatedBearer(
+    request, 'PAYLOAD_CORPUS_QUERY_TOKEN', 'CORPUS_QUERY_NOT_CONFIGURED', 'CORPUS_QUERY_UNAUTHORIZED',
+    'Set a dedicated context-query secret; do not reuse ingestion, compiler, or mining credentials.',
+  );
+}
+
+/** Projection workers consume/checkpoint outbox events but cannot compile, ingest, mine, or query. */
+export function authorizeCorpusProjectionWorker(request: Request): NextResponse | null {
+  return authorizeDedicatedBearer(
+    request, 'PAYLOAD_CORPUS_PROJECTOR_TOKEN', 'CORPUS_PROJECTOR_NOT_CONFIGURED', 'CORPUS_PROJECTOR_UNAUTHORIZED',
+    'Set a dedicated projection-worker secret; do not reuse ingestion, compiler, mining, or query credentials.',
   );
 }

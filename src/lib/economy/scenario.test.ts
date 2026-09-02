@@ -180,6 +180,38 @@ describe('POST /api/economy/scenario', () => {
     expect(body.delta.disruptedKtPerYear).toBeGreaterThan(500);
     expect(body.delta.newlyAffectedDownstream.length).toBeGreaterThan(0);
     expect(body.scenarioImpacts[0].explanation.length).toBeGreaterThan(0);
+    expect(body.unobservedStates).toEqual([]);
+  });
+
+  it('keeps unobserved impact state separate from the numeric delta', async () => {
+    const res = await post({
+      asOf: '2020-04-15',
+      label: 'Escondida interruption against country topology',
+      events: [{ entityId: 'ent:mine:escondida', type: 'outage', title: 'Facility interruption', start: '2020-04-01', severity: 'high' }],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.delta.disruptedKtPerYear).toBeNull();
+    expect(body.unobservedStates).toHaveLength(1);
+    expect(body.unobservedStates[0]).toMatchObject({
+      kind: 'unobserved_state',
+      scope: { entityId: 'ent:mine:escondida' },
+      metric: { name: 'disruptedKtPerYear', unit: 'kt/y', value: null },
+      observability: {
+        status: 'unobserved',
+        reasonCode: 'facility_allocation_unobserved',
+        missingFields: ['countryFacilityAllocation'],
+      },
+      acquisition: { status: 'evidence_required' },
+      presentation: {
+        component: 'ScenarioUnobservedStateCard',
+        accent: 'violet',
+        label: 'UNOBSERVED',
+        valueText: 'Not observed',
+      },
+    });
+    expect(body.unobservedStates[0]).not.toHaveProperty('baselineValue');
+    expect(body.unobservedStates[0].acquisition.remedy).toContain('country-to-facility allocation model');
   });
 
   it('validates the request shape', async () => {

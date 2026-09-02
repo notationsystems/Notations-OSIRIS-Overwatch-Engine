@@ -125,12 +125,37 @@ user, service, agent, source, or execution. An agent identity has no ambient
 privilege. Policy evaluates actor permission, tenant, entitlement, object
 classification, and declared purpose for every object.
 
+Canonical knowledge is deliberately layered rather than collapsed:
+
+```text
+Artifact evidence
+  -> EvidenceUnit (locator + modality + extraction provenance)
+  -> Observation (what one source reported)
+  -> CanonicalAssertion (Payload's governed interpretation)
+  -> disposable graph / spatial / search / context projections
+```
+
+An accepted assertion requires at least one compatible supporting observation.
+Other linked observations are preserved as contradictions or qualifications.
+`knownAt`/`knownTo` and valid-time bounds remain separate; a model-generated
+statement cannot enter through the observation write path.
+
 The edge API already separates the research-worker ingestion identity
 (`PAYLOAD_CORPUS_INGEST_TOKEN`) from the compiler identity
 (`PAYLOAD_CORPUS_COMPILER_TOKEN`). Possession of one credential grants no
 authority at the other service boundary. The miner has a third credential,
 `PAYLOAD_CORPUS_MINER_TOKEN`, which can read the current public build and append
 candidate runs but cannot ingest records or publish projections.
+Context compilation has a fourth non-interchangeable credential,
+`PAYLOAD_CORPUS_QUERY_TOKEN`; it reads only the current policy-filtered build.
+Projection workers use a fifth credential, `PAYLOAD_CORPUS_PROJECTOR_TOKEN`,
+which can consume and checkpoint the outbox but grants no compilation or write
+authority.
+
+Every canonical append also writes `corpus_outbox_events` in the same SQLite
+transaction. Projectors consume the global sequence and persist a monotonic
+checkpoint. The one-time legacy backfill is marked; after that point a missing
+or contradictory event is corruption, not something startup silently repairs.
 
 ## Corpus Builder
 
@@ -272,6 +297,14 @@ Target versioned API families (the implemented routes remain
 - `/v1/mining/*`: candidate dependencies, anomalies, clusters, relationships,
   analogues and leading signals with mining-run provenance.
 - `/v1/research`: authorization-bounded context compilation for people and agents.
+
+The implemented V0 counterparts are `POST /api/corpus/retrieval` for a
+deterministic plan or complete ContextPackage, and `GET/POST
+/api/corpus/projectors` for ordered projection events and checkpoints. The
+retrieval boundary caps identities, predicates, hops, evidence results and
+query size; binds every trace to the CorpusBuild and projection digest; refuses
+unavailable historical knowledge times; and returns exact output record IDs for
+each semantic tool step.
 
 The V0 facility endpoint now returns a
 `payload.corpus.answer-warrant.v1`: canonical identities, knowledge time,

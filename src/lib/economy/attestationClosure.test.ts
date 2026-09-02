@@ -275,6 +275,7 @@ describe('every number-bearing type in the layer is accounted for', () => {
     WorldLoad: 'a generated load; every rate, dwell and instant is drawn from the seeded PRNG',
     WorldOptions: 'the generator inputs — seed and load count; configuration, not measurement',
     TopologyValidity: 'extrapolationDays measures how far past the topology period WE reached — a property of our corpus coverage that qualifies a claim rather than being one',
+    ScenarioEntityDelta: 'a difference between one explicitly hypothetical run and its reconstruction baseline, not an observation of the world',
   };
 
   /**

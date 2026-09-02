@@ -125,7 +125,7 @@ describe('GET /api/corpus/facilities', () => {
         canonicalIdentities: ['pe:facility:global-pp', 'pe:material:polypropylene'],
         projectionId: 'public:global',
         projectionRecordCount: 5,
-        compilerVersion: '1.1.0',
+        compilerVersion: '1.2.0',
         policy: { inputCount: 5, effective: { classification: 'PUBLIC', externalRelease: 'PERMITTED' } },
         corpusBuild: { projectionId: 'public:global', embeddingVersion: null, ontologyVersion: 'payload.physical-economy.v1' },
       },

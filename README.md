@@ -341,6 +341,19 @@ interchangeable. Exact replay/recompilation is idempotent and changed immutable
 record IDs are refused. See
 [`docs/PHYSICAL_ECONOMY_CORPUS.md`](docs/PHYSICAL_ECONOMY_CORPUS.md).
 
+The canonical corpus now preserves the full evidence-to-state boundary:
+immutable artifact evidence → source-bounded Evidence IR unit → observation →
+canonical assertion. Evidence units carry typed document/record/telemetry/GIS/
+image/email/EDI locators plus extractor identity, version, confidence and
+content hash. Assertions are separately versioned interpretations and must cite
+compatible observations with `supports`, `contradicts`, or `qualifies` roles.
+`POST /api/corpus/retrieval` uses `PAYLOAD_CORPUS_QUERY_TOKEN` to return a
+deterministic retrieval plan and an evidence-complete, projection-bound
+`payload.corpus.context-package.v1`; models never receive direct database or
+vector-store access. `GET/POST /api/corpus/projectors` exposes the transactional
+projection outbox and monotonic checkpoints under the non-interchangeable
+`PAYLOAD_CORPUS_PROJECTOR_TOKEN` worker identity.
+
 Successful corpus writes now include a deterministic Corpus Builder manifest
 bound to the Payload product ID, physical-economy CorpusDefinition fingerprint,
 and committed record hashes. Its scope is deliberately
@@ -353,6 +366,10 @@ stores evidence- and policy-linked `CANDIDATE` objects in a separate append-only
 Pattern Registry. It never promotes a pattern into canonical state. The route
 requires `PAYLOAD_CORPUS_MINER_TOKEN`; neither ingestion nor compiler authority
 can invoke it.
+
+See [`docs/KNOWLEDGE_SUBSTRATE.md`](docs/KNOWLEDGE_SUBSTRATE.md) for the adopted
+knowledge-substrate contract and SQLite-edge → PostgreSQL/PostGIS-central
+migration boundary.
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in

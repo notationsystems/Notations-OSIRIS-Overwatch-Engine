@@ -3,6 +3,7 @@ import { runEngine } from '@/lib/economy/engine';
 import type { ScenarioSpec } from '@/lib/economy/engine';
 import type { EventImpact } from '@/lib/economy/propagation';
 import { DISRUPTIVE_EVENT_TYPES, isEventActive } from '@/lib/economy/propagation';
+import { scenarioUnobservedStates, type ScenarioEntityDelta } from '@/lib/economy/scenarioDelta';
 import type { AnalyticalResult, EconEventType, EconomyState } from '@/lib/economy/types';
 
 /**
@@ -110,6 +111,23 @@ export async function POST(request: Request) {
   const basePropagation = baseline.systems.propagation as AnalyticalResult<EventImpact[]>;
   const baseAffected = new Set(basePropagation.result.filter(i => i.active).flatMap(i => i.affected.map(a => a.entityId)));
   const entityName = new Map(counterfactual.state.entities.map(e => [e.id, e.name]));
+  const activeScenarioImpacts = scenarioImpacts.filter(i => i.active);
+  const unobservedStates = scenarioUnobservedStates(scenarioImpacts);
+  const delta: ScenarioEntityDelta = {
+    newlyDisrupted: newlyDisrupted.map(id => ({ id, name: entityName.get(id) ?? id })),
+    /** Downstream entities the scenario puts in reach of an active
+     *  disruption that the baseline did not. */
+    newlyAffectedDownstream: [...new Set(
+      activeScenarioImpacts.flatMap(i => i.affected.map(a => a.entityId)),
+    )]
+      .filter(id => !baseAffected.has(id))
+      .map(id => ({ id, name: entityName.get(id) ?? id })),
+    // A null impact figure ("cannot state at this date") poisons the sum:
+    // adding it as 0 would launder unknown into a smaller known total.
+    disruptedKtPerYear: activeScenarioImpacts.some(i => i.disruptedKtPerYear === null)
+      ? null
+      : activeScenarioImpacts.reduce((sum, impact) => sum + (impact.disruptedKtPerYear ?? 0), 0),
+  };
 
   return NextResponse.json({
     commodity,
@@ -117,20 +135,9 @@ export async function POST(request: Request) {
     baselineFrame: baseline.frame,
     counterfactualFrame: counterfactual.frame,
     scenarioImpacts,
-    delta: {
-      newlyDisrupted: newlyDisrupted.map(id => ({ id, name: entityName.get(id) ?? id })),
-      /** Downstream entities the scenario puts in reach of an active
-       *  disruption that the baseline did not. */
-      newlyAffectedDownstream: [...new Set(
-        scenarioImpacts.filter(i => i.active).flatMap(i => i.affected.map(a => a.entityId)),
-      )]
-        .filter(id => !baseAffected.has(id))
-        .map(id => ({ id, name: entityName.get(id) ?? id })),
-      // A null impact figure ("cannot state at this date") poisons the sum:
-      // adding it as 0 would launder unknown into a smaller known total.
-      disruptedKtPerYear: scenarioImpacts.filter(i => i.active).some(i => i.disruptedKtPerYear === null)
-        ? null
-        : scenarioImpacts.filter(i => i.active).reduce((s, i) => s + (i.disruptedKtPerYear ?? 0), 0),
-    },
+    delta,
+    // Kept outside ScenarioEntityDelta: these are epistemic states and
+    // evidence-acquisition queues, not fabricated numeric baselines.
+    unobservedStates,
   });
 }

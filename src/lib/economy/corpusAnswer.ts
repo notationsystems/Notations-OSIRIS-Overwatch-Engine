@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { stableValue } from './loadOperationsStore';
 import { joinCorpusPolicies, type CorpusPolicyLineage } from './corpusPolicy';
 import type { CorpusProjectionManifest } from './corpusProjection';
+import { corpusEvidenceClosure } from './physicalEconomyCorpus';
 import type {
   CorpusEvidenceRecord,
   FacilityDiscoveryResult,
@@ -102,9 +103,10 @@ function answerBasis(materialRef: string, result: FacilityDiscovery, records: re
     }
     return false;
   });
-  const evidenceIds = new Set(initial.flatMap(record => record.recordType === 'evidence' ? [] : record.evidenceIds));
-  const evidence = records.filter(record => record.recordType === 'evidence' && evidenceIds.has(record.evidenceId));
-  return [...initial, ...evidence].sort((a, b) => a.sequence - b.sequence);
+  const evidence = corpusEvidenceClosure(records, initial);
+  return [...initial, ...evidence]
+    .filter((record, index, all) => all.findIndex(candidate => candidate.recordId === record.recordId) === index)
+    .sort((a, b) => a.sequence - b.sequence);
 }
 
 export function buildFacilityAnswerWarrant(

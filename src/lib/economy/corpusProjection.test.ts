@@ -64,7 +64,7 @@ describe('Corpus Compiler public projection', () => {
           policyVersion: 'payload.corpus.policy.v1',
           embeddingVersion: null,
           representationSpecification: {
-            specificationId: 'payload.corpus.public-read-model.v2',
+            specificationId: 'payload.corpus.public-read-model.v3',
             outputs: ['search_index', 'spatial_projection', 'statistics'],
             omitted: ['graph_projection', 'semantic_index', 'summaries'],
           },

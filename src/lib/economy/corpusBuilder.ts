@@ -16,7 +16,7 @@ import { stableValue } from './loadOperationsStore';
 import { PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION } from './payloadCorpusDefinition';
 import type { CorpusAppendResult, CorpusRecordInput, CorpusScope, PhysicalEconomyCorpus } from './physicalEconomyCorpus';
 
-export const CORPUS_BUILDER_VERSION = '1.1.0';
+export const CORPUS_BUILDER_VERSION = '1.2.0';
 
 export type CorpusBuilderManifest = {
   readonly schema: 'payload.corpus.builder-manifest.v1';
@@ -77,8 +77,8 @@ export function buildCanonicalCorpusBatch(
   if (result.kind === 'refusal') return result;
   const ordered = [...result.records].sort((a, b) => a.sequence - b.sequence);
   const recordIds = ordered.map(record => record.recordId);
-  const evidenceIds = ordered.filter(record => record.recordType === 'evidence').map(record => record.evidenceId);
-  const claimRecordIds = ordered.filter(record => record.recordType !== 'evidence').map(record => record.recordId);
+  const evidenceIds = ordered.flatMap(record => record.recordType === 'evidence' ? [record.evidenceId] : record.recordType === 'evidence_unit' ? [record.evidenceUnitId] : []);
+  const claimRecordIds = ordered.filter(record => record.recordType !== 'evidence' && record.recordType !== 'evidence_unit').map(record => record.recordId);
   const commitBasis = ordered.map(record => ({ recordId: record.recordId, recordHash: record.recordHash }));
   const canonicalCommitFingerprint = digest(commitBasis);
   const builderRunId = `corpus-builder:${digest({

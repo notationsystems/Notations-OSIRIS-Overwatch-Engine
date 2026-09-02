@@ -28,6 +28,7 @@ import {
   type DerivedCorpusPolicy,
 } from './corpusPolicy';
 import {
+  corpusRecordReferenceIds,
   findFacilitiesInRecords,
   type CorpusProjectionSource,
   type FacilityDiscoveryResult,
@@ -36,9 +37,9 @@ import {
 } from './physicalEconomyCorpus';
 
 export { CORPUS_ONTOLOGY_VERSION } from './payloadCorpusDefinition';
-export const CORPUS_COMPILER_VERSION = '1.1.0';
+export const CORPUS_COMPILER_VERSION = '1.2.0';
 export const CORPUS_RECORD_SCHEMA_VERSION = 'payload.corpus.record.v1';
-export const CORPUS_REPRESENTATION_SPEC_VERSION = 'payload.corpus.public-read-model.v2';
+export const CORPUS_REPRESENTATION_SPEC_VERSION = 'payload.corpus.public-read-model.v3';
 export const PUBLIC_GLOBAL_PROJECTION_ID = 'public:global';
 
 export const PUBLIC_REPRESENTATION_SPECIFICATION = Object.freeze({
@@ -194,11 +195,20 @@ export function buildPublicProjection(source: CorpusProjectionSource, compiledAt
     return !code;
   });
 
-  const evidenceIds = new Set(candidates.filter(record => record.recordType === 'evidence').map(record => record.evidenceId));
+  const artifactEvidenceIds = new Set(candidates.filter(record => record.recordType === 'evidence').map(record => record.evidenceId));
+  const evidenceUnitIds = new Set(candidates.flatMap(record => record.recordType === 'evidence_unit' && artifactEvidenceIds.has(record.artifactEvidenceId) ? [record.evidenceUnitId] : []));
+  const evidenceIds = new Set([...artifactEvidenceIds, ...evidenceUnitIds]);
+  const observationIds = new Set(candidates.flatMap(record => record.recordType === 'observation' && record.evidenceIds.every(id => evidenceIds.has(id)) ? [record.observationId] : []));
   const entityIds = new Set(candidates.flatMap(record => record.recordType === 'entity' && record.evidenceIds.every(id => evidenceIds.has(id)) ? [record.entityId] : []));
   const accepted = candidates.filter(record => {
     if (record.recordType === 'evidence') return true;
-    const supported = record.evidenceIds.every(id => evidenceIds.has(id));
+    if (record.recordType === 'evidence_unit') {
+      if (artifactEvidenceIds.has(record.artifactEvidenceId)) return true;
+      increment(exclusions, 'CORPUS_PROJECTION_EVIDENCE_DENIED'); return false;
+    }
+    const supported = record.recordType === 'assertion'
+      ? corpusRecordReferenceIds(record).every(id => observationIds.has(id))
+      : corpusRecordReferenceIds(record).every(id => evidenceIds.has(id));
     if (!supported) { increment(exclusions, 'CORPUS_PROJECTION_EVIDENCE_DENIED'); return false; }
     if (record.recordType === 'entity') return entityIds.has(record.entityId);
     if (record.recordType === 'alias') {
@@ -208,6 +218,10 @@ export function buildPublicProjection(source: CorpusProjectionSource, compiledAt
     if (record.recordType === 'relationship') {
       if (entityIds.has(record.subjectEntityId) && entityIds.has(record.objectEntityId)) return true;
       increment(exclusions, 'CORPUS_PROJECTION_ENDPOINT_DENIED'); return false;
+    }
+    if (record.recordType === 'assertion') {
+      if (entityIds.has(record.entityId)) return true;
+      increment(exclusions, 'CORPUS_PROJECTION_ENTITY_DENIED'); return false;
     }
     if (entityIds.has(record.entityId)) return true;
     increment(exclusions, 'CORPUS_PROJECTION_ENTITY_DENIED'); return false;
@@ -362,5 +376,7 @@ export function compilePublicProjection(
   compiledAt = new Date().toISOString(),
 ) {
   const projection = buildPublicProjection(corpus.projectionSource('global', knowledgeCutoff), compiledAt);
-  return store.replace(projection);
+  const stored = store.replace(projection);
+  corpus.checkpointProjection({ projector: 'projector:public-global-read-model', scope: 'global', sequence: projection.manifest.sourceSequence, updatedAt: compiledAt });
+  return stored;
 }
