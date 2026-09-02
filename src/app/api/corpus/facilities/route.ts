@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { projectionMatchesSource } from '@/lib/economy/corpusProjection';
+import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 
 export const dynamic = 'force-dynamic';
@@ -20,11 +22,11 @@ function statusFor(code: string): number {
 }
 
 /**
- * Public, read-only projection of the global corpus.
+ * Public, read-only query over a compiled global read model.
  *
  * Customer scope is intentionally not a query parameter. A shared public route
  * must be unable—not merely instructed not—to compose a customer's private
- * records into its answer.
+ * records into its answer. It never reads canonical tables directly.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -39,15 +41,35 @@ export async function GET(request: Request) {
   }
   const materialRef = materialFromFacilityQuery(query);
   let corpus;
-  try { corpus = physicalEconomyCorpus(); }
+  let store;
+  try { corpus = physicalEconomyCorpus(); store = corpusProjectionStore(); }
   catch (error) {
-    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_UNAVAILABLE', detail: error instanceof Error ? error.message : 'Corpus integrity could not be established.', remedy: 'Restore the corpus from a verified backup before serving queries.' }, { status: 503 });
+    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_CORRUPT', detail: error instanceof Error ? error.message : 'Corpus read-model integrity could not be established.', remedy: 'Rebuild the disposable projection from verified canonical state.' }, { status: 503 });
   }
-  if (!corpus) {
-    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_NOT_CONFIGURED', detail: 'No physical-economy corpus database is configured.', remedy: 'Set PAYLOAD_CORPUS_DATABASE_PATH or PAYLOAD_DATABASE_PATH and ingest evidence-linked corpus records.' }, { status: 503 });
+  if (!corpus || !store) {
+    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_CONFIGURED', detail: 'Canonical corpus or public read-model storage is not configured.', remedy: 'Set PAYLOAD_CORPUS_DATABASE_PATH and PAYLOAD_CORPUS_READ_MODEL_PATH, ingest classified records, then compile the public projection.' }, { status: 503 });
   }
-  const result = corpus.findFacilities(materialRef, { scope: 'global', asOf, knowledgeCutoff });
-  return NextResponse.json({ ...result, query, interpretedAs: materialRef }, {
+  let projection;
+  try { projection = store.loadPublic(); }
+  catch (error) {
+    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_CORRUPT', detail: error instanceof Error ? error.message : 'Corpus read-model integrity could not be established.', remedy: 'Delete only the derived read model and rebuild it from verified canonical state.' }, { status: 503 });
+  }
+  if (!projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_BUILT', detail: 'The public global read model has not been compiled.', remedy: 'Run the authenticated public/global corpus compiler after ingestion.' }, { status: 503 });
+  let current;
+  try { current = corpus.projectionSource('global'); }
+  catch (error) {
+    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_UNAVAILABLE', detail: error instanceof Error ? error.message : 'Canonical corpus integrity could not be established.', remedy: 'Restore canonical state from a verified backup before serving projections.' }, { status: 503 });
+  }
+  if (!projectionMatchesSource(projection.manifest, current)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_STALE', detail: `Public projection ends at canonical sequence ${projection.manifest.sourceSequence}; canonical global state now ends at ${current.sourceSequence}.`, remedy: 'Recompile the public/global projection before returning corpus answers.' }, { status: 503 });
+  if (knowledgeCutoff && Date.parse(knowledgeCutoff) !== Date.parse(projection.manifest.knowledgeCutoff)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_TIME_UNAVAILABLE', detail: `The active public read model is pinned to ${projection.manifest.knowledgeCutoff}.`, remedy: 'Omit knowledgeCutoff or compile and address a versioned historical projection.' }, { status: 409 });
+  const result = store.findFacilities(materialRef, asOf);
+  return NextResponse.json({ ...result, query, interpretedAs: materialRef, warrant: {
+    projectionId: projection.manifest.projectionId,
+    projectionDigest: projection.manifest.projectionDigest,
+    projectionRecordCount: projection.manifest.recordCount,
+    compilerVersion: projection.manifest.compilerVersion,
+    compiledAt: projection.manifest.compiledAt,
+  } }, {
     status: result.kind === 'refusal' ? statusFor(result.code) : 200,
     headers: { 'Cache-Control': 'private, no-store' },
   });

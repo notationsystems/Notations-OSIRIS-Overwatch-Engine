@@ -12,7 +12,9 @@ The first computation is:
 
 ```text
 find_facilities(material)
+  -> read a compiled public projection, never canonical write tables
   -> resolve canonical material identity or explicit alias
+  -> apply object classification and allowed-use policy
   -> select active produces relationships at asOf
   -> retrieve facility and operator identities
   -> return exact supporting evidence
@@ -36,7 +38,15 @@ facility exists.
 | `observation` | `observationId` | Evidenced metric/value/basis/period attached to one canonical entity |
 
 Every record also has an immutable `recordId`, `knownAt`, optional
-`supersedes`, and canonical JSON. Supersession preserves the stable domain
+`supersedes`, optional V0-compatible `access` classification, and canonical
+JSON. New publishable records must classify visibility, licence,
+redistribution, retention, allowed uses, and—where applicable—tenant, owner,
+entitlements, and jurisdiction. Missing classification is accepted only so old
+ledgers can replay; it is denied from every public projection.
+
+Evidence records may include `artifactId`, `storageUri`, `mediaType`, and
+`parserVersion`. The database holds this metadata and the content hash, never
+the raw document/image/archive bytes. Supersession preserves the stable domain
 identity, stays inside one visibility scope, names one active prior record, and
 must have a strictly later `knownAt`.
 
@@ -52,12 +62,18 @@ Configure either:
 
 ```env
 PAYLOAD_CORPUS_DATABASE_PATH=/app/runtime-data/payload-corpus.sqlite
+PAYLOAD_CORPUS_READ_MODEL_PATH=/app/runtime-data/corpus-public-read-model.sqlite
 ```
 
 or only `PAYLOAD_DATABASE_PATH` to place the corpus tables beside the existing
 operational event tables in one backed-up SQLite file. On Podman/Docker, the
 path must live on the named runtime volume, not a host-synchronized OneDrive
 folder; SQLite WAL requires ordinary filesystem locking.
+
+The read-model database is deliberately separate and disposable. The Corpus
+Compiler can delete and reconstruct it from canonical state. Raw artifacts
+belong in an object store or filesystem hierarchy addressed by content hash;
+high-volume historical observations belong in a future columnar/lakehouse tier.
 
 Co-location does not collapse the two semantic clocks: `corpus_records.sequence`
 orders accepted knowledge records, while `payload_events.sequence` orders
@@ -66,14 +82,21 @@ the system does not currently pretend that two independent sequences are one.
 
 ## Scope isolation
 
-- `global` is reusable public-corpus knowledge (`K_G`).
+- `global` is reusable, non-tenant corpus knowledge (`K_G`); only its explicitly
+  public/redistributable subset enters the public projection.
 - `customer:<id>` is private customer knowledge (`K_C`).
 - Global reads see only global records.
 - An authorized customer read composes global plus that exact customer.
 - No read path composes two customer scopes.
-- `GET /api/corpus/facilities` is public/read-only and hard-coded to `global`;
-  supplying a `scope` query parameter cannot expand it.
+- `GET /api/corpus/facilities` is public/read-only, hard-coded to a compiled
+  `global` projection, and cannot query canonical write tables;
+- only explicitly `PUBLIC`, redistributable objects whose dependencies are
+  independently authorized can enter that projection;
+- stale projections fail closed after canonical global state advances;
 - Raw append/replay requires the dedicated `PAYLOAD_CORPUS_INGEST_TOKEN`.
+- Projection compilation/inspection requires the separate
+  `PAYLOAD_CORPUS_COMPILER_TOKEN`; the two service identities are not
+  interchangeable.
 
 ## API surfaces
 
@@ -81,7 +104,7 @@ the system does not currently pretend that two independent sequences are one.
 
 ```http
 GET /api/corpus/facilities?q=polypropylene%20production
-GET /api/corpus/facilities?q=pe:material:polypropylene&asOf=2026-09-01&knowledgeCutoff=2026-09-01
+GET /api/corpus/facilities?q=pe:material:polypropylene&asOf=2026-09-01
 ```
 
 The small intent grammar removes only an explicit suffix such as `production`,
@@ -89,6 +112,28 @@ The small intent grammar removes only an explicit suffix such as `production`,
 canonical ID or an explicit alias. The response includes facility coordinates,
 operator, relationship identity, confidence, and exact evidence records. It is
 rendered by the Search surface as a dedicated query layer on Payload Earth.
+Every successful response also carries the authorized projection digest, record
+count, compiler version, and compile time. Canonical source sequence/digest stay
+inside the authenticated compiler manifest so restricted-record cadence is not
+leaked through a public warrant. The active V0 read model has one pinned
+knowledge cutoff; arbitrary historical cutoffs require versioned projections
+and are refused rather than reconstructed from incomplete state.
+
+### Corpus Compiler
+
+```http
+POST /api/corpus/projections
+Authorization: Bearer <PAYLOAD_CORPUS_COMPILER_TOKEN>
+Content-Type: application/json
+
+{"audience":"public","scope":"global","knowledgeCutoff":"2026-09-02T12:00:00.000Z"}
+```
+
+The compiler reads active canonical global records, applies object policy,
+prunes claims with denied evidence or endpoints, computes a deterministic
+projection digest, and atomically replaces the disposable read model. Exact
+recompilation is idempotent. `GET /api/corpus/projections` returns its manifest
+to an authenticated administrator; it never returns the database path.
 
 ### Administrative ingestion and replay
 
@@ -118,11 +163,15 @@ The summary does not expose the server filesystem path.
 ## What is implemented and what is not
 
 Implemented now: the durable corpus contract, validation, append/replay API,
-scope isolation, temporal revisions, tamper detection, typed facility discovery,
-and evidence-bearing Earth projection.
+scope isolation, temporal revisions, tamper detection, object classification,
+actor/purpose policy, a deterministic Corpus Compiler, a separate public read
+model, stale-model refusal, typed facility discovery, and evidence-bearing
+Earth projection.
 
 Not yet implemented: automated API/document acquisition, raw artifact object
-storage, analyst review queues, probabilistic entity-resolution proposals,
-PostGIS projection, vector embeddings, GraphRAG, Context Compiler, additional
-computational endpoints, and SP1 proofs over corpus builds. These are the next
-layers; the UI must continue to refuse rather than imply they already exist.
+storage, append-only security-audit export, OAuth/OIDC, database RLS,
+PostgreSQL/PostGIS authority, Parquet/Iceberg history, analyst review queues,
+probabilistic entity-resolution proposals, graph/vector projections, GraphRAG,
+Context Compiler, additional computational endpoints, and SP1 proofs over
+corpus builds. These are the next layers; the UI must continue to refuse rather
+than imply they already exist.

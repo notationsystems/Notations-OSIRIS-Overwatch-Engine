@@ -21,15 +21,18 @@ export default function InformationArchitectureOverlay({ onClose }: { onClose: (
           {PIPELINE.map((step, index) => <div key={step} className="flex shrink-0 items-center gap-1"><span className="rounded border border-[var(--gold-primary)]/25 bg-[var(--gold-primary)]/5 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-[var(--gold-light)]">{step}</span>{index < PIPELINE.length - 1 && <span className="text-white/20">→</span>}</div>)}
         </div>
 
-        <div className="mx-auto mt-6 grid max-w-2xl gap-2">
+        <div className="mx-auto mt-6 grid max-w-3xl gap-2">
           <Node accent>Physical-Economy Corpus</Node>
-          <div className="grid grid-cols-3 gap-2"><Node>Evidence</Node><Node>Identity</Node><Node>Ontology</Node></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>Evidence</Node><Node>Identity</Node><Node>Ontology</Node><Node>Classification</Node></div>
           <div className="text-center text-white/20">↓</div>
-          <Node accent>Canonical State</Node>
-          <div className="grid grid-cols-3 gap-2"><Node>Relational</Node><Node planned>Graph projection</Node><Node planned>Spatial index</Node></div>
+          <Node accent>Canonical State · one authority</Node>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>SQLite / WAL V0</Node><Node planned>PostgreSQL + PostGIS</Node><Node planned>Object artifacts</Node><Node planned>Parquet / Iceberg</Node></div>
           <div className="text-center text-white/20">↓</div>
-          <div className="grid grid-cols-2 gap-2"><Node>Temporal index</Node><Node planned>Vector index</Node></div>
+          <Node>Corpus Compiler</Node>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Node>Public read model</Node><Node planned>Graph projection</Node><Node planned>Spatial projection</Node><Node planned>Vector projection</Node></div>
+          <div className="text-center text-white/20">↓</div>
           <Node>Retrieval Engine</Node>
+          <Node>Identity · Policy · Allowed use</Node>
           <Node planned>GraphRAG</Node>
           <Node planned>Context Compiler</Node>
           <div className="grid grid-cols-3 gap-2"><Node>APIs</Node><Node planned>Intelligence products</Node><Node planned>Corpus agents</Node></div>
@@ -37,7 +40,7 @@ export default function InformationArchitectureOverlay({ onClose }: { onClose: (
           <div className="grid grid-cols-3 gap-2"><Node accent>Payload Earth</Node><Node planned>Tradewind</Node><Node>Terminal</Node></div>
         </div>
 
-        <p className="mx-auto mt-5 max-w-2xl text-center text-[10px] leading-5 text-white/40">Solid nodes are present foundations. Dashed NEXT nodes are the declared build path, not capabilities claimed today. Freight, procurement, project cargo, and logistics remain preserved domain lenses over the corpus.</p>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-[10px] leading-5 text-white/40">Canonical state remains the only authority. Solid projections are policy-filtered and rebuildable; dashed NEXT nodes are the declared build path, not capabilities claimed today. APIs—not databases—are the product boundary. Freight, procurement, project cargo, and logistics remain preserved domain lenses over the corpus.</p>
       </section>
     </div>
   );

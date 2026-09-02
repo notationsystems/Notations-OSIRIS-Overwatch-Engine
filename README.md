@@ -60,6 +60,7 @@ systems remain maintained domain capability over the same epistemic discipline:
 
 See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 [`Physical-Economy Corpus V0`](docs/PHYSICAL_ECONOMY_CORPUS.md),
+[`data-platform contract`](docs/DATA_PLATFORM.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
 [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).
 
@@ -67,7 +68,7 @@ See the [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 
 | Domain | What it holds | Sources |
 |--------|---------------|---------|
-| **Physical-economy corpus** | Evidence, identities, aliases, relationships, observations, temporal revisions | Public research + customer-authorized private records |
+| **Physical-economy corpus** | Evidence, identities, aliases, relationships, observations, classification, temporal revisions, compiled read models | Public research + customer-authorized private records |
 | **Physical economy** | Entities, observations, flows, capacities, dependencies | USGS MCS, UN Comtrade, curated topology |
 | **Markets** | Benchmark price, positioning, warehouse stocks | COMEX (Yahoo), CFTC COT, LME via Westmetall |
 | **Freight book** | Loads, quotes, invoices, transit, appointments | Operator entry, append-only ledger |
@@ -134,14 +135,17 @@ Registration was never the only door.
 ┌─────────────────────────────────────────────────┐
 │                    PAYLOADOS                    │
 │          PHYSICAL-ECONOMY CORPUS                │
-│  Evidence  ·  Identity  ·  Ontology             │
-│              CANONICAL STATE                    │
-│  Relational  ·  Graph  ·  Spatial  ·  Temporal  │
+│  Evidence · Identity · Ontology · Classification│
+│          CANONICAL STATE — ONE AUTHORITY        │
+│ Structured · Artifacts · Analytics · Spatial    │
 ├─────────────────────────────────────────────────┤
-│       RETRIEVAL · COMPUTE · CONTEXT · PROOF      │
+│      CORPUS COMPILER → REBUILDABLE READ MODELS  │
+│  Relational · Graph · Spatial · Vector · Search │
+├─────────────────────────────────────────────────┤
+│   IDENTITY · POLICY · RETRIEVAL · CONTEXT · PROOF│
 ├─────────────────────────────────────────────────┤
 │          PAYLOAD EARTH / API / TERMINAL          │
-│  /api/corpus/*   facility query + linear replay │
+│  /api/corpus/* query + compile + linear replay  │
 │  /api/economy/*   state, search, table, guards, │
 │                   refusals, scenario, validate  │
 │  /api/directions  /api/geo      /api/geosearch  │
@@ -263,8 +267,12 @@ PAYLOAD_DATABASE_PATH=
 
 # Physical-economy corpus; falls back to PAYLOAD_DATABASE_PATH when omitted
 PAYLOAD_CORPUS_DATABASE_PATH=
-# Dedicated bearer authority for corpus append and raw cursor replay
+# Disposable policy-filtered read model used by public corpus queries
+PAYLOAD_CORPUS_READ_MODEL_PATH=
+# Dedicated research-worker authority for append and replay
 PAYLOAD_CORPUS_INGEST_TOKEN=
+# Separate compiler-service authority for read-model publication
+PAYLOAD_CORPUS_COMPILER_TOKEN=
 
 # Pull carrier authority/status and the weekly diesel benchmark
 FMCSA_WEB_KEY=
@@ -305,12 +313,16 @@ server-side. Extra raw journal fields are rejected. This route uses the same
 operations bearer token.
 
 `GET /api/corpus/facilities?q=polypropylene%20production` is the first public,
-read-only computational corpus endpoint. It resolves only canonical material
-IDs or explicit aliases, returns evidence-linked producing facilities, and is
-structurally fixed to the global corpus. The result becomes a dedicated
-facility layer on Payload Earth. `POST /api/corpus/records` and cursor-based
-`GET /api/corpus/records` require `PAYLOAD_CORPUS_INGEST_TOKEN`; exact replay is
-idempotent and changed immutable record IDs are refused. See
+read-only computational corpus endpoint. It reads only the separate,
+policy-filtered `public:global` read model—never canonical write tables—resolves
+canonical material IDs or explicit aliases, returns evidence-linked producing
+facilities, and carries an authorized projection warrant. The result becomes a
+dedicated facility layer on Payload Earth. `POST /api/corpus/projections`
+deterministically rebuilds that read model; stale projections are refused.
+Compilation requires `PAYLOAD_CORPUS_COMPILER_TOKEN`; append and cursor replay
+require `PAYLOAD_CORPUS_INGEST_TOKEN`. The credentials are intentionally not
+interchangeable. Exact replay/recompilation is idempotent and changed immutable
+record IDs are refused. See
 [`docs/PHYSICAL_ECONOMY_CORPUS.md`](docs/PHYSICAL_ECONOMY_CORPUS.md).
 
 For a single retrievable operational timeline, configure

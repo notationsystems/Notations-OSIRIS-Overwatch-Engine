@@ -4,10 +4,10 @@ Payload Terminal ships as a self-contained Next.js standalone build. This guide 
 running it with Docker / Docker Compose, deploying it as a [CasaOS](https://casaos.io)
 app, and configuring the optional API keys.
 
-> **TL;DR:** Payload Terminal runs fully **without any API keys**. All core feeds
+> **TL;DR:** Payload Terminal's public map feeds run **without API keys**. All core feeds
 > (aviation, satellites, fires, earthquakes, weather, news, CVEs) use public
-> keyless sources. Keys only matter for the optional RECON scanner backend and
-> for raising rate limits on a few feeds.
+> keyless sources. Private operations and corpus administration intentionally
+> fail closed until their dedicated credentials are configured.
 
 ---
 
@@ -38,9 +38,10 @@ What the compose file does:
   listens on 3000; the published **host** port is `PAYLOAD_PORT` (default
   `3000`). Set `PAYLOAD_PORT` in `.env` to remap it, e.g. `PAYLOAD_PORT=3005`
   when 3000 is already in use — no need to edit the compose file.
-- **`payload-runtime` volume** — persists the load-operation and carrier-
-  communication hash-chain journals across image rebuilds and container
-  replacement. Back this volume up as commercial operating evidence.
+- **`payload-runtime` volume** — persists canonical corpus/operations state,
+  the disposable corpus read model, and hash-chain journals across image
+  rebuilds and container replacement. Back up canonical state and operating
+  evidence; the read model can be rebuilt.
 - **`restart: unless-stopped`** — survives reboots.
 
 Common commands:
@@ -119,7 +120,7 @@ metadata.
 
 ## 3. API keys & data sources
 
-Copy `.env.template` to `.env` and fill in only what you need.
+Copy `.env.example` to `.env` and fill in only what you need.
 
 ### What the code actually reads today
 
@@ -154,8 +155,10 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_PORT` | Host port the compose file publishes (container itself always listens on 3000). `OSIRIS_PORT` is honoured for one release and warns. | `3000` |
 | `PAYLOAD_OPERATIONS_TOKEN` | Bearer authority for private freight-operation and carrier-delivery routes. Empty disables them. | none |
 | `PAYLOAD_DATABASE_PATH` | Shared SQLite/WAL file for ordered operational events and, by default, corpus records. Use the named runtime volume. | none |
-| `PAYLOAD_CORPUS_DATABASE_PATH` | Optional separate SQLite/WAL file for the physical-economy corpus. | `PAYLOAD_DATABASE_PATH` |
+| `PAYLOAD_CORPUS_DATABASE_PATH` | Canonical SQLite/WAL file for the physical-economy corpus. | `/app/runtime-data/physical-economy-corpus.sqlite` in Compose; otherwise `PAYLOAD_DATABASE_PATH` |
+| `PAYLOAD_CORPUS_READ_MODEL_PATH` | Separate disposable SQLite/WAL file for the policy-filtered public query projection. | `/app/runtime-data/corpus-public-read-model.sqlite` in Compose |
 | `PAYLOAD_CORPUS_INGEST_TOKEN` | Dedicated bearer authority for immutable corpus append and raw cursor replay. | none |
+| `PAYLOAD_CORPUS_COMPILER_TOKEN` | Separate least-privilege bearer authority for read-model compilation and manifest inspection. | none |
 | `PAYLOAD_OPERATIONS_LOG` | Append-only load-operation journal. Compose places it on `payload-runtime`. | `data-archive/load-operations.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_COMMUNICATIONS_LOG` | Append-only delivery, receipt, acknowledgement, and tracking journal. | `data-archive/carrier-communications.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_DISPATCH_URL` | Provider-neutral HTTPS endpoint that accepts carrier tenders. | none |
@@ -163,6 +166,20 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_CARRIER_DISPATCH_PROVIDER` | Stable identity recorded with delivery evidence. | `carrier-webhook` |
 | `PAYLOAD_CARRIER_DISPATCH_TIMEOUT_MS` | Outbound request deadline, clamped to 1–30 seconds. | `10000` |
 | `PAYLOAD_CARRIER_WEBHOOK_SECRET` | HMAC secret for inbound `/api/freight/carrier-events`; at least 32 random bytes. | none |
+
+After classified corpus records are ingested, an administrator publishes the
+read model explicitly:
+
+```bash
+curl -X POST http://localhost:3000/api/corpus/projections \
+  -H "Authorization: Bearer $PAYLOAD_CORPUS_COMPILER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"audience":"public","scope":"global"}'
+```
+
+Payload Earth refuses facility queries until this succeeds, and refuses again
+if canonical global state advances without a rebuild. Do not back up the read-
+model file as an authority; recreate it from the canonical corpus.
 
 ### Keyless sources (no configuration needed)
 

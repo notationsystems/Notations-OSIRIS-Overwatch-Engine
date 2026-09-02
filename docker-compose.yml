@@ -29,7 +29,8 @@ services:
       - PAYLOAD_COMMERCIAL_LOG=${PAYLOAD_COMMERCIAL_LOG:-/app/runtime-data/commercial.jsonl}
       - PAYLOAD_PROJECT_CARGO_LOG=${PAYLOAD_PROJECT_CARGO_LOG:-/app/runtime-data/project-cargo.jsonl}
       - PAYLOAD_DATABASE_PATH=${PAYLOAD_DATABASE_PATH:-}
-      - PAYLOAD_CORPUS_DATABASE_PATH=${PAYLOAD_CORPUS_DATABASE_PATH:-}
+      - PAYLOAD_CORPUS_DATABASE_PATH=${PAYLOAD_CORPUS_DATABASE_PATH:-/app/runtime-data/physical-economy-corpus.sqlite}
+      - PAYLOAD_CORPUS_READ_MODEL_PATH=${PAYLOAD_CORPUS_READ_MODEL_PATH:-/app/runtime-data/corpus-public-read-model.sqlite}
     volumes:
       - payload-runtime:/app/runtime-data
     extra_hosts:

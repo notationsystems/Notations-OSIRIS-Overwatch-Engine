@@ -30,6 +30,13 @@ type Discovery = {
   asOf: string;
   knowledgeCutoff: string;
   facilities: CorpusFacilityVisual[];
+  warrant: {
+    projectionId: string;
+    projectionDigest: string;
+    projectionRecordCount: number;
+    compilerVersion: string;
+    compiledAt: string;
+  };
 };
 
 type Refusal = { kind: 'refusal'; code: string; detail: string; remedy: string };
@@ -100,6 +107,7 @@ export default function CorpusQueryPanel({ onFacilities, onLocate, onShowArchite
           <div className="border-b border-white/[0.07] bg-white/[0.018] px-3 py-2">
             <p className="text-[10px] font-semibold text-white">{result.material.name}</p>
             <p className="mt-0.5 font-mono text-[8px] text-white/35">{result.facilities.length} evidenced facilit{result.facilities.length === 1 ? 'y' : 'ies'} · {result.facilities.filter(item => item.location).length} mapped · known by {result.knowledgeCutoff.slice(0, 10)}</p>
+            <p className="mt-1 font-mono text-[7px] uppercase tracking-wide text-[var(--alert-green)]">Policy-filtered projection · {result.warrant.projectionRecordCount} records · {result.warrant.projectionDigest.slice(0, 12)}</p>
           </div>
           {result.facilities.map(facility => (
             <article key={facility.entityId} className="border-b border-white/[0.06] p-3 last:border-0">

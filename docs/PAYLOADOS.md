@@ -30,7 +30,9 @@ path to building the information company.
 2. Observation, derived result, inference, recommendation, decision,
    authorization, execution, outcome, and verification remain distinct types.
 3. Every accepted fact has canonical identity, source/evidence references,
-   occurrence and knowledge time, lineage, and an explicit attestation class.
+   occurrence and knowledge time, lineage, attestation, and explicit access,
+   licence, redistribution, retention, and allowed-use classification before it
+   can enter a published projection.
 4. Models propose. They do not directly mutate canonical state or execute a
    commercial action.
 5. Execution is bound to the exact authorized object, actor, counterparty, and
@@ -41,6 +43,9 @@ path to building the information company.
    hash chains and database integrity checks fail closed on contradiction.
 8. A commitment prepared for a zkVM is not described as a proof. Only a result
    verified against the approved program and verification key is a proof.
+9. Canonical state is the only authority. Graph, vector, spatial, search, and
+   API read models are versioned, disposable projections built by the Corpus
+   Compiler. Customers and agents never query database tables directly.
 
 ## System topology
 
@@ -51,17 +56,23 @@ path to building the information company.
                               |
           +-------------------+-------------------+
           |                   |                   |
-       Evidence            Identity            Ontology
+       Evidence            Identity     Ontology + Classification
           +-------------------+-------------------+
                               |
                        Canonical State
                               |
+       +----------+-----------+-----------+----------+
+       |          |           |           |          |
+   Structured  Artifacts  Analytical   Spatial    Temporal
+      state               history
+       +----------+-----------+-----------+----------+
+                              |
+                       Corpus Compiler
+                              |
           +-------------------+-------------------+
           |                   |                   |
-      Relational             Graph              Spatial
-          +-------------------+-------------------+
-                              |
-                    Temporal + Vector Index
+       Relational           Graph        Spatial / Vector
+        read model        projection        projections
                               |
                        Retrieval Engine
                               |
@@ -86,6 +97,13 @@ aliases, typed relationships, and observations as immutable records in
 SQLite/WAL. Every record receives a global sequence and a scope-local hash
 chain. Public knowledge composes with exactly one authorized customer scope;
 private customer scopes can never compose with one another.
+
+Canonical records may carry object-level visibility, licence, redistribution,
+retention, allowed-use, tenant, owner, entitlement, and jurisdiction metadata.
+The public Corpus Compiler admits only explicitly public and redistributable
+records, removes claims whose evidence or endpoints are denied, and writes a
+separate digest-bound read model. The public API refuses a stale projection
+rather than querying the canonical write database as a fallback.
 
 The existing edge event database persists load-operation,
 carrier-communication, procurement, commercial, and project-cargo streams with
@@ -140,7 +158,10 @@ supporting evidence.
 The global corpus (`K_G`) contains generally reusable knowledge. A customer
 scope (`K_C`) contains that customer's internal state. Authorized retrieval may
 compute `K_G + K_C`; the public Earth query surface is structurally restricted
-to `K_G`.
+to a policy-filtered, redistributable projection of `K_G`. Missing
+classification never defaults to public. See [`DATA_PLATFORM.md`](DATA_PLATFORM.md)
+for the storage, compiler, identity, authorization, and central-deployment
+contract.
 
 ## Preserved domain capability
 
@@ -272,22 +293,27 @@ only create a larger silo.
 
 ## Delivery sequence
 
-1. **Corpus V0 (implemented substrate):** immutable evidence/entity/alias/
+1. **Corpus V0 + public compiler (implemented substrate):** immutable evidence/entity/alias/
    relationship/observation records, global linear retrieval, independent scope
-   chains, public/private composition boundary, temporal revisions, and the
-   first `find_facilities(material)` computation.
-2. **Corpus Factory:** API and document acquisition, artifact preservation,
+   chains, public/private composition boundary, temporal revisions, object
+   classification, actor/purpose policy, a deterministic disposable read model,
+   and the first `find_facilities(material)` computation.
+2. **Corpus Factory + artifact tier:** API and document acquisition, content-
+   addressed object storage, artifact preservation,
    OCR/perception candidates, review queues, resolution, and continuous
    evidence-linked publication.
-3. **Spatial and graph projections:** PostGIS, typed graph traversal, historical
+3. **Central structured and analytical tiers:** replay-equivalent PostgreSQL,
+   PostGIS, RLS, service identities, audit, read replication, and measured
+   Parquet/Iceberg partitioning for high-volume observations.
+4. **Spatial and graph projections:** PostGIS, typed graph traversal, historical
    state, and Payload Earth query composition over facilities, ports, flows,
    dependencies, disruptions, and customer-authorized overlays.
-4. **Hybrid retrieval:** relational + graph + spatial + temporal + semantic
+5. **Hybrid retrieval:** relational + graph + spatial + temporal + semantic
    indexes with an evidence-preserving Context Compiler for GraphRAG and agents.
-5. **Computational products:** supplier discovery, substitution, dependency,
+6. **Computational products:** supplier discovery, substitution, dependency,
    landed-cost, physical-risk, historical-state, and relationship-explanation
    APIs; Tradewind packages these into intelligence products.
-6. **Verification:** extend the implemented SP1 event proof boundary to selected
+7. **Verification:** extend the implemented SP1 event proof boundary to selected
    corpus builds, transformations, retrieval manifests, and disclosed
    calculations with ceremonially pinned program identities.
 

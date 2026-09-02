@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
+import { OPEN_PUBLIC_CORPUS_ACCESS, type CorpusAccess } from './corpusPolicy';
 import { PhysicalEconomyCorpus, type CorpusRecordInput } from './physicalEconomyCorpus';
 
 const temporaryDirectories: string[] = [];
@@ -18,7 +19,7 @@ async function corpus() {
 
 function globalFixture(): CorpusRecordInput[] {
   const evidenceIds = ['evidence:datasheet:hdpe'];
-  return [
+  const records: CorpusRecordInput[] = [
     {
       schema: 'payload.corpus.record.v1', recordId: 'rec:evidence:hdpe:v1', recordType: 'evidence', knownAt: known,
       evidenceId: evidenceIds[0], sourceId: 'source:producer:catalogue', title: 'Producer HDPE catalogue',
@@ -53,7 +54,13 @@ function globalFixture(): CorpusRecordInput[] {
       valueKind: 'reported', confidence: 'high', evidenceIds,
     },
   ];
+  return records.map(record => ({ ...record, access: OPEN_PUBLIC_CORPUS_ACCESS } as CorpusRecordInput));
 }
+
+const privateAccess: CorpusAccess = {
+  visibility: 'CUSTOMER_PRIVATE', licenseClass: 'CUSTOMER_CONFIDENTIAL', redistributionClass: 'PROHIBITED', retentionClass: 'CUSTOMER_CONTRACT',
+  allowedUses: ['SEARCH', 'ANALYSIS'], tenantId: 'acme',
+};
 
 afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map(path => rm(path, { recursive: true, force: true })));
@@ -92,12 +99,12 @@ describe('Physical-Economy Corpus V0', () => {
       const privateRecords: CorpusRecordInput[] = [
         {
           schema: 'payload.corpus.record.v1', recordId: 'rec:entity:facility:customer-plant:v1', recordType: 'entity', knownAt: known,
-          entityId: 'pe:facility:customer-plant', entityKind: 'facility', canonicalName: 'Customer Qualified Plant', countryCode: 'CA', evidenceIds: ['evidence:datasheet:hdpe'],
+          entityId: 'pe:facility:customer-plant', entityKind: 'facility', canonicalName: 'Customer Qualified Plant', countryCode: 'CA', evidenceIds: ['evidence:datasheet:hdpe'], access: privateAccess,
         },
         {
           schema: 'payload.corpus.record.v1', recordId: 'rec:relationship:customer-plant-produces-hdpe:v1', recordType: 'relationship', knownAt: known,
           relationshipId: 'relationship:customer-plant-produces-hdpe', subjectEntityId: 'pe:facility:customer-plant', predicate: 'produces', objectEntityId: 'pe:material:hdpe',
-          valueKind: 'reported', confidence: 'medium', evidenceIds: ['evidence:datasheet:hdpe'],
+          valueKind: 'reported', confidence: 'medium', evidenceIds: ['evidence:datasheet:hdpe'], access: privateAccess,
         },
       ];
       expect(database.append('customer:acme', privateRecords, recorded).kind).toBe('committed');
@@ -145,6 +152,10 @@ describe('Physical-Economy Corpus V0', () => {
       expect(database.append('global', [early], recorded)).toMatchObject({ kind: 'refusal', code: 'CORPUS_KNOWLEDGE_ORDER_INVALID' });
       const duplicateStableIdentity = { ...fixture[6], recordId: 'rec:relationship:baytown-produces-hdpe:duplicate' } as CorpusRecordInput;
       expect(database.append('global', [duplicateStableIdentity], recorded)).toMatchObject({ kind: 'refusal', code: 'CORPUS_RECORD_CONFLICT' });
+      const wrongTenantScope = { ...fixture[0], recordId: 'rec:evidence:wrong-scope:v1', evidenceId: 'evidence:wrong-scope', access: privateAccess } as CorpusRecordInput;
+      expect(database.append('global', [wrongTenantScope], recorded)).toMatchObject({ kind: 'refusal', code: 'CORPUS_INPUT_INVALID', detail: expect.stringMatching(/scope-inconsistent/i) });
+      const credentialedStorageUri = { ...fixture[0], recordId: 'rec:evidence:credentialed-uri:v1', evidenceId: 'evidence:credentialed-uri', storageUri: 'https://user:secret@example.test/raw.pdf' } as CorpusRecordInput;
+      expect(database.append('global', [credentialedStorageUri], recorded)).toMatchObject({ kind: 'refusal', code: 'CORPUS_INPUT_INVALID', detail: expect.stringMatching(/artifact metadata/i) });
     } finally { database.close(); }
   });
 

@@ -13,6 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { stableValue } from './loadOperationsStore';
+import { corpusAccessDefect, corpusAccessScopeDefect, type CorpusAccess } from './corpusPolicy';
 
 export type CorpusScope = 'global' | `customer:${string}`;
 export type CorpusEntityKind = 'organization' | 'facility' | 'material' | 'process' | 'network' | 'market' | 'geography';
@@ -30,6 +31,8 @@ type CommonRecord = {
   readonly recordType: CorpusRecordType;
   readonly knownAt: string;
   readonly supersedes?: string;
+  /** Optional for V0 replay compatibility; every published projection denies missing classification. */
+  readonly access?: CorpusAccess;
 };
 
 export type CorpusEvidenceRecord = CommonRecord & {
@@ -43,6 +46,11 @@ export type CorpusEvidenceRecord = CommonRecord & {
   readonly publishedAt?: string;
   readonly locator?: string;
   readonly license?: string;
+  /** Raw bytes stay in object storage; canonical state holds only their identity and locator. */
+  readonly artifactId?: string;
+  readonly storageUri?: string;
+  readonly mediaType?: string;
+  readonly parserVersion?: string;
 };
 
 export type CorpusEntityRecord = CommonRecord & {
@@ -106,6 +114,15 @@ export type CorpusAppendResult =
   | { readonly kind: 'refusal'; readonly code: 'CORPUS_INPUT_INVALID' | 'CORPUS_RECORD_CONFLICT' | 'CORPUS_REFERENCE_MISSING' | 'CORPUS_KNOWLEDGE_ORDER_INVALID' | 'CORPUS_REVISION_INVALID'; readonly detail: string; readonly remedy: string };
 type CorpusAppendRefusal = Extract<CorpusAppendResult, { kind: 'refusal' }>;
 
+export type CorpusProjectionSource = {
+  readonly kind: 'physical_economy_projection_source';
+  readonly scope: CorpusScope;
+  readonly knowledgeCutoff: string;
+  readonly sourceSequence: number;
+  readonly sourceDigest: string;
+  readonly records: readonly StoredCorpusRecord[];
+};
+
 export type FacilityDiscoveryResult =
   | {
       readonly kind: 'facility_discovery';
@@ -152,6 +169,12 @@ function canonical(value: unknown): string { return JSON.stringify(stableValue(v
 function sha(value: string): string { return createHash('sha256').update(value).digest('hex'); }
 function validTime(value: string | undefined): boolean { return typeof value === 'string' && Number.isFinite(Date.parse(value)); }
 function nonEmpty(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0; }
+function validStorageUri(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return ['https:', 's3:', 'gs:', 'az:', 'file:'].includes(parsed.protocol) && !parsed.username && !parsed.password;
+  } catch { return false; }
+}
 function normalizedAlias(value: string): string { return value.normalize('NFKC').trim().toLocaleLowerCase('en-US'); }
 function visibleScopes(scope: CorpusScope): readonly CorpusScope[] { return scope === 'global' ? ['global'] : ['global', scope]; }
 function scopeValid(scope: string): scope is CorpusScope { return scope === 'global' || CUSTOMER_SCOPE.test(scope); }
@@ -177,10 +200,15 @@ function recordDefect(record: CorpusRecordInput): string | null {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return 'record is not an object';
   if (record.schema !== 'payload.corpus.record.v1' || typeof record.recordId !== 'string' || !ID.test(record.recordId) || !validTime(record.knownAt)) return `${record.recordId || 'record'} has invalid common identity or time`;
   if (record.supersedes !== undefined && (typeof record.supersedes !== 'string' || !ID.test(record.supersedes) || record.supersedes === record.recordId)) return `${record.recordId} has an invalid supersedes reference`;
+  if (record.access !== undefined) {
+    const accessProblem = corpusAccessDefect(record.access);
+    if (accessProblem) return `${record.recordId} has invalid access classification: ${accessProblem}`;
+  }
   if (record.recordType !== 'evidence' && !Array.isArray(record.evidenceIds)) return `${record.recordId} has no evidence-reference array`;
   if (record.recordType !== 'evidence' && record.evidenceIds.length === 0) return `${record.recordId} has no supporting evidence`;
   if (record.recordType === 'evidence') {
     if (typeof record.evidenceId !== 'string' || !ID.test(record.evidenceId) || typeof record.sourceId !== 'string' || !ID.test(record.sourceId) || !nonEmpty(record.title) || typeof record.sourceUrl !== 'string' || !/^https?:\/\//.test(record.sourceUrl) || typeof record.artifactSha256 !== 'string' || !HASH.test(record.artifactSha256) || !validTime(record.retrievedAt) || record.knownAt !== record.retrievedAt || (record.publishedAt !== undefined && (!validTime(record.publishedAt) || Date.parse(record.publishedAt) > Date.parse(record.retrievedAt)))) return `${record.recordId} has invalid evidence metadata`;
+    if ((record.artifactId !== undefined && (typeof record.artifactId !== 'string' || !ID.test(record.artifactId))) || (record.storageUri !== undefined && (typeof record.storageUri !== 'string' || !validStorageUri(record.storageUri))) || (record.mediaType !== undefined && (typeof record.mediaType !== 'string' || !/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(record.mediaType))) || (record.parserVersion !== undefined && !nonEmpty(record.parserVersion))) return `${record.recordId} has invalid artifact metadata`;
   } else if (record.recordType === 'entity') {
     if (typeof record.entityId !== 'string' || !ID.test(record.entityId) || !ENTITY_KINDS.includes(record.entityKind) || !nonEmpty(record.canonicalName) || (record.countryCode !== undefined && (typeof record.countryCode !== 'string' || !/^[A-Z]{2}$/.test(record.countryCode)))) return `${record.recordId} has invalid entity metadata`;
     if (record.location && (!Number.isFinite(record.location.lat) || record.location.lat < -90 || record.location.lat > 90 || !Number.isFinite(record.location.lng) || record.location.lng < -180 || record.location.lng > 180 || !LOCATION_PRECISIONS.includes(record.location.precision))) return `${record.recordId} has invalid coordinates or precision`;
@@ -219,6 +247,78 @@ function activeRecords(records: readonly StoredCorpusRecord[]): readonly StoredC
 function relationshipActive(record: CorpusRelationshipRecord, asOf: string): boolean {
   const at = Date.parse(asOf);
   return (!record.validFrom || Date.parse(record.validFrom) <= at) && (!record.validTo || Date.parse(record.validTo) >= at);
+}
+
+function evidenceView(record: StoredCorpusRecord & CorpusEvidenceRecord): CorpusEvidenceRecord {
+  return freeze({
+    schema: record.schema, recordId: record.recordId, recordType: 'evidence', knownAt: record.knownAt,
+    ...(record.supersedes ? { supersedes: record.supersedes } : {}),
+    evidenceId: record.evidenceId, sourceId: record.sourceId, title: record.title,
+    sourceUrl: record.sourceUrl, artifactSha256: record.artifactSha256, retrievedAt: record.retrievedAt,
+    ...(record.publishedAt ? { publishedAt: record.publishedAt } : {}),
+    ...(record.locator ? { locator: record.locator } : {}),
+    ...(record.license ? { license: record.license } : {}),
+    ...(record.artifactId ? { artifactId: record.artifactId } : {}),
+    ...(record.mediaType ? { mediaType: record.mediaType } : {}),
+  });
+}
+
+/** Shared deterministic query over either canonical records or a compiled read model. */
+export function findFacilitiesInRecords(
+  materialRef: string,
+  inputRecords: readonly StoredCorpusRecord[],
+  options: { readonly scope?: CorpusScope; readonly asOf?: string; readonly knowledgeCutoff?: string } = {},
+): FacilityDiscoveryResult {
+  const scope = options.scope ?? 'global';
+  const asOf = options.asOf ?? new Date().toISOString();
+  const cutoff = options.knowledgeCutoff ?? new Date().toISOString();
+  if (!scopeValid(scope) || !validTime(asOf) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
+  const admittedScopes = new Set(visibleScopes(scope));
+  const cutoffMs = Date.parse(cutoff);
+  const records = activeRecords(inputRecords.filter(record => admittedScopes.has(record.scope) && Date.parse(record.knownAt) <= cutoffMs));
+  const entities = records.filter((record): record is StoredCorpusRecord & CorpusEntityRecord => record.recordType === 'entity');
+  const entityById = new Map(entities.map(entity => [entity.entityId, entity]));
+  const matches = new Set<string>();
+  const direct = entityById.get(materialRef);
+  if (direct?.entityKind === 'material') matches.add(direct.entityId);
+  const needle = normalizedAlias(materialRef);
+  for (const alias of records.filter((record): record is StoredCorpusRecord & CorpusAliasRecord => record.recordType === 'alias')) {
+    if (normalizedAlias(alias.value) === needle && entityById.get(alias.entityId)?.entityKind === 'material') matches.add(alias.entityId);
+  }
+  if (matches.size === 0) return queryRefusal('MATERIAL_UNRESOLVED', `No explicit material identity or alias resolves "${materialRef}" in the authorized corpus.`, 'Curate an evidence-linked alias or use a canonical material entity id. Similar names are never merged automatically.');
+  if (matches.size > 1) return queryRefusal('MATERIAL_AMBIGUOUS', `"${materialRef}" resolves to ${matches.size} material identities.`, 'Disambiguate with the canonical material entity id; do not select on similarity or ordering.');
+  const materialId = [...matches][0];
+  const material = entityById.get(materialId)!;
+  const relationships = records.filter((record): record is StoredCorpusRecord & CorpusRelationshipRecord => record.recordType === 'relationship' && relationshipActive(record, asOf));
+  const evidenceById = new Map(records.filter((record): record is StoredCorpusRecord & CorpusEvidenceRecord => record.recordType === 'evidence').map(record => [record.evidenceId, record]));
+  const facilities = relationships
+    .filter(relation => relation.predicate === 'produces' && relation.objectEntityId === materialId)
+    .flatMap(relation => {
+      const facility = entityById.get(relation.subjectEntityId);
+      if (!facility || facility.entityKind !== 'facility') return [];
+      const operatorRelation = relationships.find(candidate => candidate.subjectEntityId === facility.entityId && candidate.predicate === 'operated_by');
+      const operator = operatorRelation ? entityById.get(operatorRelation.objectEntityId) : undefined;
+      const evidence = [...new Set([
+        ...facility.evidenceIds, ...relation.evidenceIds,
+        ...(operatorRelation?.evidenceIds ?? []), ...(operator?.evidenceIds ?? []),
+      ])].flatMap(id => {
+        const item = evidenceById.get(id);
+        return item ? [evidenceView(item)] : [];
+      });
+      return [{
+        entityId: facility.entityId,
+        name: facility.canonicalName,
+        ...(facility.countryCode ? { countryCode: facility.countryCode } : {}),
+        ...(facility.location ? { location: facility.location } : {}),
+        ...(operator?.entityKind === 'organization' ? { operator: { entityId: operator.entityId, name: operator.canonicalName } } : {}),
+        relationshipId: relation.relationshipId,
+        confidence: relation.confidence,
+        evidence,
+      }];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name) || a.entityId.localeCompare(b.entityId));
+  if (facilities.length === 0) return queryRefusal('NO_EVIDENCED_FACILITIES', `The corpus resolves ${material.canonicalName} but holds no active evidence-linked producing facility at ${asOf}.`, 'Acquire or validate facility-to-material production relationships; an empty corpus is not evidence that no producer exists.');
+  return freeze({ kind: 'facility_discovery' as const, material: { entityId: material.entityId, name: material.canonicalName }, scope, asOf, knowledgeCutoff: cutoff, facilities });
 }
 
 export class PhysicalEconomyCorpus {
@@ -268,6 +368,10 @@ export class PhysicalEconomyCorpus {
     for (const record of records) {
       const defect = recordDefect(record);
       if (defect || ids.has(record.recordId)) return refusal('CORPUS_INPUT_INVALID', defect ?? `Duplicate record id ${record.recordId} in one batch.`, 'Correct the typed record; do not silently drop or merge it.');
+      if (record.access) {
+        const scopeProblem = corpusAccessScopeDefect(scope, record.access);
+        if (scopeProblem) return refusal('CORPUS_INPUT_INVALID', `${record.recordId} has scope-inconsistent access classification: ${scopeProblem}.`, 'Align tenant and visibility metadata with the immutable ledger scope.');
+      }
       if (Date.parse(record.knownAt) > Date.parse(recordedAt)) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} is recorded before its knownAt time.`, 'Record the batch at or after every included claim became knowable.');
       ids.add(record.recordId);
     }
@@ -323,55 +427,25 @@ export class PhysicalEconomyCorpus {
     return freeze({ kind: 'physical_economy_corpus_page' as const, scope, afterSequence: after, nextAfterSequence: records.at(-1)?.sequence ?? after, hasMore, records });
   }
 
+  projectionSource(scope: CorpusScope = 'global', knowledgeCutoff = new Date().toISOString()): CorpusProjectionSource {
+    if (!scopeValid(scope) || !validTime(knowledgeCutoff)) throw new Error('CORPUS_QUERY_INVALID: projection scope or knowledge cutoff is invalid');
+    const visible = this.visibleRecords(scope, knowledgeCutoff);
+    const records = activeRecords(visible);
+    return freeze({
+      kind: 'physical_economy_projection_source' as const,
+      scope,
+      knowledgeCutoff,
+      sourceSequence: visible.at(-1)?.sequence ?? 0,
+      sourceDigest: sha(canonical(records.map(record => ({ recordId: record.recordId, recordHash: record.recordHash })))),
+      records,
+    });
+  }
+
   findFacilities(materialRef: string, options: { readonly scope?: CorpusScope; readonly asOf?: string; readonly knowledgeCutoff?: string } = {}): FacilityDiscoveryResult {
     const scope = options.scope ?? 'global';
-    const asOf = options.asOf ?? new Date().toISOString();
     const cutoff = options.knowledgeCutoff ?? new Date().toISOString();
-    if (!scopeValid(scope) || !validTime(asOf) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
-    const records = activeRecords(this.visibleRecords(scope, cutoff));
-    const entities = records.filter((record): record is StoredCorpusRecord & CorpusEntityRecord => record.recordType === 'entity');
-    const entityById = new Map(entities.map(entity => [entity.entityId, entity]));
-    const matches = new Set<string>();
-    const direct = entityById.get(materialRef);
-    if (direct?.entityKind === 'material') matches.add(direct.entityId);
-    const needle = normalizedAlias(materialRef);
-    for (const alias of records.filter((record): record is StoredCorpusRecord & CorpusAliasRecord => record.recordType === 'alias')) {
-      if (normalizedAlias(alias.value) === needle && entityById.get(alias.entityId)?.entityKind === 'material') matches.add(alias.entityId);
-    }
-    if (matches.size === 0) return queryRefusal('MATERIAL_UNRESOLVED', `No explicit material identity or alias resolves "${materialRef}" in the authorized corpus.`, 'Curate an evidence-linked alias or use a canonical material entity id. Similar names are never merged automatically.');
-    if (matches.size > 1) return queryRefusal('MATERIAL_AMBIGUOUS', `"${materialRef}" resolves to ${matches.size} material identities.`, 'Disambiguate with the canonical material entity id; do not select on similarity or ordering.');
-    const materialId = [...matches][0];
-    const material = entityById.get(materialId)!;
-    const relationships = records.filter((record): record is StoredCorpusRecord & CorpusRelationshipRecord => record.recordType === 'relationship' && relationshipActive(record, asOf));
-    const evidenceById = new Map(records.filter((record): record is StoredCorpusRecord & CorpusEvidenceRecord => record.recordType === 'evidence').map(record => [record.evidenceId, record]));
-    const facilities = relationships
-      .filter(relation => relation.predicate === 'produces' && relation.objectEntityId === materialId)
-      .flatMap(relation => {
-        const facility = entityById.get(relation.subjectEntityId);
-        if (!facility || facility.entityKind !== 'facility') return [];
-        const operatorRelation = relationships.find(candidate => candidate.subjectEntityId === facility.entityId && candidate.predicate === 'operated_by');
-        const operator = operatorRelation ? entityById.get(operatorRelation.objectEntityId) : undefined;
-        const evidence = [...new Set([
-          ...facility.evidenceIds, ...relation.evidenceIds,
-          ...(operatorRelation?.evidenceIds ?? []), ...(operator?.evidenceIds ?? []),
-        ])].flatMap(id => {
-          const item = evidenceById.get(id);
-          return item ? [item] : [];
-        });
-        return [{
-          entityId: facility.entityId,
-          name: facility.canonicalName,
-          ...(facility.countryCode ? { countryCode: facility.countryCode } : {}),
-          ...(facility.location ? { location: facility.location } : {}),
-          ...(operator?.entityKind === 'organization' ? { operator: { entityId: operator.entityId, name: operator.canonicalName } } : {}),
-          relationshipId: relation.relationshipId,
-          confidence: relation.confidence,
-          evidence,
-        }];
-      })
-      .sort((a, b) => a.name.localeCompare(b.name) || a.entityId.localeCompare(b.entityId));
-    if (facilities.length === 0) return queryRefusal('NO_EVIDENCED_FACILITIES', `The corpus resolves ${material.canonicalName} but holds no active evidence-linked producing facility at ${asOf}.`, 'Acquire or validate facility-to-material production relationships; an empty corpus is not evidence that no producer exists.');
-    return freeze({ kind: 'facility_discovery' as const, material: { entityId: material.entityId, name: material.canonicalName }, scope, asOf, knowledgeCutoff: cutoff, facilities });
+    if (!scopeValid(scope) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
+    return findFacilitiesInRecords(materialRef, this.visibleRecords(scope, cutoff), { ...options, scope, knowledgeCutoff: cutoff });
   }
 
   private allRecords(): StoredCorpusRecord[] {
