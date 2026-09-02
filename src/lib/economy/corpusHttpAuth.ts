@@ -4,9 +4,9 @@ import { env } from './envCompat';
 
 function authorizeDedicatedBearer(
   request: Request,
-  environmentName: 'PAYLOAD_CORPUS_INGEST_TOKEN' | 'PAYLOAD_CORPUS_COMPILER_TOKEN',
-  unavailableCode: 'CORPUS_ADMIN_NOT_CONFIGURED' | 'CORPUS_COMPILER_NOT_CONFIGURED',
-  unauthorizedCode: 'CORPUS_ADMIN_UNAUTHORIZED' | 'CORPUS_COMPILER_UNAUTHORIZED',
+  environmentName: 'PAYLOAD_CORPUS_INGEST_TOKEN' | 'PAYLOAD_CORPUS_COMPILER_TOKEN' | 'PAYLOAD_CORPUS_MINER_TOKEN',
+  unavailableCode: 'CORPUS_ADMIN_NOT_CONFIGURED' | 'CORPUS_COMPILER_NOT_CONFIGURED' | 'CORPUS_MINER_NOT_CONFIGURED',
+  unauthorizedCode: 'CORPUS_ADMIN_UNAUTHORIZED' | 'CORPUS_COMPILER_UNAUTHORIZED' | 'CORPUS_MINER_UNAUTHORIZED',
   remedy: string,
 ): NextResponse | null {
   const expected = env(environmentName);
@@ -36,5 +36,13 @@ export function authorizeCorpusCompilation(request: Request): NextResponse | nul
   return authorizeDedicatedBearer(
     request, 'PAYLOAD_CORPUS_COMPILER_TOKEN', 'CORPUS_COMPILER_NOT_CONFIGURED', 'CORPUS_COMPILER_UNAUTHORIZED',
     'Set a dedicated compiler-service secret; do not reuse ingestion or public query credentials.',
+  );
+}
+
+/** Payload Miner may read compiled state and append candidates, but cannot mutate canonical truth or publish projections. */
+export function authorizeCorpusMining(request: Request): NextResponse | null {
+  return authorizeDedicatedBearer(
+    request, 'PAYLOAD_CORPUS_MINER_TOKEN', 'CORPUS_MINER_NOT_CONFIGURED', 'CORPUS_MINER_UNAUTHORIZED',
+    'Set a dedicated miner-service secret; do not reuse ingestion, compiler, or public query credentials.',
   );
 }

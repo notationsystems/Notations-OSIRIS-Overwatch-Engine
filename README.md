@@ -142,6 +142,9 @@ Registration was never the only door.
 │      CORPUS COMPILER → REBUILDABLE READ MODELS  │
 │  Relational · Graph · Spatial · Vector · Search │
 ├─────────────────────────────────────────────────┤
+│       PAYLOAD MINER → CANDIDATE KNOWLEDGE       │
+│ Dependencies · Patterns · Provenance · Registry │
+├─────────────────────────────────────────────────┤
 │   IDENTITY · POLICY · RETRIEVAL · CONTEXT · PROOF│
 ├─────────────────────────────────────────────────┤
 │          PAYLOAD EARTH / API / TERMINAL          │
@@ -273,6 +276,9 @@ PAYLOAD_CORPUS_READ_MODEL_PATH=
 PAYLOAD_CORPUS_INGEST_TOKEN=
 # Separate compiler-service authority for read-model publication
 PAYLOAD_CORPUS_COMPILER_TOKEN=
+# Append-only Pattern Registry and separate miner-service authority
+PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH=
+PAYLOAD_CORPUS_MINER_TOKEN=
 
 # Pull carrier authority/status and the weekly diesel benchmark
 FMCSA_WEB_KEY=
@@ -328,6 +334,17 @@ require `PAYLOAD_CORPUS_INGEST_TOKEN`. The credentials are intentionally not
 interchangeable. Exact replay/recompilation is idempotent and changed immutable
 record IDs are refused. See
 [`docs/PHYSICAL_ECONOMY_CORPUS.md`](docs/PHYSICAL_ECONOMY_CORPUS.md).
+
+Successful corpus writes now include a deterministic Corpus Builder manifest
+bound to the committed record hashes. Its scope is deliberately
+`CANONICAL_WRITE_ONLY`: upstream discovery, acquisition, extraction, and review
+remain separate attestations. `POST /api/corpus/mining/dependencies` runs the
+first deterministic Payload Miner algorithm over a current public CorpusBuild.
+It detects shared fan-in only among explicit depth-1 `depends_on` records and
+stores evidence- and policy-linked `CANDIDATE` objects in a separate append-only
+Pattern Registry. It never promotes a pattern into canonical state. The route
+requires `PAYLOAD_CORPUS_MINER_TOKEN`; neither ingestion nor compiler authority
+can invoke it.
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in

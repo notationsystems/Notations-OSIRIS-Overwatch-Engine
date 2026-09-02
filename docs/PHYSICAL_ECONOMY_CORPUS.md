@@ -70,6 +70,7 @@ Configure either:
 ```env
 PAYLOAD_CORPUS_DATABASE_PATH=/app/runtime-data/payload-corpus.sqlite
 PAYLOAD_CORPUS_READ_MODEL_PATH=/app/runtime-data/corpus-public-read-model.sqlite
+PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH=/app/runtime-data/corpus-pattern-registry.sqlite
 ```
 
 or only `PAYLOAD_DATABASE_PATH` to place the corpus tables beside the existing
@@ -104,6 +105,9 @@ the system does not currently pretend that two independent sequences are one.
 - Projection compilation/inspection requires the separate
   `PAYLOAD_CORPUS_COMPILER_TOKEN`; the two service identities are not
   interchangeable.
+- Dependency mining and Pattern Registry replay require
+  `PAYLOAD_CORPUS_MINER_TOKEN`; miner, compiler, and ingestion identities are
+  not interchangeable.
 
 ## API surfaces
 
@@ -160,7 +164,11 @@ Content-Type: application/json
 Records in a batch are ordered: evidence precedes the claims it supports and
 entities precede aliases, relationships, and observations. Exact replay is
 idempotent. A changed body under an existing record ID is a conflict, not an
-update.
+update. A successful write includes a deterministic
+`payload.corpus.builder-manifest.v1` for the exact committed scope, records,
+sequence range and hashes. The manifest explicitly covers only the canonical
+write and does not attest that upstream discovery, acquisition or extraction
+occurred in this service.
 
 ```http
 GET /api/corpus/records?scope=global&afterSequence=0&limit=100
@@ -172,18 +180,54 @@ Pages are globally ordered and cursor-based. Customer-scope administrative
 pages include global plus that exact customer scope, never any other customer.
 The summary does not expose the server filesystem path.
 
+### Shared-dependency mining
+
+```http
+POST /api/corpus/mining/dependencies
+Authorization: Bearer <PAYLOAD_CORPUS_MINER_TOKEN>
+Content-Type: application/json
+
+{"entityId":"pe:facility:gulf-coast-ethylene","depth":1,"minimumDependents":2}
+```
+
+The miner refuses absent or stale public projections. It examines only explicit
+active `depends_on` records in the current public CorpusBuild and emits typed
+`SHARED_DEPENDENCY` candidates. Every candidate preserves exact entity,
+relationship, evidence, algorithm, build, uncertainty and policy lineage. The
+associated MiningRun preserves parameters, knowledge cutoff, inputs, outputs,
+fingerprints and execution times.
+
+Results are appended to a separate hash-chained SQLite/WAL Pattern Registry:
+
+```http
+GET /api/corpus/mining/dependencies?afterSequence=0&limit=100
+GET /api/corpus/mining/dependencies?view=summary
+Authorization: Bearer <PAYLOAD_CORPUS_MINER_TOKEN>
+```
+
+The epistemic boundary is enforced in storage: every V0 mined object has
+`validationStatus: CANDIDATE`. It does not become an observed relationship and
+does not modify canonical state. The lifecycle vocabulary includes validated,
+rejected and superseded states, but transition/analyst-review authority is not
+implemented yet.
+
 ## What is implemented and what is not
 
-Implemented now: the durable corpus contract, validation, append/replay API,
+Implemented now: the durable corpus contract, validation, Corpus Builder
+canonical-write manifests, append/replay API,
 scope isolation, temporal revisions, tamper detection, object classification,
 actor/purpose policy, deterministic information-flow joins and policy lineage,
 a version-bound Corpus Compiler, a separate public read model, stale-model
-refusal, typed facility discovery, and proof-carrying Earth answers.
+refusal, typed facility discovery, proof-carrying Earth answers, deterministic
+depth-1 shared-dependency mining, MiningRun provenance, and an append-only
+Pattern Registry for candidate knowledge.
 
 Not yet implemented: automated API/document acquisition, raw artifact object
 storage, append-only security-audit export, OAuth/OIDC, database RLS,
 PostgreSQL/PostGIS authority, Parquet/Iceberg history, analyst review queues,
-probabilistic entity-resolution proposals, graph/vector projections, GraphRAG,
-Context Compiler, additional computational endpoints, and SP1 proofs over
-corpus builds. These are the next layers; the UI must continue to refuse rather
-than imply they already exist.
+probabilistic entity-resolution proposals, candidate validation/promotion,
+recursive dependency propagation, link prediction, temporal/spatial/statistical/
+anomaly mining, graph/vector projections, GraphRAG, Context Compiler,
+additional computational endpoints, and SP1 proofs over corpus builds. These
+are the next layers; the UI must continue to refuse rather than imply they
+already exist.

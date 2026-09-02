@@ -55,9 +55,19 @@ They are not a perimeter-only service.
                               ^
                        Canonical State
                               ^
-                          Evidence/DAF
+                    Corpus Builder / DAF
                               ^
                     Raw objects / lakehouse
+```
+
+The Data Miner consumes verified CorpusBuilds beside the retrieval path and
+emits candidate knowledge into a separate Pattern Registry. Mining is not an
+inverse compiler and cannot write canonical truth:
+
+```text
+CorpusBuild -> Payload Miner -> PatternCandidate -> validation -> governed write
+                                  |
+                                  +-> Pattern Registry + MiningRun provenance
 ```
 
 Identity, authorization, encryption, audit, tenancy, licensing, classification,
@@ -108,7 +118,28 @@ classification, and declared purpose for every object.
 The edge API already separates the research-worker ingestion identity
 (`PAYLOAD_CORPUS_INGEST_TOKEN`) from the compiler identity
 (`PAYLOAD_CORPUS_COMPILER_TOKEN`). Possession of one credential grants no
-authority at the other service boundary.
+authority at the other service boundary. The miner has a third credential,
+`PAYLOAD_CORPUS_MINER_TOKEN`, which can read the current public build and append
+candidate runs but cannot ingest records or publish projections.
+
+## Corpus Builder
+
+The implemented V0 Corpus Builder is the typed canonical-write stage of the
+larger acquisition pipeline:
+
+```text
+Acquire -> Extract -> Normalize -> Resolve -> Warrant -> Persist
+                                                   implemented ^
+```
+
+`POST /api/corpus/records` delegates accepted batches to the builder and emits
+a deterministic `payload.corpus.builder-manifest.v1`. The manifest binds the
+scope, record/evidence/claim identities, sequence range, record times, builder
+version, and a fingerprint of the exact canonical commit. Its coverage is
+`CANONICAL_WRITE_ONLY` and `upstreamAcquisitionAttested` is false. PayloadOS
+therefore records what this service actually did without claiming that source
+discovery, artifact acquisition, extraction, or analyst validation occurred
+inside it.
 
 ### Information-flow control
 
@@ -173,6 +204,30 @@ Graph, spatial, vector, search, entity-summary, and relationship-summary
 projectors must follow the same rule: carry canonical IDs and representation
 versions, remain reproducible, and never acquire identity authority.
 
+## Data Miner and Pattern Registry
+
+Payload Miner V0 implements one deliberately narrow graph algorithm:
+`shared_dependency_fan_in` version `1.0.0`. It reads the current verified
+`public:global` CorpusBuild, selects explicit active `depends_on` relationships,
+and emits a `SHARED_DEPENDENCY` candidate when at least the configured number of
+distinct entities name the same upstream entity. Depth is fixed at one.
+
+Each `payload.corpus.pattern-candidate.v1` carries entity, relationship and
+evidence IDs; algorithm and CorpusBuild identities; score; generation time;
+joined policy lineage; and an explicit limitation. Fan-in does not establish
+exclusivity, materiality, causality, or completeness. Every result is linked to
+a reproducible `payload.corpus.mining-run.v1` containing parameters, feature
+set, knowledge cutoff, exact input IDs and fingerprint, output IDs, policy
+lineage, and timestamps.
+
+The separate SQLite/WAL Pattern Registry assigns mining runs a linear sequence
+and SHA-256 chain and verifies run/candidate content on open and replay. Exact
+replay is idempotent; collisions and changed immutable content are refused.
+Only `CANDIDATE` writes exist in V0. `VALIDATED`, `REJECTED`, and `SUPERSEDED`
+are lifecycle types, not implemented transitions. No miner result mutates a
+canonical relationship. Later validation must acquire evidence and pass through
+the governed Corpus Builder boundary before canonical state can change.
+
 ## Tenant model
 
 ```text
@@ -200,6 +255,8 @@ Target versioned API families (the implemented routes remain
 - `/v1/evidence/*`: warrants, source artifacts and explanation.
 - `/v1/spatial/*`: nearby, within, route and exposure computation.
 - `/v1/intelligence/*`: dependencies, suppliers, substitutes and concentration.
+- `/v1/mining/*`: candidate dependencies, anomalies, clusters, relationships,
+  analogues and leading signals with mining-run provenance.
 - `/v1/research`: authorization-bounded context compilation for people and agents.
 
 The V0 facility endpoint now returns a
@@ -249,6 +306,8 @@ maximum graph depth, immutable access audits, and upstream-source isolation.
    already have an initial deterministic public representation.
 8. Extend the implemented authorization-before-emission policy join into the
    authorization-before-retrieval Context Compiler for model/agent access.
+9. Add validation decisions and evidence-acquisition tasks for mined candidates;
+   only validated, warranted records may re-enter the canonical write path.
 
 No step permits dual truth. A migration is complete only when the new backend
 replays the canonical contract and produces equivalent projection warrants.

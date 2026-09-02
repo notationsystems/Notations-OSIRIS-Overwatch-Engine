@@ -159,6 +159,8 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_CORPUS_READ_MODEL_PATH` | Separate disposable SQLite/WAL file for the policy-filtered public query projection. | `/app/runtime-data/corpus-public-read-model.sqlite` in Compose |
 | `PAYLOAD_CORPUS_INGEST_TOKEN` | Dedicated bearer authority for immutable corpus append and raw cursor replay. | none |
 | `PAYLOAD_CORPUS_COMPILER_TOKEN` | Separate least-privilege bearer authority for read-model compilation and manifest inspection. | none |
+| `PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH` | Separate append-only SQLite/WAL registry for mined candidate knowledge and mining-run provenance. | `/app/runtime-data/corpus-pattern-registry.sqlite` in Compose |
+| `PAYLOAD_CORPUS_MINER_TOKEN` | Dedicated bearer authority for mining a current public CorpusBuild and replaying the Pattern Registry. | none |
 | `PAYLOAD_OPERATIONS_LOG` | Append-only load-operation journal. Compose places it on `payload-runtime`. | `data-archive/load-operations.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_COMMUNICATIONS_LOG` | Append-only delivery, receipt, acknowledgement, and tracking journal. | `data-archive/carrier-communications.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_DISPATCH_URL` | Provider-neutral HTTPS endpoint that accepts carrier tenders. | none |
@@ -180,6 +182,22 @@ curl -X POST http://localhost:3000/api/corpus/projections \
 Payload Earth refuses facility queries until this succeeds, and refuses again
 if canonical global state advances without a rebuild. Do not back up the read-
 model file as an authority; recreate it from the canonical corpus.
+
+With the public build current, the miner can register explicit shared-dependency
+candidates:
+
+```bash
+curl -X POST http://localhost:3000/api/corpus/mining/dependencies \
+  -H "Authorization: Bearer $PAYLOAD_CORPUS_MINER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"depth":1,"minimumDependents":2}'
+```
+
+The Pattern Registry belongs on the persistent runtime volume. It is not a
+canonical knowledge store: deleting it loses mining history, while deleting a
+read model only requires recompilation. Back up the registry if candidate and
+validation history matter operationally. V0 writes candidates only; validation
+and canonical promotion remain separate future authorities.
 
 ### Keyless sources (no configuration needed)
 

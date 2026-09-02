@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { buildCanonicalCorpusBatch } from '@/lib/economy/corpusBuilder';
 import { authorizeCorpusAdministration } from '@/lib/economy/corpusHttpAuth';
 import type { CorpusRecordInput, CorpusScope } from '@/lib/economy/physicalEconomyCorpus';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   if (!owned.corpus) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_UNAVAILABLE', detail: owned.error ?? 'No corpus database is configured.', remedy: 'Configure or restore PAYLOAD_CORPUS_DATABASE_PATH before ingestion.' }, { status: 503 });
   const value = body as { scope: CorpusScope; records: CorpusRecordInput[]; recordedAt?: string };
   try {
-    const result = owned.corpus.append(value.scope, value.records, value.recordedAt);
+    const result = buildCanonicalCorpusBatch(owned.corpus, value.scope, value.records, value.recordedAt);
     if (result.kind === 'committed') return NextResponse.json(result, { status: result.idempotent ? 200 : 201 });
     const status = result.code === 'CORPUS_RECORD_CONFLICT' || result.code === 'CORPUS_REVISION_INVALID' ? 409 : 422;
     return NextResponse.json(result, { status });

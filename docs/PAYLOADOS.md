@@ -9,12 +9,15 @@ Payload API is the machine surface, agents consume compiled context, and
 Payload Terminal remains the human evidence and domain-workflow instrument.
 None is a separate source of truth.
 
-The critical corpus loop is:
+The critical corpus-production loop is:
 
 ```text
 Acquire -> Extract -> Normalize -> Resolve -> Structure -> Relate
-        -> Index -> Compress -> Retrieve -> Compute -> Prove
+        -> Index -> Mine -> Validate -> Retrieve -> Compute -> Prove
 ```
+
+Mining feeds questions and evidence acquisition back into this loop; it cannot
+write canonical truth directly.
 
 The operational loop—observe, represent, reason, decide, authorize, execute,
 capture outcome, verify, update state—remains implemented domain capability.
@@ -28,7 +31,8 @@ path to building the information company.
    models, brokers, exchanges, routers, and optimizers are projections,
    observers, computational actors, or execution adapters—not truth owners.
 2. Observation, derived result, inference, recommendation, decision,
-   authorization, execution, outcome, and verification remain distinct types.
+   mined pattern, hypothesis, authorization, execution, outcome, and
+   verification remain distinct types.
 3. Every accepted fact has canonical identity, source/evidence references,
    occurrence and knowledge time, lineage, attestation, and explicit access,
    licence, redistribution, retention, and allowed-use classification before it
@@ -48,6 +52,8 @@ path to building the information company.
    Compiler. Customers and agents never query database tables directly.
 10. Derived information inherits the joined policy of every input. Permission
     to read inputs separately never implies permission to combine or emit them.
+11. A mined pattern is candidate knowledge. Validation and warranted canonical
+    writing mediate every transition back into truth.
 
 ## System topology
 
@@ -62,6 +68,9 @@ path to building the information company.
                              |
                    REPRESENTATION PLANE
              Graph / Spatial / Search / Vector
+                             |
+                    DATA MINER / REGISTRY
+              Patterns / Dependencies / Anomalies
                              |
                         ACCESS PLANE
           Retrieval / Context Compiler / Policy Join
@@ -121,6 +130,25 @@ Owns deterministic graph, spatial, vector, search, statistics and summary
 builds. The Corpus Compiler creates a content-addressed build bound to
 canonical, schema, ontology, policy, compiler and representation versions.
 Every derived build carries joined input-policy lineage and is disposable.
+
+### Mining plane
+
+Owns deterministic/statistical knowledge discovery over controlled
+representations. Payload Miner V0 detects explicit depth-1 shared-dependency
+fan-in in a current public CorpusBuild, records the exact algorithm, parameters,
+inputs, outputs, time boundary, evidence and policy lineage, and appends the run
+to a separately hash-chained Pattern Registry. Its output is always
+`PatternCandidate`, never an observation or canonical relationship.
+
+The intended recursive loop is:
+
+```text
+Corpus -> Mine -> Candidate -> Validate -> Acquire evidence -> Corpus Builder
+```
+
+Only the first three stages and durable candidate registration are implemented.
+Analyst validation, rejection/supersession transitions, acquisition tasking and
+governed promotion remain future authorities.
 
 ### Access plane
 
@@ -290,11 +318,13 @@ only create a larger silo.
 
 ## Delivery sequence
 
-1. **Corpus V0 + public compiler (implemented substrate):** immutable evidence/entity/alias/
+1. **Corpus V0 + builder/compiler/miner substrate (implemented):** immutable evidence/entity/alias/
    relationship/observation records, global linear retrieval, independent scope
    chains, public/private composition boundary, temporal revisions, object
    classification, actor/purpose policy, a deterministic disposable read model,
-   and the first `find_facilities(material)` computation.
+   the first `find_facilities(material)` computation, deterministic canonical-
+   write manifests, explicit shared-dependency candidates, mining provenance,
+   and a separate append-only Pattern Registry.
 2. **Corpus Factory + artifact tier:** API and document acquisition, content-
    addressed object storage, artifact preservation,
    OCR/perception candidates, review queues, resolution, and continuous
@@ -307,7 +337,8 @@ only create a larger silo.
    dependencies, disruptions, and customer-authorized overlays.
 5. **Hybrid retrieval:** relational + graph + spatial + temporal + semantic
    indexes with an evidence-preserving Context Compiler for GraphRAG and agents.
-6. **Computational products:** supplier discovery, substitution, dependency,
+6. **Mining validation + computational products:** analyst validation and
+   evidence-acquisition tasks for candidate patterns; supplier discovery, substitution, dependency,
    landed-cost, physical-risk, historical-state, and relationship-explanation
    APIs; Tradewind packages these into intelligence products.
 7. **Verification:** extend the implemented SP1 event proof boundary to selected
