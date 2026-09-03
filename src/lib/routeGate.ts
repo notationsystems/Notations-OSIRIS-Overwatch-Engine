@@ -54,6 +54,8 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'cloudflare-radar': 'general-purpose',
   conflicts: 'general-purpose',
   'corpus/facilities': 'freight',
+  'corpus/federation': 'freight',
+  'corpus/index': 'freight',
   'corpus/mining/dependencies': 'freight',
   'corpus/projectors': 'freight',
   'corpus/projections': 'freight',

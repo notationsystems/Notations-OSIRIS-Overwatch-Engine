@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CorpusAgentArtifactPage, StoredCorpusAgentArtifact } from './corpusAgentArtifacts';
 import { corpusAttestationKeyId, signCorpusBuildAttestation } from './corpusBuildAttestation';
+import { compileCorpusKnowledgeIndex } from './corpusKnowledgeIndex';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from './corpusPolicy';
 import { buildPayloadCorpusControlPlane } from './payloadCorpusControlPlane';
 import { buildPublicProjection } from './corpusProjection';
@@ -42,6 +43,7 @@ describe('Payload physical-economy control plane', () => {
         canonical: { backend: 'sqlite', source: value.source },
         projection: value.projection,
         projectionCurrent: true,
+        index: { backend: 'sqlite', manifest: compileCorpusKnowledgeIndex(value.projection, NOW).manifest, current: true },
         artifactBackend: 'sqlite',
         artifactPage: emptyPage(),
         recentArtifacts: [],
@@ -87,6 +89,7 @@ describe('Payload physical-economy control plane', () => {
       const snapshot = buildPayloadCorpusControlPlane({
         generatedAt: NOW, projectionStaleAfterMs: 86_400_000,
         canonical: { backend: 'sqlite', source: value.source }, projection: value.projection, projectionCurrent: true,
+        index: { backend: 'sqlite', manifest: compileCorpusKnowledgeIndex(value.projection, NOW).manifest, current: true },
         artifactBackend: 'sqlite', artifactPage: page, recentArtifacts: [stored], currentBuildAttestation: stored,
         sp1: payloadSp1ProgramIdentity(),
       });
@@ -95,6 +98,7 @@ describe('Payload physical-economy control plane', () => {
       ]);
       expect(snapshot.topology.nodes).toEqual(expect.arrayContaining([
         expect.objectContaining({ nodeId: 'payload:attestation:ed25519', health: expect.objectContaining({ status: 'healthy' }) }),
+        expect.objectContaining({ nodeId: 'payload:index:knowledge', health: expect.objectContaining({ status: 'healthy' }) }),
       ]));
       expect(snapshot.operator.attention.map(item => item.code)).not.toContain('CORPUS_BUILD_UNSIGNED');
     } finally {

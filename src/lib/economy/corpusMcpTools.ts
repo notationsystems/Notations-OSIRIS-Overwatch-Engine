@@ -14,6 +14,9 @@ export type CorpusMcpToolDef = {
 const id = z.string().min(3).max(256);
 const instant = z.string().datetime({ offset: true });
 const evidenceLevel = z.enum(['FAST', 'GROUNDED', 'AUDIT', 'VERIFIED']);
+const recordType = z.enum(['evidence', 'evidence_unit', 'entity', 'alias', 'relationship', 'observation', 'assertion']);
+const entityKind = z.enum(['organization', 'facility', 'material', 'commodity', 'supplier', 'port', 'vessel', 'infrastructure', 'process', 'network', 'market', 'flow', 'event', 'geography']);
+const predicate = z.enum(['operated_by', 'owned_by', 'located_in', 'produces', 'consumes', 'transforms', 'supplies', 'connects_to', 'ships_via', 'trades_in', 'substitutes_for', 'depends_on', 'calls_at', 'carries', 'loads_at', 'unloads_at', 'moves_between', 'routes_via', 'affected_by', 'observed_at', 'priced_by']);
 
 function authHeaders(): Readonly<Record<string, string>> | null {
   const token = env('PAYLOAD_CORPUS_QUERY_TOKEN')?.trim();
@@ -101,8 +104,38 @@ const corpusMcpTools: CorpusMcpToolDef[] = [
     handler: (args, context) => query(context, `/api/corpus/attestations?corpusBuildId=${encodeURIComponent(String(args.corpusBuildId))}`),
   },
   {
+    name: 'search_payload_corpus_index',
+    description: 'Search the exact current policy-filtered CorpusBuild through its deterministic lexical and faceted index. Results retain canonical records and provenance references. The score is lexical relevance only—not truth, confidence, materiality, or investment quality.',
+    inputSchema: {
+      query: z.string().min(2).max(500).describe('Lexical search query.'),
+      recordTypes: z.array(recordType).max(7).optional(),
+      entityKinds: z.array(entityKind).max(16).optional(),
+      predicates: z.array(predicate).max(25).optional(),
+      sourceIds: z.array(id).max(50).optional(),
+      asOf: instant.optional().describe('Optional valid-time ceiling.'),
+      knownAt: instant.optional().describe('Optional knowledge-time ceiling.'),
+      west: z.number().min(-180).max(180).optional(),
+      south: z.number().min(-90).max(90).optional(),
+      east: z.number().min(-180).max(180).optional(),
+      north: z.number().min(-90).max(90).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+    },
+    handler(args, context) {
+      const params = new URLSearchParams({ q: String(args.query) });
+      for (const key of ['recordTypes', 'entityKinds', 'predicates', 'sourceIds'] as const) if (Array.isArray(args[key])) params.set(key, args[key].map(String).join(','));
+      for (const key of ['asOf', 'knownAt', 'west', 'south', 'east', 'north', 'limit'] as const) if (args[key] !== undefined) params.set(key, String(args[key]));
+      return query(context, `/api/corpus/index?${params}`);
+    },
+  },
+  {
+    name: 'get_payload_corpus_index_coverage',
+    description: 'Inspect typed record, entity, relationship, observation, source, temporal, and spatial coverage for the exact current index. A coverage gap means unobserved in this CorpusBuild, never absent from the physical world.',
+    inputSchema: {},
+    handler: (_args, context) => query(context, '/api/corpus/index?view=coverage'),
+  },
+  {
     name: 'get_payload_control_plane',
-    description: 'Inspect the Payload physical-economy ecosystem itself: canonical corpus, projection freshness, APIs, MCP tools, evidence sources, persistent agent-result timeline, Kepler dock, build signatures, and the separately scoped SP1 program. Health, latency, cost, approval, and dispatch states remain typed and are never inferred from configuration alone.',
+    description: 'Inspect this Payload node: canonical corpus, projection/index/federation freshness, APIs, MCP tools, evidence sources, persistent agent-result timeline, Kepler dock, build signatures, and the separately scoped SP1 program. Health, latency, cost, approval, and dispatch states remain typed and are never inferred from configuration alone.',
     inputSchema: {
       afterSequence: z.number().int().min(0).optional().describe('Optional immutable artifact-journal cursor.'),
       limit: z.number().int().min(1).max(500).optional().describe('Maximum timeline events to return.'),

@@ -10,16 +10,32 @@ afterEach(() => {
 });
 
 describe('agent-facing corpus MCP package', () => {
-  it('exposes bounded query, result, warrant, attestation, and Payload control-plane tools', () => {
+  it('exposes retrieval, lineage, index, coverage, attestation, and Payload control-plane tools', () => {
     expect(CORPUS_MCP_TOOLS.map(tool => tool.name)).toEqual([
       'query_payload_corpus',
       'get_payload_corpus_result',
       'get_payload_corpus_warrant',
       'get_payload_corpus_attestation',
+      'search_payload_corpus_index',
+      'get_payload_corpus_index_coverage',
       'get_payload_control_plane',
     ]);
     expect(CORPUS_MCP_TOOLS[0].description).toContain('kepler.gl addDataToMap');
     expect(CORPUS_MCP_TOOLS[0].description).toContain('Neither state proves source truth');
+  });
+
+  it('maps typed mining facets onto the build-bound index API', async () => {
+    process.env.PAYLOAD_CORPUS_QUERY_TOKEN = 'QUERY-TOKEN';
+    let path = '';
+    const context: McpContext = { async fetchJson(value) { path = value; return { status: 200, body: { kind: 'corpus_knowledge_index_search' } }; } };
+    await CORPUS_MCP_TOOLS[4].handler({ query: 'polymer terminal', entityKinds: ['facility'], predicates: ['depends_on'], west: -80, south: 43, east: -79, north: 44, limit: 12 }, context);
+    expect(path).toContain('/api/corpus/index?');
+    expect(path).toContain('q=polymer+terminal');
+    expect(path).toContain('entityKinds=facility');
+    expect(path).toContain('predicates=depends_on');
+    expect(path).toContain('limit=12');
+    await CORPUS_MCP_TOOLS[5].handler({}, context);
+    expect(path).toBe('/api/corpus/index?view=coverage');
   });
 
   it('maps an explicit knowledge state and evidence budget onto the authenticated retrieval route', async () => {

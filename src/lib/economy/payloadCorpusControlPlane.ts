@@ -1,6 +1,7 @@
 /** Payload-specific control-plane projection over the physical-economy stack. */
 
 import type { CorpusAgentArtifactPage, StoredCorpusAgentArtifact } from './corpusAgentArtifacts';
+import type { CorpusKnowledgeIndexManifest } from './corpusKnowledgeIndex';
 import type { CompiledCorpusProjection } from './corpusProjection';
 import type { CorpusProjectionSource } from './physicalEconomyCorpus';
 import type { Sp1ProgramIdentity } from './sp1ProgramIdentity';
@@ -18,7 +19,7 @@ type PayloadCapability = {
   readonly capabilityId: string;
   readonly mode: 'observe' | 'propose' | 'execute';
   readonly approval: {
-    readonly requirement: 'automatic' | 'compiler_credential' | 'operator';
+    readonly requirement: 'automatic' | 'compiler_credential' | 'projector_credential' | 'operator';
     readonly state: 'not_required' | 'not_requested' | 'approval_required';
   };
   readonly health: PayloadControlHealth;
@@ -29,7 +30,7 @@ type PayloadCapability = {
 
 type PayloadTopologyNode = {
   readonly nodeId: string;
-  readonly kind: 'canonical_corpus' | 'read_model' | 'api' | 'artifact_journal' | 'operational_ledger' | 'mcp_tool' | 'visual_dock' | 'data_source' | 'proof_program' | 'build_signer';
+  readonly kind: 'canonical_corpus' | 'read_model' | 'knowledge_index' | 'api' | 'artifact_journal' | 'operational_ledger' | 'mcp_tool' | 'visual_dock' | 'data_source' | 'proof_program' | 'build_signer' | 'federation_target';
   readonly label: string;
   readonly health: {
     readonly status: PayloadControlHealth;
@@ -52,7 +53,7 @@ export type PayloadCorpusControlPlaneSnapshot = {
       readonly relationId: string;
       readonly sourceNodeId: string;
       readonly targetNodeId: string;
-      readonly kind: 'ingests_from' | 'projects' | 'serves' | 'persists_to' | 'packages' | 'visualizes' | 'attests' | 'proves';
+      readonly kind: 'ingests_from' | 'projects' | 'serves' | 'persists_to' | 'packages' | 'visualizes' | 'attests' | 'proves' | 'synchronizes_to';
     }[];
   };
   readonly timeline: {
@@ -111,12 +112,13 @@ export type PayloadCorpusControlPlaneInput = {
   readonly canonical: { readonly backend: 'sqlite' | 'postgresql'; readonly source: CorpusProjectionSource } | null;
   readonly projection: CompiledCorpusProjection | null;
   readonly projectionCurrent: boolean;
+  readonly index: { readonly backend: 'sqlite'; readonly manifest: CorpusKnowledgeIndexManifest; readonly current: boolean } | null;
   readonly artifactBackend: 'sqlite' | 'postgresql' | null;
   readonly artifactPage: CorpusAgentArtifactPage;
   readonly recentArtifacts: readonly StoredCorpusAgentArtifact[];
   readonly currentBuildAttestation: StoredCorpusAgentArtifact | null;
   readonly sp1: Sp1ProgramIdentity;
-  readonly faults?: readonly { readonly component: 'canonical' | 'projection' | 'artifacts'; readonly code: string }[];
+  readonly faults?: readonly { readonly component: 'canonical' | 'projection' | 'index' | 'artifacts'; readonly code: string }[];
 };
 
 function freeze<T>(value: T): T {
@@ -212,6 +214,7 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
       : 'healthy';
   const canonicalStatus: PayloadControlHealth = faults.has('canonical') || !input.canonical ? 'blocked' : 'healthy';
   const artifactStatus: PayloadControlHealth = faults.has('artifacts') || !input.artifactBackend ? 'blocked' : 'healthy';
+  const indexStatus: PayloadControlHealth = faults.has('index') || !input.index ? 'blocked' : input.index.current ? 'healthy' : 'stale';
   const queryStatus: PayloadControlHealth = projectionStatus === 'blocked' || artifactStatus === 'blocked'
     ? 'blocked'
     : projectionStatus === 'stale' ? 'stale' : 'healthy';
@@ -231,6 +234,14 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
       !projection ? faults.get('projection') ?? 'No public projection is available.' : !input.projectionCurrent ? 'Projection does not match current canonical source state.' : projectionAge < -60_000 ? 'Projection compile time is ahead of the control-plane clock.' : projectionAge > input.projectionStaleAfterMs ? 'Projection exceeds the configured freshness window.' : 'Projection matches canonical state and is within the freshness window.',
       [capability('projection.observe', 'observe', 'automatic', projectionStatus, projection ? [projection.manifest.projectionDigest, projection.manifest.policyLineageId] : [])],
       { corpusBuildId: projection?.manifest.corpusBuildId ?? null, recordCount: projection?.manifest.recordCount ?? 0, excludedRecords: projection?.manifest.excludedRecords ?? 0 }),
+    node('payload:index:knowledge', 'knowledge_index', 'Build-bound corpus knowledge index', indexStatus, input.index?.manifest.builtAt ?? null,
+      !input.index ? faults.get('index') ?? 'No corpus knowledge index is available.' : !input.index.current ? 'Index belongs to another public CorpusBuild and is refused for queries.' : 'Lexical, entity, relation, source, temporal, and spatial facets match the current CorpusBuild.',
+      [
+        capability('knowledge-index.search', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : []),
+        capability('knowledge-index.coverage', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : []),
+        capability('knowledge-index.rebuild', 'execute', 'compiler_credential', indexStatus, projection ? [projection.manifest.projectionDigest] : []),
+      ],
+      { backend: input.index?.backend ?? null, indexId: input.index?.manifest.indexId ?? null, documentCount: input.index?.manifest.documentCount ?? 0, postingCount: input.index?.manifest.postingCount ?? 0 }),
     node('payload:api:corpus-retrieval', 'api', 'Evidence-budgeted corpus retrieval API', queryStatus, input.generatedAt,
       queryStatus === 'healthy' ? 'Authenticated retrieval and durable result storage are available.' : 'Retrieval is constrained by projection or artifact-store state.',
       [capability('agent-context.observe', 'observe', 'automatic', queryStatus, projection ? [projection.manifest.projectionDigest] : [])]),
@@ -246,6 +257,21 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
       [capability('warrant.observe', 'observe', 'automatic', projectionStatus, projection ? [projection.manifest.projectionDigest] : [])]),
     node('payload:mcp:attestation', 'mcp_tool', 'get_payload_corpus_attestation', artifactStatus, null, 'MCP tool reads build signatures and preserves the separate SP1 proof scope.',
       [capability('attestation.observe', 'observe', 'automatic', artifactStatus, currentAttestation ? [currentAttestation.artifactHash] : [])]),
+    node('payload:mcp:index-search', 'mcp_tool', 'search_payload_corpus_index', indexStatus, null, 'MCP tool searches the exact current knowledge index; lexical rank is not a trust score.',
+      [capability('knowledge-index.search', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : [])]),
+    node('payload:mcp:index-coverage', 'mcp_tool', 'get_payload_corpus_index_coverage', indexStatus, null, 'MCP tool returns typed observed and unobserved coverage for the indexed CorpusBuild.',
+      [capability('knowledge-index.coverage', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : [])]),
+    node('payload:api:notation-federation', 'api', 'Notation Data Substrate federation API', projectionStatus, projection?.manifest.compiledAt ?? null,
+      projectionStatus === 'healthy' ? 'Ordered public sync envelopes are available from the exact current CorpusBuild.' : 'Federation is constrained by public projection state.',
+      [
+        capability('notation-sync.observe', 'observe', 'automatic', projectionStatus, projection ? [projection.manifest.projectionDigest] : []),
+        capability('notation-sync.checkpoint', 'execute', 'projector_credential', projectionStatus, projection ? [projection.manifest.corpusBuildId] : []),
+      ],
+      { sourceNodeUri: 'notation://node/payload', destinationNodeUri: 'notation://node/substrate', scope: 'public/global', consumerCheckpointState: 'UNOBSERVED' }),
+    node('notation:substrate', 'federation_target', 'Notation Data Substrate', 'unobserved', null,
+      'Payload publishes a checked federation contract, but destination ingestion health, lag, cost, and latency have not been observed by this node.',
+      [capability('notation-substrate.ingest', 'execute', 'operator', 'unobserved', [])],
+      { nodeUri: 'notation://node/substrate', authorityModel: 'one_logical_identity_space_many_physical_representations' }),
     node('payload:dock:kepler', 'visual_dock', 'Kepler spatial/temporal dock', latestSpatial ? 'healthy' : 'unobserved', latestResult?.recordedAt ?? null,
       latestSpatial ? 'Latest persisted agent result contains a kepler.gl addDataToMap payload.' : 'No persisted spatial result has been observed yet.',
       [capability('physical-topology.visualize', 'observe', 'automatic', latestSpatial ? 'healthy' : 'unobserved', latestSpatial ? [latestSpatial.spatialResultId] : [])]),
@@ -277,12 +303,17 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
 
   const relations: PayloadCorpusControlPlaneSnapshot['topology']['relations'][number][] = [
     { relationId: 'canonical-projects-public', sourceNodeId: 'payload:corpus:canonical', targetNodeId: 'payload:corpus:projection', kind: 'projects' },
+    { relationId: 'projection-projects-index', sourceNodeId: 'payload:corpus:projection', targetNodeId: 'payload:index:knowledge', kind: 'projects' },
     { relationId: 'projection-serves-retrieval', sourceNodeId: 'payload:corpus:projection', targetNodeId: 'payload:api:corpus-retrieval', kind: 'serves' },
     { relationId: 'retrieval-persists-artifacts', sourceNodeId: 'payload:api:corpus-retrieval', targetNodeId: 'payload:journal:agent-artifacts', kind: 'persists_to' },
     { relationId: 'mcp-packages-retrieval', sourceNodeId: 'payload:mcp:query', targetNodeId: 'payload:api:corpus-retrieval', kind: 'packages' },
     { relationId: 'mcp-recovers-results', sourceNodeId: 'payload:mcp:result', targetNodeId: 'payload:journal:agent-artifacts', kind: 'serves' },
     { relationId: 'mcp-walks-projection', sourceNodeId: 'payload:mcp:warrant', targetNodeId: 'payload:corpus:projection', kind: 'serves' },
     { relationId: 'mcp-reads-attestations', sourceNodeId: 'payload:mcp:attestation', targetNodeId: 'payload:journal:agent-artifacts', kind: 'serves' },
+    { relationId: 'mcp-searches-index', sourceNodeId: 'payload:mcp:index-search', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
+    { relationId: 'mcp-reads-index-coverage', sourceNodeId: 'payload:mcp:index-coverage', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
+    { relationId: 'projection-serves-federation', sourceNodeId: 'payload:corpus:projection', targetNodeId: 'payload:api:notation-federation', kind: 'serves' },
+    { relationId: 'payload-synchronizes-notation-substrate', sourceNodeId: 'payload:api:notation-federation', targetNodeId: 'notation:substrate', kind: 'synchronizes_to' },
     { relationId: 'kepler-visualizes-results', sourceNodeId: 'payload:journal:agent-artifacts', targetNodeId: 'payload:dock:kepler', kind: 'visualizes' },
     { relationId: 'signer-attests-projection', sourceNodeId: 'payload:attestation:ed25519', targetNodeId: 'payload:corpus:projection', kind: 'attests' },
     { relationId: 'sp1-proves-event-batches', sourceNodeId: 'payload:proof:payload-event-batch-v1', targetNodeId: 'payload:operations:event-ledger', kind: 'proves' },
@@ -293,9 +324,14 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
   const byHealth = (status: PayloadControlHealth) => nodes.filter(entry => entry.health.status === status).map(entry => entry.nodeId);
   const attention: PayloadCorpusControlPlaneSnapshot['operator']['attention'][number][] = [];
   if (projectionStatus === 'stale') attention.push({ code: 'CORPUS_PROJECTION_STALE', detail: 'The public projection is behind canonical state or outside its freshness window.', remedy: 'Run the authenticated corpus compiler and verify replay equivalence before replacing the read model.' });
+  if (indexStatus === 'blocked') attention.push({ code: faults.get('index') ?? 'CORPUS_INDEX_NOT_BUILT', detail: 'The build-bound corpus knowledge index is unavailable.', remedy: 'Use compiler authority to rebuild the disposable index from the exact current public CorpusBuild.' });
+  if (indexStatus === 'stale') attention.push({ code: 'CORPUS_INDEX_STALE', detail: 'The knowledge index does not identify the current public CorpusBuild.', remedy: 'Replace it atomically from the current projection; do not merge index generations.' });
   if (projection && !currentAttestation) attention.push({ code: 'CORPUS_BUILD_UNSIGNED', detail: `CorpusBuild ${projection.manifest.corpusBuildId} has no stored Ed25519 attestation.`, remedy: 'After reviewing the exact commitment, use the compiler-authenticated attestation endpoint.' });
   if (!latestSpatial) attention.push({ code: 'PAYLOAD_SPATIAL_RESULT_UNOBSERVED', detail: 'No persisted agent result currently feeds the Kepler dock.', remedy: 'Run an evidence-budgeted corpus query whose entities carry observed coordinates.' });
-  for (const [component, code] of faults) attention.push({ code, detail: `${component} could not be inspected without exposing deployment details.`, remedy: 'Inspect the protected service logs and restore the configured dependency.' });
+  for (const [component, code] of faults) {
+    if (component === 'index') continue; // already carries a rebuild-specific remedy above
+    attention.push({ code, detail: `${component} could not be inspected without exposing deployment details.`, remedy: 'Inspect the protected service logs and restore the configured dependency.' });
+  }
 
   const basis = {
     schema: 'payload.corpus.control-plane.v1' as const,

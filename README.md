@@ -395,17 +395,28 @@ production zkVM boundary and proves authorized operational event batches only.
 It is explicitly marked as not applicable to corpus-build attestations, so
 corpus answers remain `zkProof: NOT_GENERATED`.
 
-`npm run mcp` now serves five agent-native corpus tools alongside the twelve
+`npm run mcp` now serves seven agent-native corpus tools alongside the twelve
 legacy analytical tools: query and persist a context, retrieve a result, walk
-its warrant, inspect its build attestation, and inspect Payload's own
-physical-economy control state. `GET /api/corpus/control-plane` derives a live
+its warrant, inspect its build attestation, search the exact build-bound index,
+inspect typed index coverage, and inspect Payload's own physical-economy
+control state. `GET/POST /api/corpus/index` atomically builds and queries a
+disposable SQLite/WAL index with lexical, entity, relation, source, temporal,
+and spatial facets. Search rank is not a trust score; coverage gaps are typed
+as unobserved. `GET /api/corpus/control-plane` derives a live
 topology, capability/approval state, immutable event timeline, current Kepler
-dock input, and operator healthy/stale/blocked/unobserved queues from the real
-corpus stack. Latency and cost remain typed `UNOBSERVED` until instrumented;
+dock input, index/federation state, and operator healthy/stale/blocked/unobserved
+queues from the real corpus stack. Latency and cost remain typed `UNOBSERVED` until instrumented;
 artifact events explicitly report that nothing was dispatched. `GET/POST
 /api/corpus/projectors` exposes the transactional
 projection outbox and monotonic checkpoints under the non-interchangeable
 `PAYLOAD_CORPUS_PROJECTOR_TOKEN` worker identity.
+
+`GET/POST /api/corpus/federation` is the Payload → Notation Data Substrate
+sync seam. It emits ordered, build-bound public records as content-addressed
+`notation://` envelopes and records monotonic per-consumer checkpoints. This
+creates one logical identity space across systems without turning the Notation
+substrate or Nodes into a second mutable source of Payload truth. Private and
+internal sync remain refused until separately governed projections exist.
 
 Successful corpus writes now include a deterministic Corpus Builder manifest
 bound to the Payload product ID, physical-economy CorpusDefinition fingerprint,

@@ -157,6 +157,7 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_DATABASE_PATH` | Shared SQLite/WAL file for ordered operational events and, by default, corpus records. Use the named runtime volume. | none |
 | `PAYLOAD_CORPUS_DATABASE_PATH` | Canonical SQLite/WAL file for the physical-economy corpus. | `/app/runtime-data/physical-economy-corpus.sqlite` in Compose; otherwise `PAYLOAD_DATABASE_PATH` |
 | `PAYLOAD_CORPUS_READ_MODEL_PATH` | Separate disposable SQLite/WAL file for the policy-filtered public query projection. | `/app/runtime-data/corpus-public-read-model.sqlite` in Compose |
+| `PAYLOAD_CORPUS_INDEX_PATH` | Disposable, build-bound lexical/faceted index over the exact public CorpusBuild. | `/app/runtime-data/corpus-knowledge-index.sqlite` in Compose; otherwise derived beside the read model |
 | `PAYLOAD_CORPUS_INGEST_TOKEN` | Dedicated bearer authority for immutable corpus append and raw cursor replay. | none |
 | `PAYLOAD_CORPUS_COMPILER_TOKEN` | Separate least-privilege bearer authority for read-model compilation and manifest inspection. | none |
 | `PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH` | Separate append-only SQLite/WAL registry for mined candidate knowledge and mining-run provenance. | `/app/runtime-data/corpus-pattern-registry.sqlite` in Compose |
@@ -196,6 +197,20 @@ curl -X POST http://localhost:3000/api/corpus/projections \
 Payload Earth refuses facility queries until this succeeds, and refuses again
 if canonical global state advances without a rebuild. Do not back up the read-
 model file as an authority; recreate it from the canonical corpus.
+
+Build the matching retrieval index after each successful projection compile:
+
+```bash
+curl -X POST http://localhost:3000/api/corpus/index \
+  -H "Authorization: Bearer $PAYLOAD_CORPUS_COMPILER_TOKEN" \
+  -H "Content-Type: application/json" -d '{}'
+```
+
+The index is also disposable. It persists on the runtime volume for restart
+speed, but Payload refuses it whenever its CorpusBuild or projection digest is
+stale. Notation Data Substrate workers use `GET/POST /api/corpus/federation`
+with the projector token to consume `notation://` sync envelopes and commit
+monotonic consumer checkpoints.
 
 The derived agent-artifact SQLite file is authoritative operational evidence and
 must remain on `payload-runtime` or another backed-up volume. For build signing,

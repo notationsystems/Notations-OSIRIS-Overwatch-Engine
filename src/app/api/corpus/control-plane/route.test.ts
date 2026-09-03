@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { POST as retrieve } from '../retrieval/route';
 import { GET } from './route';
 import { corpusAgentArtifactPath, corpusAgentArtifactStore } from '@/lib/economy/corpusAgentArtifactRuntime';
+import { CorpusKnowledgeIndexStore } from '@/lib/economy/corpusKnowledgeIndexStore';
+import { corpusKnowledgeIndexPath, corpusKnowledgeIndexStore } from '@/lib/economy/corpusKnowledgeIndexRuntime';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from '@/lib/economy/corpusPolicy';
 import { compilePublicProjection, CorpusProjectionStore } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
@@ -15,6 +17,7 @@ import { resetProcessSingleton } from '@/lib/economy/processSingleton';
 const environment = [
   'PAYLOAD_CORPUS_QUERY_TOKEN', 'PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_DATABASE_PATH',
   'PAYLOAD_CORPUS_READ_MODEL_PATH', 'PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH',
+  'PAYLOAD_CORPUS_INDEX_PATH',
   'PAYLOAD_CORPUS_CONTROL_STALE_AFTER_MS',
 ] as const;
 const original = new Map(environment.map(name => [name, process.env[name]]));
@@ -30,6 +33,11 @@ afterEach(async () => {
   if (projectionPath) {
     try { corpusProjectionStore()?.close(); } catch { /* already closed */ }
     resetProcessSingleton(`physical-economy-projection:${resolve(projectionPath)}`);
+  }
+  const indexPath = corpusKnowledgeIndexPath();
+  if (indexPath) {
+    try { corpusKnowledgeIndexStore()?.close(); } catch { /* already closed */ }
+    resetProcessSingleton(`corpus-knowledge-index:${indexPath}`);
   }
   const artifactPath = corpusAgentArtifactPath();
   if (artifactPath) {
@@ -53,6 +61,8 @@ describe('GET /api/corpus/control-plane', () => {
     process.env.PAYLOAD_CORPUS_DATABASE_PATH = corpusPath;
     process.env.PAYLOAD_CORPUS_READ_MODEL_PATH = projectionPath;
     process.env.PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH = join(directory, 'artifacts.sqlite');
+    const indexPath = join(directory, 'index.sqlite');
+    process.env.PAYLOAD_CORPUS_INDEX_PATH = indexPath;
     process.env.PAYLOAD_CORPUS_CONTROL_STALE_AFTER_MS = '31536000000';
     delete process.env.PAYLOAD_DATABASE_PATH;
 
@@ -65,8 +75,12 @@ describe('GET /api/corpus/control-plane', () => {
     expect(corpus.append('global', records, now).kind).toBe('committed');
     const projection = new CorpusProjectionStore(projectionPath);
     compilePublicProjection(corpus, projection, now, now);
+    const compiled = projection.loadPublic()!;
+    const index = new CorpusKnowledgeIndexStore(indexPath);
+    index.replace(compiled, now);
     corpus.close();
     projection.close();
+    index.close();
 
     const retrieval = await retrieve(new Request('http://localhost/api/corpus/retrieval', {
       method: 'POST',
@@ -79,12 +93,18 @@ describe('GET /api/corpus/control-plane', () => {
       headers: { authorization: 'Bearer QUERY-TOKEN' },
     }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
+    const body = await response.json();
+    expect(body).toMatchObject({
       schema: 'payload.corpus.control-plane.v1',
       ecosystemId: 'payload:physical-economy',
       timeline: { afterSequence: 0, nextAfterSequence: 1, events: [{ changed: 'agent_context_persisted', why: 'Control API Port', dispatched: false }] },
       dock: { spatial: { status: 'READY', asOf: now, keplerGl: { action: 'addDataToMap' } } },
       operator: { blocked: [] },
     });
+    expect(body.topology.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeId: 'payload:index:knowledge', health: { status: 'healthy', observedAt: now, detail: expect.any(String) } }),
+      expect.objectContaining({ nodeId: 'payload:api:notation-federation', health: expect.objectContaining({ status: 'healthy' }) }),
+      expect.objectContaining({ nodeId: 'notation:substrate', health: expect.objectContaining({ status: 'unobserved' }) }),
+    ]));
   });
 });

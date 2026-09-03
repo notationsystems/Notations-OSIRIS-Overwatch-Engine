@@ -31,6 +31,7 @@ services:
       - PAYLOAD_DATABASE_PATH=${PAYLOAD_DATABASE_PATH:-}
       - PAYLOAD_CORPUS_DATABASE_PATH=${PAYLOAD_CORPUS_DATABASE_PATH:-/app/runtime-data/physical-economy-corpus.sqlite}
       - PAYLOAD_CORPUS_READ_MODEL_PATH=${PAYLOAD_CORPUS_READ_MODEL_PATH:-/app/runtime-data/corpus-public-read-model.sqlite}
+      - PAYLOAD_CORPUS_INDEX_PATH=${PAYLOAD_CORPUS_INDEX_PATH:-/app/runtime-data/corpus-knowledge-index.sqlite}
       - PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH=${PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH:-/app/runtime-data/corpus-pattern-registry.sqlite}
     volumes:
       - payload-runtime:/app/runtime-data

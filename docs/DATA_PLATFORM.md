@@ -336,6 +336,11 @@ deterministic plan, complete ContextPackage, or persistent agent result; `GET
 /api/corpus/control-plane` for the Payload physical-economy topology,
 capability state, artifact timeline, Kepler dock, and operator attention; and `GET/POST
 /api/corpus/projectors` for ordered projection events and checkpoints. The
+implemented representation layer also exposes `GET/POST /api/corpus/index`
+for an exact build-bound lexical/faceted index and `GET/POST
+/api/corpus/federation` for public `notation://` sync envelopes plus monotonic
+Notation Data Substrate consumer checkpoints. The substrate is a federation
+target and identity plane, not a second mutable canonical authority. The
 retrieval boundary caps identities, predicates, hops, evidence results and
 query size; binds every trace to the CorpusBuild and projection digest; refuses
 unavailable historical knowledge times; and returns exact output record IDs for
@@ -428,8 +433,9 @@ maximum graph depth, immutable access audits, and upstream-source isolation.
    monitor projector lag from the transactional outbox.
 6. Move high-volume observations into partitioned columnar history only after
    measured query and lifecycle requirements justify it.
-7. Add graph and vector projections through the compiler; spatial and search
-   already have an initial deterministic public representation.
+7. Operate the deterministic build-bound lexical/faceted index and public
+   Notation federation feed; add graph and vector projections through the
+   compiler only when measured workloads justify them.
 8. Extend the implemented authorization-before-emission policy join into the
    authorization-before-retrieval Context Compiler for model/agent access.
 9. Add validation decisions and evidence-acquisition tasks for mined candidates;

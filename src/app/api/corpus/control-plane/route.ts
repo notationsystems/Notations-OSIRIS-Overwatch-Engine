@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { corpusAgentArtifactStore } from '@/lib/economy/corpusAgentArtifactRuntime';
 import type { CorpusAgentArtifactPage, StoredCorpusAgentArtifact } from '@/lib/economy/corpusAgentArtifacts';
 import { authorizeCorpusQuery } from '@/lib/economy/corpusHttpAuth';
+import { corpusKnowledgeIndexStore } from '@/lib/economy/corpusKnowledgeIndexRuntime';
+import type { CorpusKnowledgeIndexManifest } from '@/lib/economy/corpusKnowledgeIndex';
 import { buildPayloadCorpusControlPlane } from '@/lib/economy/payloadCorpusControlPlane';
 import { projectionMatchesSource, type CompiledCorpusProjection } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
@@ -50,9 +52,10 @@ export async function GET(req: Request) {
   }
 
   const generatedAt = new Date().toISOString();
-  const faults: { component: 'canonical' | 'projection' | 'artifacts'; code: string }[] = [];
+  const faults: { component: 'canonical' | 'projection' | 'index' | 'artifacts'; code: string }[] = [];
   let canonical: { backend: 'sqlite' | 'postgresql'; source: CorpusProjectionSource } | null = null;
   let projection: CompiledCorpusProjection | null = null;
+  let index: { backend: 'sqlite'; manifest: CorpusKnowledgeIndexManifest; current: boolean } | null = null;
   let artifactBackend: 'sqlite' | 'postgresql' | null = null;
   let artifactPage: CorpusAgentArtifactPage = { ...EMPTY_PAGE, afterSequence, nextAfterSequence: afterSequence };
   let recentArtifacts: readonly StoredCorpusAgentArtifact[] = [];
@@ -90,12 +93,25 @@ export async function GET(req: Request) {
     faults.push({ component: 'artifacts', code: 'CORPUS_AGENT_ARTIFACT_STORE_UNAVAILABLE' });
   }
 
+  try {
+    const store = corpusKnowledgeIndexStore();
+    if (!store) faults.push({ component: 'index', code: 'CORPUS_INDEX_NOT_CONFIGURED' });
+    else {
+      const manifest = store.manifest();
+      if (!manifest) faults.push({ component: 'index', code: 'CORPUS_INDEX_NOT_BUILT' });
+      else index = { backend: store.backend, manifest, current: Boolean(projection && manifest.corpusBuildId === projection.manifest.corpusBuildId && manifest.projectionDigest === projection.manifest.projectionDigest) };
+    }
+  } catch {
+    faults.push({ component: 'index', code: 'CORPUS_INDEX_UNAVAILABLE' });
+  }
+
   const snapshot = buildPayloadCorpusControlPlane({
     generatedAt,
     projectionStaleAfterMs: freshness,
     canonical,
     projection,
     projectionCurrent: Boolean(canonical && projection && projectionMatchesSource(projection.manifest, canonical.source)),
+    index,
     artifactBackend,
     artifactPage,
     recentArtifacts,

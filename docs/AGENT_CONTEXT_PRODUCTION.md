@@ -30,13 +30,15 @@ attestations, and gives neither role update or delete authority.
 
 ## Agent MCP tools
 
-`npm run mcp` exposes five corpus tools in addition to the existing analytical
+`npm run mcp` exposes seven corpus tools in addition to the existing analytical
 surface:
 
 - `query_payload_corpus`
 - `get_payload_corpus_result`
 - `get_payload_corpus_warrant`
 - `get_payload_corpus_attestation`
+- `search_payload_corpus_index`
+- `get_payload_corpus_index_coverage`
 - `get_payload_control_plane`
 
 The MCP process needs `PAYLOAD_CORPUS_QUERY_TOKEN`; the token is sent only in the
@@ -44,13 +46,35 @@ Authorization header to the same HTTP routes used by Terminal. Every query names
 valid time, knowledge mode and evidence budget. A historical `as_known_then`
 request succeeds only against a projection compiled at that knowledge time.
 
+The index tools read a separate SQLite/WAL representation bound to one exact
+CorpusBuild and projection digest. Search supports lexical, record/entity,
+relationship, source, valid-time, knowledge-time and bounding-box facets.
+Its score is labeled lexical relevance and never reused as confidence or
+truth. Coverage returns typed unobserved-location and unobserved-source-health
+signals; absence from the index is not absence from the physical world.
+
 ## Payload ecosystem control view
 
 `GET /api/corpus/control-plane` and `get_payload_control_plane` inspect one
 real system deeply: Payload's physical-economy corpus. The topology is derived
 from the configured canonical store, current public projection, retrieval API,
 artifact journal, evidence source IDs, MCP package, Kepler adapter, Ed25519
-signer state, operational-event ledger boundary, and pinned SP1 identity.
+signer state, build-bound knowledge index, Notation federation API,
+operational-event ledger boundary, and pinned SP1 identity.
+
+## Notation Data Substrate federation
+
+`GET /api/corpus/federation` emits ordered, content-addressed sync envelopes
+from the exact current policy-filtered public CorpusBuild. Payload identities
+are projected into stable `notation://artifact|entity|observation|claim/...`
+URIs while the Payload canonical corpus remains authoritative. `POST` records
+a monotonic checkpoint for one named substrate consumer. Both operations use
+the projector credential, never query or compiler authority.
+
+This implements one logical identity space with many physical
+representations—not a second mutable master database. V1 intentionally covers
+public/global data only. Customer or internal federation requires a separate
+authorized projection and cannot be enabled by changing a request parameter.
 
 The result includes capability mode and approval state, projection freshness,
 an artifact-derived event timeline, and an operator summary of healthy, stale,

@@ -387,9 +387,10 @@ refusal, typed facility discovery, reproducible proof-carrying Earth answers,
 domain-separated CorpusBuild commitments and inclusion proofs, score-free
 Warrant Graph API/inspector, evidence-budgeted agent contexts and common
 Notation assertions, persistent result lookup, a linearized agent-artifact
-journal, signed CorpusBuild attestations, five agent-facing corpus MCP tools,
+journal, signed CorpusBuild attestations, seven agent-facing corpus MCP tools,
 a Payload-specific control view over topology, capability state, artifact
-events, operator attention, and the latest Kepler dock input,
+events, operator attention, the build-bound knowledge index, public Notation
+Data Substrate federation, and the latest Kepler dock input,
 kepler.gl-compatible spatial result envelopes, deterministic
 depth-1 shared-dependency mining, MiningRun provenance, and an append-only
 Pattern Registry for candidate knowledge.
@@ -399,7 +400,8 @@ storage, append-only security-audit export, OAuth/OIDC, production
 PostgreSQL/PostGIS cutover, Parquet/Iceberg history, analyst review queues,
 probabilistic entity-resolution proposals, candidate validation/promotion,
 recursive dependency propagation, link prediction, temporal/spatial/statistical/
-anomaly mining, graph/vector projections, additional computational endpoints,
+anomaly mining, graph/vector/semantic projections, governed internal/customer
+federation, additional computational endpoints,
 independent timestamp anchoring, and SP1 proofs over corpus builds. These
 are the next layers; the UI must continue to refuse rather than imply they
 already exist.
