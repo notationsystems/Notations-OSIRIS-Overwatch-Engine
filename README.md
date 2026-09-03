@@ -342,8 +342,18 @@ policy-filtered `public:global` read model—never canonical write tables—reso
 canonical material IDs or explicit aliases, returns evidence-linked producing
 facilities, and carries a proof-shaped answer warrant. The warrant binds
 canonical identities, evidence hashes, computation digests, uncertainty,
-joined information-flow policy, and a privacy-safe corpus-build identity. The
-result becomes a dedicated facility layer on Payload Earth.
+joined information-flow policy, and a privacy-safe corpus-build identity. It
+also carries a `payload.verification-envelope.v1` and a score-free
+`payload.corpus.warrant-graph.v1`. Every basis record has a deterministic
+Merkle inclusion proof against the exact public CorpusBuild; the envelope says
+`REPRODUCIBLE`, not `ATTESTED` or `ZK_VERIFIED`, until an independent signature
+or SP1 proof actually exists. The result becomes a dedicated facility layer on
+Payload Earth, where operators can open the Warrant Graph and walk from answer
+to computation, records, evidence, named source, build, and commitment.
+`GET /api/corpus/warrants?entityId=...` provides the same bounded graph under
+`PAYLOAD_CORPUS_QUERY_TOKEN` for any entity or exact record in the current
+public projection. Supporting, qualifying, and contradictory evidence remain
+separate edges; no composite trust score is calculated.
 `POST /api/corpus/projections` deterministically rebuilds that read model;
 stale projections are refused. Every build is version-bound to canonical
 state, schema, ontology, policy, compiler, embedding and representation spec.

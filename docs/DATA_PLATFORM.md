@@ -242,6 +242,32 @@ Graph, spatial, vector, search, entity-summary, and relationship-summary
 projectors must follow the same rule: carry canonical IDs and representation
 versions, remain reproducible, and never acquire identity authority.
 
+## Proof-carrying outputs and Warrant Graph
+
+The implemented answer boundary exposes more than a key and value:
+
+```text
+identity + value + time + basis + evidence + lineage + verification
+```
+
+`payload.verification-envelope.v1` binds each deterministic answer to its
+program/version, inputs, parameters, output digest, CorpusBuild, and exact basis
+record IDs. Each basis record carries a domain-separated SHA-256 Merkle
+inclusion proof against the compiled projection. This establishes reproducible
+membership in that build commitment; it does not establish source truth or an
+independent historical timestamp.
+
+`payload.corpus.warrant-graph.v1` turns the same contract into a walkable graph:
+answer, computation, record, evidence, source, CorpusBuild, and commitment.
+Support, contradiction, and qualification are distinct edges. The graph has an
+explicit `NO_COMPOSITE_TRUST_SCORE` policy because disagreement is evidence to
+inspect, not a scalar to average away.
+
+The vocabulary is `PROVENANCE`, `REPRODUCIBLE`, `ATTESTED`, and `ZK_VERIFIED`.
+V0 returns `REPRODUCIBLE`, with external attestation and zk proof marked absent.
+A later pinned SP1 program may prove selected deterministic metrics or compiler
+transformations. It will prove computation integrity, never empirical truth.
+
 ## Data Miner and Pattern Registry
 
 PayloadOS Miner V0 implements one deliberately narrow graph algorithm authorized

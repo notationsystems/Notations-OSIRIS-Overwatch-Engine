@@ -72,8 +72,22 @@ export const API_GROUPS: ApiGroup[] = [
           { name: 'knowledgeCutoff', desc: 'Optional exact cutoff of the active compiled projection; other historical cutoffs are refused in V0.' },
         ],
         returns: ['kind', 'material', 'scope', 'asOf', 'knowledgeCutoff', 'facilities', 'warrant'],
-        notes: 'Reads only the compiled, policy-filtered public/global read model. Successful answers carry canonical identities, evidence hashes, computation digests, uncertainty, joined policy lineage, and a privacy-safe corpus-build reference. Missing, ambiguous, stale, corrupt, unauthorized, or historically unavailable state returns a typed refusal; customer scope cannot be requested here.',
+        notes: 'Reads only the compiled, policy-filtered public/global read model. Successful answers carry canonical identities, evidence hashes, computation digests, uncertainty, joined policy lineage, a privacy-safe corpus-build reference, a VerificationEnvelope, and a score-free Warrant Graph. Current answers are reproducible and have Merkle inclusion proofs; they are not presented as externally attested or zk-verified. Missing, ambiguous, stale, corrupt, unauthorized, or historically unavailable state returns a typed refusal; customer scope cannot be requested here.',
         env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_QUERY_DATABASE_URL', 'PAYLOAD_CORPUS_READ_MODEL_PATH'],
+      },
+      {
+        path: '/api/corpus/warrants',
+        method: 'GET',
+        summary: 'Explains one current public corpus record or entity as a walkable, score-free provenance and computation graph.',
+        params: [
+          { name: 'recordId', desc: 'Exact record ID. Supply this or entityId, never both.', example: 'record:entity:warrant-api' },
+          { name: 'entityId', desc: 'Canonical entity ID. Supply this or recordId, never both.' },
+          { name: 'maximumRecords', desc: 'Hard response bound from 1 to 500.', example: '200' },
+        ],
+        returns: ['kind', 'subject', 'verification', 'graph'],
+        notes: 'Requires dedicated query authority and reads only the current policy-filtered public projection. It preserves supports, contradicts, and qualifies as separate edges and never computes a composite trust score. The VerificationEnvelope binds exact records to a CorpusBuild Merkle root and deterministic computation; membership is not source truth, external timestamping, or an SP1 proof.',
+        env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_QUERY_DATABASE_URL', 'PAYLOAD_CORPUS_READ_MODEL_PATH', 'PAYLOAD_CORPUS_QUERY_TOKEN'],
+        requiresAuth: true,
       },
       {
         path: '/api/corpus/projections',

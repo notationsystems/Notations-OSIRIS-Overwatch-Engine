@@ -4,6 +4,8 @@ import { createHash } from 'node:crypto';
 import { stableValue } from './loadOperationsStore';
 import { joinCorpusPolicies, type CorpusPolicyLineage } from './corpusPolicy';
 import type { CorpusProjectionManifest } from './corpusProjection';
+import { buildVerificationEnvelope, type VerificationEnvelope } from './corpusVerification';
+import { buildCorpusWarrantGraph, type CorpusWarrantGraph } from './corpusWarrantGraph';
 import { corpusEvidenceClosure } from './physicalEconomyCorpus';
 import type {
   CorpusEvidenceRecord,
@@ -49,6 +51,8 @@ export type FacilityAnswerWarrant = {
   };
   readonly policy: CorpusPolicyLineage;
   readonly corpusBuild: PublicCorpusBuildReference;
+  readonly verification: VerificationEnvelope;
+  readonly warrantGraph: CorpusWarrantGraph;
   /** V0 compatibility fields; corpusBuild is the durable contract. */
   readonly projectionId: string;
   readonly projectionDigest: string;
@@ -144,6 +148,23 @@ export function buildFacilityAnswerWarrant(
     records: basis.map(record => ({ recordId: record.recordId, recordHash: record.recordHash })),
   });
   const outputDigest = digest(result);
+  const computation = [{ operation: 'facility_discovery' as const, version: '1.0.0' as const, inputDigest, outputDigest }] as const;
+  const verification = buildVerificationEnvelope({
+    manifest,
+    projectionRecords: records,
+    basisRecords: basis,
+    programId: 'payload:facility-discovery',
+    algorithmVersion: '1.0.0',
+    inputDigest,
+    outputDigest,
+    parameters: { materialRef, asOf: result.asOf, knowledgeCutoff: result.knowledgeCutoff },
+  });
+  const warrantGraph = buildCorpusWarrantGraph({
+    statement: `Facilities producing ${result.material.name}`,
+    basisRecords: basis,
+    manifest,
+    verification,
+  });
   const knownAt = basis.reduce((latest, record) => Date.parse(record.knownAt) > Date.parse(latest) ? record.knownAt : latest, basis[0]?.knownAt ?? result.knowledgeCutoff);
   const corpusBuild = publicCorpusBuildReference(manifest);
   return frozen({
@@ -154,7 +175,7 @@ export function buildFacilityAnswerWarrant(
       canonicalIdentities: identities,
       knownAt,
       evidence,
-      computation: [{ operation: 'facility_discovery' as const, version: '1.0.0' as const, inputDigest, outputDigest }],
+      computation,
       uncertainty: {
         kind: 'reported_confidence' as const,
         facilityCounts: confidence,
@@ -162,6 +183,8 @@ export function buildFacilityAnswerWarrant(
       },
       policy: joined.lineage,
       corpusBuild,
+      verification,
+      warrantGraph,
       projectionId: manifest.projectionId,
       projectionDigest: manifest.projectionDigest,
       projectionRecordCount: manifest.recordCount,

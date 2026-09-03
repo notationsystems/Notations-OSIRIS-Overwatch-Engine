@@ -169,6 +169,8 @@ the system does not currently pretend that two independent sequences are one.
 - Context compilation and projector checkpoints require
   `PAYLOAD_CORPUS_QUERY_TOKEN` and `PAYLOAD_CORPUS_PROJECTOR_TOKEN`
   respectively; neither credential grants database authority.
+- Exact record/entity warrant walks require `PAYLOAD_CORPUS_QUERY_TOKEN` and
+  remain bounded to records admitted into the current public projection.
 
 ## API surfaces
 
@@ -187,11 +189,52 @@ rendered by the Search surface as a dedicated query layer on Payload Earth.
 Every successful response carries a `payload.corpus.answer-warrant.v1` with
 canonical identities, knowledge time, evidence artifact hashes, deterministic
 computation input/output digests, explicit uncertainty, policy lineage, and a
-privacy-safe corpus-build reference. Canonical source sequence and fingerprint
-stay inside the authenticated compiler manifest so restricted-record cadence is
-not leaked through a public warrant. The active V0 read model has one pinned
-knowledge cutoff; arbitrary historical cutoffs require versioned projections
-and are refused rather than reconstructed from incomplete state.
+privacy-safe corpus-build reference. The warrant also contains a
+`payload.verification-envelope.v1` and the complete score-free graph used by
+the Terminal inspector. Canonical source sequence and fingerprint stay inside
+the authenticated compiler manifest so restricted-record cadence is not leaked
+through a public warrant. The active V0 read model has one pinned knowledge
+cutoff; arbitrary historical cutoffs require versioned projections and are
+refused rather than reconstructed from incomplete state.
+
+### Warrant Graph and verification envelope
+
+```http
+GET /api/corpus/warrants?entityId=pe:facility:example
+GET /api/corpus/warrants?recordId=record:assertion:example&maximumRecords=100
+Authorization: Bearer <PAYLOAD_CORPUS_QUERY_TOKEN>
+```
+
+Exactly one subject is accepted. The route selects that record, or the direct
+canonical neighborhood of that entity, closes over its evidence, refuses a
+graph above the requested bound, and never leaves the policy-filtered public
+read model. It emits this structural chain:
+
+```text
+answer -> deterministic computation -> exact records -> evidence -> source
+                                   \-> CorpusBuild -> Merkle commitment
+```
+
+Assertions retain `supported_by`, `contradicted_by`, and `qualified_by` as
+different edges. Two disagreeing observations therefore remain two values; no
+average and no composite trust score is manufactured.
+
+Every selected record receives a domain-separated SHA-256 Merkle inclusion
+proof against the exact projection record set. Odd nodes are promoted rather
+than duplicated and the algorithm is named in the manifest. The envelope's
+trust vocabulary is monotonic:
+
+```text
+PROVENANCE -> REPRODUCIBLE -> ATTESTED -> ZK_VERIFIED
+```
+
+Current corpus answers stop honestly at `REPRODUCIBLE`: evidence references,
+record hashes, build identity, program/version, inputs, parameters, output,
+commitment, and membership proofs are available. The commitment is neither an
+independent timestamp nor an assertion that source observations are true. The
+envelope therefore reports `NOT_ATTESTED` and `NOT_GENERATED` for zk proof. A
+later signed build anchor can establish attestation; a pinned SP1 program can
+prove deterministic computation integrity. Neither can prove empirical truth.
 
 ### Corpus Compiler
 
@@ -284,7 +327,9 @@ canonical-write manifests, append/replay API,
 scope isolation, temporal revisions, tamper detection, object classification,
 actor/purpose policy, deterministic information-flow joins and policy lineage,
 a version-bound Corpus Compiler, a separate public read model, stale-model
-refusal, typed facility discovery, proof-carrying Earth answers, deterministic
+refusal, typed facility discovery, reproducible proof-carrying Earth answers,
+domain-separated CorpusBuild commitments and inclusion proofs, score-free
+Warrant Graph API/inspector, deterministic
 depth-1 shared-dependency mining, MiningRun provenance, and an append-only
 Pattern Registry for candidate knowledge.
 

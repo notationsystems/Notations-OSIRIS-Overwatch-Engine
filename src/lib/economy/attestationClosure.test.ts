@@ -279,6 +279,8 @@ describe('every number-bearing type in the layer is accounted for', () => {
     CorpusReplayPlan: 'record counts and sequence bounds for our own canonical-ledger migration, not a measurement of the physical economy',
     CorpusReplayResult: 'import counts and sequence positions proving equivalence between our own storage engines, not a world observation',
     PostgresCorpusRepositoryOptions: 'connection-pool size is deployment configuration for our repository adapter, not a claim about the world',
+    CorpusCommitmentManifest: 'leafCount describes the exact record set Payload committed in its own compiled corpus build',
+    CorpusMerkleInclusionProof: 'sequence and leaf positions locate one of our own records inside one of our own Merkle commitments',
   };
 
   /**

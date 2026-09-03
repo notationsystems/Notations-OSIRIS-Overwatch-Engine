@@ -132,6 +132,16 @@ describe('GET /api/corpus/facilities', () => {
     });
     expect(body.warrant.computation[0].inputDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(body.warrant.computation[0].outputDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.warrant.verification).toMatchObject({
+      verificationLevel: 'REPRODUCIBLE',
+      provenanceStatus: 'COMPLETE',
+      sourceTruthClaimed: false,
+      commitment: { leafCount: 5 },
+      attestation: { status: 'NOT_ATTESTED' },
+      zkProof: { status: 'NOT_GENERATED' },
+    });
+    expect(body.warrant.warrantGraph).toMatchObject({ scorePolicy: 'NO_COMPOSITE_TRUST_SCORE' });
+    expect(body.warrant.warrantGraph.nodes.some((node: { canonicalId?: string }) => node.canonicalId === 'pe:facility:global-pp')).toBe(true);
     expect(body.warrant).not.toHaveProperty('sourceSequence');
     expect(body.warrant).not.toHaveProperty('sourceDigest');
     expect(body.warrant.corpusBuild).not.toHaveProperty('canonicalStateFingerprint');

@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { AlertTriangle, Building2, ExternalLink, Network, Search, ShieldCheck } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { AlertTriangle, Building2, ExternalLink, GitBranch, Network, Search, ShieldCheck } from 'lucide-react';
+import type { CorpusWarrantGraph } from '@/lib/economy/corpusWarrantGraph';
+import type { VerificationEnvelope } from '@/lib/economy/corpusVerification';
+
+const WarrantGraphOverlay = dynamic(() => import('./WarrantGraphOverlay'), { ssr: false });
 
 export interface CorpusFacilityVisual {
   entityId: string;
@@ -40,6 +45,8 @@ type Discovery = {
     compiledAt: string;
     policy: { lineageId: string; effective: { classification: string; externalRelease: 'PERMITTED' | 'PROHIBITED' } };
     corpusBuild: { corpusBuildId: string; ontologyVersion: string; embeddingVersion: string | null; generatedAt: string };
+    verification: VerificationEnvelope;
+    warrantGraph: CorpusWarrantGraph;
   };
 };
 
@@ -55,12 +62,14 @@ export default function CorpusQueryPanel({ onFacilities, onLocate, onShowArchite
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<Discovery | Refusal | null>(null);
   const [loading, setLoading] = useState(false);
+  const [warrantFocus, setWarrantFocus] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const value = query.trim();
     if (value.length < 2 || loading) return;
     setLoading(true);
+    setWarrantFocus(null);
     try {
       const response = await fetch(`/api/corpus/facilities?q=${encodeURIComponent(value)}`, { cache: 'no-store' });
       const body = await response.json() as Discovery | Refusal;
@@ -109,9 +118,14 @@ export default function CorpusQueryPanel({ onFacilities, onLocate, onShowArchite
       {result?.kind === 'facility_discovery' && (
         <div className="max-h-[44vh] overflow-y-auto styled-scrollbar">
           <div className="border-b border-white/[0.07] bg-white/[0.018] px-3 py-2">
-            <p className="text-[10px] font-semibold text-white">{result.material.name}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold text-white">{result.material.name}</p>
+              <button type="button" onClick={() => setWarrantFocus(result.material.entityId)} className="flex items-center gap-1 rounded border border-[var(--gold-primary)]/30 px-1.5 py-1 font-mono text-[7px] uppercase text-[var(--gold-primary)] hover:bg-[var(--gold-primary)]/10" title="Walk the evidence and computation behind this answer">
+                <GitBranch size={9} /> Walk warrant
+              </button>
+            </div>
             <p className="mt-0.5 font-mono text-[8px] text-white/35">{result.facilities.length} evidenced facilit{result.facilities.length === 1 ? 'y' : 'ies'} · {result.facilities.filter(item => item.location).length} mapped · known by {result.knowledgeCutoff.slice(0, 10)}</p>
-            <p className="mt-1 font-mono text-[7px] uppercase tracking-wide text-[var(--alert-green)]">Corpus build {result.warrant.corpusBuild.corpusBuildId.slice(-12)} · {result.warrant.policy.effective.classification} release · {result.warrant.projectionRecordCount} records</p>
+            <p className="mt-1 font-mono text-[7px] uppercase tracking-wide text-[var(--alert-green)]">Corpus build {result.warrant.corpusBuild.corpusBuildId.slice(-12)} · {result.warrant.policy.effective.classification} release · {result.warrant.projectionRecordCount} records · {result.warrant.verification.verificationLevel}</p>
           </div>
           {result.facilities.map(facility => (
             <article key={facility.entityId} className="border-b border-white/[0.06] p-3 last:border-0">
@@ -124,6 +138,7 @@ export default function CorpusQueryPanel({ onFacilities, onLocate, onShowArchite
                 <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[7px] uppercase text-[var(--alert-green)]">{facility.confidence}</span>
               </button>
               <div className="mt-2 space-y-1.5 pl-[22px]">
+                <button type="button" onClick={() => setWarrantFocus(facility.entityId)} className="flex items-center gap-1 font-mono text-[7px] uppercase tracking-wide text-[var(--gold-primary)] hover:underline"><GitBranch size={9} /> Why does Payload hold this?</button>
                 {facility.evidence.map(item => (
                   <a key={item.evidenceId} href={item.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-start gap-1.5 text-[8px] leading-3 text-[var(--cyan-primary)] hover:underline">
                     <ExternalLink size={9} className="mt-0.5 shrink-0" /><span>{item.title} · retrieved {item.retrievedAt.slice(0, 10)}</span>
@@ -133,6 +148,15 @@ export default function CorpusQueryPanel({ onFacilities, onLocate, onShowArchite
             </article>
           ))}
         </div>
+      )}
+
+      {result?.kind === 'facility_discovery' && warrantFocus && (
+        <WarrantGraphOverlay
+          graph={result.warrant.warrantGraph}
+          verification={result.warrant.verification}
+          initialCanonicalId={warrantFocus}
+          onClose={() => setWarrantFocus(null)}
+        />
       )}
     </section>
   );
