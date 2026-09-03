@@ -71,6 +71,15 @@ different historic knowledge time fail closed until a separately addressed
 historical projection exists. This prevents a current projection from being
 misrepresented as what Payload knew earlier.
 
+`mode: agent` compiles this complete internal package into a disclosure-budgeted
+`notation.agent-context.v1`. `FAST`, `GROUNDED`, `AUDIT`, and `VERIFIED` add
+material monotonically while preserving one canonical assertion identity.
+`notation.assertion.v1` carries its epistemic class, bitemporal basis,
+observation roles, evidence/source IDs, uncertainty and a non-probabilistic
+confidence label. The verified budget includes checked CorpusBuild membership
+proofs and the Warrant Graph, but the enclosed assurance remains
+`REPRODUCIBLE` until a real external attestation or SP1 proof exists.
+
 ## Counterfactual unobserved states
 
 Scenario responses keep `unobservedStates[]` beside, never inside,

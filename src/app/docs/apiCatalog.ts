@@ -118,12 +118,12 @@ export const API_GROUPS: ApiGroup[] = [
       {
         path: '/api/corpus/retrieval',
         method: 'POST',
-        summary: 'Builds a deterministic retrieval plan and provenance-complete ContextPackage for people or agents.',
-        returns: ['kind', 'plan', 'context'],
-        notes: 'Requires dedicated query authority. Reads only the current verified public projection, bounds resolution/traversal/evidence retrieval, refuses stale or unavailable historical state, and returns exact record IDs and CorpusBuild identity in its trace. mode=plan omits execution.',
+        summary: 'Builds a deterministic retrieval plan, evidence-complete ContextPackage, or evidence-budgeted agent context.',
+        returns: ['kind', 'plan', 'context', 'agentContext'],
+        notes: 'Requires dedicated query authority. Reads only the current verified public projection, bounds resolution/traversal/evidence retrieval, refuses stale or unavailable historical state, and returns exact record IDs and CorpusBuild identity in its trace. mode=plan omits execution; mode=agent accepts FAST, GROUNDED, AUDIT, or VERIFIED. Higher evidence budgets add detail without changing assertion identity. VERIFIED includes locally checked CorpusBuild membership proofs but still reports absent external attestation and SP1 proof honestly.',
         env: ['PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_CORPUS_QUERY_DATABASE_URL', 'PAYLOAD_CORPUS_READ_MODEL_PATH', 'PAYLOAD_CORPUS_QUERY_TOKEN'],
         requiresAuth: true,
-        bodyExample: '{\n  "query": "Which facilities depend on this supplier?",\n  "entityIds": ["pe:organization:supplier"],\n  "asOf": "2026-09-02T12:00:00.000Z",\n  "traversal": { "predicates": ["depends_on"], "direction": "inbound", "maxHops": 2 },\n  "evidenceQuery": "supplier dependency"\n}',
+        bodyExample: '{\n  "mode": "agent",\n  "evidenceLevel": "AUDIT",\n  "query": "Which facilities depend on this supplier?",\n  "entityIds": ["pe:organization:supplier"],\n  "asOf": "2026-09-02T12:00:00.000Z",\n  "traversal": { "predicates": ["depends_on"], "direction": "inbound", "maxHops": 2 },\n  "evidenceQuery": "supplier dependency"\n}',
       },
       {
         path: '/api/corpus/projectors',

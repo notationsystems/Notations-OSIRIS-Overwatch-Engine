@@ -332,6 +332,35 @@ query size; binds every trace to the CorpusBuild and projection digest; refuses
 unavailable historical knowledge times; and returns exact output record IDs for
 each semantic tool step.
 
+The same retrieval endpoint supports `mode: agent` and compiles a reusable
+`notation.agent-context.v1`. Its assertion primitive carries canonical subject,
+predicate, typed value, valid and knowledge time, epistemic class, a confidence
+label explicitly marked non-probabilistic, contradiction/missing-evidence
+state, observation/evidence/source IDs, CorpusBuild identity, and an explicit
+statement that source truth is not claimed.
+
+Evidence disclosure is monotonic:
+
+| Budget | Added material |
+|---|---|
+| `FAST` | Compact canonical state and stable provenance IDs |
+| `GROUNDED` | Artifact/source citation metadata |
+| `AUDIT` | Observations, contradictions, Evidence IR, missing data, retrieval trace |
+| `VERIFIED` | VerificationEnvelope, checked Merkle membership proofs, Warrant Graph |
+
+`VERIFIED` is a request for available proof material, not permission to upgrade
+assurance language. Until an independent build anchor or SP1 proof exists, the
+response remains `REPRODUCIBLE`, `NOT_ATTESTED`, and `NOT_GENERATED` for zk.
+Agents receive exact `get_provenance` and `get_evidence` warrant paths so they
+can hand stable identifiers between procurement, risk, research, and validator
+workflows instead of copying prose.
+
+This product-neutral wire contract is the first reusable Notation Systems
+corpus-engine surface. Payload remains the only real corpus registered here.
+Future Code, Materials, Science, Built, Spatial, or private-corpus worlds should
+not appear as empty UI or API shells; each must first have a governed
+CorpusDefinition, source registry, canonical model, compiler, and real build.
+
 The V0 facility endpoint now returns a
 `payload.corpus.answer-warrant.v1`: canonical identities, knowledge time,
 evidence hashes, deterministic computation input/output digests, explicit

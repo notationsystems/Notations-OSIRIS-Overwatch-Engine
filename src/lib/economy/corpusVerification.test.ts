@@ -92,6 +92,26 @@ describe('proof-carrying corpus verification', () => {
     }
   });
 
+  it('does not call an empty evidence basis provenance-complete', () => {
+    const value = fixture();
+    try {
+      const envelope = buildVerificationEnvelope({
+        manifest: value.projection.manifest,
+        projectionRecords: value.projection.records,
+        basisRecords: [],
+        programId: 'payload:empty-result',
+        algorithmVersion: '1.0.0',
+        inputDigest: corpusVerificationDigest({ query: 'missing' }),
+        outputDigest: corpusVerificationDigest([]),
+        parameters: {},
+      });
+      expect(envelope).toMatchObject({ provenanceStatus: 'PARTIAL', recordRefs: [], inclusionProofs: [] });
+    } finally {
+      value.corpus.close();
+      rmSync(value.directory, { recursive: true, force: true });
+    }
+  });
+
   it('renders disagreement as separate structural edges and never as a trust score', () => {
     const value = fixture();
     try {

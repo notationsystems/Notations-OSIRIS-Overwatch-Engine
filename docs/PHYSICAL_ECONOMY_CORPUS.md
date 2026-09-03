@@ -236,6 +236,47 @@ envelope therefore reports `NOT_ATTESTED` and `NOT_GENERATED` for zk proof. A
 later signed build anchor can establish attestation; a pinned SP1 program can
 prove deterministic computation integrity. Neither can prove empirical truth.
 
+### Agent evidence budgets
+
+```http
+POST /api/corpus/retrieval
+Authorization: Bearer <PAYLOAD_CORPUS_QUERY_TOKEN>
+Content-Type: application/json
+
+{
+  "mode": "agent",
+  "evidenceLevel": "AUDIT",
+  "query": "Example terminal capacity",
+  "entityIds": ["pe:facility:example"],
+  "propertyKeys": ["capacity"]
+}
+```
+
+The retrieval planner and evidence-complete ContextPackage still execute first.
+Payload then compiles one of four monotonically richer agent views:
+
+- `FAST`: canonical entities, relationships and assertions with stable
+  provenance identifiers;
+- `GROUNDED`: adds source/artifact citation metadata;
+- `AUDIT`: adds exact observations, Evidence IR units, contradictions, missing
+  evidence and the deterministic retrieval trace;
+- `VERIFIED`: adds the VerificationEnvelope, locally checked Merkle inclusion
+  proofs and score-free Warrant Graph.
+
+All four carry the same `notation.assertion.v1` identities and values. Raising
+the budget does not silently reinterpret an assertion. Each assertion separates
+its epistemic class from its confidence label, marks the label as
+non-probabilistic, preserves valid time and `knownAt`, lists supporting and
+contradictory observation roles, and retains evidence/source identities.
+Inspection operations link directly to authenticated warrant walks for
+`get_provenance` and `get_evidence` behavior.
+
+The word `VERIFIED` names the requested response budget, not a blanket claim of
+truth. Its `assuranceAvailable` field remains the envelope's actual level. V0
+therefore returns reproducibility and membership proofs while continuing to
+state that empirical truth, an external timestamp/signature, and SP1 execution
+have not been established.
+
 ### Corpus Compiler
 
 ```http
@@ -329,16 +370,18 @@ actor/purpose policy, deterministic information-flow joins and policy lineage,
 a version-bound Corpus Compiler, a separate public read model, stale-model
 refusal, typed facility discovery, reproducible proof-carrying Earth answers,
 domain-separated CorpusBuild commitments and inclusion proofs, score-free
-Warrant Graph API/inspector, deterministic
+Warrant Graph API/inspector, evidence-budgeted agent contexts and common
+Notation assertions, deterministic
 depth-1 shared-dependency mining, MiningRun provenance, and an append-only
 Pattern Registry for candidate knowledge.
 
 Not yet implemented: automated API/document acquisition, raw artifact object
-storage, append-only security-audit export, OAuth/OIDC, database RLS,
-PostgreSQL/PostGIS authority, Parquet/Iceberg history, analyst review queues,
+storage, append-only security-audit export, OAuth/OIDC, production
+PostgreSQL/PostGIS cutover, Parquet/Iceberg history, analyst review queues,
 probabilistic entity-resolution proposals, candidate validation/promotion,
 recursive dependency propagation, link prediction, temporal/spatial/statistical/
-anomaly mining, graph/vector projections, GraphRAG, Context Compiler,
-additional computational endpoints, and SP1 proofs over corpus builds. These
+anomaly mining, graph/vector projections, additional computational endpoints,
+persisted agent-context/result lookup, agent-facing MCP packaging, and SP1
+proofs over corpus builds. These
 are the next layers; the UI must continue to refuse rather than imply they
 already exist.

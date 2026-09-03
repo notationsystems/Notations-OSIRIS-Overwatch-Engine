@@ -372,7 +372,14 @@ compatible observations with `supports`, `contradicts`, or `qualifies` roles.
 `POST /api/corpus/retrieval` uses `PAYLOAD_CORPUS_QUERY_TOKEN` to return a
 deterministic retrieval plan and an evidence-complete, projection-bound
 `payload.corpus.context-package.v1`; models never receive direct database or
-vector-store access. `GET/POST /api/corpus/projectors` exposes the transactional
+vector-store access. With `mode: "agent"`, the same endpoint compiles a
+`notation.agent-context.v1` under a typed evidence budget: `FAST` returns
+compact canonical state, `GROUNDED` adds source references, `AUDIT` adds exact
+observations, disagreements, Evidence IR and retrieval trace, and `VERIFIED`
+adds the Warrant Graph plus locally checked CorpusBuild inclusion proofs. These
+tiers change disclosure, never the underlying assertion identity. A verified
+budget still reports the actual assurance level—currently `REPRODUCIBLE`, with
+external attestation and SP1 absent. `GET/POST /api/corpus/projectors` exposes the transactional
 projection outbox and monotonic checkpoints under the non-interchangeable
 `PAYLOAD_CORPUS_PROJECTOR_TOKEN` worker identity.
 

@@ -238,6 +238,7 @@ export function verifyCorpusRecordInclusion(
 }
 
 function provenanceStatus(records: readonly StoredCorpusRecord[]): VerificationEnvelope['provenanceStatus'] {
+  if (records.length === 0) return 'PARTIAL';
   const supportIds = new Set(records.flatMap(record => record.recordType === 'evidence'
     ? [record.evidenceId]
     : record.recordType === 'evidence_unit'

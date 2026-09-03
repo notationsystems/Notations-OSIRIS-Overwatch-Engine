@@ -88,6 +88,24 @@ describe('POST /api/corpus/retrieval', () => {
     expect(second.status).toBe(200);
     expect((await second.json()).plan.planId).toBe(result.plan.planId);
 
+    const fast = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'FAST' }));
+    expect(fast.status).toBe(200);
+    const fastResult = await fast.json();
+    expect(fastResult).toMatchObject({ kind: 'corpus_agent_context', agentContext: { evidenceBudget: { requestedLevel: 'FAST', assuranceAvailable: 'PROVENANCE' }, assertions: [{ assertionId: 'assertion:retrieval-api' }] } });
+    expect(fastResult.agentContext).not.toHaveProperty('evidence');
+    expect(fastResult.agentContext).not.toHaveProperty('proof');
+
+    const verified = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'VERIFIED' }));
+    expect(verified.status).toBe(200);
+    expect(await verified.json()).toMatchObject({ kind: 'corpus_agent_context', agentContext: { evidenceBudget: { requestedLevel: 'VERIFIED', assuranceAvailable: 'REPRODUCIBLE' }, proof: { membershipProofsVerified: true, envelope: { attestation: { status: 'NOT_ATTESTED' }, zkProof: { status: 'NOT_GENERATED' } } } } });
+
+    const invalidLevel = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'MAXIMUM' }));
+    expect(invalidLevel.status).toBe(400);
+    expect(await invalidLevel.json()).toMatchObject({ kind: 'refusal', code: 'CORPUS_EVIDENCE_LEVEL_INVALID' });
+
+    const ignoredLevel = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'context', evidenceLevel: 'FAST' }));
+    expect(ignoredLevel.status).toBe(400);
+
     const historical = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, knownAt: '2026-02-03T00:00:00.000Z' }));
     expect(historical.status).toBe(409);
     expect(await historical.json()).toMatchObject({ kind: 'refusal', code: 'CORPUS_PROJECTION_TIME_UNAVAILABLE' });
