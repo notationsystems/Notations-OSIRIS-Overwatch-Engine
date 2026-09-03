@@ -341,6 +341,13 @@ for an exact build-bound lexical/faceted index and `GET/POST
 /api/corpus/federation` for public `notation://` sync envelopes plus monotonic
 Notation Data Substrate consumer checkpoints. The substrate is a federation
 target and identity plane, not a second mutable canonical authority. The
+destination-side `GET/POST /api/corpus/substrate` surface reads a durable
+SQLite/WAL ingestion journal with global collision refusal, source
+acknowledgements, lag samples, deterministic semantic documents, and
+model/version-bound vector projections. The public channel is operational;
+internal and customer channel identities are separately governed, explicitly
+blocked contracts until their own projection policies and entitlements are
+implemented. The
 retrieval boundary caps identities, predicates, hops, evidence results and
 query size; binds every trace to the CorpusBuild and projection digest; refuses
 unavailable historical knowledge times; and returns exact output record IDs for
@@ -433,9 +440,10 @@ maximum graph depth, immutable access audits, and upstream-source isolation.
    monitor projector lag from the transactional outbox.
 6. Move high-volume observations into partitioned columnar history only after
    measured query and lifecycle requirements justify it.
-7. Operate the deterministic build-bound lexical/faceted index and public
-   Notation federation feed; add graph and vector projections through the
-   compiler only when measured workloads justify them.
+7. Operate the deterministic build-bound lexical/faceted index, public Notation
+   federation feed, destination semantic projection, and externally generated
+   model/version-bound vectors. Add a dedicated graph projection or embedding
+   provider only when measured workloads and governance justify them.
 8. Extend the implemented authorization-before-emission policy join into the
    authorization-before-retrieval Context Compiler for model/agent access.
 9. Add validation decisions and evidence-acquisition tasks for mined candidates;

@@ -30,7 +30,7 @@ attestations, and gives neither role update or delete authority.
 
 ## Agent MCP tools
 
-`npm run mcp` exposes seven corpus tools in addition to the existing analytical
+`npm run mcp` exposes eight corpus tools in addition to the existing analytical
 surface:
 
 - `query_payload_corpus`
@@ -40,6 +40,7 @@ surface:
 - `search_payload_corpus_index`
 - `get_payload_corpus_index_coverage`
 - `get_payload_control_plane`
+- `get_payload_substrate_status`
 
 The MCP process needs `PAYLOAD_CORPUS_QUERY_TOKEN`; the token is sent only in the
 Authorization header to the same HTTP routes used by Terminal. Every query names
@@ -71,10 +72,26 @@ URIs while the Payload canonical corpus remains authoritative. `POST` records
 a monotonic checkpoint for one named substrate consumer. Both operations use
 the projector credential, never query or compiler authority.
 
+The destination worker (`npm run sync:notation-substrate -- --watch`) verifies
+every page and record digest before one SQLite/WAL transaction binds global
+identities, stores immutable record versions, creates deterministic semantic
+documents, appends a hash-chained acknowledgement, and records a lag sample. A
+record URI, event ID, source sequence, or object URI cannot silently bind to a
+different object. If the upstream checkpoint call fails after the destination
+commit, the next cycle repairs that acknowledgement before pulling new data.
+
+`GET/POST /api/corpus/substrate` exposes destination status, acknowledgement and
+lag history, semantic documents awaiting one named model/version, immutable
+vector writes, and exact-model cosine search. Similarity is explicitly not
+truth, confidence, causality, or materiality. Payload does not claim an
+embedding provider exists until vectors have actually been supplied and stored.
+
 This implements one logical identity space with many physical
-representations—not a second mutable master database. V1 intentionally covers
-public/global data only. Customer or internal federation requires a separate
-authorized projection and cannot be enabled by changing a request parameter.
+representations—not a second mutable master database. Public/global is the only
+ready channel. Internal/global and `customer:<tenant>` are addressable channel
+contracts with distinct required entitlements, but fail closed until separate
+policy-filtered projection compilers exist; changing a request parameter cannot
+widen the public projector's authority.
 
 The result includes capability mode and approval state, projection freshness,
 an artifact-derived event timeline, and an operator summary of healthy, stale,

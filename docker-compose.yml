@@ -33,6 +33,7 @@ services:
       - PAYLOAD_CORPUS_READ_MODEL_PATH=${PAYLOAD_CORPUS_READ_MODEL_PATH:-/app/runtime-data/corpus-public-read-model.sqlite}
       - PAYLOAD_CORPUS_INDEX_PATH=${PAYLOAD_CORPUS_INDEX_PATH:-/app/runtime-data/corpus-knowledge-index.sqlite}
       - PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH=${PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH:-/app/runtime-data/corpus-pattern-registry.sqlite}
+      - PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH=${PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH:-/app/runtime-data/notation-substrate.sqlite}
     volumes:
       - payload-runtime:/app/runtime-data
     extra_hosts:
@@ -41,6 +42,30 @@ services:
     networks:
       - default
       - umami_default
+
+  payload-substrate-sync:
+    profiles: ["substrate"]
+    build:
+      context: .
+      dockerfile: Dockerfile.substrate-worker
+    container_name: payload-substrate-sync
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - NODE_ENV=production
+      - PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH=/app/runtime-data/notation-substrate.sqlite
+      - PAYLOAD_NOTATION_SOURCE_URL=http://payload:3000
+      - PAYLOAD_NOTATION_SUBSTRATE_CONSUMER_ID=${PAYLOAD_NOTATION_SUBSTRATE_CONSUMER_ID:-primary-fabric}
+      - PAYLOAD_NOTATION_SUBSTRATE_PAGE_LIMIT=${PAYLOAD_NOTATION_SUBSTRATE_PAGE_LIMIT:-100}
+      - PAYLOAD_NOTATION_SUBSTRATE_POLL_MS=${PAYLOAD_NOTATION_SUBSTRATE_POLL_MS:-5000}
+    volumes:
+      - payload-runtime:/app/runtime-data
+    depends_on:
+      - payload
+    restart: unless-stopped
+    networks:
+      - default
 
   payload-cache:
     image: nginx:alpine

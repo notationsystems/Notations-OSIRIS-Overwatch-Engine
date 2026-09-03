@@ -44,7 +44,13 @@ describe('/api/corpus/federation', () => {
     const response = (await GET(new Request('http://localhost/api/corpus/federation?afterSequence=0&limit=10', { headers: { authorization: 'Bearer PROJECTOR-TOKEN' } })))!;
     expect(response.status).toBe(200);
     const page = await response.json();
-    expect(page).toMatchObject({ schema: 'payload.notation.sync-page.v1', sourceNodeUri: 'notation://node/payload', corpusBuildId: compiled.corpusBuildId, nextAfterSequence: 1, envelopes: [{ objectUri: 'notation://artifact/payload/evidence%3Afederation-api' }] });
+    expect(page).toMatchObject({ schema: 'payload.notation.sync-page.v1', sourceNodeUri: 'notation://node/payload', channel: { channelId: 'payload:public:global', status: 'READY' }, corpusBuildId: compiled.corpusBuildId, nextAfterSequence: 1, remainingEnvelopeCount: 0, envelopes: [{ objectUri: 'notation://artifact/payload/evidence%3Afederation-api' }] });
+    const internal = (await GET(new Request('http://localhost/api/corpus/federation?channel=internal-global', { headers: { authorization: 'Bearer PROJECTOR-TOKEN' } })))!;
+    expect(internal.status).toBe(503);
+    expect(await internal.json()).toMatchObject({ code: 'NOTATION_SYNC_CHANNEL_PROJECTION_NOT_CONFIGURED', channel: { channelId: 'payload:internal:global', requiredEntitlements: ['corpus:read:internal'] } });
+    const customer = (await GET(new Request('http://localhost/api/corpus/federation?channel=customer%3Aacme', { headers: { authorization: 'Bearer PROJECTOR-TOKEN' } })))!;
+    expect(customer.status).toBe(503);
+    expect(await customer.json()).toMatchObject({ code: 'NOTATION_SYNC_CHANNEL_PROJECTION_NOT_CONFIGURED', channel: { channelId: 'payload:customer:acme', audience: 'customer', scope: 'customer:acme' } });
     const checkpoint = (await POST(new Request('http://localhost/api/corpus/federation', { method: 'POST', headers: { authorization: 'Bearer PROJECTOR-TOKEN' }, body: JSON.stringify({ consumerId: 'primary-fabric', sequence: page.nextAfterSequence, corpusBuildId: page.corpusBuildId, projectionDigest: page.projectionDigest, updatedAt: at }) })))!;
     expect(checkpoint.status).toBe(200);
     expect(await checkpoint.json()).toMatchObject({ kind: 'notation_corpus_sync_checkpoint', consumerId: 'primary-fabric', checkpoint: { projector: 'notation-sync:primary-fabric', sequence: 1 } });

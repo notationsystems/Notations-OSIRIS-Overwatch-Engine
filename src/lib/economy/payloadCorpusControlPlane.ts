@@ -6,6 +6,7 @@ import type { CompiledCorpusProjection } from './corpusProjection';
 import type { CorpusProjectionSource } from './physicalEconomyCorpus';
 import type { Sp1ProgramIdentity } from './sp1ProgramIdentity';
 import type { CorpusSpatialResult } from './corpusSpatialResult';
+import type { NotationSubstrateStatus } from './notationSubstrateStore';
 import { corpusVerificationDigest } from './corpusVerification';
 
 export type PayloadControlHealth = 'healthy' | 'stale' | 'blocked' | 'unobserved';
@@ -30,7 +31,7 @@ type PayloadCapability = {
 
 type PayloadTopologyNode = {
   readonly nodeId: string;
-  readonly kind: 'canonical_corpus' | 'read_model' | 'knowledge_index' | 'api' | 'artifact_journal' | 'operational_ledger' | 'mcp_tool' | 'visual_dock' | 'data_source' | 'proof_program' | 'build_signer' | 'federation_target';
+  readonly kind: 'canonical_corpus' | 'read_model' | 'knowledge_index' | 'api' | 'artifact_journal' | 'operational_ledger' | 'mcp_tool' | 'visual_dock' | 'data_source' | 'proof_program' | 'build_signer' | 'sync_worker' | 'federation_target';
   readonly label: string;
   readonly health: {
     readonly status: PayloadControlHealth;
@@ -117,8 +118,9 @@ export type PayloadCorpusControlPlaneInput = {
   readonly artifactPage: CorpusAgentArtifactPage;
   readonly recentArtifacts: readonly StoredCorpusAgentArtifact[];
   readonly currentBuildAttestation: StoredCorpusAgentArtifact | null;
+  readonly substrate?: NotationSubstrateStatus | null;
   readonly sp1: Sp1ProgramIdentity;
-  readonly faults?: readonly { readonly component: 'canonical' | 'projection' | 'index' | 'artifacts'; readonly code: string }[];
+  readonly faults?: readonly { readonly component: 'canonical' | 'projection' | 'index' | 'artifacts' | 'substrate'; readonly code: string }[];
 };
 
 function freeze<T>(value: T): T {
@@ -218,6 +220,21 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
   const queryStatus: PayloadControlHealth = projectionStatus === 'blocked' || artifactStatus === 'blocked'
     ? 'blocked'
     : projectionStatus === 'stale' ? 'stale' : 'healthy';
+  const substrateChannel = input.substrate?.channels.find(channel => channel.channelId === 'payload:public:global') ?? null;
+  const substrateStatus: PayloadControlHealth = faults.has('substrate') || !input.substrate
+    ? 'blocked'
+    : !substrateChannel
+      ? 'unobserved'
+      : substrateChannel.acknowledgementLag > 0
+        ? 'stale'
+        : 'healthy';
+  const substrateSourceSequence = projection?.manifest.sourceSequence ?? substrateChannel?.sourceSequence ?? null;
+  const substrateSequenceLag = substrateChannel && substrateSourceSequence !== null ? Math.max(0, substrateSourceSequence - substrateChannel.lastIngestedSequence) : null;
+  const substrateSyncStatus: PayloadControlHealth = projectionStatus === 'blocked' || substrateStatus === 'blocked'
+    ? 'blocked'
+    : projectionStatus === 'stale' || substrateStatus === 'stale' || (substrateSequenceLag ?? 0) > 0
+      ? 'stale'
+      : substrateStatus;
   const currentAttestation = input.currentBuildAttestation?.artifactType === 'build_attestation'
     && input.currentBuildAttestation.corpusBuildId === projection?.manifest.corpusBuildId
     ? input.currentBuildAttestation
@@ -268,10 +285,18 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
         capability('notation-sync.checkpoint', 'execute', 'projector_credential', projectionStatus, projection ? [projection.manifest.corpusBuildId] : []),
       ],
       { sourceNodeUri: 'notation://node/payload', destinationNodeUri: 'notation://node/substrate', scope: 'public/global', consumerCheckpointState: 'UNOBSERVED' }),
-    node('notation:substrate', 'federation_target', 'Notation Data Substrate', 'unobserved', null,
-      'Payload publishes a checked federation contract, but destination ingestion health, lag, cost, and latency have not been observed by this node.',
-      [capability('notation-substrate.ingest', 'execute', 'operator', 'unobserved', [])],
-      { nodeUri: 'notation://node/substrate', authorityModel: 'one_logical_identity_space_many_physical_representations' }),
+    node('payload:worker:notation-substrate-sync', 'sync_worker', 'Notation substrate ingestion worker', substrateSyncStatus, substrateChannel?.lastIngestedAt ?? null,
+      !input.substrate ? faults.get('substrate') ?? 'The destination store is not configured.' : !substrateChannel ? 'The destination is readable, but no public federation page has been ingested.' : substrateSyncStatus === 'blocked' ? 'The public federation source or durable destination is unavailable.' : substrateSyncStatus === 'stale' ? 'Destination ingestion or source-checkpoint acknowledgement is behind the current public projection.' : 'Destination ingestion and source acknowledgement are current for the public channel.',
+      [capability('notation-substrate.ingest', 'execute', 'automatic', substrateSyncStatus, substrateChannel ? [substrateChannel.projectionDigest] : [])],
+      { channelId: substrateChannel?.channelId ?? 'payload:public:global', publicProjectionSequenceLag: substrateSequenceLag, acknowledgementLag: substrateChannel?.acknowledgementLag ?? null }),
+    node('notation:substrate', 'federation_target', 'Notation Data Substrate', substrateStatus, substrateChannel?.lastIngestedAt ?? null,
+      !input.substrate ? faults.get('substrate') ?? 'The destination store is not configured.' : !substrateChannel ? 'The store is available, but its public/global federation state is unobserved.' : substrateStatus === 'stale' ? 'The durable destination exposes an exact, non-zero ingestion or acknowledgement lag.' : 'Global identities, source records, semantic documents, acknowledgements, and lag telemetry are durable and current.',
+      [
+        capability('semantic-document.observe', 'observe', 'automatic', substrateStatus, substrateChannel ? [substrateChannel.projectionDigest] : []),
+        capability('vector-projection.write', 'execute', 'projector_credential', substrateStatus, input.substrate?.vectorModels.map(model => `${model.modelId}@${model.modelVersion}`) ?? []),
+        capability('vector-search.observe', 'observe', 'automatic', substrateStatus, input.substrate?.vectorModels.map(model => `${model.modelId}@${model.modelVersion}`) ?? []),
+      ],
+      { nodeUri: 'notation://node/substrate', authorityModel: 'one_logical_identity_space_many_physical_representations', identityCount: input.substrate?.counts.identities ?? 0, semanticDocumentCount: input.substrate?.counts.semanticDocuments ?? 0, vectorProjectionCount: input.substrate?.counts.vectorProjections ?? 0, vectorModelCount: input.substrate?.vectorModels.length ?? 0, embeddingProviderStatus: input.substrate?.boundaries.embeddingProviderStatus ?? 'UNOBSERVED' }),
     node('payload:dock:kepler', 'visual_dock', 'Kepler spatial/temporal dock', latestSpatial ? 'healthy' : 'unobserved', latestResult?.recordedAt ?? null,
       latestSpatial ? 'Latest persisted agent result contains a kepler.gl addDataToMap payload.' : 'No persisted spatial result has been observed yet.',
       [capability('physical-topology.visualize', 'observe', 'automatic', latestSpatial ? 'healthy' : 'unobserved', latestSpatial ? [latestSpatial.spatialResultId] : [])]),
@@ -313,7 +338,8 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
     { relationId: 'mcp-searches-index', sourceNodeId: 'payload:mcp:index-search', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
     { relationId: 'mcp-reads-index-coverage', sourceNodeId: 'payload:mcp:index-coverage', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
     { relationId: 'projection-serves-federation', sourceNodeId: 'payload:corpus:projection', targetNodeId: 'payload:api:notation-federation', kind: 'serves' },
-    { relationId: 'payload-synchronizes-notation-substrate', sourceNodeId: 'payload:api:notation-federation', targetNodeId: 'notation:substrate', kind: 'synchronizes_to' },
+    { relationId: 'federation-serves-substrate-worker', sourceNodeId: 'payload:api:notation-federation', targetNodeId: 'payload:worker:notation-substrate-sync', kind: 'synchronizes_to' },
+    { relationId: 'substrate-worker-persists-destination', sourceNodeId: 'payload:worker:notation-substrate-sync', targetNodeId: 'notation:substrate', kind: 'persists_to' },
     { relationId: 'kepler-visualizes-results', sourceNodeId: 'payload:journal:agent-artifacts', targetNodeId: 'payload:dock:kepler', kind: 'visualizes' },
     { relationId: 'signer-attests-projection', sourceNodeId: 'payload:attestation:ed25519', targetNodeId: 'payload:corpus:projection', kind: 'attests' },
     { relationId: 'sp1-proves-event-batches', sourceNodeId: 'payload:proof:payload-event-batch-v1', targetNodeId: 'payload:operations:event-ledger', kind: 'proves' },
@@ -326,10 +352,13 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
   if (projectionStatus === 'stale') attention.push({ code: 'CORPUS_PROJECTION_STALE', detail: 'The public projection is behind canonical state or outside its freshness window.', remedy: 'Run the authenticated corpus compiler and verify replay equivalence before replacing the read model.' });
   if (indexStatus === 'blocked') attention.push({ code: faults.get('index') ?? 'CORPUS_INDEX_NOT_BUILT', detail: 'The build-bound corpus knowledge index is unavailable.', remedy: 'Use compiler authority to rebuild the disposable index from the exact current public CorpusBuild.' });
   if (indexStatus === 'stale') attention.push({ code: 'CORPUS_INDEX_STALE', detail: 'The knowledge index does not identify the current public CorpusBuild.', remedy: 'Replace it atomically from the current projection; do not merge index generations.' });
+  if (substrateSyncStatus === 'blocked') attention.push({ code: faults.get('substrate') ?? 'NOTATION_SUBSTRATE_SYNC_BLOCKED', detail: 'The public federation source or durable Notation destination cannot support synchronization.', remedy: 'Restore the current public projection, configure PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH on persistent storage, and start the authenticated sync worker.' });
+  if (substrateSyncStatus === 'stale') attention.push({ code: 'NOTATION_SUBSTRATE_SYNC_LAG', detail: `The public channel has ${substrateSequenceLag ?? 0} un-ingested projected records and ${substrateChannel?.acknowledgementLag ?? 0} destination acknowledgements not checkpointed upstream.`, remedy: 'Inspect the worker, restore source connectivity, and allow idempotent pull/ack recovery; do not advance either cursor manually.' });
+  if (substrateStatus === 'unobserved') attention.push({ code: 'NOTATION_SUBSTRATE_CHANNEL_UNOBSERVED', detail: 'The destination store is available but has not observed the public/global channel.', remedy: 'Run one authenticated substrate synchronization cycle.' });
   if (projection && !currentAttestation) attention.push({ code: 'CORPUS_BUILD_UNSIGNED', detail: `CorpusBuild ${projection.manifest.corpusBuildId} has no stored Ed25519 attestation.`, remedy: 'After reviewing the exact commitment, use the compiler-authenticated attestation endpoint.' });
   if (!latestSpatial) attention.push({ code: 'PAYLOAD_SPATIAL_RESULT_UNOBSERVED', detail: 'No persisted agent result currently feeds the Kepler dock.', remedy: 'Run an evidence-budgeted corpus query whose entities carry observed coordinates.' });
   for (const [component, code] of faults) {
-    if (component === 'index') continue; // already carries a rebuild-specific remedy above
+    if (component === 'index' || component === 'substrate') continue; // already carry component-specific remedies above
     attention.push({ code, detail: `${component} could not be inspected without exposing deployment details.`, remedy: 'Inspect the protected service logs and restore the configured dependency.' });
   }
 

@@ -7,6 +7,9 @@ import { GET } from './route';
 import { corpusAgentArtifactPath, corpusAgentArtifactStore } from '@/lib/economy/corpusAgentArtifactRuntime';
 import { CorpusKnowledgeIndexStore } from '@/lib/economy/corpusKnowledgeIndexStore';
 import { corpusKnowledgeIndexPath, corpusKnowledgeIndexStore } from '@/lib/economy/corpusKnowledgeIndexRuntime';
+import { buildNotationCorpusSyncPage } from '@/lib/economy/notationCorpusFederation';
+import { notationSubstratePath, notationSubstrateStore } from '@/lib/economy/notationSubstrateRuntime';
+import { NotationSubstrateStore } from '@/lib/economy/notationSubstrateStore';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from '@/lib/economy/corpusPolicy';
 import { compilePublicProjection, CorpusProjectionStore } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
@@ -18,6 +21,7 @@ const environment = [
   'PAYLOAD_CORPUS_QUERY_TOKEN', 'PAYLOAD_CORPUS_DATABASE_PATH', 'PAYLOAD_DATABASE_PATH',
   'PAYLOAD_CORPUS_READ_MODEL_PATH', 'PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH',
   'PAYLOAD_CORPUS_INDEX_PATH',
+  'PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH',
   'PAYLOAD_CORPUS_CONTROL_STALE_AFTER_MS',
 ] as const;
 const original = new Map(environment.map(name => [name, process.env[name]]));
@@ -44,6 +48,11 @@ afterEach(async () => {
     try { await corpusAgentArtifactStore('query')?.close(); } catch { /* already closed */ }
     resetProcessSingleton(`corpus-agent-artifacts:sqlite:${artifactPath}`);
   }
+  const substratePath = notationSubstratePath();
+  if (substratePath) {
+    try { notationSubstrateStore()?.close(); } catch { /* already closed */ }
+    resetProcessSingleton(`notation-substrate:${substratePath}`);
+  }
   for (const name of environment) {
     const value = original.get(name);
     if (value === undefined) delete process.env[name]; else process.env[name] = value;
@@ -63,6 +72,8 @@ describe('GET /api/corpus/control-plane', () => {
     process.env.PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH = join(directory, 'artifacts.sqlite');
     const indexPath = join(directory, 'index.sqlite');
     process.env.PAYLOAD_CORPUS_INDEX_PATH = indexPath;
+    const substratePath = join(directory, 'substrate.sqlite');
+    process.env.PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH = substratePath;
     process.env.PAYLOAD_CORPUS_CONTROL_STALE_AFTER_MS = '31536000000';
     delete process.env.PAYLOAD_DATABASE_PATH;
 
@@ -78,9 +89,13 @@ describe('GET /api/corpus/control-plane', () => {
     const compiled = projection.loadPublic()!;
     const index = new CorpusKnowledgeIndexStore(indexPath);
     index.replace(compiled, now);
+    const substrate = new NotationSubstrateStore(substratePath);
+    const ingestion = substrate.ingest(buildNotationCorpusSyncPage(compiled, { limit: 100 }), now);
+    substrate.markUpstreamAcknowledged('payload:public:global', ingestion.acknowledgement.acknowledgedSequence, now);
     corpus.close();
     projection.close();
     index.close();
+    substrate.close();
 
     const retrieval = await retrieve(new Request('http://localhost/api/corpus/retrieval', {
       method: 'POST',
@@ -104,7 +119,8 @@ describe('GET /api/corpus/control-plane', () => {
     expect(body.topology.nodes).toEqual(expect.arrayContaining([
       expect.objectContaining({ nodeId: 'payload:index:knowledge', health: { status: 'healthy', observedAt: now, detail: expect.any(String) } }),
       expect.objectContaining({ nodeId: 'payload:api:notation-federation', health: expect.objectContaining({ status: 'healthy' }) }),
-      expect.objectContaining({ nodeId: 'notation:substrate', health: expect.objectContaining({ status: 'unobserved' }) }),
+      expect.objectContaining({ nodeId: 'payload:worker:notation-substrate-sync', health: expect.objectContaining({ status: 'healthy' }) }),
+      expect.objectContaining({ nodeId: 'notation:substrate', health: expect.objectContaining({ status: 'healthy' }), metadata: expect.objectContaining({ identityCount: 2, semanticDocumentCount: 2 }) }),
     ]));
   });
 });

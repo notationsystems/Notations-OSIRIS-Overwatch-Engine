@@ -147,6 +147,12 @@ const corpusMcpTools: CorpusMcpToolDef[] = [
       return query(context, `/api/corpus/control-plane${params.size ? `?${params}` : ''}`);
     },
   },
+  {
+    name: 'get_payload_substrate_status',
+    description: 'Inspect the durable Notation destination: global identity and record counts, public-channel ingestion and upstream acknowledgement cursors, exact lag, semantic-document coverage, and observed vector model/version projections. An unobserved embedding provider or zero vector count is returned explicitly rather than inferred.',
+    inputSchema: {},
+    handler: (_args, context) => query(context, '/api/corpus/substrate?view=status'),
+  },
 ];
 
 export const CORPUS_MCP_TOOLS: readonly CorpusMcpToolDef[] = Object.freeze(corpusMcpTools);

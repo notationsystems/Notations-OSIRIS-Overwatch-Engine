@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import type { CorpusAgentArtifactPage, StoredCorpusAgentArtifact } from './corpusAgentArtifacts';
 import { corpusAttestationKeyId, signCorpusBuildAttestation } from './corpusBuildAttestation';
 import { compileCorpusKnowledgeIndex } from './corpusKnowledgeIndex';
+import { buildNotationCorpusSyncPage } from './notationCorpusFederation';
+import { NotationSubstrateStore } from './notationSubstrateStore';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from './corpusPolicy';
 import { buildPayloadCorpusControlPlane } from './payloadCorpusControlPlane';
 import { buildPublicProjection } from './corpusProjection';
@@ -26,7 +28,10 @@ function fixture() {
   if (appended.kind !== 'committed') throw new Error(appended.code);
   const source = corpus.projectionSource('global', NOW);
   const projection = buildPublicProjection(source, NOW);
-  return { directory, corpus, source, projection };
+  const substrate = new NotationSubstrateStore(join(directory, 'substrate.sqlite'));
+  const ingestion = substrate.ingest(buildNotationCorpusSyncPage(projection, { limit: 100 }), NOW);
+  substrate.markUpstreamAcknowledged('payload:public:global', ingestion.acknowledgement.acknowledgedSequence, NOW);
+  return { directory, corpus, source, projection, substrate };
 }
 
 function emptyPage(): CorpusAgentArtifactPage {
@@ -48,6 +53,7 @@ describe('Payload physical-economy control plane', () => {
         artifactPage: emptyPage(),
         recentArtifacts: [],
         currentBuildAttestation: null,
+        substrate: value.substrate.status(),
         sp1: payloadSp1ProgramIdentity(),
       });
       expect(snapshot).toMatchObject({
@@ -58,6 +64,8 @@ describe('Payload physical-economy control plane', () => {
       expect(snapshot.topology.nodes).toEqual(expect.arrayContaining([
         expect.objectContaining({ nodeId: 'payload:corpus:canonical', health: expect.objectContaining({ status: 'healthy' }) }),
         expect.objectContaining({ nodeId: 'payload:corpus:projection', health: expect.objectContaining({ status: 'healthy' }) }),
+        expect.objectContaining({ nodeId: 'payload:worker:notation-substrate-sync', health: expect.objectContaining({ status: 'healthy' }) }),
+        expect.objectContaining({ nodeId: 'notation:substrate', health: expect.objectContaining({ status: 'healthy' }), metadata: expect.objectContaining({ identityCount: 2, semanticDocumentCount: 2 }) }),
         expect.objectContaining({ nodeId: 'payload:source:source:port-authority', health: expect.objectContaining({ status: 'unobserved' }) }),
         expect.objectContaining({ nodeId: 'payload:proof:payload-event-batch-v1', metadata: expect.objectContaining({ appliesToCorpusBuild: false }) }),
       ]));
@@ -65,6 +73,7 @@ describe('Payload physical-economy control plane', () => {
       expect(query.capabilities[0]).toMatchObject({ latency: { status: 'UNOBSERVED' }, cost: { status: 'UNOBSERVED' } });
       expect(snapshot.operator.attention.map(item => item.code)).toEqual(expect.arrayContaining(['CORPUS_BUILD_UNSIGNED', 'PAYLOAD_SPATIAL_RESULT_UNOBSERVED']));
     } finally {
+      value.substrate.close();
       value.corpus.close();
       rmSync(value.directory, { recursive: true, force: true });
     }
@@ -91,6 +100,7 @@ describe('Payload physical-economy control plane', () => {
         canonical: { backend: 'sqlite', source: value.source }, projection: value.projection, projectionCurrent: true,
         index: { backend: 'sqlite', manifest: compileCorpusKnowledgeIndex(value.projection, NOW).manifest, current: true },
         artifactBackend: 'sqlite', artifactPage: page, recentArtifacts: [stored], currentBuildAttestation: stored,
+        substrate: value.substrate.status(),
         sp1: payloadSp1ProgramIdentity(),
       });
       expect(snapshot.timeline.events).toEqual([
@@ -102,6 +112,7 @@ describe('Payload physical-economy control plane', () => {
       ]));
       expect(snapshot.operator.attention.map(item => item.code)).not.toContain('CORPUS_BUILD_UNSIGNED');
     } finally {
+      value.substrate.close();
       value.corpus.close();
       rmSync(value.directory, { recursive: true, force: true });
     }

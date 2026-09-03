@@ -6,6 +6,27 @@ import { corpusVerificationDigest } from './corpusVerification';
 
 export const NOTATION_CORPUS_SYNC_SCHEMA = 'payload.notation.sync-page.v1' as const;
 export const PAYLOAD_NOTATION_NODE_URI = 'notation://node/payload' as const;
+export const PAYLOAD_PUBLIC_FEDERATION_CHANNEL = Object.freeze({
+  schema: 'payload.notation.federation-channel.v1' as const,
+  channelId: 'payload:public:global' as const,
+  audience: 'public' as const,
+  scope: 'global' as const,
+  projectionId: 'public:global' as const,
+  status: 'READY' as const,
+  requiredEntitlements: Object.freeze([] as string[]),
+});
+
+export type NotationFederationChannel =
+  | typeof PAYLOAD_PUBLIC_FEDERATION_CHANNEL
+  | {
+      readonly schema: 'payload.notation.federation-channel.v1';
+      readonly channelId: 'payload:internal:global' | `payload:customer:${string}`;
+      readonly audience: 'internal' | 'customer';
+      readonly scope: 'global' | `customer:${string}`;
+      readonly projectionId: string | null;
+      readonly status: 'BLOCKED_UNTIL_GOVERNED_PROJECTION';
+      readonly requiredEntitlements: readonly string[];
+    };
 
 export type NotationObjectKind = 'artifact' | 'entity' | 'observation' | 'claim';
 
@@ -33,6 +54,7 @@ export type NotationCorpusSyncEnvelope = {
 export type NotationCorpusSyncPage = {
   readonly schema: typeof NOTATION_CORPUS_SYNC_SCHEMA;
   readonly sourceNodeUri: typeof PAYLOAD_NOTATION_NODE_URI;
+  readonly channel: typeof PAYLOAD_PUBLIC_FEDERATION_CHANNEL;
   readonly authority: {
     readonly canonical: 'Payload canonical corpus';
     readonly destination: 'Notation Data Substrate';
@@ -48,6 +70,8 @@ export type NotationCorpusSyncPage = {
   readonly afterSequence: number;
   readonly nextAfterSequence: number;
   readonly sourceSequence: number;
+  readonly remainingEnvelopeCount: number;
+  readonly sourceLatestOccurredAt: string | null;
   readonly hasMore: boolean;
   readonly envelopes: readonly NotationCorpusSyncEnvelope[];
   readonly pageDigest: string;
@@ -56,8 +80,33 @@ export type NotationCorpusSyncPage = {
 
 const encode = (value: string): string => encodeURIComponent(value);
 
-export function notationUri(kind: 'record' | 'source' | 'artifact' | 'entity' | 'observation' | 'claim' | 'dataset', localId: string): string {
+export function notationUri(kind: 'record' | 'source' | 'artifact' | 'entity' | 'observation' | 'claim' | 'dataset' | 'state' | 'model' | 'transform', localId: string): string {
   return `notation://${kind}/payload/${encode(localId)}`;
+}
+
+/** Declares future channels without granting access or fabricating a projection. */
+export function notationFederationChannel(channelId: string): NotationFederationChannel | null {
+  if (channelId === PAYLOAD_PUBLIC_FEDERATION_CHANNEL.channelId || channelId === 'public-global') return PAYLOAD_PUBLIC_FEDERATION_CHANNEL;
+  if (channelId === 'payload:internal:global' || channelId === 'internal-global') return Object.freeze({
+    schema: 'payload.notation.federation-channel.v1' as const,
+    channelId: 'payload:internal:global' as const,
+    audience: 'internal' as const,
+    scope: 'global' as const,
+    projectionId: null,
+    status: 'BLOCKED_UNTIL_GOVERNED_PROJECTION' as const,
+    requiredEntitlements: Object.freeze(['corpus:read:internal']),
+  });
+  const match = /^(?:payload:)?customer:([a-z0-9][a-z0-9._-]{1,63})$/.exec(channelId);
+  if (!match) return null;
+  return Object.freeze({
+    schema: 'payload.notation.federation-channel.v1' as const,
+    channelId: `payload:customer:${match[1]}` as const,
+    audience: 'customer' as const,
+    scope: `customer:${match[1]}` as const,
+    projectionId: null,
+    status: 'BLOCKED_UNTIL_GOVERNED_PROJECTION' as const,
+    requiredEntitlements: Object.freeze([`tenant:${match[1]}:projection`, `tenant:${match[1]}:federation`]),
+  });
 }
 
 function objectIdentity(record: StoredCorpusRecord): { readonly kind: NotationObjectKind; readonly id: string } {
@@ -143,6 +192,7 @@ export function buildNotationCorpusSyncPage(
   const pageBasis = {
     schema: NOTATION_CORPUS_SYNC_SCHEMA,
     sourceNodeUri: PAYLOAD_NOTATION_NODE_URI,
+    channel: PAYLOAD_PUBLIC_FEDERATION_CHANNEL,
     authority: {
       canonical: 'Payload canonical corpus' as const,
       destination: 'Notation Data Substrate' as const,
@@ -158,6 +208,8 @@ export function buildNotationCorpusSyncPage(
     afterSequence,
     nextAfterSequence,
     sourceSequence: projection.manifest.sourceSequence,
+    remainingEnvelopeCount: available.length - selected.length,
+    sourceLatestOccurredAt: projection.records.at(-1)?.recordedAt ?? null,
     hasMore,
     envelopes,
     limitations: [

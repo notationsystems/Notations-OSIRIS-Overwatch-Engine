@@ -1,0 +1,18 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+RUN addgroup --system --gid 1001 payload && \
+    adduser --system --uid 1001 --ingroup payload substrate && \
+    mkdir -p /app/runtime-data && \
+    chown substrate:payload /app/runtime-data
+
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY --chown=substrate:payload tsconfig.json next-env.d.ts ./
+COPY --chown=substrate:payload scripts ./scripts
+COPY --chown=substrate:payload src ./src
+
+ENV NODE_ENV=production
+USER substrate
+CMD ["npm", "run", "sync:notation-substrate", "--", "--watch"]

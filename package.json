@@ -15,6 +15,7 @@
     "migrate:corpus-postgres": "tsx scripts/migrate-corpus-postgres.ts",
     "replay:corpus-postgres": "tsx scripts/replay-corpus-to-postgres.ts",
     "rebuild:corpus-projection": "tsx scripts/rebuild-corpus-projection-v3.ts",
+    "sync:notation-substrate": "tsx scripts/sync-notation-substrate.ts",
     "prove:event-batch": "tsx scripts/run-sp1-proof-worker.ts",
     "smoke": "node scripts/smoke.mjs"
   },

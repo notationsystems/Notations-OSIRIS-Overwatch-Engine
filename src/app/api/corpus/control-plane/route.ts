@@ -9,6 +9,8 @@ import { projectionMatchesSource, type CompiledCorpusProjection } from '@/lib/ec
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { awaitCorpus } from '@/lib/economy/corpusRepository';
 import { env } from '@/lib/economy/envCompat';
+import { notationSubstrateStore } from '@/lib/economy/notationSubstrateRuntime';
+import type { NotationSubstrateStatus } from '@/lib/economy/notationSubstrateStore';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 import type { CorpusProjectionSource } from '@/lib/economy/physicalEconomyCorpus';
 import { payloadSp1ProgramIdentity } from '@/lib/economy/sp1ProgramIdentity';
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
   }
 
   const generatedAt = new Date().toISOString();
-  const faults: { component: 'canonical' | 'projection' | 'index' | 'artifacts'; code: string }[] = [];
+  const faults: { component: 'canonical' | 'projection' | 'index' | 'artifacts' | 'substrate'; code: string }[] = [];
   let canonical: { backend: 'sqlite' | 'postgresql'; source: CorpusProjectionSource } | null = null;
   let projection: CompiledCorpusProjection | null = null;
   let index: { backend: 'sqlite'; manifest: CorpusKnowledgeIndexManifest; current: boolean } | null = null;
@@ -60,6 +62,7 @@ export async function GET(req: Request) {
   let artifactPage: CorpusAgentArtifactPage = { ...EMPTY_PAGE, afterSequence, nextAfterSequence: afterSequence };
   let recentArtifacts: readonly StoredCorpusAgentArtifact[] = [];
   let currentBuildAttestation: StoredCorpusAgentArtifact | null = null;
+  let substrate: NotationSubstrateStatus | null = null;
 
   try {
     const repository = physicalEconomyCorpus('query');
@@ -105,6 +108,14 @@ export async function GET(req: Request) {
     faults.push({ component: 'index', code: 'CORPUS_INDEX_UNAVAILABLE' });
   }
 
+  try {
+    const store = notationSubstrateStore();
+    if (!store) faults.push({ component: 'substrate', code: 'NOTATION_SUBSTRATE_NOT_CONFIGURED' });
+    else substrate = store.status();
+  } catch {
+    faults.push({ component: 'substrate', code: 'NOTATION_SUBSTRATE_UNAVAILABLE' });
+  }
+
   const snapshot = buildPayloadCorpusControlPlane({
     generatedAt,
     projectionStaleAfterMs: freshness,
@@ -116,6 +127,7 @@ export async function GET(req: Request) {
     artifactPage,
     recentArtifacts,
     currentBuildAttestation,
+    substrate,
     sp1: payloadSp1ProgramIdentity(),
     faults,
   });

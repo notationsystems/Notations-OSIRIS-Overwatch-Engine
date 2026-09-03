@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authorizeCorpusProjectionWorker } from '@/lib/economy/corpusHttpAuth';
-import { buildNotationCorpusSyncPage } from '@/lib/economy/notationCorpusFederation';
+import { buildNotationCorpusSyncPage, notationFederationChannel, PAYLOAD_PUBLIC_FEDERATION_CHANNEL } from '@/lib/economy/notationCorpusFederation';
 import { projectionMatchesSource } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { awaitCorpus } from '@/lib/economy/corpusRepository';
@@ -40,9 +40,12 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   const denied = authorizeCorpusProjectionWorker(request); if (denied) return denied;
   try {
+    const params = new URL(request.url).searchParams;
+    const channel = notationFederationChannel(params.get('channel') ?? PAYLOAD_PUBLIC_FEDERATION_CHANNEL.channelId);
+    if (!channel) return NextResponse.json({ kind: 'refusal', code: 'NOTATION_SYNC_CHANNEL_INVALID', detail: 'The requested federation channel identity is invalid.' }, { status: 400 });
+    if (channel.status !== 'READY') return NextResponse.json({ kind: 'refusal', code: 'NOTATION_SYNC_CHANNEL_PROJECTION_NOT_CONFIGURED', detail: `${channel.channelId} has no separately governed projection.`, channel, remedy: 'Create a policy-filtered projection with the declared scope and entitlements; a public projector token cannot widen this channel.' }, { status: 503 });
     const state = await current(owner());
     if ('refusal' in state) return state.refusal;
-    const params = new URL(request.url).searchParams;
     const page = buildNotationCorpusSyncPage(state.projection, {
       afterSequence: Number(params.get('afterSequence') ?? '0'),
       limit: Number(params.get('limit') ?? '100'),

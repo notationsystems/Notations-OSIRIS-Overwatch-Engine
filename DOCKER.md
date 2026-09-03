@@ -158,6 +158,11 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_CORPUS_DATABASE_PATH` | Canonical SQLite/WAL file for the physical-economy corpus. | `/app/runtime-data/physical-economy-corpus.sqlite` in Compose; otherwise `PAYLOAD_DATABASE_PATH` |
 | `PAYLOAD_CORPUS_READ_MODEL_PATH` | Separate disposable SQLite/WAL file for the policy-filtered public query projection. | `/app/runtime-data/corpus-public-read-model.sqlite` in Compose |
 | `PAYLOAD_CORPUS_INDEX_PATH` | Disposable, build-bound lexical/faceted index over the exact public CorpusBuild. | `/app/runtime-data/corpus-knowledge-index.sqlite` in Compose; otherwise derived beside the read model |
+| `PAYLOAD_NOTATION_SUBSTRATE_DATABASE_PATH` | Durable destination identities, federated record versions, semantic documents, vector projections, acknowledgements, and lag samples. | `/app/runtime-data/notation-substrate.sqlite` in Compose; otherwise derived beside the canonical corpus |
+| `PAYLOAD_NOTATION_SOURCE_URL` | HTTP(S) base URL from which the substrate worker pulls authenticated federation pages. | `http://payload:3000` in the Compose worker profile |
+| `PAYLOAD_NOTATION_SUBSTRATE_CONSUMER_ID` | Stable upstream checkpoint identity for this destination worker. | `primary-fabric` |
+| `PAYLOAD_NOTATION_SUBSTRATE_PAGE_LIMIT` | Records per verified destination transaction, from 1 to 500. | `100` |
+| `PAYLOAD_NOTATION_SUBSTRATE_POLL_MS` | Idle polling interval for the worker, from 1000 to 60000 ms. | `5000` |
 | `PAYLOAD_CORPUS_INGEST_TOKEN` | Dedicated bearer authority for immutable corpus append and raw cursor replay. | none |
 | `PAYLOAD_CORPUS_COMPILER_TOKEN` | Separate least-privilege bearer authority for read-model compilation and manifest inspection. | none |
 | `PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH` | Separate append-only SQLite/WAL registry for mined candidate knowledge and mining-run provenance. | `/app/runtime-data/corpus-pattern-registry.sqlite` in Compose |
@@ -211,6 +216,20 @@ speed, but Payload refuses it whenever its CorpusBuild or projection digest is
 stale. Notation Data Substrate workers use `GET/POST /api/corpus/federation`
 with the projector token to consume `notation://` sync envelopes and commit
 monotonic consumer checkpoints.
+
+Start the separately packaged worker after configuring
+`PAYLOAD_CORPUS_PROJECTOR_TOKEN`:
+
+```bash
+docker compose --profile substrate up -d --build
+```
+
+The worker and Payload API share only the named `payload-runtime` volume. The
+worker writes the destination database; `/api/corpus/substrate` and the control
+view inspect it. A failed upstream checkpoint never rolls back an already
+committed destination page: the next cycle retries that exact checkpoint before
+pulling again. Back up the substrate database; unlike the disposable public
+read model and lexical index, it contains acknowledgement and lag history.
 
 The derived agent-artifact SQLite file is authoritative operational evidence and
 must remain on `payload-runtime` or another backed-up volume. For build signing,

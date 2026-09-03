@@ -19,9 +19,19 @@ describe('agent-facing corpus MCP package', () => {
       'search_payload_corpus_index',
       'get_payload_corpus_index_coverage',
       'get_payload_control_plane',
+      'get_payload_substrate_status',
     ]);
     expect(CORPUS_MCP_TOOLS[0].description).toContain('kepler.gl addDataToMap');
     expect(CORPUS_MCP_TOOLS[0].description).toContain('Neither state proves source truth');
+  });
+
+  it('exposes destination ingestion, acknowledgement, lag, and vector projection state', async () => {
+    process.env.PAYLOAD_CORPUS_QUERY_TOKEN = 'QUERY-TOKEN';
+    let path = '';
+    const context: McpContext = { async fetchJson(value) { path = value; return { status: 200, body: { kind: 'notation_substrate_status' } }; } };
+    const result = await CORPUS_MCP_TOOLS[7].handler({}, context);
+    expect(path).toBe('/api/corpus/substrate?view=status');
+    expect(result).toMatchObject({ kind: 'notation_substrate_status' });
   });
 
   it('maps typed mining facets onto the build-bound index API', async () => {
