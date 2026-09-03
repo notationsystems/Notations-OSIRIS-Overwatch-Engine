@@ -6,6 +6,30 @@ import { bootReport } from '@/lib/economy/boot';
 import { processReport } from '@/lib/economy/observability';
 import { rateStats } from '@/lib/economy/outboundRate';
 import { spendReport, spendTally } from '@/lib/economy/spendGovernor';
+import {
+  CONTRACT_ID, CONTRACT_VERSION, CONTRACT_DIGEST,
+  AXES_IMPLEMENTED, AXES_ABSENT, CONFORMANCE_LIMIT,
+} from '@/lib/corpus/contract';
+
+/**
+ * Which provenance vocabulary this deployment speaks.
+ *
+ * An instrument in a multi-corpus ecosystem has to be able to say what its
+ * evidence labels MEAN, or a consumer reading `evidenceClass: "reported"`
+ * has to guess which of two incompatible lattices produced it — and the two
+ * that exist rank that exact word at opposite ends. The digest is the
+ * answer: a consumer holding the same one knows precisely what the label
+ * commits to, and a consumer holding a different one knows it is reading a
+ * different vocabulary BEFORE it acts on the number.
+ */
+const corpusConformance = () => ({
+  contract: CONTRACT_ID,
+  version: CONTRACT_VERSION,
+  digest: CONTRACT_DIGEST,
+  axes_implemented: Object.keys(AXES_IMPLEMENTED),
+  axes_absent: Object.keys(AXES_ABSENT),
+  limit: CONFORMANCE_LIMIT,
+});
 
 /**
  * Health surface. The substrate's own liveness block is unchanged; the
@@ -54,6 +78,7 @@ export async function GET() {
         process: processReport(),
         outbound: rateStats(),
         spend: { providers: spendReport(Date.now()), decisions: spendTally() },
+        corpus: corpusConformance(),
       },
     });
   }
@@ -100,6 +125,8 @@ export async function GET() {
       // cap would be the claim we cannot make. An EMPTY providers list means
       // no budget is registered, not that nothing was spent.
       spend: { providers: spendReport(Date.now()), decisions: spendTally() },
+      // Which provenance vocabulary this deployment speaks, by digest.
+      corpus: corpusConformance(),
     },
     endpoints: [
       '/api/flights',

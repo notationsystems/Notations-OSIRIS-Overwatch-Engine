@@ -1,0 +1,108 @@
+{
+  "contract": "notation-systems.corpus.provenance",
+  "version": "1.0.0",
+  "purpose": "Notation Systems builds and operates provenance-bearing computational corpora. This file is the one declaration of what 'provenance' means across them, so that two corpora can disagree about a value without disagreeing about what a value's evidence claim IS.",
+
+  "why_this_exists": [
+    "Measured, 2026-08-31: two repositories had independently built a lattice, both called it the evidence class, and neither knew the other existed.",
+    "data-acquisition-fabric (Python) fixes a class AT INGEST: asserted | computed | derived | measured. It answers HOW THE VALUE CAME TO EXIST.",
+    "Payload Terminal (TypeScript) carries a ranked class on every claim: reported | estimated | representative | derived. It answers HOW HARD THE EVIDENCE IS.",
+    "Those are two different questions, and the TypeScript module says so in its own header — 'Provenance answers where a number came from; source class answers how hard the evidence is' — and then implements only the second.",
+    "Neither repository is wrong. Each built one axis of a two-axis property and named it after the whole. This file names both axes so that a corpus can be missing one deliberately rather than by not having noticed."
+  ],
+
+  "axes": {
+    "production_class": {
+      "question": "How did this value come to exist?",
+      "terms": ["asserted", "computed", "derived", "measured"],
+      "ordered": false,
+      "ordering_note": "NOT ranked. A measured value is not automatically better evidence than an asserted one — a mislabelled instrument beats an honest statement, and the ranking question belongs to claim_strength. Anyone who ranks these is answering a different axis's question with this axis's terms.",
+      "absence": "unclassified",
+      "absence_note": "`unclassified` is not a fifth term. It is the absence of one, and it is inadmissible for canonical assertion. It is never defaulted to any term.",
+      "implemented_by": ["data-acquisition-fabric"]
+    },
+
+    "claim_strength": {
+      "question": "How hard is the evidence for this claim about the world?",
+      "terms": ["reported", "estimated", "representative", "derived"],
+      "ordered": true,
+      "rank": { "reported": 3, "estimated": 2, "representative": 1, "derived": 0 },
+      "ordering_note": "Higher is harder. The order is the CONTAMINATION direction, used when inputs combine.",
+      "absence": null,
+      "absence_note": "This axis has no declared absence term. A value with no claim_strength is not admissible; there is nothing to default it to. Adding an absence term here is a contract change, not an implementation detail.",
+      "implemented_by": ["payload-terminal"]
+    },
+
+    "interest": {
+      "question": "What stake did the source have in stating it this way?",
+      "terms": ["disinterested", "unknown", "self_reported", "negotiating_position"],
+      "ordered": true,
+      "rank": { "disinterested": 3, "unknown": 2, "self_reported": 1, "negotiating_position": 0 },
+      "ordering_note": "`unknown` sits ABOVE self_reported deliberately: not established is not the same as established to be interested. It is never collapsed into `disinterested`, which is how an interested number gets treated as a measurement.",
+      "absence": "unknown",
+      "absence_note": "Here the absence IS a term, and it is ranked, because an unestablished stake still has to combine with other inputs rather than halt them.",
+      "implemented_by": ["payload-terminal"]
+    }
+  },
+
+  "combination": {
+    "rule": "weakest_input_wins",
+    "applies_to": ["claim_strength", "interest"],
+    "statement": "When a value is computed from several inputs, it takes the WEAKEST rank of any input on each ordered axis independently. A derived quantity is only as sound as its softest input.",
+    "does_not_apply_to": ["production_class"],
+    "does_not_apply_note": "production_class is unordered, so there is no weakest. A value computed from inputs of any production class is `computed` or `derived` by its own construction, not by the minimum of anything.",
+    "opposite_direction_warning": "The reverse rule — one good witness is enough — is correct for ENTITY EXISTENCE and wrong for quantities. Payload Terminal implements it separately as `strongestAttestingClass`. The two must never be unified; a contract that had one rule for both would silently launder a weak quantity through a well-attested subject."
+  },
+
+  "contested_terms": {
+    "note": "Terms that appear on more than one axis. These are where a value crossing a corpus boundary can be corrupted while every local check passes, so each one is resolved here explicitly — including the ones resolved as REFUSED.",
+
+    "reported": {
+      "appears_in": {
+        "claim_strength": "the HARDEST class, rank 3 — a figure the source itself published.",
+        "production_class_vocabulary_map": "data-acquisition-fabric maps the presentation term `reported` onto `asserted`, its class for a party stating something."
+      },
+      "translation": "refused",
+      "refusal_reason": "The two uses point opposite ways. In claim_strength, `reported` is the strongest thing a value can be. In the production vocabulary it maps to `asserted`, which is the class you would trust LESS than `measured` because no instrument stands behind it. A value crossing from an acquisition corpus as `asserted` and arriving as `reported` would be promoted from 'a party claimed this' to 'hardest available evidence' by nothing but a shared spelling.",
+      "what_a_caller_must_do": "State claim_strength explicitly at the boundary from evidence about the SOURCE, not by translating the production class. There is no automatic mapping and this contract does not provide one."
+    },
+
+    "derived": {
+      "appears_in": {
+        "claim_strength": "the WEAKEST class, rank 0.",
+        "production_class": "a value computed from other evidence."
+      },
+      "translation": "one_way",
+      "direction": "production_class.derived -> claim_strength.derived",
+      "direction_reason": "This one is sound in exactly one direction. A value whose PRODUCTION was derivation cannot have claim strength above `derived`, because it is downstream of inputs it did not measure. The converse does not hold: a value can carry claim_strength `derived` — because one of its inputs was representative — while its own production was a direct measurement.",
+      "what_a_caller_must_do": "Applying it backwards would relabel a measurement as a derivation on the strength of a weak input, which is a claim about how the number was made, and false."
+    }
+  },
+
+  "implementations": {
+    "data-acquisition-fabric": {
+      "repository": "notationsystems/data-acquisition-channel",
+      "language": "python",
+      "declares": "epistemics/evidence_class.py",
+      "axes_implemented": ["production_class"],
+      "axes_absent": ["claim_strength", "interest"],
+      "absence_is_deliberate": true,
+      "absence_note": "An acquisition fabric records how a value was obtained. It is not the layer that decides how much a claim about the world is worth, and inventing a strength at ingest would be fabricating an assessment nobody made."
+    },
+    "payload-terminal": {
+      "repository": "notationsystems/Payload-Terminal-V0",
+      "language": "typescript",
+      "declares": "src/lib/economy/attestation.ts",
+      "axes_implemented": ["claim_strength", "interest"],
+      "axes_absent": ["production_class"],
+      "absence_is_deliberate": false,
+      "absence_note": "OPEN GAP, recorded rather than closed by assertion. Payload Terminal cannot today say whether a figure was measured or asserted upstream; it knows only how hard it judges the resulting claim. When an acquisition corpus feeds it, the production class arrives with the value and this becomes implementable."
+    }
+  },
+
+  "what_conformance_proves": [
+    "That each corpus's local vocabulary matches the terms this file declares for the axes it says it implements.",
+    "That the copy of this file each corpus carries hashes to the digest that corpus pins.",
+    "It does NOT prove the two copies are the same file. Each side verifies its own copy against its own pin; two equally stale copies pass every check either side has. Byte identity across corpora is coverage for divergence, not currency — the same limit the archive mirror states about itself, and it is stated here rather than left to be discovered."
+  ]
+}

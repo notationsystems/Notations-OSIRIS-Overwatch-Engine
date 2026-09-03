@@ -5569,3 +5569,134 @@ can.
 
 The last row is the one that matters. The count of layers that work did not
 change. What changed is that the panel no longer claims otherwise.
+
+## Phase 71 — the ecosystem: one contract, because two corpora had two lattices
+
+The operator asked for the sibling repositories to be scanned and made
+coherent as apparatuses of one ecosystem: *Notation Systems builds and
+operates provenance-bearing computational corpora.* Scanning found four
+trees and one finding worth the whole exercise.
+
+### Two corpora had built the same thing twice, as two different halves
+
+| | data-acquisition-fabric (Python) | Payload Terminal (this) |
+|---|---|---|
+| terms | `asserted` `computed` `derived` `measured` | `reported` `estimated` `representative` `derived` |
+| the question | how did this value **come to exist**? | how **hard** is the evidence? |
+| ordered | no | yes — `reported` 3 … `derived` 0 |
+| fixed | at ingest, content-addressed, immutable | at the claim, weakest-input-wins |
+| absence | `unclassified`, inadmissible | none declared |
+
+Both call it *the evidence class*. Neither knew the other existed — no
+import, no reference, no shared file, in either direction.
+
+Neither is wrong. **Each built one axis of a two-axis property and named it
+after the whole.** `attestation.ts` even states the distinction in its own
+header — *"Provenance answers where a number came from; source class
+answers how hard the evidence is"* — and then implements only the second,
+because there was nowhere for the first to be declared.
+
+### The collision that made it urgent
+
+`VOCABULARY_MAP` in the acquisition fabric sends the presentation term
+**`reported`** onto `asserted` — its class for *a party stated this*, which
+you would trust less than `measured` because no instrument stands behind
+it.
+
+Here, `EVIDENCE_RANK.reported` is **3: the hardest class there is.**
+
+A value leaving one corpus as `asserted` and arriving here as `reported` is
+promoted from *a party claimed this* to *hardest available evidence* by
+nothing but a shared spelling — with every local check green on both sides,
+because each side is internally consistent about its own lattice. It is the
+context-severance class at the widest scope this program has found it: a
+mechanism correct about what it examined and silent about what it handed
+on, across a company rather than across a module.
+
+### What was built
+
+`information-systems-archive/corpus-contract/contract.json` is the one
+declaration: both axes named separately, the terms on each, which corpus
+implements which, and the rule for combining them stated once. The two
+shared terms are resolved explicitly:
+
+- **`reported` — REFUSED.** No automatic translation exists, and the
+  contract does not provide one. A caller at a boundary states claim
+  strength from evidence about the *source*, never by translating a
+  production class.
+- **`derived` — one way only.** A value whose production was derivation
+  cannot have claim strength above `derived`. The converse is false: a
+  direct measurement can carry `derived` strength because one input was
+  representative, and applying the mapping backwards would relabel a
+  measurement as a derivation — a claim about how the number was made, and
+  untrue.
+
+Each corpus vendors the contract and pins its digest: here in
+`src/lib/corpus/` with 14 pins, in the fabric at `epistemics/corpus/` with
+16. Both assert their own vocabulary against it, that the vendored copy
+hashes to the pin, and that **every axis they claim to implement names a
+symbol that exists** — a conformance declaration pointing at a deleted
+module would otherwise pass everything else while claiming an axis nobody
+implements.
+
+The absences are recorded as different in kind, which is the point of
+recording them at all. The fabric's missing `claim_strength` is
+`absence_is_deliberate: true` — assessing a claim is not acquiring a value,
+and inventing a strength at ingest would fabricate an assessment nobody
+made. This corpus's missing `production_class` is `false`: an **open gap**,
+not a decision.
+
+### `/api/health` now says which vocabulary this deployment speaks
+
+A consumer reading `evidenceClass: "reported"` from a multi-corpus
+ecosystem has to know which of two incompatible lattices produced it — and
+the two that exist rank that exact word at opposite ends. The health block
+carries the contract id, version and digest, so a consumer holding the same
+digest knows exactly what the label commits to, and one holding a different
+digest knows it is reading a different vocabulary *before* it acts on the
+number.
+
+### What no side can check, and the thing that can
+
+Each corpus verifies its own copy against its own pin. That catches a local
+edit. It cannot catch **divergence** — two corpora carrying different
+contracts, each internally consistent, both green. Only something seeing
+more than one tree can, which is `corpus-contract/verify-vendored.mjs` in
+the archive. It also catches the case that is green locally and wrong about
+itself: the right file with a stale pin.
+
+**Its first version had the defect it was written to prevent.** Planted
+against an unreachable root, it printed `matched 0, diverged 0` and exited
+`0` — a CI job pointed at the wrong directory would have gone green having
+checked nothing. It now has three exit codes, because there are three
+outcomes and two of them are not success: `0` reachable and matching, `1`
+diverged, `3` nothing checked.
+
+### Two more repairs the scan turned up
+
+**The archive's restore path named two repositories, and neither existed.**
+It read *"`notationsystems/Sea-Dog-OSIRIS-Terminal-V0`, formerly
+Notations-OSIRIS-Overwatch-Engine"* — the middle name of three, given as
+current, with the first given as former. The instrument is
+`Payload-Terminal-V0`. Corrected, with the full rename chain recorded. The
+`sea-dog-terminal/` **directory** keeps its name deliberately: it is an
+identifier, it appears on every entry of `MANIFEST.json`, and renaming it
+would break the byte identity the archive exists to hold.
+
+**The cross-repo instrument was measuring less than it claimed.** The
+fabric's `test_sea_dog_session_instrument.py` makes absence claims about
+this repository, over four search roots given as absolute `/home/user/…`
+paths — so in any other checkout the claims silently weakened to
+local-only. Its vacuity guard required `len(roots) >= 2`, which the two
+*local* roots satisfy on their own: an absence claim about this repository
+could pass with this repository nowhere in the search. Roots are now split
+local/sibling, resolved through `NOTATION_CORPORA_ROOT`, and the
+sibling-dependent claims **skip** rather than pass when no sibling is
+reachable. Measured: with siblings absent it previously reported 6 passed;
+it now reports 3 passed, 3 skipped, each naming what it could not verify.
+
+### Measured after
+
+**78 test files, 1,152 passed here. 2,317 passed, 6 skipped in the
+acquisition fabric. Typecheck clean. Production build compiles.**
+`verify-vendored.mjs`: 2 matched, 0 diverged, 0 unreachable.

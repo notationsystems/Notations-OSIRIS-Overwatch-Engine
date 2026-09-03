@@ -287,6 +287,11 @@ an ordinal that contradicts this table.
 | 61 | 70 | An escape hatch (`PAYLOAD_ROUTES_ENABLED`) that could still be set, still read, and could no longer enable anything |
 | 62 | 70 | Repairing three real defects in a component before measuring whether anything could reach it |
 | 63 | 70 | A deletion helper that took the enclosing effect, where the enclosing effect was the entire map initialisation — and a clean typecheck that confirmed only that the remainder was consistent, not that it was the program |
+| 64 | 71 | Two corpora building two halves of one property, both naming their half after the whole, neither aware the other existed |
+| 65 | 71 | `reported` as the HARDEST evidence class in one corpus and a synonym for `asserted` in another — a promotion across a boundary that every local check passes |
+| 66 | 71 | A restore path naming two repositories in sequence, neither of which is the repository's name |
+| 67 | 71 | An absence claim about a sibling repository, measured over search roots that did not include it, guarded by a count that two local roots already satisfied |
+| 68 | 71 | My own divergence checker exiting 0 when it could reach nothing — the vacuous pass committed inside the file whose header warns against it |
 
 **What the roster shows that the prose did not.** Instances 12–16 are all in
 CHECKING machinery — a probe arbiter, a selection branch, two tests, a scanner,
