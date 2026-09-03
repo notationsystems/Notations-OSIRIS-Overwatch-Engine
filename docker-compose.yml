@@ -13,8 +13,8 @@ services:
     # not break on the rename; it stops being read after v0.2.0.
     ports:
       - "${PAYLOAD_PORT:-${OSIRIS_PORT:-3000}}:3000"
-    # Optional API keys / scanner backend — copy .env.template to .env and
-    # fill in what you need. Missing file is ignored (keyless feeds still work).
+    # Optional freight authority, carrier adapter, and feed keys — copy
+    # .env.example to .env and fill in what you need. Missing file is ignored.
     env_file:
       - path: .env
         required: false
@@ -23,6 +23,10 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
+      - PAYLOAD_OPERATIONS_LOG=${PAYLOAD_OPERATIONS_LOG:-/app/runtime-data/load-operations.jsonl}
+      - PAYLOAD_CARRIER_COMMUNICATIONS_LOG=${PAYLOAD_CARRIER_COMMUNICATIONS_LOG:-/app/runtime-data/carrier-communications.jsonl}
+    volumes:
+      - payload-runtime:/app/runtime-data
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -57,6 +61,7 @@ services:
 
 volumes:
   nginx-cache:
+  payload-runtime:
 
 networks:
   umami_default:
@@ -109,6 +114,12 @@ x-casaos:
     - container: N2YO_API_KEY
       description:
         en_us: "(Optional) N2YO key for satellite tracking."
+    - container: FMCSA_WEB_KEY
+      description:
+        en_us: "FMCSA QCMobile WebKey for USDOT carrier authority and operating-status pulls."
+    - container: EIA_API_KEY
+      description:
+        en_us: "EIA Open Data key for the weekly U.S. diesel benchmark."
   ports:
     - container: "3000"
       description:

@@ -200,9 +200,14 @@ describe('every number-bearing type in the layer is accounted for', () => {
     // negotiating_position); these are its parts.
     Field: 'one stated value, or why it could not become one',
     Opportunity: 'carries its own attestation; completeness counts fields WE could read',
+    WebhookCarrierDispatchGatewayOptions: 'timeoutMs is a delivery-adapter configuration cap, not a measurement of carrier performance',
     RawEmail: 'the message as it arrived; what it asserts is the senders claim',
     ExtractionReview: 'counts of fields two instances agreed on',
     BoundaryDecision: 'which vendors a document passed through — a decision record, not a measurement',
+    // OCR intake. Artifact bytes are transport metadata needed to bound and
+    // identify document handling; they are not a fact the document asserts
+    // about a shipment, carrier, facility, or the physical economy.
+    OcrArtifact: 'artifact byte count is document transport metadata, not a claim about the physical economy',
     // The pricing engine. Every figure is computed from OUR OWN settled loads,
     // which carry the world's `representative` stamp; the quote's own honesty
     // lives in its confidence tier and its refusals, which is what the type is

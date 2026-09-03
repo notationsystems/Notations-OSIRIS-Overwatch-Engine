@@ -4,6 +4,75 @@ What the instance does between deploys: what survives a restart, where
 the backup is, how a change gets checked before a researcher sees it, and
 what postures have been taken about external clients.
 
+## Freight-operation journals
+
+The load-operation and carrier-communication journals are append-only,
+hash-chained commercial evidence. Docker Compose mounts `payload-runtime` at
+`/app/runtime-data` and points both journal variables there, so rebuilds and
+container replacement preserve them. They are excluded from Git, Docker build
+contexts, and the static archive manifest.
+
+Use one application writer and back up the volume independently. Restoring only
+one journal is not sufficient: carrier receipts and events bind to immutable
+dispatch identities in the load journal, and the communications API refuses an
+orphan or mismatched history. Outbound tender delivery is at-least-once across a
+process crash and sends a stable attempt `Idempotency-Key`; the carrier adapter
+must honor that key to make a retry side-effect safe.
+
+---
+
+## Brokerage control tower
+
+Open `/operations` and supply the same `PAYLOAD_OPERATIONS_TOKEN` used by the
+private freight APIs. The credential remains in the active tab's memory; it is
+not written to local storage, session storage, URLs, or the server-rendered
+page. Locking or closing the workspace clears it.
+
+The workspace reads `GET /api/freight/control-tower` every 30 seconds. This is a
+projection over the two journals, not a third mutable record. It joins:
+
+- opportunity, route, equipment, load, carrier, lane, episode, and action IDs;
+- authorization, assignment, dispatch, tender delivery, acknowledgement, and
+  tracking state;
+- pickup and delivery commitments plus tracking freshness;
+- quoted carrier cost, captured invoice, gross margin, and outcome status.
+
+The default queue is exception-first. Every queue item exposes a named issue,
+severity, applicable deadline, evidence-reference count, and operator remedy.
+There is no opaque composite score. Missing tracking is not treated as on time,
+and journal corruption or unavailability makes the entire view refuse rather
+than silently showing an empty desk.
+
+Operational policy is currently fixed in code: 30 minutes to acknowledge a
+delivered tender, 120 minutes before in-motion tracking is stale, and 24 hours
+after delivered evidence before settlement becomes high priority. Change those
+values through a reviewed deployment until per-customer policies have their own
+authenticated configuration ledger.
+
+---
+
+## Authoritative freight-source pulls
+
+The private `/api/freight/sources` route pulls two fixed official APIs: FMCSA
+QCMobile for USDOT carrier identity, operating status, authority and
+out-of-service evidence; and EIA API v2 for the latest weekly U.S. retail
+on-highway diesel benchmark. Configure `FMCSA_WEB_KEY` and `EIA_API_KEY` plus
+the same `PAYLOAD_OPERATIONS_TOKEN` used by the operation journal.
+
+The response is normalized and excludes carrier address and telephone data.
+Every successful provider response receives an evidence id and a reported,
+disinterested attestation. API credentials are excluded from URLs in errors
+and from evidence hashes. The source route is pull-through rather than a raw
+proxy: provider hosts, paths, and the EIA series are fixed in code.
+
+FMCSA's public response is useful regulatory evidence but is not a current
+cargo certificate. `authorizationCarrier.insuranceExpiresAt` and
+`cargoCoverAmount` therefore remain null, with explicit remedies, until an
+insurer/broker record supplies them. An active authority status without an
+actual grant date is also surfaced as missing rather than backfilled with the
+retrieval date. This means the deterministic gate can refuse or remain
+undetermined without ever inventing a pass.
+
 ---
 
 ## Restart and persistence semantics (D-8)

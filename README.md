@@ -164,6 +164,12 @@ Registration was never the only door.
 - **Exception queue** — loads where the tender and the bill of lading name
   different carriers, with uncaptured bills of lading surfaced rather than
   counted clean
+- **Persistent operating loop** — opportunity intake, carrier alternatives,
+  authorization, assignment, dispatch delivery, acknowledgement, tracking,
+  settlement, and outcome capture remain replayable after restart
+- **Control-tower workspace** — `/operations` joins those durable records into
+  an exception-first desk queue with exact load/carrier/lane identity,
+  deadlines, evidence counts, and explicit operator remedies
 
 ### Commodity analytics
 - Concentration (HHI with remainder and effective groups), flow centrality,
@@ -224,6 +230,23 @@ PAYLOAD_PORT=3000
 # Force every source to its snapshot rung (visible in provenance, never silent)
 PAYLOAD_DISABLE_LIVE=
 
+# Authorize persistent freight-operation commands; leave empty to disable the API
+PAYLOAD_OPERATIONS_TOKEN=
+PAYLOAD_OPERATIONS_LOG=
+
+# Pull carrier authority/status and the weekly diesel benchmark
+FMCSA_WEB_KEY=
+EIA_API_KEY=
+PAYLOAD_FREIGHT_SOURCE_TIMEOUT_MS=10000
+
+# Outbound carrier adapter and authenticated inbound carrier events
+PAYLOAD_CARRIER_DISPATCH_URL=
+PAYLOAD_CARRIER_DISPATCH_TOKEN=
+PAYLOAD_CARRIER_DISPATCH_PROVIDER=carrier-webhook
+PAYLOAD_CARRIER_DISPATCH_TIMEOUT_MS=10000
+PAYLOAD_CARRIER_WEBHOOK_SECRET=
+PAYLOAD_CARRIER_COMMUNICATIONS_LOG=
+
 # Optional, for higher rate limits (see DOCKER.md for signup links)
 FIRMS_API_KEY=                # NASA FIRMS
 OPENSKY_CLIENT_ID=            # OpenSky OAuth2
@@ -231,6 +254,38 @@ OPENSKY_CLIENT_SECRET=
 N2YO_API_KEY=                 # N2YO satellites
 AIS_API_KEY=                  # aisstream.io maritime
 ```
+
+`GET /api/freight/operations` reads the current load-operation projections;
+`POST /api/freight/operations` advances opportunity intake, alternatives,
+authorization, assignment, dispatch evidence, and settlement outcome capture.
+`GET /api/freight/control-tower` joins those projections to tender delivery,
+carrier acknowledgements, tracking freshness, delivery windows, and settlement
+state. The `/operations` workspace refreshes that private view every 30 seconds
+and keeps its bearer credential only in the active browser tab's memory.
+`GET /api/freight/sources?usdot=<number>&carrierId=<internal-id>&includeDiesel=1`
+pulls current FMCSA identity/authority/out-of-service evidence and the fixed EIA
+weekly U.S. diesel benchmark. It returns a gate-ready `authorizationCarrier`
+object, but deliberately leaves cargo insurance expiry and limit null: the
+public registry is not a certificate of insurance, and missing coverage never
+becomes clearance.
+`POST /api/freight/communications` delivers the journal-derived tender to the
+configured carrier adapter with a stable `Idempotency-Key`; its corresponding
+`GET` exposes delivery and carrier-event projections. These routes require
+`Authorization: Bearer <PAYLOAD_OPERATIONS_TOKEN>`.
+
+The carrier adapter must return JSON containing `receiptId` and optionally
+`acceptedAt`. It receives only the selected carrier rate and sanitized load
+facts—not the shipper target rate or source-message identity. Carriers post
+acknowledgements and tracking updates to `/api/freight/carrier-events`, signed
+as `HMAC-SHA256(timestamp + "." + rawBody)` using
+`PAYLOAD_CARRIER_WEBHOOK_SECRET` (at least 32 random bytes). Run both journals
+on persistent, backed-up storage with one application writer; Compose
+provisions that volume by default.
+
+FMCSA and EIA keys stay server-side and are never returned, logged in source
+errors, or included in evidence identifiers. A partial upstream failure is
+reported as a typed source refusal; the API never substitutes a zero, a stale
+snapshot, or an inferred compliance pass.
 
 > **Renamed from `OSIRIS_*`.** The old spellings are still read for one
 > release and log a deprecation warning naming the replacement, so a running

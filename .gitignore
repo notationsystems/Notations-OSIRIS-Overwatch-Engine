@@ -39,6 +39,9 @@ scanner/
 
 # Data files
 threatfox.json
+/data-archive/load-operations.jsonl
+/data-archive/carrier-communications.jsonl
+/runtime-data/
 
 # Dev scripts (one-time migration helpers)
 scripts/*
