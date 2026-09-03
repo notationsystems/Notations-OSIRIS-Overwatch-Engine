@@ -48,6 +48,11 @@ describe('Corpus Compiler public projection', () => {
       expect(first).toMatchObject({
         kind: 'projection_stored',
         idempotent: false,
+        preflight: {
+          status: 'DEGRADED',
+          publicationAllowed: true,
+          preflightDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
         manifest: {
           recordCount: 5,
           excludedRecords: 2,

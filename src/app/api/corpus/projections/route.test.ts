@@ -72,10 +72,10 @@ describe('/api/corpus/projections', () => {
     const created = await POST(request('POST', token, body));
     expect(created.status).toBe(201);
     const createdBody = await created.json();
-    expect(createdBody).toMatchObject({ kind: 'projection_stored', idempotent: false, manifest: { projectionId: 'public:global', recordCount: 1, excludedRecords: 1, exclusions: [{ code: 'CORPUS_CLASSIFICATION_MISSING', count: 1 }] } });
+    expect(createdBody).toMatchObject({ kind: 'projection_stored', idempotent: false, preflight: { status: 'DEGRADED', publicationAllowed: true, preflightDigest: expect.stringMatching(/^[a-f0-9]{64}$/) }, manifest: { projectionId: 'public:global', recordCount: 1, excludedRecords: 1, exclusions: [{ code: 'CORPUS_CLASSIFICATION_MISSING', count: 1 }] } });
     const read = await GET(request('GET', token));
     expect(read.status).toBe(200);
-    expect(await read.json()).toMatchObject({ kind: 'compiled_corpus_projection', manifest: { projectionDigest: createdBody.manifest.projectionDigest } });
+    expect(await read.json()).toMatchObject({ kind: 'compiled_corpus_projection', manifest: { projectionDigest: createdBody.manifest.projectionDigest }, preflight: { publicationAllowed: true, preflightDigest: createdBody.preflight.preflightDigest } });
     const replay = await POST(request('POST', token, body));
     expect(replay.status).toBe(200);
     expect(await replay.json()).toMatchObject({ idempotent: true, manifest: { projectionDigest: createdBody.manifest.projectionDigest } });

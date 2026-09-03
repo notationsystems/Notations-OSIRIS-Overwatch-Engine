@@ -41,6 +41,16 @@ describe('SQLite corpus agent-artifact journal', () => {
       const store = new SqliteCorpusAgentArtifactStore(path);
       const fast = value.result('FAST');
       const verified = value.result('VERIFIED');
+      expect(fast.output.resultManifest).toMatchObject({
+        schema: 'notation.result-manifest.v1',
+        methodology: { capabilityId: 'agent-result-sidecar', capabilityStatus: 'BETA' },
+        corpus: { corpusBuildId: fast.corpusBuildId, projectionDigest: fast.projectionDigest },
+        uncertainty: { spatialState: 'OBSERVED' },
+        verification: { level: 'PROVENANCE', sourceTruthClaimed: false, commitmentId: null },
+        deliberateNonClaims: expect.arrayContaining([expect.stringContaining('source observations are empirically true')]),
+        manifestDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+      });
+      expect(verified.output.resultManifest.verification).toMatchObject({ level: 'REPRODUCIBLE', sourceTruthClaimed: false, commitmentId: expect.stringMatching(/^corpus-commitment:/), attestationStatus: 'NOT_ATTESTED', zkProofStatus: 'NOT_GENERATED' });
       const first = store.append('global', { artifactType: 'agent_result', artifactId: fast.resultId, corpusBuildId: fast.corpusBuildId, payload: fast }, at);
       const second = store.append('global', { artifactType: 'agent_result', artifactId: verified.resultId, corpusBuildId: verified.corpusBuildId, payload: verified }, '2026-09-02T17:01:00.000Z');
       const replay = store.append('global', { artifactType: 'agent_result', artifactId: fast.resultId, corpusBuildId: fast.corpusBuildId, payload: fast }, '2026-09-02T17:02:00.000Z');

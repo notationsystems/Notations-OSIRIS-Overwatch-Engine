@@ -30,7 +30,7 @@ attestations, and gives neither role update or delete authority.
 
 ## Agent MCP tools
 
-`npm run mcp` exposes eight corpus tools in addition to the existing analytical
+`npm run mcp` exposes nine corpus tools in addition to the existing analytical
 surface:
 
 - `query_payload_corpus`
@@ -41,6 +41,13 @@ surface:
 - `get_payload_corpus_index_coverage`
 - `get_payload_control_plane`
 - `get_payload_substrate_status`
+- `get_payload_corpus_methodology`
+
+Every new agent result also carries `notation.result-manifest.v1`: the exact
+methodology and build digests, canonical identities and evidence used,
+deterministic computation references, typed uncertainty, evidence-budget
+exclusions, and actual attestation/zk status. The sidecar is hashed into the
+stable `resultId`; it is not an optional explanatory field.
 
 The MCP process needs `PAYLOAD_CORPUS_QUERY_TOKEN`; the token is sent only in the
 Authorization header to the same HTTP routes used by Terminal. Every query names
@@ -62,6 +69,10 @@ from the configured canonical store, current public projection, retrieval API,
 artifact journal, evidence source IDs, MCP package, Kepler adapter, Ed25519
 signer state, build-bound knowledge index, Notation federation API,
 operational-event ledger boundary, and pinned SP1 identity.
+
+The topology now also names the inspectable methodology API/MCP node and the
+compiler preflight capability. Capability maturity remains authoritative in the
+methodology contract rather than being inferred from runtime health.
 
 ## Notation Data Substrate federation
 

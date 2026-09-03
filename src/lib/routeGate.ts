@@ -57,6 +57,7 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'corpus/federation': 'freight',
   'corpus/index': 'freight',
   'corpus/mining/dependencies': 'freight',
+  'corpus/methodology': 'freight',
   'corpus/projectors': 'freight',
   'corpus/projections': 'freight',
   'corpus/records': 'freight',

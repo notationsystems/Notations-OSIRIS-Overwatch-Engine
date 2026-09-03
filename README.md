@@ -63,6 +63,7 @@ systems remain maintained domain capability over the same epistemic discipline:
 See the [`Notation Systems product boundaries`](docs/PRODUCT_BOUNDARIES.md),
 [`PayloadOS architecture contract`](docs/PAYLOADOS.md),
 [`Physical-Economy Corpus V0`](docs/PHYSICAL_ECONOMY_CORPUS.md),
+[`Payload corpus methodology`](docs/CORPUS_METHODOLOGY.md),
 [`data-platform contract`](docs/DATA_PLATFORM.md),
 [`docs/PHYSICAL_ECONOMY.md`](docs/PHYSICAL_ECONOMY.md), and
 [`docs/ARCHITECTURE_LEDGER.md`](docs/ARCHITECTURE_LEDGER.md).

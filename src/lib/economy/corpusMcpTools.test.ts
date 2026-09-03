@@ -20,9 +20,19 @@ describe('agent-facing corpus MCP package', () => {
       'get_payload_corpus_index_coverage',
       'get_payload_control_plane',
       'get_payload_substrate_status',
+      'get_payload_corpus_methodology',
     ]);
     expect(CORPUS_MCP_TOOLS[0].description).toContain('kepler.gl addDataToMap');
     expect(CORPUS_MCP_TOOLS[0].description).toContain('Neither state proves source truth');
+  });
+
+  it('exposes the same inspectable methodology contract to agents', async () => {
+    process.env.PAYLOAD_CORPUS_QUERY_TOKEN = 'QUERY-TOKEN';
+    let path = '';
+    const context: McpContext = { async fetchJson(value) { path = value; return { status: 200, body: { kind: 'payload_corpus_methodology' } }; } };
+    const result = await CORPUS_MCP_TOOLS[8].handler({}, context);
+    expect(path).toBe('/api/corpus/methodology?view=full');
+    expect(result).toMatchObject({ kind: 'payload_corpus_methodology' });
   });
 
   it('exposes destination ingestion, acknowledgement, lag, and vector projection state', async () => {

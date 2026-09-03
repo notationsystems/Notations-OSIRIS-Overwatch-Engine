@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { authorizeCorpusCompilation } from '@/lib/economy/corpusHttpAuth';
 import { compilePublicProjectionFromRepository } from '@/lib/economy/corpusProjection';
+import { preflightPublicCorpusBuild } from '@/lib/economy/corpusPreflight';
+import { awaitCorpus } from '@/lib/economy/corpusRepository';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 
@@ -20,11 +22,13 @@ export async function GET(request: Request) {
   const denied = authorizeCorpusCompilation(request);
   if (denied) return denied;
   const owned = owners();
-  if (!owned.projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_CONFIGURED', detail: owned.error ?? 'No corpus read-model database is configured.', remedy: 'Set PAYLOAD_CORPUS_READ_MODEL_PATH to a disposable, persistent SQLite path.' }, { status: 503 });
+  if (!owned.corpus || !owned.projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_CONFIGURED', detail: owned.error ?? 'No corpus or read-model database is configured.', remedy: 'Set PAYLOAD_CORPUS_DATABASE_PATH and PAYLOAD_CORPUS_READ_MODEL_PATH to persistent paths.' }, { status: 503 });
   try {
     const projection = owned.projection.loadPublic();
     if (!projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_BUILT', detail: 'The public global projection has not been compiled.', remedy: 'POST the public/global compiler request after canonical ingestion.' }, { status: 404 });
-    return NextResponse.json({ kind: projection.kind, manifest: projection.manifest }, { headers: { 'Cache-Control': 'private, no-store' } });
+    const source = await awaitCorpus(owned.corpus.projectionSource('global', projection.manifest.knowledgeCutoff));
+    const preflight = preflightPublicCorpusBuild(source, projection);
+    return NextResponse.json({ kind: projection.kind, manifest: projection.manifest, preflight }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_CORRUPT', detail: error instanceof Error ? error.message : 'Projection integrity failed.', remedy: 'Delete only the derived read model and rebuild it from verified canonical state.' }, { status: 503 });
   }

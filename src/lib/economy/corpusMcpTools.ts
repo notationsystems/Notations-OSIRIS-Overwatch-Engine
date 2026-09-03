@@ -153,6 +153,12 @@ const corpusMcpTools: CorpusMcpToolDef[] = [
     inputSchema: {},
     handler: (_args, context) => query(context, '/api/corpus/substrate?view=status'),
   },
+  {
+    name: 'get_payload_corpus_methodology',
+    description: 'Retrieve the exact versioned Payload physical-economy methodology, capability maturity states, typed uncertainty vocabulary, known limitations, deliberate non-claims, component versions, and methodology digest. Planned and research capabilities remain explicitly unavailable.',
+    inputSchema: {},
+    handler: (_args, context) => query(context, '/api/corpus/methodology?view=full'),
+  },
 ];
 
 export const CORPUS_MCP_TOOLS: readonly CorpusMcpToolDef[] = Object.freeze(corpusMcpTools);

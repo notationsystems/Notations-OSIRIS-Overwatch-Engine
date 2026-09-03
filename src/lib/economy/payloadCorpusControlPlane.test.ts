@@ -66,6 +66,8 @@ describe('Payload physical-economy control plane', () => {
         expect.objectContaining({ nodeId: 'payload:corpus:projection', health: expect.objectContaining({ status: 'healthy' }) }),
         expect.objectContaining({ nodeId: 'payload:worker:notation-substrate-sync', health: expect.objectContaining({ status: 'healthy' }) }),
         expect.objectContaining({ nodeId: 'notation:substrate', health: expect.objectContaining({ status: 'healthy' }), metadata: expect.objectContaining({ identityCount: 2, semanticDocumentCount: 2 }) }),
+        expect.objectContaining({ nodeId: 'payload:api:corpus-methodology', health: expect.objectContaining({ status: 'healthy' }), metadata: expect.objectContaining({ methodologyVersion: 'payload.methodology.physical-economy@1.0.0' }) }),
+        expect.objectContaining({ nodeId: 'payload:mcp:methodology', health: expect.objectContaining({ status: 'healthy' }) }),
         expect.objectContaining({ nodeId: 'payload:source:source:port-authority', health: expect.objectContaining({ status: 'unobserved' }) }),
         expect.objectContaining({ nodeId: 'payload:proof:payload-event-batch-v1', metadata: expect.objectContaining({ appliesToCorpusBuild: false }) }),
       ]));

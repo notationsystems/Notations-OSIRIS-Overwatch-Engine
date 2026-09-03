@@ -2,6 +2,7 @@
 
 import type { CorpusAgentArtifactPage, StoredCorpusAgentArtifact } from './corpusAgentArtifacts';
 import type { CorpusKnowledgeIndexManifest } from './corpusKnowledgeIndex';
+import { PAYLOAD_CORPUS_METHODOLOGY } from './corpusMethodology';
 import type { CompiledCorpusProjection } from './corpusProjection';
 import type { CorpusProjectionSource } from './physicalEconomyCorpus';
 import type { Sp1ProgramIdentity } from './sp1ProgramIdentity';
@@ -54,7 +55,7 @@ export type PayloadCorpusControlPlaneSnapshot = {
       readonly relationId: string;
       readonly sourceNodeId: string;
       readonly targetNodeId: string;
-      readonly kind: 'ingests_from' | 'projects' | 'serves' | 'persists_to' | 'packages' | 'visualizes' | 'attests' | 'proves' | 'synchronizes_to';
+      readonly kind: 'ingests_from' | 'projects' | 'serves' | 'persists_to' | 'packages' | 'visualizes' | 'attests' | 'proves' | 'synchronizes_to' | 'governs';
     }[];
   };
   readonly timeline: {
@@ -249,8 +250,15 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
       { backend: input.canonical?.backend ?? null, sourceSequence: input.canonical?.source.sourceSequence ?? null }),
     node('payload:corpus:projection', 'read_model', 'Public corpus projection', projectionStatus, projection?.manifest.compiledAt ?? null,
       !projection ? faults.get('projection') ?? 'No public projection is available.' : !input.projectionCurrent ? 'Projection does not match current canonical source state.' : projectionAge < -60_000 ? 'Projection compile time is ahead of the control-plane clock.' : projectionAge > input.projectionStaleAfterMs ? 'Projection exceeds the configured freshness window.' : 'Projection matches canonical state and is within the freshness window.',
-      [capability('projection.observe', 'observe', 'automatic', projectionStatus, projection ? [projection.manifest.projectionDigest, projection.manifest.policyLineageId] : [])],
+      [
+        capability('projection.observe', 'observe', 'automatic', projectionStatus, projection ? [projection.manifest.projectionDigest, projection.manifest.policyLineageId] : []),
+        capability('projection.preflight', 'execute', 'compiler_credential', projectionStatus, [PAYLOAD_CORPUS_METHODOLOGY.methodologyDigest]),
+      ],
       { corpusBuildId: projection?.manifest.corpusBuildId ?? null, recordCount: projection?.manifest.recordCount ?? 0, excludedRecords: projection?.manifest.excludedRecords ?? 0 }),
+    node('payload:api:corpus-methodology', 'api', 'Inspectable corpus methodology API', 'healthy', input.generatedAt,
+      'The immutable methodology contract exposes component versions, maturity, uncertainty, limitations, and deliberate non-claims.',
+      [capability('methodology.observe', 'observe', 'automatic', 'healthy', [PAYLOAD_CORPUS_METHODOLOGY.methodologyDigest])],
+      { methodologyVersion: PAYLOAD_CORPUS_METHODOLOGY.methodologyVersion, methodologyDigest: PAYLOAD_CORPUS_METHODOLOGY.methodologyDigest, capabilityCount: PAYLOAD_CORPUS_METHODOLOGY.capabilities.length }),
     node('payload:index:knowledge', 'knowledge_index', 'Build-bound corpus knowledge index', indexStatus, input.index?.manifest.builtAt ?? null,
       !input.index ? faults.get('index') ?? 'No corpus knowledge index is available.' : !input.index.current ? 'Index belongs to another public CorpusBuild and is refused for queries.' : 'Lexical, entity, relation, source, temporal, and spatial facets match the current CorpusBuild.',
       [
@@ -278,6 +286,8 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
       [capability('knowledge-index.search', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : [])]),
     node('payload:mcp:index-coverage', 'mcp_tool', 'get_payload_corpus_index_coverage', indexStatus, null, 'MCP tool returns typed observed and unobserved coverage for the indexed CorpusBuild.',
       [capability('knowledge-index.coverage', 'observe', 'automatic', indexStatus, input.index ? [input.index.manifest.indexDigest] : [])]),
+    node('payload:mcp:methodology', 'mcp_tool', 'get_payload_corpus_methodology', 'healthy', null, 'MCP tool exposes the same versioned trust contract used by result sidecars and compiler preflight.',
+      [capability('methodology.observe', 'observe', 'automatic', 'healthy', [PAYLOAD_CORPUS_METHODOLOGY.methodologyDigest])]),
     node('payload:api:notation-federation', 'api', 'Notation Data Substrate federation API', projectionStatus, projection?.manifest.compiledAt ?? null,
       projectionStatus === 'healthy' ? 'Ordered public sync envelopes are available from the exact current CorpusBuild.' : 'Federation is constrained by public projection state.',
       [
@@ -337,6 +347,8 @@ export function buildPayloadCorpusControlPlane(input: PayloadCorpusControlPlaneI
     { relationId: 'mcp-reads-attestations', sourceNodeId: 'payload:mcp:attestation', targetNodeId: 'payload:journal:agent-artifacts', kind: 'serves' },
     { relationId: 'mcp-searches-index', sourceNodeId: 'payload:mcp:index-search', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
     { relationId: 'mcp-reads-index-coverage', sourceNodeId: 'payload:mcp:index-coverage', targetNodeId: 'payload:index:knowledge', kind: 'serves' },
+    { relationId: 'mcp-reads-methodology', sourceNodeId: 'payload:mcp:methodology', targetNodeId: 'payload:api:corpus-methodology', kind: 'serves' },
+    { relationId: 'methodology-governs-projection', sourceNodeId: 'payload:api:corpus-methodology', targetNodeId: 'payload:corpus:projection', kind: 'governs' },
     { relationId: 'projection-serves-federation', sourceNodeId: 'payload:corpus:projection', targetNodeId: 'payload:api:notation-federation', kind: 'serves' },
     { relationId: 'federation-serves-substrate-worker', sourceNodeId: 'payload:api:notation-federation', targetNodeId: 'payload:worker:notation-substrate-sync', kind: 'synchronizes_to' },
     { relationId: 'substrate-worker-persists-destination', sourceNodeId: 'payload:worker:notation-substrate-sync', targetNodeId: 'notation:substrate', kind: 'persists_to' },

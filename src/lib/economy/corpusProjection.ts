@@ -36,6 +36,7 @@ import {
   type StoredCorpusRecord,
 } from './physicalEconomyCorpus';
 import type { CorpusRepository } from './corpusRepository';
+import { assertCorpusBuildPublicationAllowed, preflightPublicCorpusBuild } from './corpusPreflight';
 
 export { CORPUS_ONTOLOGY_VERSION } from './payloadCorpusDefinition';
 export const CORPUS_COMPILER_VERSION = '1.2.0';
@@ -376,10 +377,13 @@ export function compilePublicProjection(
   knowledgeCutoff = new Date().toISOString(),
   compiledAt = new Date().toISOString(),
 ) {
-  const projection = buildPublicProjection(corpus.projectionSource('global', knowledgeCutoff), compiledAt);
+  const source = corpus.projectionSource('global', knowledgeCutoff);
+  const projection = buildPublicProjection(source, compiledAt);
+  const preflight = preflightPublicCorpusBuild(source, projection);
+  assertCorpusBuildPublicationAllowed(preflight);
   const stored = store.replace(projection);
   corpus.checkpointProjection({ projector: 'projector:public-global-read-model', scope: 'global', sequence: projection.manifest.sourceSequence, updatedAt: compiledAt });
-  return stored;
+  return freeze({ ...stored, preflight });
 }
 
 /** Production compiler boundary; awaits either the embedded or central repository. */
@@ -389,8 +393,11 @@ export async function compilePublicProjectionFromRepository(
   knowledgeCutoff = new Date().toISOString(),
   compiledAt = new Date().toISOString(),
 ) {
-  const projection = buildPublicProjection(await corpus.projectionSource('global', knowledgeCutoff), compiledAt);
+  const source = await corpus.projectionSource('global', knowledgeCutoff);
+  const projection = buildPublicProjection(source, compiledAt);
+  const preflight = preflightPublicCorpusBuild(source, projection);
+  assertCorpusBuildPublicationAllowed(preflight);
   const stored = store.replace(projection);
   await corpus.checkpointProjection({ projector: 'projector:public-global-read-model', scope: 'global', sequence: projection.manifest.sourceSequence, updatedAt: compiledAt });
-  return stored;
+  return freeze({ ...stored, preflight });
 }

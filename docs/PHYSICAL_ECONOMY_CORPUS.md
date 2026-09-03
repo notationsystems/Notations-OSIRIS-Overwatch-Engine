@@ -291,6 +291,21 @@ Authorization: Bearer <PAYLOAD_CORPUS_QUERY_TOKEN>
 The saved result includes an OGC:CRS84 GeoJSON feature collection and a
 kepler.gl-compatible `addDataToMap` payload. Only evidence-bearing canonical
 locations are emitted; absent coordinates become a typed unobserved state.
+It also includes a mandatory `notation.result-manifest.v1` sidecar binding the
+human-facing output to methodology/build identity, exact lineage, computation
+versions, typed uncertainty, evidence-budget exclusions, and actual proof state.
+
+### Inspectable methodology
+
+```http
+GET /api/corpus/methodology?view=full
+```
+
+This public, content-digested contract exposes component versions, process
+rules, appropriate uncertainty semantics, deliberate non-claims, known
+limitations, and formal capability maturity. It is also available to agents as
+`get_payload_corpus_methodology`. See
+[`CORPUS_METHODOLOGY.md`](CORPUS_METHODOLOGY.md).
 
 ### Corpus Compiler
 
@@ -310,6 +325,12 @@ record schema, ontology, policy, compiler, embedding and representation
 versions. Exact
 recompilation is idempotent. `GET /api/corpus/projections` returns its manifest
 to an authenticated administrator; it never returns the database path.
+
+Before either compiler implementation writes or checkpoints, it runs the
+versioned publication preflight. Source equivalence, ontology, stable identity,
+evidence/endpoint closure, temporal leakage, and all public uses are blocking;
+ambiguous aliases are explicit review risks and live source health remains
+unobserved. The compiler response returns the full preflight and digest.
 
 The manifest also binds the PayloadOS Corpus Engine identity, Payload product
 identity, and exact `payload.corpus-definition.physical-economy.v1` definition
@@ -387,7 +408,9 @@ refusal, typed facility discovery, reproducible proof-carrying Earth answers,
 domain-separated CorpusBuild commitments and inclusion proofs, score-free
 Warrant Graph API/inspector, evidence-budgeted agent contexts and common
 Notation assertions, persistent result lookup, a linearized agent-artifact
-journal, signed CorpusBuild attestations, eight agent-facing corpus MCP tools,
+journal, signed CorpusBuild attestations, nine agent-facing corpus MCP tools,
+a mandatory result-manifest sidecar, an inspectable methodology/maturity API,
+fail-closed corpus-build publication preflight,
 a Payload-specific control view over topology, capability state, artifact
 events, operator attention, the build-bound knowledge index, public Notation
 Data Substrate federation, a destination ingestion worker with collision-safe
