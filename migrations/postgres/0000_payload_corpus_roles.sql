@@ -1,0 +1,25 @@
+-- Run with a PostgreSQL role that has CREATEROLE. Service roles are NOLOGIN
+-- group roles; grant each to a distinct LOGIN role managed by the deployment.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payload_corpus_owner') THEN
+    CREATE ROLE payload_corpus_owner NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payload_corpus_ingest') THEN
+    CREATE ROLE payload_corpus_ingest NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payload_corpus_query') THEN
+    CREATE ROLE payload_corpus_query NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payload_corpus_projector') THEN
+    CREATE ROLE payload_corpus_projector NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'payload_corpus_compiler') THEN
+    CREATE ROLE payload_corpus_compiler NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+END $$;
+
+ALTER ROLE payload_corpus_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE payload_corpus_ingest NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE payload_corpus_query NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE payload_corpus_projector NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE payload_corpus_compiler NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;

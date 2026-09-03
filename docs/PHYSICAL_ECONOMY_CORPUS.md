@@ -89,6 +89,53 @@ operational event tables in one backed-up SQLite file. On Podman/Docker, the
 path must live on the named runtime volume, not a host-synchronized OneDrive
 folder; SQLite WAL requires ordinary filesystem locking.
 
+For a central deployment, run the PostgreSQL migrations with a privileged URL
+that is not exposed to the web process, then give each runtime capability a
+distinct login granted only its corresponding `payload_corpus_*` group role:
+
+```sql
+GRANT payload_corpus_query TO payload_query;
+GRANT payload_corpus_ingest TO payload_ingest;
+GRANT payload_corpus_projector TO payload_projector;
+GRANT payload_corpus_compiler TO payload_compiler;
+GRANT payload_corpus_owner TO payload_replay;
+```
+
+```env
+PAYLOAD_CORPUS_QUERY_DATABASE_URL=postgresql://payload_query:...@postgres/payload
+PAYLOAD_CORPUS_INGEST_DATABASE_URL=postgresql://payload_ingest:...@postgres/payload
+PAYLOAD_CORPUS_PROJECTOR_DATABASE_URL=postgresql://payload_projector:...@postgres/payload
+PAYLOAD_CORPUS_COMPILER_DATABASE_URL=postgresql://payload_compiler:...@postgres/payload
+PAYLOAD_CORPUS_TENANT_ID=acme
+PAYLOAD_CORPUS_ALLOW_GLOBAL_WRITE=false
+PAYLOAD_CORPUS_POSTGRES_SSL=require
+```
+
+PostgreSQL uses transaction-local tenant context and RLS. Customer scope must
+match `PAYLOAD_CORPUS_TENANT_ID`; global writes remain disabled unless an
+operator explicitly enables them for an ingest/projector/compiler service.
+PostGIS derives point geometry from canonical entity JSON and indexes it with
+GiST, but canonical JSON and its SHA-256 chain remain authoritative.
+
+Migration and exact replay are separate operations:
+
+```bash
+PAYLOAD_CORPUS_MIGRATION_DATABASE_URL=postgresql://... npm run migrate:corpus-postgres
+PAYLOAD_CORPUS_REPLAY_DATABASE_URL=postgresql://... npm run replay:corpus-postgres
+PAYLOAD_CORPUS_REPLAY_DATABASE_URL=postgresql://... npm run replay:corpus-postgres -- --apply
+npm run rebuild:corpus-projection
+```
+
+Replay is dry-run unless `--apply` is present and refuses a non-empty target.
+Its CLI-only login must inherit `payload_corpus_owner`; never place that URL in
+the web runtime. The canonical, outbox, and checkpoint tables force RLS even
+for their table owner, so ordinary database ownership is not an application
+authorization boundary.
+It verifies exact records, global sequences, per-scope chains, outbox identities
+and active projection digests. The projection rebuild archives a recognized v2
+database; it never deletes canonical state or guesses how to handle an unknown
+format.
+
 The read-model database is deliberately separate and disposable. The Corpus
 Compiler can delete and reconstruct it from canonical state. Raw artifacts
 belong in an object store or filesystem hierarchy addressed by content hash;
@@ -119,6 +166,9 @@ the system does not currently pretend that two independent sequences are one.
 - Dependency mining and Pattern Registry replay require
   `PAYLOAD_CORPUS_MINER_TOKEN`; miner, compiler, and ingestion identities are
   not interchangeable.
+- Context compilation and projector checkpoints require
+  `PAYLOAD_CORPUS_QUERY_TOKEN` and `PAYLOAD_CORPUS_PROJECTOR_TOKEN`
+  respectively; neither credential grants database authority.
 
 ## API surfaces
 

@@ -161,6 +161,15 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_CORPUS_COMPILER_TOKEN` | Separate least-privilege bearer authority for read-model compilation and manifest inspection. | none |
 | `PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH` | Separate append-only SQLite/WAL registry for mined candidate knowledge and mining-run provenance. | `/app/runtime-data/corpus-pattern-registry.sqlite` in Compose |
 | `PAYLOAD_CORPUS_MINER_TOKEN` | Dedicated bearer authority for mining a current public CorpusBuild and replaying the Pattern Registry. | none |
+| `PAYLOAD_CORPUS_QUERY_TOKEN` | Dedicated bearer authority for bounded ContextPackage compilation. | none |
+| `PAYLOAD_CORPUS_PROJECTOR_TOKEN` | Dedicated bearer authority for outbox consumption and monotonic checkpoints. | none |
+| `PAYLOAD_CORPUS_QUERY_DATABASE_URL` | PostgreSQL query-role connection; when set, replaces SQLite for canonical reads. | none |
+| `PAYLOAD_CORPUS_INGEST_DATABASE_URL` | PostgreSQL ingest-role connection. | none |
+| `PAYLOAD_CORPUS_PROJECTOR_DATABASE_URL` | PostgreSQL projector-role connection. | none |
+| `PAYLOAD_CORPUS_COMPILER_DATABASE_URL` | PostgreSQL compiler-role connection. | none |
+| `PAYLOAD_CORPUS_TENANT_ID` | Tenant bound into transaction-local PostgreSQL RLS context. | none/global-only |
+| `PAYLOAD_CORPUS_ALLOW_GLOBAL_WRITE` | Explicitly permits global PostgreSQL ingest/checkpoint writes. | `false` |
+| `PAYLOAD_CORPUS_POSTGRES_SSL` | PostgreSQL transport policy: `require` or `disable`. | driver/URL default |
 | `PAYLOAD_OPERATIONS_LOG` | Append-only load-operation journal. Compose places it on `payload-runtime`. | `data-archive/load-operations.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_COMMUNICATIONS_LOG` | Append-only delivery, receipt, acknowledgement, and tracking journal. | `data-archive/carrier-communications.jsonl` outside Compose |
 | `PAYLOAD_CARRIER_DISPATCH_URL` | Provider-neutral HTTPS endpoint that accepts carrier tenders. | none |
@@ -183,11 +192,11 @@ Payload Earth refuses facility queries until this succeeds, and refuses again
 if canonical global state advances without a rebuild. Do not back up the read-
 model file as an authority; recreate it from the canonical corpus.
 
-Corpus Compiler `1.1.0` binds the PayloadOS engine, Payload product and
+Corpus Compiler `1.2.0` binds the PayloadOS engine, Payload product and
 `payload.corpus-definition.physical-economy.v1` fingerprint into representation
-specification `payload.corpus.public-read-model.v2`. After upgrading from an
-older build, remove only the disposable read-model database and then run this
-compile endpoint. Do not remove the canonical corpus database.
+specification `payload.corpus.public-read-model.v3`. After upgrading from v2,
+run `npm run rebuild:corpus-projection`; the tool archives the recognized old
+read-model database and builds v3. Do not remove the canonical corpus database.
 
 With the public build current, the miner can register explicit shared-dependency
 candidates:

@@ -13,7 +13,7 @@ const BODY_KEYS = new Set(['entityId', 'depth', 'minimumDependents', 'executedAt
 
 function owners() {
   try {
-    return { corpus: physicalEconomyCorpus(), projection: corpusProjectionStore(), registry: patternRegistry(), error: null };
+    return { corpus: physicalEconomyCorpus('query'), projection: corpusProjectionStore(), registry: patternRegistry(), error: null };
   } catch (error) {
     return { corpus: null, projection: null, registry: null, error: error instanceof Error ? error.message : 'Miner storage integrity could not be established.' };
   }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   try {
     const projection = owned.projection.loadPublic();
     if (!projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_BUILT', detail: 'No public CorpusBuild is available to mine.', remedy: 'Compile the public/global representation before running the miner.' }, { status: 503 });
-    const source = owned.corpus.projectionSource('global');
+    const source = await owned.corpus.projectionSource('global');
     if (!projectionMatchesSource(projection.manifest, source)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_STALE', detail: 'The active read model no longer represents current canonical global state.', remedy: 'Recompile the CorpusBuild before mining it.' }, { status: 503 });
     const result = mineSharedDependencies(projection, {
       ...(typeof value.entityId === 'string' ? { entityId: value.entityId } : {}),

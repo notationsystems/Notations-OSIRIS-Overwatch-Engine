@@ -14,6 +14,7 @@ import {
 } from './corpusDefinition';
 import { stableValue } from './loadOperationsStore';
 import { PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION } from './payloadCorpusDefinition';
+import type { CorpusRepository } from './corpusRepository';
 import type { CorpusAppendResult, CorpusRecordInput, CorpusScope, PhysicalEconomyCorpus } from './physicalEconomyCorpus';
 
 export const CORPUS_BUILDER_VERSION = '1.2.0';
@@ -53,13 +54,7 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-export function buildCanonicalCorpusBatch(
-  corpus: PhysicalEconomyCorpus,
-  scope: CorpusScope,
-  records: readonly CorpusRecordInput[],
-  recordedAt?: string,
-  corpusDefinition: CorpusDefinition = PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION,
-): CorpusBuilderResult {
+function assertBatchDefinition(records: readonly CorpusRecordInput[], corpusDefinition: CorpusDefinition): void {
   assertCorpusDefinition(corpusDefinition);
   if (corpusDefinition.definitionFingerprint !== PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION.definitionFingerprint) {
     throw new Error('CORPUS_BUILDER_DOMAIN_UNSUPPORTED: this V0 repository adapter writes only the Payload physical-economy corpus');
@@ -73,7 +68,13 @@ export function buildCanonicalCorpusBatch(
           ? `observation type ${record.observationType ?? 'metric'}` : null;
     if (unsupported) throw new Error(`CORPUS_BUILDER_DEFINITION_MISMATCH: ${unsupported} is not admitted by ${corpusDefinition.definitionId}`);
   }
-  const result = corpus.append(scope, records, recordedAt);
+}
+
+function attachBuilderManifest(
+  result: CorpusAppendResult,
+  scope: CorpusScope,
+  corpusDefinition: CorpusDefinition,
+): CorpusBuilderResult {
   if (result.kind === 'refusal') return result;
   const ordered = [...result.records].sort((a, b) => a.sequence - b.sequence);
   const recordIds = ordered.map(record => record.recordId);
@@ -111,4 +112,28 @@ export function buildCanonicalCorpusBatch(
     canonicalCommitFingerprint,
   });
   return freeze({ ...result, builderManifest: manifest });
+}
+
+export function buildCanonicalCorpusBatch(
+  corpus: PhysicalEconomyCorpus,
+  scope: CorpusScope,
+  records: readonly CorpusRecordInput[],
+  recordedAt?: string,
+  corpusDefinition: CorpusDefinition = PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION,
+): CorpusBuilderResult {
+  assertBatchDefinition(records, corpusDefinition);
+  const result = corpus.append(scope, records, recordedAt);
+  return attachBuilderManifest(result, scope, corpusDefinition);
+}
+
+export async function buildCanonicalCorpusBatchFromRepository(
+  corpus: CorpusRepository,
+  scope: CorpusScope,
+  records: readonly CorpusRecordInput[],
+  recordedAt?: string,
+  corpusDefinition: CorpusDefinition = PAYLOAD_PHYSICAL_ECONOMY_CORPUS_DEFINITION,
+): Promise<CorpusBuilderResult> {
+  assertBatchDefinition(records, corpusDefinition);
+  const result = await corpus.append(scope, records, recordedAt);
+  return attachBuilderManifest(result, scope, corpusDefinition);
 }

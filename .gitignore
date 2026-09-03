@@ -50,6 +50,9 @@ scripts/*
 !scripts/archive-manifest.mjs
 !scripts/smoke.mjs
 !scripts/run-sp1-proof-worker.ts
+!scripts/migrate-corpus-postgres.ts
+!scripts/replay-corpus-to-postgres.ts
+!scripts/rebuild-corpus-projection-v3.ts
 
 # Rust/SP1 build output
 /zk/payload-event-batch/target/

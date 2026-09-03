@@ -82,9 +82,10 @@ contract. The supported queues distinguish topology, facility allocation,
 material-basis conversion, reporter-vintage coverage, regulatory scope, and
 otherwise-unclassified impact evidence. No baseline value is synthesized.
 
-## Central deployment target
+## Implemented central deployment
 
-The central implementation will map, without changing domain behavior, to:
+The same repository contract now selects SQLite or PostgreSQL/PostGIS without
+changing domain behavior:
 
 | Edge | Central |
 | --- | --- |
@@ -100,14 +101,32 @@ permitted only after the central adapter reproduces canonical sequences, record
 hashes, scope visibility, active revisions, projection digests, policy lineage
 and answer/context warrants from the edge ledger.
 
+`migrations/postgres` installs PostGIS, canonical/outbox/checkpoint tables,
+spatial point materialization with a GiST index, checksum-pinned schema state,
+and separate owner, ingest, query, projector and compiler roles. Every service
+role is `NOBYPASSRLS`. Transaction-local `payload.tenant_id` binds customer
+reads and writes; global writes additionally require the explicit
+`PAYLOAD_CORPUS_ALLOW_GLOBAL_WRITE=true` deployment decision. Application roles
+cannot update or delete canonical records or outbox events. RLS is forced on
+all tenant-bearing tables. The CLI-only exact-replay login inherits
+`payload_corpus_owner`; no application container receives that credential.
+
+The web runtime accepts capability-specific connection URLs. Privileged
+migration and replay URLs are consumed only by CLI tools and must not be
+injected into the application container. Exact replay is dry-run by default,
+requires an empty central target, preserves sequences and hashes, and verifies
+canonical plus per-scope projection digests before reporting success.
+
+The disposable public representation is v3. `npm run
+rebuild:corpus-projection` recognizes v2, moves the database and WAL companions
+to a timestamped archive, and rebuilds from canonical state. Unknown projection
+formats are refused rather than deleted.
+
 ## Next production increments
 
-1. Extract the SQLite corpus behind a repository interface and add equivalence
-   fixtures.
-2. Create PostgreSQL/PostGIS migrations, service roles and RLS policies.
-3. Add encrypted artifact storage and short-lived, authorization-checked access.
-4. Add durable retrieval/audit traces without persisting unnecessary raw query
+1. Add encrypted artifact storage and short-lived, authorization-checked access.
+2. Add durable retrieval/audit traces without persisting unnecessary raw query
    text.
-5. Implement idempotent spatial and vector workers with lag monitoring.
-6. Add version-addressed historical projections and state comparison tools.
-7. Extend assertion review into validation queues for mined candidate knowledge.
+3. Implement idempotent spatial and vector workers with lag monitoring.
+4. Add version-addressed historical projections and state comparison tools.
+5. Extend assertion review into validation queues for mined candidate knowledge.

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authorizeCorpusCompilation } from '@/lib/economy/corpusHttpAuth';
-import { compilePublicProjection } from '@/lib/economy/corpusProjection';
+import { compilePublicProjectionFromRepository } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 
@@ -10,7 +10,7 @@ const MAX_BODY_BYTES = 8_192;
 
 function owners() {
   try {
-    return { corpus: physicalEconomyCorpus(), projection: corpusProjectionStore(), error: null };
+    return { corpus: physicalEconomyCorpus('compiler'), projection: corpusProjectionStore(), error: null };
   } catch (error) {
     return { corpus: null, projection: null, error: error instanceof Error ? error.message : 'Corpus or projection integrity could not be established.' };
   }
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   const owned = owners();
   if (!owned.corpus || !owned.projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_UNAVAILABLE', detail: owned.error ?? 'Canonical corpus or read-model storage is not configured.', remedy: 'Set PAYLOAD_CORPUS_DATABASE_PATH and PAYLOAD_CORPUS_READ_MODEL_PATH before compiling.' }, { status: 503 });
   try {
-    const result = compilePublicProjection(owned.corpus, owned.projection, value.knowledgeCutoff as string | undefined);
+    const result = await compilePublicProjectionFromRepository(owned.corpus, owned.projection, value.knowledgeCutoff as string | undefined);
     return NextResponse.json(result, { status: result.idempotent ? 200 : 201, headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_FAILED', detail: error instanceof Error ? error.message : 'Corpus compilation failed.', remedy: 'Verify canonical integrity and classifications, then rebuild the disposable read model.' }, { status: 503 });

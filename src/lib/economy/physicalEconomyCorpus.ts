@@ -194,6 +194,9 @@ export type CorpusAppendResult =
   | { readonly kind: 'committed'; readonly records: readonly StoredCorpusRecord[]; readonly idempotent: boolean }
   | { readonly kind: 'refusal'; readonly code: 'CORPUS_INPUT_INVALID' | 'CORPUS_RECORD_CONFLICT' | 'CORPUS_REFERENCE_MISSING' | 'CORPUS_KNOWLEDGE_ORDER_INVALID' | 'CORPUS_REVISION_INVALID'; readonly detail: string; readonly remedy: string };
 type CorpusAppendRefusal = Extract<CorpusAppendResult, { kind: 'refusal' }>;
+export type CorpusAppendPreparation =
+  | CorpusAppendRefusal
+  | { readonly kind: 'prepared'; readonly idempotent: boolean; readonly newRecordIds: readonly string[] };
 
 export type CorpusProjectionSource = {
   readonly kind: 'physical_economy_projection_source';
@@ -231,6 +234,33 @@ export type CorpusProjectorCheckpoint = {
   readonly scope: CorpusScope;
   readonly sequence: number;
   readonly updatedAt: string;
+};
+
+export type CorpusSummary = {
+  readonly kind: 'physical_economy_corpus_summary';
+  readonly databasePath: string;
+  readonly durability: 'sqlite_wal' | 'postgresql_postgis';
+  readonly lastSequence: number;
+  readonly projectionEvents: number;
+  readonly projectorCheckpoints: number;
+  readonly records: readonly { readonly scope: string; readonly recordType: CorpusRecordType; readonly count: number }[];
+};
+
+export type CorpusPage = {
+  readonly kind: 'physical_economy_corpus_page';
+  readonly scope: CorpusScope;
+  readonly afterSequence: number;
+  readonly nextAfterSequence: number;
+  readonly hasMore: boolean;
+  readonly records: readonly StoredCorpusRecord[];
+};
+
+export type CorpusReplayPage = {
+  readonly kind: 'physical_economy_corpus_replay_page';
+  readonly afterSequence: number;
+  readonly nextAfterSequence: number;
+  readonly hasMore: boolean;
+  readonly records: readonly StoredCorpusRecord[];
 };
 
 export type FacilityDiscoveryResult =
@@ -279,7 +309,7 @@ type ProjectionEventRow = {
 const HASH = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._/-]{2,255}$/;
 const CUSTOMER_SCOPE = /^customer:[a-z0-9][a-z0-9._-]{1,63}$/;
-const CORPUS_HASH_DOMAIN = 'payload.physical_economy.corpus.record.v1';
+export const CORPUS_HASH_DOMAIN = 'payload.physical_economy.corpus.record.v1';
 const ENTITY_KINDS: readonly CorpusEntityKind[] = ['organization', 'facility', 'material', 'commodity', 'supplier', 'port', 'vessel', 'infrastructure', 'process', 'network', 'market', 'flow', 'event', 'geography'];
 const PREDICATES: readonly CorpusRelationshipPredicate[] = ['operated_by', 'owned_by', 'located_in', 'produces', 'consumes', 'transforms', 'supplies', 'connects_to', 'ships_via', 'trades_in', 'substitutes_for', 'depends_on', 'calls_at', 'carries', 'loads_at', 'unloads_at', 'moves_between', 'routes_via', 'affected_by', 'observed_at', 'priced_by'];
 const OBSERVATION_TYPES: readonly CorpusObservationType[] = ['metric', 'capacity', 'production', 'inventory', 'price', 'trade_flow', 'vessel_position', 'shipment', 'infrastructure_status', 'market_state', 'event_signal'];
@@ -291,8 +321,17 @@ const ASSERTION_STATUSES: readonly CorpusAssertionStatus[] = ['proposed', 'accep
 const ASSERTION_EVIDENCE_ROLES: readonly CorpusAssertionEvidenceRole[] = ['supports', 'contradicts', 'qualifies'];
 const LOCATION_PRECISIONS = ['exact', 'site', 'city', 'region', 'country'] as const;
 
-function canonical(value: unknown): string { return JSON.stringify(stableValue(value)); }
+export function canonicalCorpusJson(value: unknown): string { return JSON.stringify(stableValue(value)); }
 function sha(value: string): string { return createHash('sha256').update(value).digest('hex'); }
+export function corpusRecordHash(
+  sequence: number,
+  scope: CorpusScope,
+  recordedAt: string,
+  previousHash: string | null,
+  record: CorpusRecordInput,
+): string {
+  return sha(canonicalCorpusJson({ domain: CORPUS_HASH_DOMAIN, sequence, scope, recordedAt, previousHash, record }));
+}
 function validTime(value: string | undefined): boolean { return typeof value === 'string' && Number.isFinite(Date.parse(value)); }
 function nonEmpty(value: unknown): value is string { return typeof value === 'string' && value.trim().length > 0; }
 function validInterval(from: string | undefined, to: string | undefined): boolean {
@@ -338,8 +377,8 @@ function validStorageUri(value: string): boolean {
   } catch { return false; }
 }
 function normalizedAlias(value: string): string { return value.normalize('NFKC').trim().toLocaleLowerCase('en-US'); }
-function visibleScopes(scope: CorpusScope): readonly CorpusScope[] { return scope === 'global' ? ['global'] : ['global', scope]; }
-function scopeValid(scope: string): scope is CorpusScope { return scope === 'global' || CUSTOMER_SCOPE.test(scope); }
+export function corpusVisibleScopes(scope: CorpusScope): readonly CorpusScope[] { return scope === 'global' ? ['global'] : ['global', scope]; }
+export function corpusScopeValid(scope: string): scope is CorpusScope { return scope === 'global' || CUSTOMER_SCOPE.test(scope); }
 function freeze<T>(value: T): T {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -384,7 +423,7 @@ export function corpusEvidenceClosure(records: readonly StoredCorpusRecord[], se
   return [...included.values()].sort((a, b) => a.sequence - b.sequence);
 }
 
-function recordDefect(record: CorpusRecordInput): string | null {
+export function corpusRecordDefect(record: CorpusRecordInput): string | null {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return 'record is not an object';
   if (record.schema !== 'payload.corpus.record.v1' || typeof record.recordId !== 'string' || !ID.test(record.recordId) || !validTime(record.knownAt)) return `${record.recordId || 'record'} has invalid common identity or time`;
   if (record.knownTo !== undefined && (!validTime(record.knownTo) || Date.parse(record.knownTo) <= Date.parse(record.knownAt))) return `${record.recordId} has an invalid knowledge interval`;
@@ -421,15 +460,15 @@ function recordDefect(record: CorpusRecordInput): string | null {
 }
 
 function parseRow(row: RecordRow): StoredCorpusRecord {
-  if (!scopeValid(row.scope) || !HASH.test(row.record_hash) || (row.previous_hash !== null && !HASH.test(row.previous_hash)) || !validTime(row.recorded_at)) throw new Error(`CORPUS_DATABASE_CORRUPT: sequence ${row.sequence} has invalid indexed metadata`);
+  if (!corpusScopeValid(row.scope) || !HASH.test(row.record_hash) || (row.previous_hash !== null && !HASH.test(row.previous_hash)) || !validTime(row.recorded_at)) throw new Error(`CORPUS_DATABASE_CORRUPT: sequence ${row.sequence} has invalid indexed metadata`);
   let record: CorpusRecordInput;
   try { record = JSON.parse(row.record_json) as CorpusRecordInput; } catch { throw new Error(`CORPUS_DATABASE_CORRUPT: sequence ${row.sequence} has invalid JSON`); }
-  const defect = recordDefect(record);
+  const defect = corpusRecordDefect(record);
   if (defect || record.recordId !== row.record_id || record.recordType !== row.record_type || record.knownAt !== row.known_at) throw new Error(`CORPUS_DATABASE_CORRUPT: sequence ${row.sequence} contradicts its canonical record${defect ? ` (${defect})` : ''}`);
   return freeze({ ...record, sequence: Number(row.sequence), scope: row.scope, recordedAt: row.recorded_at, previousHash: row.previous_hash, recordHash: row.record_hash } as StoredCorpusRecord);
 }
 
-function stableIdentity(record: CorpusRecordInput | StoredCorpusRecord): string {
+export function corpusStableIdentity(record: CorpusRecordInput | StoredCorpusRecord): string {
   return record.recordType === 'entity' ? record.entityId
     : record.recordType === 'relationship' ? record.relationshipId
       : record.recordType === 'observation' ? record.observationId
@@ -438,9 +477,35 @@ function stableIdentity(record: CorpusRecordInput | StoredCorpusRecord): string 
             : record.recordType === 'alias' ? record.aliasId : record.evidenceId;
 }
 
-function activeRecords(records: readonly StoredCorpusRecord[]): readonly StoredCorpusRecord[] {
+export function activeCorpusRecords(records: readonly StoredCorpusRecord[]): readonly StoredCorpusRecord[] {
   const superseded = new Set(records.flatMap(record => record.supersedes ? [record.supersedes] : []));
   return records.filter(record => !superseded.has(record.recordId));
+}
+
+export function corpusRecordInput(record: StoredCorpusRecord): CorpusRecordInput {
+  const storageFields = new Set(['sequence', 'scope', 'recordedAt', 'previousHash', 'recordHash']);
+  return Object.fromEntries(Object.entries(record).filter(([key]) => !storageFields.has(key))) as CorpusRecordInput;
+}
+
+/** Verifies immutable content and each visible scope chain without requiring a storage engine. */
+export function verifyCorpusRecordSet(records: readonly StoredCorpusRecord[]): void {
+  const ordered = [...records].sort((a, b) => a.sequence - b.sequence);
+  const sequences = new Set<number>();
+  const recordIds = new Set<string>();
+  const tails = new Map<CorpusScope, string | null>();
+  for (const record of ordered) {
+    const input = corpusRecordInput(record);
+    const defect = corpusRecordDefect(input);
+    if (!Number.isSafeInteger(record.sequence) || record.sequence < 1 || sequences.has(record.sequence) || recordIds.has(record.recordId) || !corpusScopeValid(record.scope) || !validTime(record.recordedAt) || !HASH.test(record.recordHash) || (record.previousHash !== null && !HASH.test(record.previousHash)) || defect) {
+      throw new Error(`CORPUS_DATABASE_CORRUPT: sequence ${record.sequence} has invalid canonical content${defect ? ` (${defect})` : ''}`);
+    }
+    const expectedPrevious = tails.get(record.scope) ?? null;
+    const expectedHash = corpusRecordHash(record.sequence, record.scope, record.recordedAt, expectedPrevious, input);
+    if (record.previousHash !== expectedPrevious || record.recordHash !== expectedHash) throw new Error(`CORPUS_DATABASE_CORRUPT: ${record.scope} chain fails at sequence ${record.sequence}`);
+    sequences.add(record.sequence);
+    recordIds.add(record.recordId);
+    tails.set(record.scope, record.recordHash);
+  }
 }
 
 function relationshipActive(record: CorpusRelationshipRecord, asOf: string): boolean {
@@ -489,7 +554,7 @@ function ensureCorpusRecordSchema(db: Database.Database): void {
 }
 
 function projectionEvent(row: ProjectionEventRow): CorpusProjectionEvent {
-  if (!Number.isSafeInteger(row.sequence) || row.sequence < 1 || !scopeValid(row.scope) || !ID.test(row.record_id) || !HASH.test(row.record_hash) || !validTime(row.known_at) || !validTime(row.occurred_at)) {
+  if (!Number.isSafeInteger(row.sequence) || row.sequence < 1 || !corpusScopeValid(row.scope) || !ID.test(row.record_id) || !HASH.test(row.record_hash) || !validTime(row.known_at) || !validTime(row.occurred_at)) {
     throw new Error(`CORPUS_DATABASE_CORRUPT: projection event ${row.sequence} has invalid indexed metadata`);
   }
   const expectedEventId = `corpus-event:${row.record_hash}`;
@@ -510,10 +575,10 @@ export function findFacilitiesInRecords(
   const scope = options.scope ?? 'global';
   const asOf = options.asOf ?? new Date().toISOString();
   const cutoff = options.knowledgeCutoff ?? new Date().toISOString();
-  if (!scopeValid(scope) || !validTime(asOf) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
-  const admittedScopes = new Set(visibleScopes(scope));
+  if (!corpusScopeValid(scope) || !validTime(asOf) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
+  const admittedScopes = new Set(corpusVisibleScopes(scope));
   const cutoffMs = Date.parse(cutoff);
-  const records = activeRecords(inputRecords.filter(record => admittedScopes.has(record.scope) && Date.parse(record.knownAt) <= cutoffMs));
+  const records = activeCorpusRecords(inputRecords.filter(record => admittedScopes.has(record.scope) && Date.parse(record.knownAt) <= cutoffMs));
   const entities = records.filter((record): record is StoredCorpusRecord & CorpusEntityRecord => record.recordType === 'entity');
   const entityById = new Map(entities.map(entity => [entity.entityId, entity]));
   const matches = new Set<string>();
@@ -560,7 +625,85 @@ export function findFacilitiesInRecords(
   return freeze({ kind: 'facility_discovery' as const, material: { entityId: material.entityId, name: material.canonicalName }, scope, asOf, knowledgeCutoff: cutoff, facilities });
 }
 
+/** Shared referential-integrity gate used by both SQLite and PostgreSQL. */
+export function corpusReferenceDefect(
+  scope: CorpusScope,
+  record: CorpusRecordInput,
+  staged: ReadonlyMap<string, StoredCorpusRecord>,
+): CorpusAppendRefusal | null {
+  const visible = (candidate: StoredCorpusRecord | undefined) => Boolean(candidate && (candidate.scope === 'global' || candidate.scope === scope));
+  if (record.supersedes) {
+    const prior = staged.get(record.supersedes);
+    if (!prior || prior.scope !== scope || prior.recordType !== record.recordType || [...staged.values()].some(candidate => candidate.supersedes === record.supersedes)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} does not supersede one active record of the same type and scope.`, 'Reference the exact prior immutable record once; revisions never cross visibility scopes.');
+    if (corpusStableIdentity(record) !== corpusStableIdentity(prior)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} changes the stable identity of ${record.supersedes}.`, 'Keep the domain identity stable across revisions; only the immutable record id changes.');
+    if (Date.parse(record.knownAt) <= Date.parse(prior.knownAt)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} is not knowable after the record it supersedes.`, 'Give every revision a strictly later knownAt time so historical replay has one deterministic state.');
+  }
+  const active = activeCorpusRecords([...staged.values()]);
+  const requireEntity = (entityId: string) => active.some(candidate => visible(candidate) && candidate.recordType === 'entity' && candidate.entityId === entityId);
+  const references = corpusRecordReferenceIds(record);
+  const support = references.map(id => active.find(candidate => {
+    if (!visible(candidate)) return false;
+    if (record.recordType === 'evidence_unit') return candidate.recordType === 'evidence' && candidate.evidenceId === id;
+    if (record.recordType === 'assertion') return candidate.recordType === 'observation' && candidate.observationId === id;
+    return (candidate.recordType === 'evidence' && candidate.evidenceId === id) || (candidate.recordType === 'evidence_unit' && candidate.evidenceUnitId === id);
+  }));
+  const missingEvidence = references.find((_id, index) => !support[index]);
+  if (missingEvidence) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable evidence ${missingEvidence}.`, 'Commit the evidence in global or the same customer scope before asserting the claim.');
+  const futureEvidence = support.find(candidate => candidate && Date.parse(candidate.knownAt) > Date.parse(record.knownAt));
+  if (futureEvidence) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} claims knowledge before supporting evidence ${futureEvidence.recordId} was acquired.`, 'Set knownAt to the earliest defensible time at or after all supporting evidence became known.');
+  const expiredEvidence = support.find(candidate => candidate?.knownTo && Date.parse(record.knownAt) >= Date.parse(candidate.knownTo));
+  if (expiredEvidence) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} cites ${expiredEvidence.recordId} after its knowledge interval closed.`, 'Cite evidence active at the claim knowledge time or append a new evidence revision.');
+  const collision = active.find(candidate => visible(candidate) && candidate.recordType === record.recordType && corpusStableIdentity(candidate) === corpusStableIdentity(record) && candidate.recordId !== record.supersedes);
+  if (collision) return refusal('CORPUS_RECORD_CONFLICT', `${record.recordType} ${corpusStableIdentity(record)} already has an active canonical record.`, `Create a superseding revision of ${collision.recordId}; stable domain identities have exactly one active record.`);
+  if (record.recordType === 'alias' && !requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the entity before its alias.');
+  if (record.recordType === 'relationship' && (!requireEntity(record.subjectEntityId) || !requireEntity(record.objectEntityId))) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} has an unresolved relationship endpoint.`, 'Commit or resolve both canonical entities before relating them.');
+  if (record.recordType === 'observation' && !requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the canonical entity before its observation.');
+  if (record.recordType === 'assertion') {
+    if (!requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the canonical entity before its assertion.');
+    const incompatible = support.find((candidate): candidate is StoredCorpusRecord & CorpusObservationRecord => Boolean(candidate && candidate.recordType === 'observation' && (candidate.entityId !== record.entityId || candidate.metric !== record.propertyKey)));
+    if (incompatible) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} uses observation ${incompatible.observationId} from another subject or property.`, 'Link only observations with the assertion subject and property; preserve other evidence as a separate assertion.');
+  }
+  return null;
+}
+
+/** Pure append preparation shared by every repository adapter. */
+export function prepareCorpusAppend(
+  scope: CorpusScope,
+  records: readonly CorpusRecordInput[],
+  recordedAt: string,
+  existingRecords: readonly StoredCorpusRecord[],
+): CorpusAppendPreparation {
+  if (!corpusScopeValid(scope) || !validTime(recordedAt) || records.length < 1 || records.length > 1_000) return refusal('CORPUS_INPUT_INVALID', 'Scope, commit time, or batch size is invalid.', 'Use global or customer:<id>, a valid ISO time, and 1..1000 records.');
+  const batchIds = new Set<string>();
+  for (const record of records) {
+    const defect = corpusRecordDefect(record);
+    if (defect || batchIds.has(record.recordId)) return refusal('CORPUS_INPUT_INVALID', defect ?? `Duplicate record id ${record.recordId} in one batch.`, 'Correct the typed record; do not silently drop or merge it.');
+    if (record.access) {
+      const scopeProblem = corpusAccessScopeDefect(scope, record.access);
+      if (scopeProblem) return refusal('CORPUS_INPUT_INVALID', `${record.recordId} has scope-inconsistent access classification: ${scopeProblem}.`, 'Align tenant and visibility metadata with the immutable ledger scope.');
+    }
+    if (Date.parse(record.knownAt) > Date.parse(recordedAt)) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} is recorded before its knownAt time.`, 'Record the batch at or after every included claim became knowable.');
+    batchIds.add(record.recordId);
+  }
+  const existing = new Map(existingRecords.map(record => [record.recordId, record]));
+  const staged = new Map(existing);
+  const newRecordIds: string[] = [];
+  for (const record of records) {
+    const prior = existing.get(record.recordId);
+    if (prior) {
+      if (prior.scope !== scope || canonicalCorpusJson(corpusRecordInput(prior)) !== canonicalCorpusJson(record)) return refusal('CORPUS_RECORD_CONFLICT', `Record ${record.recordId} already exists with different canonical content.`, 'Create an explicit superseding record; immutable record ids are never overwritten.');
+      continue;
+    }
+    const problem = corpusReferenceDefect(scope, record, staged);
+    if (problem) return problem;
+    newRecordIds.push(record.recordId);
+    staged.set(record.recordId, { ...record, sequence: -1, scope, recordedAt, previousHash: null, recordHash: '' } as StoredCorpusRecord);
+  }
+  return freeze({ kind: 'prepared' as const, idempotent: newRecordIds.length === 0, newRecordIds });
+}
+
 export class PhysicalEconomyCorpus {
+  readonly backend = 'sqlite' as const;
   readonly databasePath: string;
   private readonly db: Database.Database;
 
@@ -621,7 +764,7 @@ export class PhysicalEconomyCorpus {
 
   close(): void { this.db.close(); }
 
-  summary() {
+  summary(): CorpusSummary {
     const rows = this.db.prepare('SELECT scope, record_type, COUNT(*) AS count FROM corpus_records GROUP BY scope, record_type ORDER BY scope, record_type').all() as Array<{ scope: string; record_type: CorpusRecordType; count: number }>;
     const last = this.db.prepare('SELECT MAX(sequence) AS sequence FROM corpus_records').get() as { sequence: number | null };
     const outbox = this.db.prepare('SELECT COUNT(*) AS count FROM corpus_outbox_events').get() as { count: number };
@@ -633,8 +776,8 @@ export class PhysicalEconomyCorpus {
     const scope = options.scope ?? 'global';
     const afterSequence = options.afterSequence ?? 0;
     const limit = options.limit ?? 100;
-    if (!scopeValid(scope) || !Number.isSafeInteger(afterSequence) || afterSequence < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new Error('CORPUS_PROJECTION_CURSOR_INVALID: scope, cursor, or limit is invalid');
-    const scopes = visibleScopes(scope);
+    if (!corpusScopeValid(scope) || !Number.isSafeInteger(afterSequence) || afterSequence < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500) throw new Error('CORPUS_PROJECTION_CURSOR_INVALID: scope, cursor, or limit is invalid');
+    const scopes = corpusVisibleScopes(scope);
     const placeholders = scopes.map(() => '?').join(',');
     const rows = this.db.prepare(`SELECT * FROM corpus_outbox_events WHERE scope IN (${placeholders}) AND sequence > ? ORDER BY sequence ASC LIMIT ?`).all(...scopes, afterSequence, limit + 1) as ProjectionEventRow[];
     const hasMore = rows.length > limit;
@@ -645,8 +788,8 @@ export class PhysicalEconomyCorpus {
   checkpointProjection(input: { readonly projector: string; readonly scope?: CorpusScope; readonly sequence: number; readonly updatedAt?: string }): CorpusProjectorCheckpoint {
     const scope = input.scope ?? 'global';
     const updatedAt = input.updatedAt ?? new Date().toISOString();
-    if (!ID.test(input.projector) || !scopeValid(scope) || !Number.isSafeInteger(input.sequence) || input.sequence < 0 || !validTime(updatedAt)) throw new Error('CORPUS_PROJECTION_CHECKPOINT_INVALID: projector, scope, sequence, or time is invalid');
-    const scopes = visibleScopes(scope);
+    if (!ID.test(input.projector) || !corpusScopeValid(scope) || !Number.isSafeInteger(input.sequence) || input.sequence < 0 || !validTime(updatedAt)) throw new Error('CORPUS_PROJECTION_CHECKPOINT_INVALID: projector, scope, sequence, or time is invalid');
+    const scopes = corpusVisibleScopes(scope);
     const placeholders = scopes.map(() => '?').join(',');
     const maximum = this.db.prepare(`SELECT MAX(sequence) AS sequence FROM corpus_outbox_events WHERE scope IN (${placeholders})`).get(...scopes) as { sequence: number | null };
     if (input.sequence > Number(maximum.sequence ?? 0)) throw new Error('CORPUS_PROJECTION_CHECKPOINT_INVALID: sequence is beyond the visible outbox');
@@ -660,45 +803,23 @@ export class PhysicalEconomyCorpus {
   }
 
   append(scope: CorpusScope, records: readonly CorpusRecordInput[], recordedAt = new Date().toISOString()): CorpusAppendResult {
-    if (!scopeValid(scope) || !validTime(recordedAt) || records.length < 1 || records.length > 1_000) return refusal('CORPUS_INPUT_INVALID', 'Scope, commit time, or batch size is invalid.', 'Use global or customer:<id>, a valid ISO time, and 1..1000 records.');
-    const ids = new Set<string>();
-    for (const record of records) {
-      const defect = recordDefect(record);
-      if (defect || ids.has(record.recordId)) return refusal('CORPUS_INPUT_INVALID', defect ?? `Duplicate record id ${record.recordId} in one batch.`, 'Correct the typed record; do not silently drop or merge it.');
-      if (record.access) {
-        const scopeProblem = corpusAccessScopeDefect(scope, record.access);
-        if (scopeProblem) return refusal('CORPUS_INPUT_INVALID', `${record.recordId} has scope-inconsistent access classification: ${scopeProblem}.`, 'Align tenant and visibility metadata with the immutable ledger scope.');
-      }
-      if (Date.parse(record.knownAt) > Date.parse(recordedAt)) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} is recorded before its knownAt time.`, 'Record the batch at or after every included claim became knowable.');
-      ids.add(record.recordId);
-    }
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const existing = new Map(this.allRecords().map(record => [record.recordId, record]));
-      const staged = new Map(existing);
-      let idempotent = true;
-      for (const record of records) {
-        const prior = existing.get(record.recordId);
-        if (prior) {
-          const priorInput = JSON.parse((this.db.prepare('SELECT record_json FROM corpus_records WHERE record_id = ?').get(record.recordId) as { record_json: string }).record_json) as CorpusRecordInput;
-          if (prior.scope !== scope || canonical(priorInput) !== canonical(record)) { this.db.exec('ROLLBACK'); return refusal('CORPUS_RECORD_CONFLICT', `Record ${record.recordId} already exists with different canonical content.`, 'Create an explicit superseding record; immutable record ids are never overwritten.'); }
-          continue;
-        }
-        idempotent = false;
-        const problem = this.referenceDefect(scope, record, staged);
-        if (problem) { this.db.exec('ROLLBACK'); return problem; }
-        staged.set(record.recordId, { ...record, sequence: -1, scope, recordedAt, previousHash: null, recordHash: '' } as StoredCorpusRecord);
-      }
+      const existingRecords = this.allRecords();
+      const existing = new Map(existingRecords.map(record => [record.recordId, record]));
+      const preparation = prepareCorpusAppend(scope, records, recordedAt, existingRecords);
+      if (preparation.kind === 'refusal') { this.db.exec('ROLLBACK'); return preparation; }
+      const newRecordIds = new Set(preparation.newRecordIds);
       const committed: StoredCorpusRecord[] = [];
       for (const record of records) {
         const prior = existing.get(record.recordId);
-        if (prior) { committed.push(prior); continue; }
+        if (!newRecordIds.has(record.recordId) && prior) { committed.push(prior); continue; }
         const tail = this.db.prepare('SELECT record_hash FROM corpus_records WHERE scope = ? ORDER BY sequence DESC LIMIT 1').get(scope) as { record_hash: string } | undefined;
         const previousHash = tail?.record_hash ?? null;
         const next = this.db.prepare("SELECT seq + 1 AS sequence FROM sqlite_sequence WHERE name = 'corpus_records'").get() as { sequence?: number } | undefined;
         const sequence = Number(next?.sequence ?? 1);
-        const recordHash = sha(canonical({ domain: CORPUS_HASH_DOMAIN, sequence, scope, recordedAt, previousHash, record }));
-        const result = this.db.prepare('INSERT INTO corpus_records(scope, record_id, record_type, known_at, recorded_at, previous_hash, record_hash, record_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(scope, record.recordId, record.recordType, record.knownAt, recordedAt, previousHash, recordHash, canonical(record));
+        const recordHash = corpusRecordHash(sequence, scope, recordedAt, previousHash, record);
+        const result = this.db.prepare('INSERT INTO corpus_records(scope, record_id, record_type, known_at, recorded_at, previous_hash, record_hash, record_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(scope, record.recordId, record.recordType, record.knownAt, recordedAt, previousHash, recordHash, canonicalCorpusJson(record));
         const committedSequence = Number(result.lastInsertRowid);
         this.db.prepare('INSERT INTO corpus_outbox_events(sequence, event_id, scope, record_id, record_type, known_at, occurred_at, record_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
           committedSequence, `corpus-event:${recordHash}`, scope, record.recordId, record.recordType, record.knownAt, recordedAt, recordHash,
@@ -706,20 +827,20 @@ export class PhysicalEconomyCorpus {
         committed.push(freeze({ ...record, sequence: committedSequence, scope, recordedAt, previousHash, recordHash } as StoredCorpusRecord));
       }
       this.db.exec('COMMIT');
-      return freeze({ kind: 'committed' as const, records: committed, idempotent });
+      return freeze({ kind: 'committed' as const, records: committed, idempotent: preparation.idempotent });
     } catch (error) {
       try { this.db.exec('ROLLBACK'); } catch { /* transaction already closed */ }
       throw error;
     }
   }
 
-  page(options: { readonly scope?: CorpusScope; readonly afterSequence?: number; readonly limit?: number; readonly knowledgeCutoff?: string } = {}) {
+  page(options: { readonly scope?: CorpusScope; readonly afterSequence?: number; readonly limit?: number; readonly knowledgeCutoff?: string } = {}): CorpusPage {
     const scope = options.scope ?? 'global';
     const after = options.afterSequence ?? 0;
     const limit = options.limit ?? 100;
     const cutoff = options.knowledgeCutoff ?? new Date().toISOString();
-    if (!scopeValid(scope) || !Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500 || !validTime(cutoff)) throw new Error('CORPUS_QUERY_INVALID: scope, cursor, limit, or knowledge cutoff is invalid');
-    const allowed = visibleScopes(scope);
+    if (!corpusScopeValid(scope) || !Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 500 || !validTime(cutoff)) throw new Error('CORPUS_QUERY_INVALID: scope, cursor, limit, or knowledge cutoff is invalid');
+    const allowed = corpusVisibleScopes(scope);
     const placeholders = allowed.map(() => '?').join(',');
     const rows = this.db.prepare(`SELECT * FROM corpus_records WHERE scope IN (${placeholders}) AND sequence > ? AND julianday(known_at) <= julianday(?) ORDER BY sequence ASC LIMIT ?`).all(...allowed, after, cutoff, limit + 1) as RecordRow[];
     const hasMore = rows.length > limit;
@@ -729,15 +850,15 @@ export class PhysicalEconomyCorpus {
   }
 
   projectionSource(scope: CorpusScope = 'global', knowledgeCutoff = new Date().toISOString()): CorpusProjectionSource {
-    if (!scopeValid(scope) || !validTime(knowledgeCutoff)) throw new Error('CORPUS_QUERY_INVALID: projection scope or knowledge cutoff is invalid');
+    if (!corpusScopeValid(scope) || !validTime(knowledgeCutoff)) throw new Error('CORPUS_QUERY_INVALID: projection scope or knowledge cutoff is invalid');
     const visible = this.visibleRecords(scope, knowledgeCutoff);
-    const records = activeRecords(visible);
+    const records = activeCorpusRecords(visible);
     return freeze({
       kind: 'physical_economy_projection_source' as const,
       scope,
       knowledgeCutoff,
       sourceSequence: visible.at(-1)?.sequence ?? 0,
-      sourceDigest: sha(canonical(records.map(record => ({ recordId: record.recordId, recordHash: record.recordHash })))),
+      sourceDigest: sha(canonicalCorpusJson(records.map(record => ({ recordId: record.recordId, recordHash: record.recordHash })))),
       records,
     });
   }
@@ -745,8 +866,19 @@ export class PhysicalEconomyCorpus {
   findFacilities(materialRef: string, options: { readonly scope?: CorpusScope; readonly asOf?: string; readonly knowledgeCutoff?: string } = {}): FacilityDiscoveryResult {
     const scope = options.scope ?? 'global';
     const cutoff = options.knowledgeCutoff ?? new Date().toISOString();
-    if (!scopeValid(scope) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
+    if (!corpusScopeValid(scope) || !validTime(cutoff)) return queryRefusal('CORPUS_SCOPE_INVALID', 'Scope or query time is invalid.', 'Use global or one authorized customer:<id> scope and valid ISO times.');
     return findFacilitiesInRecords(materialRef, this.visibleRecords(scope, cutoff), { ...options, scope, knowledgeCutoff: cutoff });
+  }
+
+  /** Administrative export for exact edge-to-central replay. Never exposed by a public route. */
+  replayPage(options: { readonly afterSequence?: number; readonly limit?: number } = {}): CorpusReplayPage {
+    const afterSequence = options.afterSequence ?? 0;
+    const limit = options.limit ?? 500;
+    if (!Number.isSafeInteger(afterSequence) || afterSequence < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 5_000) throw new Error('CORPUS_REPLAY_CURSOR_INVALID: cursor or limit is invalid');
+    const rows = this.allRecords().filter(record => record.sequence > afterSequence).slice(0, limit + 1);
+    const hasMore = rows.length > limit;
+    const records = rows.slice(0, limit);
+    return freeze({ kind: 'physical_economy_corpus_replay_page' as const, afterSequence, nextAfterSequence: records.at(-1)?.sequence ?? afterSequence, hasMore, records });
   }
 
   private backfillProjectionOutbox(): void {
@@ -780,61 +912,19 @@ export class PhysicalEconomyCorpus {
 
   private allRecords(): StoredCorpusRecord[] {
     const records = (this.db.prepare('SELECT * FROM corpus_records ORDER BY sequence ASC').all() as RecordRow[]).map(parseRow);
-    const tails = new Map<string, string | null>();
-    for (const record of records) {
-      const expectedPrevious = tails.get(record.scope) ?? null;
-      const input = JSON.parse((this.db.prepare('SELECT record_json FROM corpus_records WHERE sequence = ?').get(record.sequence) as { record_json: string }).record_json) as CorpusRecordInput;
-      const expectedHash = sha(canonical({ domain: CORPUS_HASH_DOMAIN, sequence: record.sequence, scope: record.scope, recordedAt: record.recordedAt, previousHash: expectedPrevious, record: input }));
-      if (record.previousHash !== expectedPrevious || record.recordHash !== expectedHash) throw new Error(`CORPUS_DATABASE_CORRUPT: ${record.scope} chain fails at sequence ${record.sequence}`);
-      tails.set(record.scope, record.recordHash);
-    }
+    verifyCorpusRecordSet(records);
     return records;
   }
 
   private visibleRecords(scope: CorpusScope, cutoff: string): StoredCorpusRecord[] {
-    const allowed = new Set(visibleScopes(scope));
+    const allowed = new Set(corpusVisibleScopes(scope));
     const cutoffMs = Date.parse(cutoff);
     return this.allRecords().filter(record => allowed.has(record.scope) && Date.parse(record.knownAt) <= cutoffMs && (!record.knownTo || cutoffMs < Date.parse(record.knownTo)));
   }
 
   private verifyVisibleChain(scope: CorpusScope): void {
-    const allowed = new Set(visibleScopes(scope));
+    const allowed = new Set(corpusVisibleScopes(scope));
     this.allRecords().filter(record => allowed.has(record.scope));
   }
 
-  private referenceDefect(scope: CorpusScope, record: CorpusRecordInput, staged: ReadonlyMap<string, StoredCorpusRecord>): CorpusAppendRefusal | null {
-    const visible = (candidate: StoredCorpusRecord | undefined) => Boolean(candidate && (candidate.scope === 'global' || candidate.scope === scope));
-    if (record.supersedes) {
-      const prior = staged.get(record.supersedes);
-      if (!prior || prior.scope !== scope || prior.recordType !== record.recordType || [...staged.values()].some(candidate => candidate.supersedes === record.supersedes)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} does not supersede one active record of the same type and scope.`, 'Reference the exact prior immutable record once; revisions never cross visibility scopes.');
-      if (stableIdentity(record) !== stableIdentity(prior)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} changes the stable identity of ${record.supersedes}.`, 'Keep the domain identity stable across revisions; only the immutable record id changes.');
-      if (Date.parse(record.knownAt) <= Date.parse(prior.knownAt)) return refusal('CORPUS_REVISION_INVALID', `${record.recordId} is not knowable after the record it supersedes.`, 'Give every revision a strictly later knownAt time so historical replay has one deterministic state.');
-    }
-    const active = activeRecords([...staged.values()]);
-    const requireEntity = (entityId: string) => active.some(candidate => visible(candidate) && candidate.recordType === 'entity' && candidate.entityId === entityId);
-    const references = corpusRecordReferenceIds(record);
-    const support = references.map(id => active.find(candidate => {
-      if (!visible(candidate)) return false;
-      if (record.recordType === 'evidence_unit') return candidate.recordType === 'evidence' && candidate.evidenceId === id;
-      if (record.recordType === 'assertion') return candidate.recordType === 'observation' && candidate.observationId === id;
-      return (candidate.recordType === 'evidence' && candidate.evidenceId === id) || (candidate.recordType === 'evidence_unit' && candidate.evidenceUnitId === id);
-    }));
-    const missingEvidence = references.find((_id, index) => !support[index]);
-    if (missingEvidence) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable evidence ${missingEvidence}.`, 'Commit the evidence in global or the same customer scope before asserting the claim.');
-    const futureEvidence = support.find(candidate => candidate && Date.parse(candidate.knownAt) > Date.parse(record.knownAt));
-    if (futureEvidence) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} claims knowledge before supporting evidence ${futureEvidence.recordId} was acquired.`, 'Set knownAt to the earliest defensible time at or after all supporting evidence became known.');
-    const expiredEvidence = support.find(candidate => candidate?.knownTo && Date.parse(record.knownAt) >= Date.parse(candidate.knownTo));
-    if (expiredEvidence) return refusal('CORPUS_KNOWLEDGE_ORDER_INVALID', `${record.recordId} cites ${expiredEvidence.recordId} after its knowledge interval closed.`, 'Cite evidence active at the claim knowledge time or append a new evidence revision.');
-    const collision = active.find(candidate => visible(candidate) && candidate.recordType === record.recordType && stableIdentity(candidate) === stableIdentity(record) && candidate.recordId !== record.supersedes);
-    if (collision) return refusal('CORPUS_RECORD_CONFLICT', `${record.recordType} ${stableIdentity(record)} already has an active canonical record.`, `Create a superseding revision of ${collision.recordId}; stable domain identities have exactly one active record.`);
-    if (record.recordType === 'alias' && !requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the entity before its alias.');
-    if (record.recordType === 'relationship' && (!requireEntity(record.subjectEntityId) || !requireEntity(record.objectEntityId))) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} has an unresolved relationship endpoint.`, 'Commit or resolve both canonical entities before relating them.');
-    if (record.recordType === 'observation' && !requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the canonical entity before its observation.');
-    if (record.recordType === 'assertion') {
-      if (!requireEntity(record.entityId)) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} references unavailable entity ${record.entityId}.`, 'Commit or resolve the canonical entity before its assertion.');
-      const incompatible = support.find((candidate): candidate is StoredCorpusRecord & CorpusObservationRecord => Boolean(candidate && candidate.recordType === 'observation' && (candidate.entityId !== record.entityId || candidate.metric !== record.propertyKey)));
-      if (incompatible) return refusal('CORPUS_REFERENCE_MISSING', `${record.recordId} uses observation ${incompatible.observationId} from another subject or property.`, 'Link only observations with the assertion subject and property; preserve other evidence as a separate assertion.');
-    }
-    return null;
-  }
 }

@@ -343,10 +343,10 @@ maximum graph depth, immutable access audits, and upstream-source isolation.
 1. Keep SQLite/WAL as the working edge canonical ledger and compiler source.
 2. Add an artifact service and content-addressed object-store layout.
 3. Add source/actor registries and an append-only security audit sink.
-4. Implement PostgreSQL/PostGIS behind the same canonical repository contract;
-   validate replay and digest equivalence before cutover.
-5. Add RLS and service roles, then replicate authorized read workloads away
-   from the write authority.
+4. Operate the implemented PostgreSQL/PostGIS adapter through its
+   capability-specific roles; cut over only after exact replay equivalence.
+5. Replicate authorized read workloads away from the write authority and
+   monitor projector lag from the transactional outbox.
 6. Move high-volume observations into partitioned columnar history only after
    measured query and lifecycle requirements justify it.
 7. Add graph and vector projections through the compiler; spatial and search

@@ -96,7 +96,7 @@ describe('/api/corpus/mining/dependencies', () => {
     const summary = await GET(request('GET', 'http://localhost/api/corpus/mining/dependencies?view=summary', 'MINER-ONLY-TEST-TOKEN'));
     expect(await summary.json()).toMatchObject({ runCount: 1, candidateCount: 1 });
     const corpus = physicalEconomyCorpus();
-    expect(corpus?.summary().lastSequence).toBe(6);
+    expect((await corpus?.summary())?.lastSequence).toBe(6);
   });
 
   it('rejects raw canonical fields and refuses to mine a stale CorpusBuild', async () => {

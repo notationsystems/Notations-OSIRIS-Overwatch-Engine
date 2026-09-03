@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const materialRef = materialFromFacilityQuery(query);
   let corpus;
   let store;
-  try { corpus = physicalEconomyCorpus(); store = corpusProjectionStore(); }
+  try { corpus = physicalEconomyCorpus('query'); store = corpusProjectionStore(); }
   catch (error) {
     return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_CORRUPT', detail: error instanceof Error ? error.message : 'Corpus read-model integrity could not be established.', remedy: 'Rebuild the disposable projection from verified canonical state.' }, { status: 503 });
   }
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
   }
   if (!projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_BUILT', detail: 'The public global read model has not been compiled.', remedy: 'Run the authenticated public/global corpus compiler after ingestion.' }, { status: 503 });
   let current;
-  try { current = corpus.projectionSource('global'); }
+  try { current = await corpus.projectionSource('global'); }
   catch (error) {
     return NextResponse.json({ kind: 'refusal', code: 'CORPUS_UNAVAILABLE', detail: error instanceof Error ? error.message : 'Canonical corpus integrity could not be established.', remedy: 'Restore canonical state from a verified backup before serving projections.' }, { status: 503 });
   }

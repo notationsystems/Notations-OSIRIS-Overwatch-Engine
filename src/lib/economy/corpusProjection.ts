@@ -35,6 +35,7 @@ import {
   type PhysicalEconomyCorpus,
   type StoredCorpusRecord,
 } from './physicalEconomyCorpus';
+import type { CorpusRepository } from './corpusRepository';
 
 export { CORPUS_ONTOLOGY_VERSION } from './payloadCorpusDefinition';
 export const CORPUS_COMPILER_VERSION = '1.2.0';
@@ -378,5 +379,18 @@ export function compilePublicProjection(
   const projection = buildPublicProjection(corpus.projectionSource('global', knowledgeCutoff), compiledAt);
   const stored = store.replace(projection);
   corpus.checkpointProjection({ projector: 'projector:public-global-read-model', scope: 'global', sequence: projection.manifest.sourceSequence, updatedAt: compiledAt });
+  return stored;
+}
+
+/** Production compiler boundary; awaits either the embedded or central repository. */
+export async function compilePublicProjectionFromRepository(
+  corpus: CorpusRepository,
+  store: CorpusProjectionStore,
+  knowledgeCutoff = new Date().toISOString(),
+  compiledAt = new Date().toISOString(),
+) {
+  const projection = buildPublicProjection(await corpus.projectionSource('global', knowledgeCutoff), compiledAt);
+  const stored = store.replace(projection);
+  await corpus.checkpointProjection({ projector: 'projector:public-global-read-model', scope: 'global', sequence: projection.manifest.sourceSequence, updatedAt: compiledAt });
   return stored;
 }

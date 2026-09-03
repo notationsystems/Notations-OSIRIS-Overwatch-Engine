@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 const MAX_BODY_BYTES = 128_000;
 
 function owners() {
-  try { return { corpus: physicalEconomyCorpus(), projection: corpusProjectionStore(), error: null }; }
+  try { return { corpus: physicalEconomyCorpus('query'), projection: corpusProjectionStore(), error: null }; }
   catch (error) { return { corpus: null, projection: null, error: error instanceof Error ? error.message : 'Corpus integrity could not be established.' }; }
 }
 export async function POST(request: Request) {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   try {
     const projection = owned.projection.loadPublic();
     if (!projection) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_NOT_BUILT', detail: 'No public projection has been compiled.', remedy: 'Run the authenticated public/global compiler first.' }, { status: 503 });
-    const current = owned.corpus.projectionSource('global');
+    const current = await owned.corpus.projectionSource('global');
     if (!projectionMatchesSource(projection.manifest, current)) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_PROJECTION_STALE', detail: `Projection ends at canonical sequence ${projection.manifest.sourceSequence}; canonical global state ends at ${current.sourceSequence}.`, remedy: 'Recompile before producing model context.' }, { status: 503 });
     const plan = planCorpusRetrieval(projection, value);
     if (value.mode === 'plan') return NextResponse.json({ kind: 'corpus_retrieval_plan', plan }, { headers: { 'Cache-Control': 'private, no-store' } });

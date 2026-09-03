@@ -282,9 +282,21 @@ PAYLOAD_CORPUS_READ_MODEL_PATH=
 PAYLOAD_CORPUS_INGEST_TOKEN=
 # Separate compiler-service authority for read-model publication
 PAYLOAD_CORPUS_COMPILER_TOKEN=
+# Context Compiler and projection-worker authorities
+PAYLOAD_CORPUS_QUERY_TOKEN=
+PAYLOAD_CORPUS_PROJECTOR_TOKEN=
 # Append-only Pattern Registry and separate miner-service authority
 PAYLOAD_CORPUS_PATTERN_REGISTRY_PATH=
 PAYLOAD_CORPUS_MINER_TOKEN=
+
+# Optional central PostgreSQL/PostGIS repository (SQLite remains the edge fallback)
+PAYLOAD_CORPUS_QUERY_DATABASE_URL=
+PAYLOAD_CORPUS_INGEST_DATABASE_URL=
+PAYLOAD_CORPUS_PROJECTOR_DATABASE_URL=
+PAYLOAD_CORPUS_COMPILER_DATABASE_URL=
+PAYLOAD_CORPUS_TENANT_ID=
+PAYLOAD_CORPUS_ALLOW_GLOBAL_WRITE=false
+PAYLOAD_CORPUS_POSTGRES_SSL=require
 
 # Pull carrier authority/status and the weekly diesel benchmark
 FMCSA_WEB_KEY=
@@ -370,6 +382,25 @@ can invoke it.
 See [`docs/KNOWLEDGE_SUBSTRATE.md`](docs/KNOWLEDGE_SUBSTRATE.md) for the adopted
 knowledge-substrate contract and SQLite-edge → PostgreSQL/PostGIS-central
 migration boundary.
+
+The central boundary is implemented. Apply the checksum-pinned PostGIS/RLS
+migration with a privileged CLI-only URL, dry-run exact replay, apply it only
+to an empty target, and rebuild the disposable v3 public projection:
+
+```bash
+PAYLOAD_CORPUS_MIGRATION_DATABASE_URL=postgresql://... npm run migrate:corpus-postgres
+PAYLOAD_CORPUS_REPLAY_DATABASE_URL=postgresql://... npm run replay:corpus-postgres -- --knowledge-cutoff=2026-09-02T00:00:00.000Z
+PAYLOAD_CORPUS_REPLAY_DATABASE_URL=postgresql://... npm run replay:corpus-postgres -- --apply --knowledge-cutoff=2026-09-02T00:00:00.000Z
+npm run rebuild:corpus-projection -- --knowledge-cutoff=2026-09-02T00:00:00.000Z
+```
+
+Replay preserves the original global sequence, per-scope hash chains, record
+hashes and transactional outbox identities. Cutover is refused unless exact
+canonical and per-scope projection digests agree. A v2 read model is moved to
+a timestamped sibling archive before v3 is built; canonical state is never
+deleted by the rebuild tool. Use a CLI-only replay login granted
+`payload_corpus_owner`; never expose the migration or replay URL to the web
+process.
 
 For a single retrievable operational timeline, configure
 `PAYLOAD_DATABASE_PATH`. All domain streams then use one SQLite database in

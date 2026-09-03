@@ -276,6 +276,9 @@ describe('every number-bearing type in the layer is accounted for', () => {
     WorldOptions: 'the generator inputs — seed and load count; configuration, not measurement',
     TopologyValidity: 'extrapolationDays measures how far past the topology period WE reached — a property of our corpus coverage that qualifies a claim rather than being one',
     ScenarioEntityDelta: 'a difference between one explicitly hypothetical run and its reconstruction baseline, not an observation of the world',
+    CorpusReplayPlan: 'record counts and sequence bounds for our own canonical-ledger migration, not a measurement of the physical economy',
+    CorpusReplayResult: 'import counts and sequence positions proving equivalence between our own storage engines, not a world observation',
+    PostgresCorpusRepositoryOptions: 'connection-pool size is deployment configuration for our repository adapter, not a claim about the world',
   };
 
   /**
