@@ -16,7 +16,8 @@ import {
   type VerificationEnvelope,
   type VerificationLevel,
 } from './corpusVerification';
-import { buildCorpusWarrantGraph, type CorpusWarrantGraph } from './corpusWarrantGraph';
+import { buildCorpusWarrantGraph, markCorpusWarrantGraphAttested, type CorpusWarrantGraph } from './corpusWarrantGraph';
+import { applyBuildAttestation, type CorpusBuildAttestation } from './corpusBuildAttestation';
 
 export const CORPUS_EVIDENCE_LEVELS = Object.freeze(['FAST', 'GROUNDED', 'AUDIT', 'VERIFIED'] as const);
 export type CorpusEvidenceLevel = typeof CORPUS_EVIDENCE_LEVELS[number];
@@ -157,6 +158,7 @@ export type CorpusAgentContext = {
     readonly envelope: VerificationEnvelope;
     readonly warrantGraph: CorpusWarrantGraph;
     readonly membershipProofsVerified: true;
+    readonly buildAttestation?: CorpusBuildAttestation;
   };
 };
 
@@ -390,5 +392,24 @@ export function compileCorpusAgentContext(
     agentContextId,
     evidenceBudget: { ...core.evidenceBudget, assuranceAvailable: envelope.verificationLevel },
     proof: { envelope, warrantGraph, membershipProofsVerified: true as const },
+  });
+}
+
+/** Elevate only a VERIFIED context whose exact build commitment was signed. */
+export function attestCorpusAgentContext(
+  context: CorpusAgentContext,
+  attestation: CorpusBuildAttestation,
+): CorpusAgentContext {
+  if (!context.proof) throw new CorpusAgentContextError('CORPUS_AGENT_CONTEXT_INVALID', 'Only a VERIFIED context carries the build commitment required for attestation.');
+  const envelope = applyBuildAttestation(context.proof.envelope, attestation);
+  return freeze({
+    ...context,
+    evidenceBudget: { ...context.evidenceBudget, assuranceAvailable: envelope.verificationLevel },
+    proof: {
+      ...context.proof,
+      envelope,
+      warrantGraph: markCorpusWarrantGraphAttested(context.proof.warrantGraph, envelope.commitment.commitmentId, attestation.attestationId),
+      buildAttestation: attestation,
+    },
   });
 }

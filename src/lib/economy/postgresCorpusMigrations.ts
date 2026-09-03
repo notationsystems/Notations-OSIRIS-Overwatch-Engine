@@ -7,6 +7,7 @@ const MIGRATION_LOCK = 1_917_309_338;
 
 export const POSTGRES_CORPUS_MIGRATIONS = Object.freeze([
   { version: 1, name: 'payload_corpus_v3', file: '0001_payload_corpus_v3.sql' },
+  { version: 2, name: 'agent_artifact_journal', file: '0002_agent_artifact_journal.sql' },
 ] as const);
 
 export type CorpusMigrationResult = {

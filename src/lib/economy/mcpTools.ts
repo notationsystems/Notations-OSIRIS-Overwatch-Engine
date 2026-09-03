@@ -46,7 +46,7 @@ export interface McpContext {
   /** Fetch a route path (e.g. "/api/economy/table?…") and parse JSON.
    *  The default context speaks HTTP to a running instance; tests inject
    *  an in-process adapter over the same route handlers. */
-  fetchJson(path: string, init?: { method?: string; body?: string }): Promise<{ status: number; body: unknown }>;
+  fetchJson(path: string, init?: { method?: string; body?: string; headers?: Readonly<Record<string, string>> }): Promise<{ status: number; body: unknown }>;
 }
 
 export function httpContext(baseUrl = env('PAYLOAD_URL') ?? 'http://localhost:3000'): McpContext {
@@ -57,6 +57,7 @@ export function httpContext(baseUrl = env('PAYLOAD_URL') ?? 'http://localhost:30
         headers: {
           [MACHINE_CLIENT_HEADER]: 'machine',
           ...(init?.body ? { 'content-type': 'application/json' } : {}),
+          ...init?.headers,
         },
         body: init?.body,
       });

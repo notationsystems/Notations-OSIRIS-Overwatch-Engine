@@ -206,7 +206,7 @@ export function buildCorpusWarrantGraph(input: {
   addNode({ id: answerId, kind: 'answer', label: input.statement, epistemicClass: 'derived', description: 'The API result being explained. Its structure, not a composite score, carries the warrant.', contentHash: input.verification.contentHash });
   addNode({ id: computationId, kind: 'computation', label: input.verification.computation.programId, epistemicClass: 'derived', description: `Deterministic program ${input.verification.computation.algorithmVersion}.`, contentHash: input.verification.computation.outputDigest });
   addNode({ id: buildId, kind: 'corpus_build', label: `CorpusBuild ${buildId.slice(-12)}`, epistemicClass: 'system', description: `Policy-filtered projection generated ${input.manifest.generatedAt}.`, contentHash: input.manifest.projectionDigest });
-  addNode({ id: commitmentId, kind: 'commitment', label: `Merkle ${input.verification.commitment.root.slice(0, 12)}…`, epistemicClass: 'system', description: input.verification.attestation.status === 'ATTESTED' ? `Externally attested by ${input.verification.attestation.anchorId}.` : input.verification.attestation.reason, contentHash: input.verification.commitment.root });
+  addNode({ id: commitmentId, kind: 'commitment', label: `Merkle ${input.verification.commitment.root.slice(0, 12)}…`, epistemicClass: 'system', description: input.verification.attestation.status === 'ATTESTED' ? `Cryptographically attested by ${input.verification.attestation.anchorId}; inspect the attestation to determine whether its time source is independent.` : input.verification.attestation.reason, contentHash: input.verification.commitment.root });
   addEdge(answerId, computationId, 'produced_by', 'produced by');
   addEdge(computationId, buildId, 'ran_over', 'ran over');
   addEdge(buildId, commitmentId, 'committed_by', 'committed by');
@@ -286,6 +286,27 @@ export function buildCorpusWarrantGraph(input: {
     legend: LEGEND,
   };
   return freeze({ ...graphBasis, graphId: `warrant-graph:${corpusVerificationDigest(graphBasis)}` });
+}
+
+export function markCorpusWarrantGraphAttested(
+  graph: CorpusWarrantGraph,
+  commitmentId: string,
+  attestationId: string,
+): CorpusWarrantGraph {
+  const basis = {
+    schema: graph.schema,
+    rootNodeId: graph.rootNodeId,
+    corpusBuildId: graph.corpusBuildId,
+    statement: graph.statement,
+    scorePolicy: graph.scorePolicy,
+    nodes: graph.nodes.map(node => node.id === commitmentId ? {
+      ...node,
+      description: `Cryptographically attested by ${attestationId}; inspect the attestation to determine whether its time source is independent.`,
+    } : node),
+    edges: graph.edges,
+    legend: graph.legend,
+  };
+  return freeze({ ...basis, graphId: `warrant-graph:${corpusVerificationDigest(basis)}` });
 }
 
 export function warrantSubjectLabel(records: readonly StoredCorpusRecord[]): string {

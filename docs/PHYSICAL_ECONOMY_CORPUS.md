@@ -228,13 +228,17 @@ trust vocabulary is monotonic:
 PROVENANCE -> REPRODUCIBLE -> ATTESTED -> ZK_VERIFIED
 ```
 
-Current corpus answers stop honestly at `REPRODUCIBLE`: evidence references,
+Unsigned corpus answers stop honestly at `REPRODUCIBLE`: evidence references,
 record hashes, build identity, program/version, inputs, parameters, output,
 commitment, and membership proofs are available. The commitment is neither an
 independent timestamp nor an assertion that source observations are true. The
-envelope therefore reports `NOT_ATTESTED` and `NOT_GENERATED` for zk proof. A
-later signed build anchor can establish attestation; a pinned SP1 program can
-prove deterministic computation integrity. Neither can prove empirical truth.
+envelope therefore reports `NOT_ATTESTED` and `NOT_GENERATED` for zk proof.
+`POST /api/corpus/attestations` now signs the exact commitment with Ed25519 and
+persists that signature. A later `VERIFIED` query over the same build returns
+`ATTESTED`, while declaring that `signedAt` came from `SIGNER_CLOCK`, not an
+independent timestamp authority. The pinned SP1 event-batch program proves a
+different operational computation and is never attached to a corpus result.
+Neither a signature nor an SP1 proof can prove empirical truth.
 
 ### Agent evidence budgets
 
@@ -272,10 +276,21 @@ Inspection operations link directly to authenticated warrant walks for
 `get_provenance` and `get_evidence` behavior.
 
 The word `VERIFIED` names the requested response budget, not a blanket claim of
-truth. Its `assuranceAvailable` field remains the envelope's actual level. V0
-therefore returns reproducibility and membership proofs while continuing to
-state that empirical truth, an external timestamp/signature, and SP1 execution
-have not been established.
+truth. Its `assuranceAvailable` field remains the envelope's actual level:
+`REPRODUCIBLE` for an unsigned build and `ATTESTED` for an exact verified build
+signature. SP1 execution remains `NOT_GENERATED` for corpus answers.
+
+Every agent response also returns a content-addressed `resultId` and is appended
+to the persistent corpus agent-artifact journal. Recover it without recompiling:
+
+```http
+GET /api/corpus/retrieval?resultId=corpus-result:...
+Authorization: Bearer <PAYLOAD_CORPUS_QUERY_TOKEN>
+```
+
+The saved result includes an OGC:CRS84 GeoJSON feature collection and a
+kepler.gl-compatible `addDataToMap` payload. Only evidence-bearing canonical
+locations are emitted; absent coordinates become a typed unobserved state.
 
 ### Corpus Compiler
 
@@ -371,7 +386,11 @@ a version-bound Corpus Compiler, a separate public read model, stale-model
 refusal, typed facility discovery, reproducible proof-carrying Earth answers,
 domain-separated CorpusBuild commitments and inclusion proofs, score-free
 Warrant Graph API/inspector, evidence-budgeted agent contexts and common
-Notation assertions, deterministic
+Notation assertions, persistent result lookup, a linearized agent-artifact
+journal, signed CorpusBuild attestations, five agent-facing corpus MCP tools,
+a Payload-specific control view over topology, capability state, artifact
+events, operator attention, and the latest Kepler dock input,
+kepler.gl-compatible spatial result envelopes, deterministic
 depth-1 shared-dependency mining, MiningRun provenance, and an append-only
 Pattern Registry for candidate knowledge.
 
@@ -381,7 +400,6 @@ PostgreSQL/PostGIS cutover, Parquet/Iceberg history, analyst review queues,
 probabilistic entity-resolution proposals, candidate validation/promotion,
 recursive dependency propagation, link prediction, temporal/spatial/statistical/
 anomaly mining, graph/vector projections, additional computational endpoints,
-persisted agent-context/result lookup, agent-facing MCP packaging, and SP1
-proofs over corpus builds. These
+independent timestamp anchoring, and SP1 proofs over corpus builds. These
 are the next layers; the UI must continue to refuse rather than imply they
 already exist.

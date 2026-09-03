@@ -378,8 +378,32 @@ compact canonical state, `GROUNDED` adds source references, `AUDIT` adds exact
 observations, disagreements, Evidence IR and retrieval trace, and `VERIFIED`
 adds the Warrant Graph plus locally checked CorpusBuild inclusion proofs. These
 tiers change disclosure, never the underlying assertion identity. A verified
-budget still reports the actual assurance level—currently `REPRODUCIBLE`, with
-external attestation and SP1 absent. `GET/POST /api/corpus/projectors` exposes the transactional
+budget still reports the actual assurance level. Agent responses are now
+appended to one persistent, hash-chained artifact journal and return a stable
+`resultId`; `GET /api/corpus/retrieval?resultId=...` retrieves the exact saved
+plan, context, and spatial result. The spatial result carries OGC:CRS84 GeoJSON
+plus deterministic `fields`/`rows` datasets ready for kepler.gl's
+`addDataToMap` action. Renderer edits never mutate canonical state.
+
+`POST /api/corpus/attestations` signs the exact current CorpusBuild commitment
+with a protected Ed25519 key and stores the signature in the same linearized
+journal. A matching signature elevates `VERIFIED` from `REPRODUCIBLE` to
+`ATTESTED`; the response still states that signer-clock time is not an
+independent timestamp and that the signature does not establish source truth.
+The ceremonially pinned SP1 `payload_event_batch_v1` program remains the first
+production zkVM boundary and proves authorized operational event batches only.
+It is explicitly marked as not applicable to corpus-build attestations, so
+corpus answers remain `zkProof: NOT_GENERATED`.
+
+`npm run mcp` now serves five agent-native corpus tools alongside the twelve
+legacy analytical tools: query and persist a context, retrieve a result, walk
+its warrant, inspect its build attestation, and inspect Payload's own
+physical-economy control state. `GET /api/corpus/control-plane` derives a live
+topology, capability/approval state, immutable event timeline, current Kepler
+dock input, and operator healthy/stale/blocked/unobserved queues from the real
+corpus stack. Latency and cost remain typed `UNOBSERVED` until instrumented;
+artifact events explicitly report that nothing was dispatched. `GET/POST
+/api/corpus/projectors` exposes the transactional
 projection outbox and monotonic checkpoints under the non-interchangeable
 `PAYLOAD_CORPUS_PROJECTOR_TOKEN` worker identity.
 
@@ -396,7 +420,9 @@ Pattern Registry. It never promotes a pattern into canonical state. The route
 requires `PAYLOAD_CORPUS_MINER_TOKEN`; neither ingestion nor compiler authority
 can invoke it.
 
-See [`docs/KNOWLEDGE_SUBSTRATE.md`](docs/KNOWLEDGE_SUBSTRATE.md) for the adopted
+See [`docs/AGENT_CONTEXT_PRODUCTION.md`](docs/AGENT_CONTEXT_PRODUCTION.md) for
+the artifact journal, signing ceremony, MCP package, and kepler.gl integration,
+and [`docs/KNOWLEDGE_SUBSTRATE.md`](docs/KNOWLEDGE_SUBSTRATE.md) for the adopted
 knowledge-substrate contract and SQLite-edge → PostgreSQL/PostGIS-central
 migration boundary.
 

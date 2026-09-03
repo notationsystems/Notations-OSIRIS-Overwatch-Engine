@@ -163,6 +163,11 @@ them only if you extend the relevant route or hit rate limits.
 | `PAYLOAD_CORPUS_MINER_TOKEN` | Dedicated bearer authority for mining a current public CorpusBuild and replaying the Pattern Registry. | none |
 | `PAYLOAD_CORPUS_QUERY_TOKEN` | Dedicated bearer authority for bounded ContextPackage compilation. | none |
 | `PAYLOAD_CORPUS_PROJECTOR_TOKEN` | Dedicated bearer authority for outbox consumption and monotonic checkpoints. | none |
+| `PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH` | Append-only SQLite/WAL journal for persistent agent results and CorpusBuild attestations. Derived beside `PAYLOAD_CORPUS_DATABASE_PATH` when omitted. | derived |
+| `PAYLOAD_CORPUS_CONTROL_STALE_AFTER_MS` | Freshness window used by the Payload physical-economy control view before a projection is reported stale. | `86400000` (24 hours) |
+| `PAYLOAD_CORPUS_AGENT_DATABASE_URL` | Optional PostgreSQL connection for the migration-2 RLS agent-artifact journal; otherwise the capability-specific corpus URL is reused. | none |
+| `PAYLOAD_CORPUS_ATTESTATION_PRIVATE_KEY_PATH` | Protected mounted Ed25519 PKCS#8 PEM used only by the compiler boundary to sign exact CorpusBuild commitments. | none/signing disabled |
+| `PAYLOAD_CORPUS_ATTESTATION_KEY_ID` | Optional deployment guard; when set it must equal the public-key-derived `notation:ed25519:<sha256>` identity. | derived |
 | `PAYLOAD_CORPUS_QUERY_DATABASE_URL` | PostgreSQL query-role connection; when set, replaces SQLite for canonical reads. | none |
 | `PAYLOAD_CORPUS_INGEST_DATABASE_URL` | PostgreSQL ingest-role connection. | none |
 | `PAYLOAD_CORPUS_PROJECTOR_DATABASE_URL` | PostgreSQL projector-role connection. | none |
@@ -191,6 +196,12 @@ curl -X POST http://localhost:3000/api/corpus/projections \
 Payload Earth refuses facility queries until this succeeds, and refuses again
 if canonical global state advances without a rebuild. Do not back up the read-
 model file as an authority; recreate it from the canonical corpus.
+
+The derived agent-artifact SQLite file is authoritative operational evidence and
+must remain on `payload-runtime` or another backed-up volume. For build signing,
+mount the private PEM read-only outside the image and point
+`PAYLOAD_CORPUS_ATTESTATION_PRIVATE_KEY_PATH` at that mount. Never put the key in
+`.env`, an image layer, the repository, or the public read-model database.
 
 Corpus Compiler `1.2.0` binds the PayloadOS engine, Payload product and
 `payload.corpus-definition.physical-economy.v1` fingerprint into representation

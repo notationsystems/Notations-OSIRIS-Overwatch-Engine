@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { MCP_TOOLS, httpContext, runMcpTool } from '../lib/economy/mcpTools';
 import { VERSION } from '../lib/identity';
 import { env } from '../lib/economy/envCompat';
+import { CORPUS_MCP_TOOLS } from '../lib/economy/corpusMcpTools';
 
 const ctx = httpContext();
 
@@ -51,6 +52,21 @@ for (const def of MCP_TOOLS) {
           content: [{ type: 'text' as const, text: `ERROR: ${e instanceof Error ? e.message : String(e)}` }],
           isError: true,
         };
+      }
+    },
+  );
+}
+
+for (const def of CORPUS_MCP_TOOLS) {
+  server.registerTool(
+    def.name,
+    { description: def.description, inputSchema: def.inputSchema },
+    async (args: Record<string, unknown>) => {
+      try {
+        const result = await def.handler(args, ctx);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        return { content: [{ type: 'text' as const, text: `ERROR: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
       }
     },
   );

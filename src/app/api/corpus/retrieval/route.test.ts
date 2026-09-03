@@ -2,18 +2,20 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { POST } from './route';
+import { GET, POST } from './route';
 import { OPEN_PUBLIC_CORPUS_ACCESS } from '@/lib/economy/corpusPolicy';
 import { compilePublicProjection, CorpusProjectionStore } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
 import { PhysicalEconomyCorpus, type CorpusRecordInput } from '@/lib/economy/physicalEconomyCorpus';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 import { resetProcessSingleton } from '@/lib/economy/processSingleton';
+import { corpusAgentArtifactPath, corpusAgentArtifactStore } from '@/lib/economy/corpusAgentArtifactRuntime';
 
 const oldToken = process.env.PAYLOAD_CORPUS_QUERY_TOKEN;
 const oldCorpusPath = process.env.PAYLOAD_CORPUS_DATABASE_PATH;
 const oldDatabasePath = process.env.PAYLOAD_DATABASE_PATH;
 const oldProjectionPath = process.env.PAYLOAD_CORPUS_READ_MODEL_PATH;
+const oldArtifactPath = process.env.PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH;
 const directories: string[] = [];
 const at = '2026-02-04T00:00:00.000Z';
 
@@ -30,7 +32,7 @@ function records(): CorpusRecordInput[] {
   return [
     { ...common, recordId: 'rec:evidence:retrieval-api:v1', recordType: 'evidence', evidenceId: 'evidence:retrieval-api', sourceId: 'source:retrieval-api', title: 'Capacity record', sourceUrl: 'https://example.test/capacity', artifactSha256: 'a'.repeat(64), retrievedAt: at },
     { ...common, recordId: 'rec:evidence-unit:retrieval-api:v1', recordType: 'evidence_unit', evidenceUnitId: 'evidence-unit:retrieval-api', artifactEvidenceId: 'evidence:retrieval-api', modality: 'structured_record', locator: { jsonPath: '$.capacity' }, extraction: { kind: 'system_record', version: '1.0.0', adapter: 'test-adapter' }, contentSha256: 'b'.repeat(64), extractedText: 'capacity 42 tonnes' },
-    { ...common, recordId: 'rec:entity:retrieval-api:v1', recordType: 'entity', entityId: 'pe:facility:retrieval-api', entityKind: 'facility', canonicalName: 'Retrieval Test Facility', evidenceIds: ['evidence-unit:retrieval-api'] },
+    { ...common, recordId: 'rec:entity:retrieval-api:v1', recordType: 'entity', entityId: 'pe:facility:retrieval-api', entityKind: 'facility', canonicalName: 'Retrieval Test Facility', location: { lat: 43.65, lng: -79.38, precision: 'site' }, evidenceIds: ['evidence-unit:retrieval-api'] },
     { ...common, recordId: 'rec:observation:retrieval-api:v1', recordType: 'observation', observationId: 'observation:retrieval-api', entityId: 'pe:facility:retrieval-api', observationType: 'capacity', metric: 'capacity', value: 42, unit: 't', validFrom: '2026-01-01T00:00:00.000Z', valueKind: 'reported', confidence: 'high', evidenceIds: ['evidence-unit:retrieval-api'] },
     { ...common, recordId: 'rec:assertion:retrieval-api:v1', recordType: 'assertion', assertionId: 'assertion:retrieval-api', entityId: 'pe:facility:retrieval-api', propertyKey: 'capacity', selectedValue: 42, unit: 't', status: 'accepted', selectionPolicy: 'reviewed-source-v1', validFrom: '2026-01-01T00:00:00.000Z', confidence: 'high', evidence: [{ observationId: 'observation:retrieval-api', role: 'supports' }] },
   ];
@@ -49,7 +51,12 @@ afterEach(async () => {
     try { corpusProjectionStore()?.close(); } catch { /* already closed */ }
     resetProcessSingleton(`physical-economy-projection:${path}`);
   }
-  for (const [name, value] of [['PAYLOAD_CORPUS_QUERY_TOKEN', oldToken], ['PAYLOAD_CORPUS_DATABASE_PATH', oldCorpusPath], ['PAYLOAD_DATABASE_PATH', oldDatabasePath], ['PAYLOAD_CORPUS_READ_MODEL_PATH', oldProjectionPath]] as const) {
+  const artifactPath = corpusAgentArtifactPath();
+  if (artifactPath) {
+    try { await corpusAgentArtifactStore('query')?.close(); } catch { /* already closed */ }
+    resetProcessSingleton(`corpus-agent-artifacts:sqlite:${artifactPath}`);
+  }
+  for (const [name, value] of [['PAYLOAD_CORPUS_QUERY_TOKEN', oldToken], ['PAYLOAD_CORPUS_DATABASE_PATH', oldCorpusPath], ['PAYLOAD_DATABASE_PATH', oldDatabasePath], ['PAYLOAD_CORPUS_READ_MODEL_PATH', oldProjectionPath], ['PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH', oldArtifactPath]] as const) {
     if (value === undefined) delete process.env[name]; else process.env[name] = value;
   }
   await Promise.all(directories.splice(0).map(directory => rm(directory, { recursive: true, force: true })));
@@ -89,14 +96,25 @@ describe('POST /api/corpus/retrieval', () => {
     expect((await second.json()).plan.planId).toBe(result.plan.planId);
 
     const fast = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'FAST' }));
-    expect(fast.status).toBe(200);
+    expect(fast.status).toBe(201);
     const fastResult = await fast.json();
-    expect(fastResult).toMatchObject({ kind: 'corpus_agent_context', agentContext: { evidenceBudget: { requestedLevel: 'FAST', assuranceAvailable: 'PROVENANCE' }, assertions: [{ assertionId: 'assertion:retrieval-api' }] } });
+    expect(fastResult).toMatchObject({
+      kind: 'corpus_agent_context', resultId: expect.stringMatching(/^corpus-result:/),
+      persistence: { sequence: 1, idempotent: false, artifactHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      agentContext: { evidenceBudget: { requestedLevel: 'FAST', assuranceAvailable: 'PROVENANCE' }, assertions: [{ assertionId: 'assertion:retrieval-api' }] },
+      spatial: { status: 'READY', coordinateReferenceSystem: 'OGC:CRS84', keplerGl: { action: 'addDataToMap' } },
+    });
     expect(fastResult.agentContext).not.toHaveProperty('evidence');
     expect(fastResult.agentContext).not.toHaveProperty('proof');
+    const replay = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'FAST' }));
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toMatchObject({ resultId: fastResult.resultId, persistence: { sequence: 1, idempotent: true } });
+    const retrieved = await GET(new Request(`http://localhost/api/corpus/retrieval?resultId=${encodeURIComponent(fastResult.resultId)}`, { headers: { authorization: `Bearer ${process.env.PAYLOAD_CORPUS_QUERY_TOKEN}` } }));
+    expect(retrieved.status).toBe(200);
+    expect(await retrieved.json()).toMatchObject({ resultId: fastResult.resultId, persistence: { sequence: 1 }, spatial: { status: 'READY' } });
 
     const verified = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'VERIFIED' }));
-    expect(verified.status).toBe(200);
+    expect(verified.status).toBe(201);
     expect(await verified.json()).toMatchObject({ kind: 'corpus_agent_context', agentContext: { evidenceBudget: { requestedLevel: 'VERIFIED', assuranceAvailable: 'REPRODUCIBLE' }, proof: { membershipProofsVerified: true, envelope: { attestation: { status: 'NOT_ATTESTED' }, zkProof: { status: 'NOT_GENERATED' } } } } });
 
     const invalidLevel = await POST(request(process.env.PAYLOAD_CORPUS_QUERY_TOKEN, { ...body, mode: 'agent', evidenceLevel: 'MAXIMUM' }));

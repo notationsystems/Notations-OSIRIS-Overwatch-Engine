@@ -29,7 +29,7 @@ import {
 
 const HASH = /^[a-f0-9]{64}$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9:._/-]{2,255}$/;
-const REQUIRED_MIGRATION = 1;
+const REQUIRED_MIGRATION = 2;
 const GLOBAL_SEQUENCE_LOCK = 1_917_309_337;
 
 type RecordRow = {

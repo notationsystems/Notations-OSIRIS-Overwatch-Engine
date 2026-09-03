@@ -264,9 +264,14 @@ explicit `NO_COMPOSITE_TRUST_SCORE` policy because disagreement is evidence to
 inspect, not a scalar to average away.
 
 The vocabulary is `PROVENANCE`, `REPRODUCIBLE`, `ATTESTED`, and `ZK_VERIFIED`.
-V0 returns `REPRODUCIBLE`, with external attestation and zk proof marked absent.
-A later pinned SP1 program may prove selected deterministic metrics or compiler
-transformations. It will prove computation integrity, never empirical truth.
+A `VERIFIED` context returns `REPRODUCIBLE` until its exact build commitment has
+a valid stored Ed25519 signature. A matching signature raises it to `ATTESTED`
+and names the immutable attestation artifact. The signed time remains explicitly
+`SIGNER_CLOCK`, not an independent timestamp. The production, ceremonially
+pinned SP1 `payload_event_batch_v1` program proves the operational event ledger,
+not corpus compilation, so corpus answers continue to report zk proof absent.
+A future corpus-specific guest must prove its own declared transformation before
+the same answer can become `ZK_VERIFIED`. No proof can establish empirical truth.
 
 ## Data Miner and Pattern Registry
 
@@ -325,7 +330,11 @@ Target versioned API families (the implemented routes remain
 - `/v1/research`: authorization-bounded context compilation for people and agents.
 
 The implemented V0 counterparts are `POST /api/corpus/retrieval` for a
-deterministic plan or complete ContextPackage, and `GET/POST
+deterministic plan, complete ContextPackage, or persistent agent result; `GET
+/api/corpus/retrieval?resultId=...` for exact result recovery; `GET/POST
+/api/corpus/attestations` for build signatures; `GET
+/api/corpus/control-plane` for the Payload physical-economy topology,
+capability state, artifact timeline, Kepler dock, and operator attention; and `GET/POST
 /api/corpus/projectors` for ordered projection events and checkpoints. The
 retrieval boundary caps identities, predicates, hops, evidence results and
 query size; binds every trace to the CorpusBuild and projection digest; refuses
@@ -349,11 +358,26 @@ Evidence disclosure is monotonic:
 | `VERIFIED` | VerificationEnvelope, checked Merkle membership proofs, Warrant Graph |
 
 `VERIFIED` is a request for available proof material, not permission to upgrade
-assurance language. Until an independent build anchor or SP1 proof exists, the
-response remains `REPRODUCIBLE`, `NOT_ATTESTED`, and `NOT_GENERATED` for zk.
+assurance language. An unsigned build remains `REPRODUCIBLE` and
+`NOT_ATTESTED`. A valid stored Ed25519 build signature becomes `ATTESTED`, while
+retaining `independentTimestamp: false`; zk remains `NOT_GENERATED` because the
+existing production SP1 program has a different, operational-event scope.
 Agents receive exact `get_provenance` and `get_evidence` warrant paths so they
 can hand stable identifiers between procurement, risk, research, and validator
 workflows instead of copying prose.
+
+Every agent result is immutable and content-addressed, then assigned one global
+sequence in a per-scope SHA-256 chain shared with build attestations. The
+SQLite/WAL edge implementation verifies the journal on restart. PostgreSQL
+migration 2 creates the equivalent RLS-protected journal: query-role connections
+may append only `agent_result`, compiler-role connections may append only
+`build_attestation`, and neither receives update or delete authority.
+
+Spatial output remains a representation, not an authority. Each saved result
+contains OGC:CRS84 GeoJSON and a kepler.gl `addDataToMap` payload with stable
+dataset IDs and tabular `fields`/`rows`. Missing entity coordinates produce an
+explicit `SPATIAL_LOCATION_UNOBSERVED` state. Relationship lines express graph
+adjacency, never a surveyed route.
 
 This product-neutral wire contract is the first reusable Notation Systems
 corpus-engine surface. Payload remains the only real corpus registered here.

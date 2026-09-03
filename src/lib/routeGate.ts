@@ -59,6 +59,8 @@ export const ROUTE_DISPOSITION: Readonly<Record<string, Disposition>> = {
   'corpus/projections': 'freight',
   'corpus/records': 'freight',
   'corpus/retrieval': 'freight',
+  'corpus/attestations': 'freight',
+  'corpus/control-plane': 'freight',
   'corpus/warrants': 'freight',
   'country-risk': 'general-purpose',
   crypto: 'general-purpose',

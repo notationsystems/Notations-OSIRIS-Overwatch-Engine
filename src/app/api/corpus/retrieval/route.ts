@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { authorizeCorpusQuery } from '@/lib/economy/corpusHttpAuth';
 import { projectionMatchesSource } from '@/lib/economy/corpusProjection';
 import { corpusProjectionStore } from '@/lib/economy/corpusProjectionRuntime';
-import { compileCorpusAgentContext, CorpusAgentContextError, parseCorpusEvidenceLevel } from '@/lib/economy/corpusAgentContext';
+import { attestCorpusAgentContext, compileCorpusAgentContext, CorpusAgentContextError, parseCorpusEvidenceLevel } from '@/lib/economy/corpusAgentContext';
+import { buildCorpusAgentResult } from '@/lib/economy/corpusAgentArtifacts';
+import { corpusAgentArtifactStore } from '@/lib/economy/corpusAgentArtifactRuntime';
+import { buildCorpusSpatialResult } from '@/lib/economy/corpusSpatialResult';
 import { buildCorpusContextPackage, CorpusRetrievalError, planCorpusRetrieval, type CorpusRetrievalRequest } from '@/lib/economy/corpusRetrieval';
 import { physicalEconomyCorpus } from '@/lib/economy/physicalEconomyCorpusRuntime';
 
@@ -11,9 +14,26 @@ export const runtime = 'nodejs';
 const MAX_BODY_BYTES = 128_000;
 
 function owners() {
-  try { return { corpus: physicalEconomyCorpus('query'), projection: corpusProjectionStore(), error: null }; }
-  catch (error) { return { corpus: null, projection: null, error: error instanceof Error ? error.message : 'Corpus integrity could not be established.' }; }
+  try { return { corpus: physicalEconomyCorpus('query'), projection: corpusProjectionStore(), artifacts: corpusAgentArtifactStore('query'), error: null }; }
+  catch (error) { return { corpus: null, projection: null, artifacts: null, error: error instanceof Error ? error.message : 'Corpus integrity could not be established.' }; }
 }
+
+export async function GET(request: Request) {
+  const denied = authorizeCorpusQuery(request);
+  if (denied) return denied;
+  const resultId = new URL(request.url).searchParams.get('resultId')?.trim();
+  if (!resultId) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_AGENT_RESULT_INPUT_INVALID', detail: 'resultId is required.' }, { status: 400 });
+  const owned = owners();
+  if (!owned.artifacts) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_AGENT_ARTIFACT_STORE_NOT_CONFIGURED', detail: owned.error ?? 'Persistent agent-result storage is unavailable.', remedy: 'Configure the corpus database or a dedicated PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH.' }, { status: 503 });
+  try {
+    const stored = await owned.artifacts.get('global', resultId);
+    if (!stored || stored.artifactType !== 'agent_result') return NextResponse.json({ kind: 'refusal', code: 'CORPUS_AGENT_RESULT_NOT_FOUND', detail: `No visible agent result has id ${resultId}.` }, { status: 404 });
+    return NextResponse.json({ ...stored.payload.output, resultId: stored.payload.resultId, persistence: { sequence: stored.sequence, scope: stored.scope, recordedAt: stored.recordedAt, artifactHash: stored.artifactHash } }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error) {
+    return NextResponse.json({ kind: 'refusal', code: 'CORPUS_AGENT_RESULT_READ_FAILED', detail: error instanceof Error ? error.message : 'Persisted agent result could not be read.', remedy: 'Verify the append-only artifact journal before serving this result.' }, { status: 503 });
+  }
+}
+
 export async function POST(request: Request) {
   const denied = authorizeCorpusQuery(request);
   if (denied) return denied;
@@ -40,8 +60,20 @@ export async function POST(request: Request) {
     if (value.mode === 'plan') return NextResponse.json({ kind: 'corpus_retrieval_plan', plan }, { headers: { 'Cache-Control': 'private, no-store' } });
     const context = buildCorpusContextPackage(projection, plan);
     if (value.mode === 'agent') {
-      const agentContext = compileCorpusAgentContext(projection, plan, context, evidenceLevel!);
-      return NextResponse.json({ kind: 'corpus_agent_context', plan, agentContext }, { headers: { 'Cache-Control': 'private, no-store' } });
+      if (!owned.artifacts) return NextResponse.json({ kind: 'refusal', code: 'CORPUS_AGENT_ARTIFACT_STORE_NOT_CONFIGURED', detail: owned.error ?? 'Persistent agent-result storage is unavailable.', remedy: 'Configure the corpus database or a dedicated PAYLOAD_CORPUS_AGENT_ARTIFACT_PATH.' }, { status: 503 });
+      let agentContext = compileCorpusAgentContext(projection, plan, context, evidenceLevel!);
+      if (agentContext.proof) {
+        const storedAttestation = await owned.artifacts.latestBuildAttestation('global', agentContext.corpus.corpusBuildId);
+        if (storedAttestation?.artifactType === 'build_attestation') agentContext = attestCorpusAgentContext(agentContext, storedAttestation.payload);
+      }
+      const spatial = buildCorpusSpatialResult(agentContext);
+      const result = buildCorpusAgentResult({ plan, agentContext, spatial });
+      const persisted = await owned.artifacts.append('global', { artifactType: 'agent_result', artifactId: result.resultId, corpusBuildId: result.corpusBuildId, payload: result });
+      return NextResponse.json({
+        ...result.output,
+        resultId: result.resultId,
+        persistence: { sequence: persisted.artifact.sequence, scope: persisted.artifact.scope, recordedAt: persisted.artifact.recordedAt, artifactHash: persisted.artifact.artifactHash, idempotent: persisted.idempotent },
+      }, { status: persisted.idempotent ? 200 : 201, headers: { 'Cache-Control': 'private, no-store' } });
     }
     return NextResponse.json({ kind: 'corpus_context', plan, context }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {

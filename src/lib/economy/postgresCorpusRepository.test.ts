@@ -8,7 +8,11 @@ describe('PostgreSQL/PostGIS corpus production boundary', () => {
   it('pins a forward migration with PostGIS, service roles, RLS, and immutable application grants', () => {
     const roles = readFileSync(join(process.cwd(), 'migrations', 'postgres', '0000_payload_corpus_roles.sql'), 'utf8');
     const schema = readFileSync(join(process.cwd(), 'migrations', 'postgres', '0001_payload_corpus_v3.sql'), 'utf8');
-    expect(POSTGRES_CORPUS_MIGRATIONS).toEqual([{ version: 1, name: 'payload_corpus_v3', file: '0001_payload_corpus_v3.sql' }]);
+    const artifacts = readFileSync(join(process.cwd(), 'migrations', 'postgres', '0002_agent_artifact_journal.sql'), 'utf8');
+    expect(POSTGRES_CORPUS_MIGRATIONS).toEqual([
+      { version: 1, name: 'payload_corpus_v3', file: '0001_payload_corpus_v3.sql' },
+      { version: 2, name: 'agent_artifact_journal', file: '0002_agent_artifact_journal.sql' },
+    ]);
     for (const role of ['owner', 'ingest', 'query', 'projector', 'compiler']) {
       expect(roles).toContain(`payload_corpus_${role}`);
     }
@@ -31,6 +35,15 @@ describe('PostgreSQL/PostGIS corpus production boundary', () => {
     expect(schema).toContain('FOREIGN KEY(sequence, scope, record_id, record_type, known_at, occurred_at, record_hash)');
     expect(schema).not.toMatch(/GRANT\s+(?:[^;]*,\s*)?(?:UPDATE|DELETE)[^;]*corpus_records/i);
     expect(schema).not.toMatch(/GRANT\s+(?:[^;]*,\s*)?(?:UPDATE|DELETE)[^;]*corpus_outbox_events/i);
+    expect(artifacts).toContain('CREATE TABLE IF NOT EXISTS payload_corpus.agent_artifacts');
+    expect(artifacts).toContain("artifact_type IN ('agent_result', 'build_attestation')");
+    expect(artifacts).toContain('FORCE ROW LEVEL SECURITY');
+    expect(artifacts).toContain("artifact_type = 'agent_result'");
+    expect(artifacts).toContain("artifact_type = 'build_attestation'");
+    expect(artifacts).toContain('CORPUS_AGENT_ARTIFACT_IMMUTABLE');
+    expect(artifacts).toContain('ON SEQUENCE payload_corpus.agent_artifacts_sequence_seq');
+    expect(artifacts).not.toContain('ON ALL SEQUENCES');
+    expect(artifacts).not.toMatch(/GRANT\s+(?:[^;]*,\s*)?(?:UPDATE|DELETE)[^;]*agent_artifacts/i);
   });
 
   it('redacts credentials and denies cross-tenant/global writes before opening a connection', async () => {
